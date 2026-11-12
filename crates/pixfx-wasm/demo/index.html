@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>pixfx-wasm demo</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #14121a; color: #c8c3d6; font: 14px ui-monospace, monospace; }
+    canvas { width: 384px; image-rendering: pixelated; background: #000; }
+    p { margin: 12px 0 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <canvas id="fx"></canvas>
+    <p id="status">loading…</p>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

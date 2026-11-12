@@ -34,16 +34,17 @@ runtimes (pixelfx is JS-only live; beanfx is Python-only offline and needs a sep
    the beanfx layout (Aseprite "array" + `meta.beanfx`, see beanfx `docs/output-json.md`), gif, strip, a
    self-contained HTML preview, and "takes" sheets (variants side by side to pick from).
 5. **Live wasm engine** usable from a gpui-on-wasm game via a `pixfx-gpui` adapter.
-6. **Sound**: beanfx 0.3's synthesis (hit/charge/whoosh/tail cues from the effect's act and states; retro/soft/real
+6. **JS-driven wasm engine** (`pixfx-wasm`): JS lists effects, spawns instances, steps them and reads
+   frames.
+7. **Sound**: beanfx 0.3's synthesis (hit/charge/whoosh/tail cues from the effect's act and states; retro/soft/real
    voices; metal, thunder, fire, ice, wind, arcane), exported as WAV natively and playable live on the web.
-7. **Claude Code skill** `/pixfx <description | image>`: research the subject, ask knob questions with ASCII
+8. **Claude Code skill** `/pixfx <description | image>`: research the subject, ask knob questions with ASCII
    previews, write a Rust effect module, render takes, look, refine, export. Knob set follows beanfx's
    `knobs/` (size, view, loop, timing, role, density, placement, clarity, style, palette, glow, shape, caster,
    combo, aura, states, sound).
 
 ## Non-goals
 
-- A JS/TS API or npm package. The web consumer is a Rust gpui game; no JS boundary is designed for.
 - Adapters for Bevy, macroquad, Phaser, Pixi. The core stays engine-agnostic so they can be added later.
 - Runtime-loaded effects (scripts/data). Effects are compiled Rust; the web plays what was built in.
 - beanfx's WIP `/char` and `/scene` (SDF/Blender) tools.
@@ -107,6 +108,7 @@ pixfx-rs/
     pixfx-export   native only: PNG/gif/strip, sheet packing, beanfx JSON, HTML preview, takes, WAV
     pixfx-cli      `pixfx render|sheet|takes|list|check|parity` over the above
     pixfx-gpui     adapter: a gpui element/entity that ticks an effect and paints its frame
+    pixfx-wasm     wasm-bindgen engine JS drives: list effects, spawn, step, read frames (demo/ page)
   examples/gpui-web  a minimal gpui wasm app playing effects (the integration proof)
   skill/pixfx      the Claude Code skill (SKILL.md, knobs/, research notes)
   casters/         beanfx's four bundled casters

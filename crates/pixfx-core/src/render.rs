@@ -60,8 +60,9 @@ pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -
 }
 
 /// Ease the light out over the last [`EDGE`] pixels of the frame, in place; colour is left alone
-/// (pixelfx `edgeFade`).
-fn edge_fade(f: &mut Frame) {
+/// (pixelfx `edgeFade`). [`render_frames`] applies it to margin-0 renders of effects that are not full-screen;
+/// a live host showing an effect on its own canvas applies it the same way to match them.
+pub fn edge_fade(f: &mut Frame) {
     let (w, h, e_max) = (i64::from(f.w), i64::from(f.h), i64::from(EDGE));
     for y in 0..h {
         let ey = y.min(h - 1 - y);

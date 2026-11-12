@@ -15,4 +15,4 @@ pub use effect::{Effect, EffectState, Instance, Layer, Meta, OptValue, Options, 
 pub use frame::{Frame, composite, frame_hash};
 pub use math::{Rng, rand};
 pub use painter::Painter;
-pub use render::{Rendered, render_frames};
+pub use render::{Rendered, edge_fade, render_frames};

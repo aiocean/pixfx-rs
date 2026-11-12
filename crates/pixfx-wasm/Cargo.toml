@@ -1,0 +1,21 @@
+[package]
+name = "pixfx-wasm"
+description = "pixfx as a wasm engine driven from JavaScript: list effects, spawn instances, step them, read frames"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+js-sys = "=0.3.107"
+pixfx-core = { path = "../pixfx-core" }
+pixfx-effects = { path = "../pixfx-effects" }
+wasm-bindgen = "=0.2.130"
+
+[dev-dependencies]
+wasm-bindgen-test = "=0.3.80"
+
+[lints]
+workspace = true

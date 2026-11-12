@@ -1,2 +1,5 @@
 target/
 .superpowers/
+
+# wasm-pack output for the pixfx-wasm demo
+crates/pixfx-wasm/demo/pkg/
