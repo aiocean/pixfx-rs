@@ -20,6 +20,11 @@ impl Rgba {
     pub const fn unpack(c: u32) -> Rgba {
         Rgba(c as u8, (c >> 8) as u8, (c >> 16) as u8, (c >> 24) as u8)
     }
+
+    /// The opaque colour written `#rrggbb` as the literal `0xrrggbb`: [`hex`] for constants (palette defaults).
+    pub const fn hex24(rgb: u32) -> Rgba {
+        Rgba((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8, 255)
+    }
 }
 
 /// pixelfx `rgb(r, g, b)`: each channel taken as `v & 255` (JS ToInt32, so fractions truncate), alpha 255.
@@ -154,6 +159,13 @@ mod tests {
             0xff60_5953
         );
         assert_eq!(mix(BLACK, WHITE, 0.5).pack(), 0xff7f_7f7f);
+        Ok(())
+    }
+
+    #[test]
+    fn hex24_is_hex() -> Result<(), ColorError> {
+        assert_eq!(Rgba::hex24(0x4a1712), hex("#4a1712")?);
+        assert_eq!(Rgba::hex24(0xffffff), WHITE);
         Ok(())
     }
 
