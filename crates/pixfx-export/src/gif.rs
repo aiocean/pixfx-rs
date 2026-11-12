@@ -14,12 +14,16 @@ const BACKDROP: [u8; 4] = [20, 18, 28, 255];
 /// Write `r` to `path` as a looping gif, each pixel blown up to `scale` x `scale` (at least 1).
 pub fn write_gif(path: &Path, r: &Rendered, scale: u32) -> Result<(), ExportError> {
     let scale = scale.max(1);
-    let (gw, gh) = (r.w * scale, r.h * scale);
-    let too_big = || ExportError::TooBig { w: gw, h: gh };
-    let (gw16, gh16) = (
-        u16::try_from(gw).map_err(|_| too_big())?,
-        u16::try_from(gh).map_err(|_| too_big())?,
-    );
+    let scaled = |n: u32| {
+        n.checked_mul(scale)
+            .and_then(|v| u16::try_from(v).ok())
+            .ok_or(ExportError::TooBig {
+                w: r.w,
+                h: r.h,
+                scale,
+            })
+    };
+    let (gw16, gh16) = (scaled(r.w)?, scaled(r.h)?);
     let mut enc = gif::Encoder::new(BufWriter::new(fs::File::create(path)?), gw16, gh16, &[])?;
     enc.set_repeat(gif::Repeat::Infinite)?;
     let fps = r.fps.max(1);

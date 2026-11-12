@@ -21,10 +21,11 @@ pub enum ExportError {
     Png(png::EncodingError),
     Gif(::gif::EncodingError),
     Json(serde_json::Error),
-    /// The image does not fit the file format's size field.
+    /// A `w` x `h` image blown up by `scale` does not fit the file format's size field.
     TooBig {
         w: u32,
         h: u32,
+        scale: u32,
     },
 }
 
@@ -35,7 +36,9 @@ impl fmt::Display for ExportError {
             Self::Png(e) => write!(f, "png: {e}"),
             Self::Gif(e) => write!(f, "gif: {e}"),
             Self::Json(e) => write!(f, "json: {e}"),
-            Self::TooBig { w, h } => write!(f, "{w}x{h} is too big for the file format"),
+            Self::TooBig { w, h, scale } => {
+                write!(f, "{w}x{h} at scale {scale} is too big for the file format")
+            }
         }
     }
 }
