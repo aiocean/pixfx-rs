@@ -30,11 +30,11 @@ pub fn occupied(words: &[u32], w: u32, mask: u32) -> Option<PixelRect> {
     }
     let (mut x0, mut y0, mut x1, mut y1) = (usize::MAX, usize::MAX, 0, 0);
     for (y, row) in words.chunks(w).enumerate() {
-        let mut lit = row.iter().enumerate().filter(|(_, v)| *v & mask != 0);
-        let Some((first, _)) = lit.next() else {
+        let lit = |v: &u32| v & mask != 0;
+        let Some(first) = row.iter().position(lit) else {
             continue;
         };
-        let last = lit.last().map_or(first, |(x, _)| x);
+        let last = row.iter().rposition(lit).unwrap_or(first);
         x0 = x0.min(first);
         x1 = x1.max(last);
         y0 = y0.min(y);
@@ -63,7 +63,9 @@ pub fn upscale_nearest(
     let mut out = Vec::with_capacity(row_bytes * rect.h as usize * k);
     for y in rect.y as usize..(rect.y + rect.h) as usize {
         let start = out.len();
-        let src = words.get(y * stride + x0..y * stride + x0 + w).unwrap_or(&[]);
+        let src = words
+            .get(y * stride + x0..y * stride + x0 + w)
+            .unwrap_or(&[]);
         for &word in src {
             let px = bgra(word);
             for _ in 0..k {
@@ -178,10 +180,10 @@ fn slot(layer: Layer) -> usize {
 }
 
 /// Paint `layer` of `view` with the effect's origin at `origin`, each effect pixel `scale` x `scale` logical
-/// pixels: colour with [`SpriteBlend::Normal`], then light with [`SpriteBlend::Additive`]. Images are
+/// pixels (a `scale` of 0 paints as 1): colour with [`SpriteBlend::Normal`], then light with [`SpriteBlend::Additive`]. Images are
 /// upscaled on the CPU to whole device pixels and rebuilt only when the view ticked or the window's scale
-/// factor changed; the images they replace are dropped from the atlas after the new ones are painted.
-/// Call during gpui's paint phase.
+/// factor changed; the images they replace are dropped from `window`'s atlas after the new ones are
+/// painted, so paint a view into one window only. Call during gpui's paint phase.
 pub fn paint_fx(
     view: &mut FxView,
     layer: Layer,
@@ -200,6 +202,7 @@ pub fn paint_fx(
         let painted = view.rasterise(layer, k);
         view.painted[slot(layer)].replace(painted)
     };
+    let mut painting = Ok(());
     if let Some(painted) = &view.painted[slot(layer)] {
         let corner = |rect: PixelRect| {
             let s = scale as f32;
@@ -212,13 +215,15 @@ pub fn paint_fx(
             (&painted.color, SpriteBlend::Normal),
             (&painted.light, SpriteBlend::Additive),
         ] {
-            let Some(sprite) = sprite else { continue };
+            let (Some(sprite), Ok(())) = (sprite, &painting) else {
+                continue;
+            };
             let s = scale as f32;
             let bounds = Bounds::new(
                 corner(sprite.rect),
                 size(px(sprite.rect.w as f32 * s), px(sprite.rect.h as f32 * s)),
             );
-            window.paint_image_blended(
+            painting = window.paint_image_blended(
                 bounds,
                 bounds,
                 Corners::default(),
@@ -226,15 +231,16 @@ pub fn paint_fx(
                 0,
                 false,
                 blend,
-            )?;
+            );
         }
     }
+    // dropped whether or not the paint failed, so a failing frame cannot leak atlas space
     if let Some(old) = replaced {
         for sprite in [old.color, old.light].into_iter().flatten() {
             window.drop_image(sprite.image)?;
         }
     }
-    Ok(())
+    painting
 }
 
 /// Device pixels per effect pixel: `scale` logical pixels at the window's scale factor, at least 1.
@@ -250,7 +256,12 @@ mod tests {
     #[test]
     fn upscale_nearest_makes_each_pixel_a_solid_block() {
         let words = [0xff00_00ff_u32, 0x8000_ff00];
-        let rect = PixelRect { x: 0, y: 0, w: 2, h: 1 };
+        let rect = PixelRect {
+            x: 0,
+            y: 0,
+            w: 2,
+            h: 1,
+        };
         let out = upscale_nearest(&words, 2, rect, 3, |w| w.to_le_bytes());
         let (left, right) = (words[0].to_le_bytes(), words[1].to_le_bytes());
         let mut want = Vec::new();
@@ -270,7 +281,12 @@ mod tests {
     fn upscale_nearest_reads_only_the_rect() {
         // 3x2 frame, rect is the middle column
         let words = [1, 2, 3, 4, 5, 6];
-        let rect = PixelRect { x: 1, y: 0, w: 1, h: 2 };
+        let rect = PixelRect {
+            x: 1,
+            y: 0,
+            w: 1,
+            h: 2,
+        };
         let out = upscale_nearest(&words, 3, rect, 2, |w| [w as u8, 0, 0, 0]);
         let firsts: Vec<u8> = out.chunks(4).map(|p| p[0]).collect();
         assert_eq!(firsts, [2, 2, 2, 2, 5, 5, 5, 5]);
@@ -283,7 +299,15 @@ mod tests {
         words[2 * 5 + 3] = 0x0100_0000;
         words[3 * 5 + 4] = 0x00ff_ffff; // light only: outside the colour mask
         let rect = occupied(&words, 5, 0xff00_0000);
-        assert_eq!(rect, Some(PixelRect { x: 1, y: 1, w: 3, h: 2 }));
+        assert_eq!(
+            rect,
+            Some(PixelRect {
+                x: 1,
+                y: 1,
+                w: 3,
+                h: 2
+            })
+        );
         assert_eq!(occupied(&[0; 6], 3, 0xff00_0000), None);
     }
 

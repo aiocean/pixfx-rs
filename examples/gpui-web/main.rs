@@ -71,10 +71,18 @@ impl Campsite {
         let ground_y = (bounds.origin.y + bounds.size.height * 0.72).round();
         let ground = Bounds::new(
             point(bounds.origin.x, ground_y),
-            size(bounds.size.width, bounds.origin.y + bounds.size.height - ground_y),
+            size(
+                bounds.size.width,
+                bounds.origin.y + bounds.size.height - ground_y,
+            ),
         );
         window.paint_quad(fill(ground, rgb(GROUND)));
-        let at = |fraction: f32| point((bounds.origin.x + bounds.size.width * fraction).round(), ground_y);
+        let at = |fraction: f32| {
+            point(
+                (bounds.origin.x + bounds.size.width * fraction).round(),
+                ground_y,
+            )
+        };
         for (view, x) in [(&mut self.candle, 0.3), (&mut self.campfire, 0.62)] {
             if let Err(error) = paint_fx(view, Layer::Both, at(x), SCALE, window) {
                 log::error!("pixfx: failed to paint an effect: {error:#}");
@@ -134,7 +142,12 @@ fn requested_backend() -> gpui_platform::WebBackendPreference {
     let search = web_sys::window()
         .and_then(|window| window.location().search().ok())
         .unwrap_or_default();
-    let requested = |value: &str| search.trim_start_matches('?').split('&').any(|p| p == value);
+    let requested = |value: &str| {
+        search
+            .trim_start_matches('?')
+            .split('&')
+            .any(|p| p == value)
+    };
     if requested("backend=webgpu") {
         gpui_platform::WebBackendPreference::WebGpu
     } else if requested("backend=webgl") {
@@ -148,5 +161,7 @@ fn requested_backend() -> gpui_platform::WebBackendPreference {
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
 pub fn start() {
     gpui_platform::web_init();
-    run(gpui_platform::application_with_web_backend(requested_backend()));
+    run(gpui_platform::application_with_web_backend(
+        requested_backend(),
+    ));
 }
