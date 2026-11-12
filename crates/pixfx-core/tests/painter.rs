@@ -156,3 +156,22 @@ fn scene_matches_pixelfx() -> Result<(), pixfx_core::ColorError> {
     assert_eq!(fnv1a(out.iter().copied()), 0xa6c4_c561_53a9_250c);
     Ok(())
 }
+
+#[test]
+fn reach_is_the_distance_to_the_farthest_frame_corner() {
+    // frame x in [-2, 8], y in [10, 16]; origin at (1, 12): farthest corner (8, 16) is 7 across, 4 down
+    let mut f = Frame::new(10, 6, -2, 10);
+    let mut p = Painter::new(&mut f);
+    p.place(1.0, 12.0, true, 0.9);
+    assert_eq!(
+        p.reach(),
+        libm::hypot(7.0, 4.0),
+        "flip and angle keep distances"
+    );
+    // a local point just past reach, in any direction, lands off the frame
+    let d = p.reach() + 1.0;
+    for a in [0.0, 1.0, 2.5, 4.0, 5.5] {
+        p.px(d * libm::cos(a), d * libm::sin(a), WHITE);
+    }
+    assert!(f.color.iter().all(|&c| c == 0));
+}

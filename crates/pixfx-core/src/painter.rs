@@ -154,6 +154,15 @@ impl<'a> Painter<'a> {
         let (dx, dy) = (sx - self.tx, sy - self.ty);
         -dx * self.sn + dy * self.cs
     }
+    /// The farthest a local point can be from the effect's origin and still land on the frame: the distance
+    /// from the placed origin to the frame's farthest corner. Placement only mirrors and rotates, which keep
+    /// distances, so a shape whose every local point is farther than this draws nothing; an effect may skip
+    /// it (a tall flame's rows past the frame) without changing a pixel. NaN when the placement is NaN.
+    pub fn reach(&self) -> f64 {
+        let far = |lo: f64, size: f64, at: f64| js_max((at - lo).abs(), (lo + size - at).abs());
+        libm::hypot(far(self.ox, self.w, self.tx), far(self.oy, self.h, self.ty))
+    }
+
     /// The screen pixel of the local pixel cell holding (x, y): mirrors and rotations land on whole cells.
     pub fn cell_x(&self, x: f64, y: f64) -> f64 {
         libm::floor(self.to_x(libm::floor(x) + 0.5, libm::floor(y) + 0.5))

@@ -139,11 +139,16 @@ pub fn flame_tongue(
     if h < 1.0 {
         return;
     }
+    // Rows climb away from the origin; once a row's centre line is past the frame's reach, so is every pixel of
+    // it and of every row above (a pixel cell (px, yy) lies at least |floor(yy) + 0.5| from the origin), so the
+    // rest are skipped. Same pixels as drawing them all, but a huge `h` costs only the rows that can show. (A NaN
+    // placement makes `top` NaN and skips every row; it would have drawn nothing anyway.)
+    let top = -(p.reach() + 2.0);
     for &(lw, lh, ri) in layers {
         let l = h * lh;
         let c = hh.get(ri).copied().unwrap_or(Rgba::NONE);
         let mut r = 0.0;
-        while r <= l {
+        while r <= l && y - r >= top {
             let u = r / js_max(1.0, l);
             let half = w * lw * libm::pow(1.0 - u, 0.85) * js_min(1.0, (r + 1.5) / 3.5)
                 + nf(9.0, n, r * 0.45) * jit;
