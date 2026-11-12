@@ -188,20 +188,29 @@ impl<T> Scene<T> {
         &mut self,
         mut blit: impl FnMut(Pass, &Frame, &mut T) -> Result<(), E>,
     ) -> Result<(), E> {
-        for layer in [Layer::Back, Layer::Front] {
-            for i in 0..self.entries.len() {
-                let Some(e) = self.entries.get(i) else { break };
-                let pass = Pass {
-                    handle: e.handle,
-                    layer,
-                    rect: self.rect_of(e),
-                };
-                let Some(e) = self.entries.get_mut(i) else {
-                    break;
-                };
-                e.player.draw(layer);
-                blit(pass, e.player.frame(), &mut e.surface)?;
-            }
+        self.draw_layer(Layer::Back, &mut blit)?;
+        self.draw_layer(Layer::Front, &mut blit)
+    }
+
+    /// Draw only `layer` of every instance, oldest first, handing each drawn frame to `blit`. Stops at the
+    /// first error `blit` returns.
+    pub fn draw_layer<E>(
+        &mut self,
+        layer: Layer,
+        mut blit: impl FnMut(Pass, &Frame, &mut T) -> Result<(), E>,
+    ) -> Result<(), E> {
+        for i in 0..self.entries.len() {
+            let Some(e) = self.entries.get(i) else { break };
+            let pass = Pass {
+                handle: e.handle,
+                layer,
+                rect: self.rect_of(e),
+            };
+            let Some(e) = self.entries.get_mut(i) else {
+                break;
+            };
+            e.player.draw(layer);
+            blit(pass, e.player.frame(), &mut e.surface)?;
         }
         Ok(())
     }

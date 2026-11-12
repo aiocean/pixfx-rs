@@ -1,6 +1,9 @@
 //! pixfx as a wasm renderer: mount a [`Stage`] on a canvas, say which effects play where, and it runs its own
 //! `requestAnimationFrame` loop and draws them (or a host that owns the loop calls [`Stage::tick`]).
 //!
+//! A host that draws its own sprites between an effect's layers owns the loop: `update(dt)`, draw its ground,
+//! `drawLayer("back")`, draw its sprites, `drawLayer("front")`. `drawLayer` never clears.
+//!
 //! Canvas 2D: each frame clears the canvas (or fills the background), then draws the back layer of every
 //! effect, then the front layer of every effect. Each layer is its colour drawn normally and its light drawn
 //! with `globalCompositeOperation = "lighter"` (additive, saturating), upscaled by an integer scale with
@@ -16,7 +19,7 @@ use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
 use js_sys::Uint8ClampedArray;
-use pixfx_core::Frame;
+use pixfx_core::{Frame, Layer};
 use pixfx_effects::effect;
 use pixfx_wasm::parse_options;
 use stage::{Pass, Scene, color_rgba, light_rgba, live_player};
@@ -119,6 +122,36 @@ impl Stage {
             .map_err(|e| JsError::new(&e))
     }
 
+    /// Advance by `dt` seconds (finite, 0 or more) without drawing, for a host that draws its own sprites
+    /// between the layers: `update(dt)`, draw the ground, `drawLayer("back")`, draw sprites,
+    /// `drawLayer("front")`.
+    pub fn update(&mut self, dt: f64) -> Result<(), JsError> {
+        self.renderer
+            .borrow_mut()
+            .scene
+            .update(dt)
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Draw `"back"` or `"front"` of every effect onto the canvas as it is: nothing is cleared (the host owns
+    /// clearing), and the context's compositing and smoothing are left as the host had them.
+    #[wasm_bindgen(js_name = drawLayer)]
+    pub fn draw_layer(&mut self, layer: &str) -> Result<(), JsError> {
+        let layer = match layer {
+            "back" => Layer::Back,
+            "front" => Layer::Front,
+            other => {
+                return Err(JsError::new(&format!(
+                    "unknown layer {other:?}: expected \"back\" or \"front\""
+                )));
+            }
+        };
+        self.renderer
+            .borrow_mut()
+            .draw_layer(layer)
+            .map_err(|e| JsError::new(&e))
+    }
+
     /// The playing handles, oldest first (finished effects are gone).
     pub fn handles(&self) -> Vec<u32> {
         self.renderer.borrow().scene.handles().collect()
@@ -150,10 +183,22 @@ impl Renderer {
             }
             None => ctx.clear_rect(0.0, 0.0, w, h),
         }
-        // resizing the canvas resets this, so set it every frame
+        self.draw_layer(Layer::Back)?;
+        self.draw_layer(Layer::Front)
+    }
+
+    /// One layer of every effect onto the canvas as it stands. Runs inside save/restore so the host's
+    /// compositing and smoothing survive, whatever the blits set.
+    fn draw_layer(&mut self, layer: Layer) -> Result<(), String> {
+        let ctx = &self.ctx;
+        ctx.save();
+        // resizing the canvas resets smoothing, so set it every draw
         ctx.set_image_smoothing_enabled(false);
-        self.scene
-            .draw(|pass, frame, surface| surface.blit(ctx, pass, frame))
+        let drawn = self
+            .scene
+            .draw_layer(layer, |pass, frame, surface| surface.blit(ctx, pass, frame));
+        ctx.restore();
+        drawn
     }
 }
 

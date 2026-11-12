@@ -8,7 +8,7 @@ use pixfx_canvas::stage::{
     Pass, Rect, Scene, StageError, color_rgba, light_rgba, live_player, margin,
 };
 use pixfx_core::{
-    Effect, EffectState, Frame, Layer, Meta, Options, Painter, composite_px, render_frames,
+    Effect, EffectState, Frame, Layer, Meta, Options, Painter, Rgba, composite_px, render_frames,
 };
 use pixfx_effects::effect;
 use pixfx_wasm::Player;
@@ -45,6 +45,44 @@ impl Effect for Blip {
     }
     fn spawn(&self, _opts: &Options, _seed: u64) -> Box<dyn EffectState> {
         Box::new(BlipState)
+    }
+}
+
+/// A loop that paints one red pixel on its back layer and one blue pixel on its front layer.
+struct Layered;
+
+static LAYERED: Layered = Layered;
+
+const LAYERED_META: Meta = Meta {
+    id: "test/layered",
+    name: "Layered",
+    desc: "Red behind, blue in front.",
+    tags: &[],
+    size: (8, 6),
+    origin: (4, 5),
+    duration: 1.0,
+    looping: true,
+    fps: 30,
+    seed: 1,
+};
+
+struct LayeredState;
+
+impl EffectState for LayeredState {
+    fn draw(&self, p: &mut Painter, _t: f64, layer: Layer) {
+        match layer {
+            Layer::Back => p.px(1.0, 1.0, Rgba(255, 0, 0, 255)),
+            _ => p.px(2.0, 2.0, Rgba(0, 0, 255, 255)),
+        }
+    }
+}
+
+impl Effect for Layered {
+    fn meta(&self) -> &Meta {
+        &LAYERED_META
+    }
+    fn spawn(&self, _opts: &Options, _seed: u64) -> Box<dyn EffectState> {
+        Box::new(LayeredState)
     }
 }
 
@@ -145,6 +183,83 @@ fn draws_every_back_layer_before_any_front_layer() -> Res {
             (Layer::Front, a),
             (Layer::Front, b),
             (Layer::Front, c),
+        ]
+    );
+    Ok(())
+}
+
+fn layer_passes(scene: &mut Scene<()>, layer: Layer) -> Vec<Pass> {
+    let mut seen = Vec::new();
+    let ok: Result<(), ()> = scene.draw_layer(layer, |pass, _frame, _surface| {
+        seen.push(pass);
+        Ok(())
+    });
+    assert_eq!(ok, Ok(()));
+    seen
+}
+
+#[test]
+fn drawing_one_layer_hands_only_that_layer_in_instance_order() -> Res {
+    let mut scene = Scene::new(scale(2)?);
+    let a = scene.play(player("fire/candle")?, 30.0, 70.0, ())?;
+    let b = scene.play(player("fire/campfire")?, 100.0, 120.0, ())?;
+    let c = scene.play(player("fire/brazier")?, 200.0, 140.0, ())?;
+    for layer in [Layer::Back, Layer::Front] {
+        let got: Vec<(Layer, u32)> = layer_passes(&mut scene, layer)
+            .iter()
+            .map(|p| (p.layer, p.handle))
+            .collect();
+        assert_eq!(got, vec![(layer, a), (layer, b), (layer, c)]);
+    }
+    Ok(())
+}
+
+#[test]
+fn drawing_both_is_back_then_front() -> Res {
+    let mut scene = Scene::new(scale(2)?);
+    scene.play(player("fire/candle")?, 30.0, 70.0, ())?;
+    scene.play(player("fire/campfire")?, 100.0, 120.0, ())?;
+    let mut split = layer_passes(&mut scene, Layer::Back);
+    split.extend(layer_passes(&mut scene, Layer::Front));
+    assert_eq!(passes(&mut scene), split);
+    Ok(())
+}
+
+#[test]
+fn a_host_draw_between_the_layers_lands_over_back_and_under_front() -> Res {
+    let mut scene = Scene::new(scale(1)?);
+    scene.play(live_player(&LAYERED, Options::default()), 20.0, 20.0, ())?;
+    scene.update(0.1)?;
+    let (red, blue) = (0xff00_00ff_u32, 0xffff_0000_u32);
+    // (what happened, red shown, blue shown): the host's draw is the middle event
+    let mut events: Vec<(&str, bool, bool)> = Vec::new();
+    let seen = |layer: &'static str, frame: &Frame| {
+        (
+            layer,
+            frame.color.contains(&red),
+            frame.color.contains(&blue),
+        )
+    };
+    let mut got = Vec::new();
+    let ok: Result<(), ()> = scene.draw_layer(Layer::Back, |_, frame, _| {
+        got.push(seen("back", frame));
+        Ok(())
+    });
+    assert_eq!(ok, Ok(()));
+    events.append(&mut got);
+    events.push(("host", false, false));
+    let ok: Result<(), ()> = scene.draw_layer(Layer::Front, |_, frame, _| {
+        got.push(seen("front", frame));
+        Ok(())
+    });
+    assert_eq!(ok, Ok(()));
+    events.append(&mut got);
+    assert_eq!(
+        events,
+        vec![
+            ("back", true, false),
+            ("host", false, false),
+            ("front", false, true)
         ]
     );
     Ok(())

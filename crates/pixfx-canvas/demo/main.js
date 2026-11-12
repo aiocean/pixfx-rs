@@ -1,5 +1,5 @@
-// Candle, campfire and brazier side by side on a dark ground, drawn by the pixfx-canvas Stage, which runs its
-// own animation loop. Click: play a one-shot effect there if the registry has one, else restart the nearest effect.
+// Candle, campfire and brazier side by side on a dark ground, drawn by the pixfx-canvas Stage. The page owns the
+// loop: ground, the effects' back layers, a pixel figure standing in the campfire, then the front layers. Click: play a one-shot effect there if the registry has one, else restart the nearest effect.
 // Build first: wasm-pack build crates/pixfx-canvas --target web --out-dir demo/pkg
 import init, { Stage, effects, meta } from "./pkg/pixfx_canvas.js";
 
@@ -14,18 +14,38 @@ canvas.width = GAME.w * SCALE;
 canvas.height = GAME.h * SCALE;
 
 const stage = new Stage(canvas, SCALE);
-stage.background("#17131c");
+const ctx = canvas.getContext("2d");
 const placed = [
   { id: "fire/candle", x: 60, y: GROUND },
   { id: "fire/campfire", x: 168, y: GROUND },
   { id: "fire/brazier", x: 280, y: GROUND },
 ].map((p) => ({ ...p, handle: stage.play(p.id, p.x, p.y, { seed: 1 }) }));
-stage.start();
+
+// A pixel figure (game pixels, feet at its x, y), drawn by the page between the layers.
+const FIGURE = { x: 150, y: GROUND, color: "#4fd1c5", w: 8, h: 18 };
+function drawFigure() {
+  ctx.fillStyle = FIGURE.color;
+  ctx.fillRect((FIGURE.x - FIGURE.w / 2) * SCALE, (FIGURE.y - FIGURE.h) * SCALE, FIGURE.w * SCALE, FIGURE.h * SCALE);
+}
+
+let last = null;
+function frame(now) {
+  const dt = last === null ? 0 : Math.max(0, now - last) / 1000;
+  last = now;
+  stage.update(dt);
+  ctx.fillStyle = "#17131c";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  stage.drawLayer("back");
+  drawFigure();
+  stage.drawLayer("front");
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
 
 const oneShot = effects().find((id) => !meta(id).loop);
 
 // window.pixfxDemo lets a test harness read what the page is doing.
-const stats = { stage, placed, oneShot: oneShot ?? null, clicks: [], fps: 0 };
+const stats = { stage, figure: FIGURE, placed, oneShot: oneShot ?? null, clicks: [], fps: 0 };
 window.pixfxDemo = stats;
 
 canvas.addEventListener("click", (e) => {
@@ -42,7 +62,7 @@ canvas.addEventListener("click", (e) => {
   stats.clicks.push({ x, y, restarted: near.id, was, handle: near.handle });
 });
 
-// Display rate, measured in the page; the stage draws once per animation frame.
+// Display rate, measured in the page; the page draws once per animation frame.
 let windowStart = performance.now();
 let frames = 0;
 function count(now) {

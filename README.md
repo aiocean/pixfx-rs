@@ -22,7 +22,7 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 | `crates/pixfx-cli` | The `pixfx` binary: `parity`, `sheet`, `render`. |
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`. Demo in `crates/pixfx-wasm/demo/`. |
-| `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick`. Demo in `crates/pixfx-canvas/demo/`. |
+| `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick`; for a host-owned loop `update(dt)` then `drawLayer("back")` / `drawLayer("front")` around its own sprites. Demo in `crates/pixfx-canvas/demo/`. |
 | `crates/pixfx-gpui` | Live playback inside gpui. Needs the gpui fork (see [gpui](#gpui)). |
 | `examples/gpui-web` | A gpui web app that plays the candle and campfire. Needs the gpui fork. |
 
