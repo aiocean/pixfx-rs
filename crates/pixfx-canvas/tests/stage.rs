@@ -4,8 +4,12 @@
 use std::error::Error;
 use std::num::NonZeroU32;
 
-use pixfx_canvas::stage::{Pass, Rect, Scene, StageError, color_rgba, light_rgba};
-use pixfx_core::{Effect, EffectState, Frame, Layer, Meta, Options, Painter};
+use pixfx_canvas::stage::{
+    Pass, Rect, Scene, StageError, color_rgba, light_rgba, live_player, margin,
+};
+use pixfx_core::{
+    Effect, EffectState, Frame, Layer, Meta, Options, Painter, composite_px, render_frames,
+};
 use pixfx_effects::effect;
 use pixfx_wasm::Player;
 
@@ -46,7 +50,7 @@ impl Effect for Blip {
 
 fn player(id: &str) -> Result<Player, Box<dyn Error>> {
     let fx = effect(id).ok_or_else(|| format!("{id} not registered"))?;
-    Ok(Player::new(fx, Options::default()))
+    Ok(live_player(fx, Options::default()))
 }
 
 fn scale(n: u32) -> Result<NonZeroU32, Box<dyn Error>> {
@@ -83,7 +87,7 @@ fn handles_are_unique_and_never_reused() -> Res {
 #[test]
 fn finished_one_shot_is_removed() -> Res {
     let mut scene = Scene::new(scale(1)?);
-    let shot = scene.play(Player::new(&BLIP, Options::default()), 0.0, 0.0, ())?;
+    let shot = scene.play(live_player(&BLIP, Options::default()), 0.0, 0.0, ())?;
     let fire = scene.play(player("fire/candle")?, 0.0, 0.0, ())?;
     scene.update(0.05)?;
     assert_eq!(scene.handles().collect::<Vec<_>>(), vec![shot, fire]);
@@ -177,27 +181,99 @@ fn passes_carry_the_drawn_layer() -> Res {
 #[test]
 fn rects_place_the_origin_and_follow_the_scale() -> Res {
     let mut scene = Scene::new(scale(4)?);
-    // candle: 56x76, origin (28, 64)
+    // candle: 56x76, origin (28, 64); margin half its longer side, 38, on every side
     let h = scene.play(player("fire/candle")?, 100.0, 150.0, ())?;
     let at4 = Rect {
-        x: (100 - 28) * 4,
-        y: (150 - 64) * 4,
-        w: 56 * 4,
-        h: 76 * 4,
+        x: (100 - 28 - 38) * 4,
+        y: (150 - 64 - 38) * 4,
+        w: (56 + 2 * 38) * 4,
+        h: (76 + 2 * 38) * 4,
     };
     assert_eq!(scene.rect(h), Some(at4));
     assert_eq!(passes(&mut scene).first().map(|p| p.rect), Some(at4));
 
     scene.set_scale(scale(2)?);
     let at2 = Rect {
-        x: (100 - 28) * 2,
-        y: (150 - 64) * 2,
-        w: 56 * 2,
-        h: 76 * 2,
+        x: (100 - 28 - 38) * 2,
+        y: (150 - 64 - 38) * 2,
+        w: (56 + 2 * 38) * 2,
+        h: (76 + 2 * 38) * 2,
     };
     assert_eq!(scene.scale(), scale(2)?);
     assert_eq!(scene.rect(h), Some(at2));
     assert_eq!(passes(&mut scene).first().map(|p| p.rect), Some(at2));
+    Ok(())
+}
+
+#[test]
+fn the_origin_lands_where_the_caller_put_it() -> Res {
+    // the effect's origin is pixel (origin + margin) of its frame; the rect puts that pixel on (x, y)
+    let mut scene = Scene::new(scale(3)?);
+    for id in ["fire/candle", "fire/campfire", "fire/brazier"] {
+        let p = player(id)?;
+        let (o, m) = (p.meta().origin, i64::from(p.margin()));
+        assert_eq!(p.margin(), margin(p.meta()));
+        let h = scene.play(p, 40.0, 90.0, ())?;
+        let r = scene.rect(h).ok_or("no rect")?;
+        assert_eq!(
+            (
+                r.x + (i64::from(o.0) + m) * 3,
+                r.y + (i64::from(o.1) + m) * 3
+            ),
+            (40 * 3, 90 * 3),
+            "{id}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn stage_shows_glow_that_spills_past_the_canvas() -> Res {
+    // the candle's halo (radius up to 38 * flicker) reaches past its 56x76 canvas when it flares: the stage
+    // shows those pixels instead of cutting them at the canvas edge
+    for id in ["fire/candle", "fire/campfire", "fire/brazier"] {
+        let fx = effect(id).ok_or("not registered")?;
+        let (w, h) = fx.meta().size;
+        let mut live = live_player(fx, Options::default());
+        let m = live.margin();
+        let mut spilled = 0;
+        for _ in 0..60 {
+            live.update(1.0 / 30.0);
+            live.draw(Layer::Both);
+            let f = live.frame();
+            spilled += (0..f.h)
+                .flat_map(|y| (0..f.w).map(move |x| (x, y)))
+                .filter(|&(x, y)| x < m || y < m || x >= m + w || y >= m + h)
+                .filter(|&(x, y)| f.light[(y * f.w + x) as usize] & 0x00ff_ffff != 0)
+                .count();
+        }
+        assert!(spilled > 0, "{id}: no glow past its canvas in 2 s");
+    }
+    Ok(())
+}
+
+#[test]
+fn player_frames_equal_render_frames_at_its_margin() -> Res {
+    // margin 0 (Fx: edge fade, sprite-sheet frames) and the stage's margin (no fade) both match the render
+    let fx = effect("fire/candle").ok_or("candle not registered")?;
+    let opts = Options {
+        seed: Some(4),
+        ..Options::default()
+    };
+    let fps = f64::from(fx.meta().fps);
+    for m in [0, margin(fx.meta())] {
+        let want = render_frames(fx, &opts, m).frames;
+        let mut live = Player::new(fx, opts.clone(), m);
+        let mut stepped = 0;
+        for n in [0usize, 1, 45] {
+            while stepped < n {
+                live.update(1.0 / fps);
+                stepped += 1;
+            }
+            live.draw(Layer::Both);
+            assert_eq!(Some(live.frame()), want.get(n), "margin {m}, frame {n}");
+        }
+    }
     Ok(())
 }
 
@@ -207,12 +283,12 @@ fn positions_snap_to_whole_game_pixels() -> Res {
     let h = scene.play(player("fire/candle")?, 99.5, 149.4, ())?;
     assert_eq!(
         scene.rect(h).map(|r| (r.x, r.y)),
-        Some(((100 - 28) * 3, (149 - 64) * 3))
+        Some(((100 - 28 - 38) * 3, (149 - 64 - 38) * 3))
     );
     let left = scene.play(player("fire/candle")?, -0.5, -10.6, ())?;
     assert_eq!(
         scene.rect(left).map(|r| (r.x, r.y)),
-        Some(((0 - 28) * 3, (-11 - 64) * 3))
+        Some(((0 - 28 - 38) * 3, (-11 - 64 - 38) * 3))
     );
     Ok(())
 }
@@ -272,13 +348,24 @@ fn colour_words_become_straight_rgba_bytes() {
 }
 
 #[test]
-fn light_words_become_opaque_rgb_where_lit() {
-    // xBGR words; the top byte is ignored. Lit pixels get alpha 255 (dst += src under "lighter"), dark ones
-    // alpha 0 so a transparent canvas stays transparent there.
-    let f = tiny([0; 3], [0x7700_0000, 0xab03_0201, 0x00ff_8040]);
+fn light_words_become_light_over_transparency() {
+    // xBGR words; the top byte is ignored. A lit pixel is light over nothing (alpha its brightest channel, rgb
+    // scaled up to it) so faint glow stays faint on a transparent canvas; dark pixels are alpha 0.
+    let f = tiny([0; 3], [0x7700_0000, 0xab00_050a, 0x00ff_8040]);
     let mut out = [9u8; 12];
     assert!(light_rgba(&f, &mut out));
-    assert_eq!(out, [0, 0, 0, 0, 1, 2, 3, 255, 0x40, 0x80, 0xff, 255]);
+    assert_eq!(
+        out,
+        [0, 0, 0, 0, 255, 128, 0, 10, 0x40, 0x80, 0xff, 255],
+        "(10, 5, 0) is (255, 128, 0) at alpha 10; a full channel keeps the light as it is"
+    );
+    for (i, px) in out.chunks(4).enumerate() {
+        assert_eq!(
+            px,
+            composite_px(0, f.light[i], None),
+            "the same pixel core's composite makes"
+        );
+    }
     let mut empty = [9u8; 12];
     assert!(
         !light_rgba(&tiny([0xffff_ffff; 3], [0xff00_0000; 3]), &mut empty),

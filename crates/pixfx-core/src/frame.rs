@@ -66,8 +66,7 @@ fn clamp_u8(x: f64) -> u8 {
 
 /// Colour over a background, plus light, into RGBA8 bytes (`out`: w * h * 4; extra pixels are left alone).
 /// `bg`: `None` for transparent, or RGBA8 bytes of the frame's size (its alpha is ignored; pixels past its
-/// end composite as transparent). Over transparency, light becomes colour with alpha its brightest channel,
-/// which reads as additive over dark backgrounds (pixelfx `composite` with lightK 1; beanfx `pfx.composite`).
+/// end composite as transparent). Each pixel is [`composite_px`].
 pub fn composite(frame: &Frame, out: &mut [u8], bg: Option<&[u8]>) {
     let n = frame.w as usize * frame.h as usize;
     let pixels = frame
@@ -77,42 +76,53 @@ pub fn composite(frame: &Frame, out: &mut [u8], bg: Option<&[u8]>) {
         .zip(out.as_chunks_mut::<4>().0)
         .take(n);
     for (i, ((&c, &l), o)) in pixels.enumerate() {
-        let l = l & 0x00ff_ffff;
-        let ch = |v: u32, s: u32| f64::from((v >> s) & 255);
-        let ca = c >> 24;
-        let ground = bg.and_then(|b| b.get(i * 4..i * 4 + 3));
-        let (mut r, mut g, mut b, mut a);
-        if ca == 255 {
-            (r, g, b, a) = (ch(c, 0), ch(c, 8), ch(c, 16), 255.0);
-        } else if let Some(k) = ground {
-            let f = f64::from(ca) / 255.0;
-            let mixk = |s: u32, kb: u8| ch(c, s) * f + f64::from(kb) * (1.0 - f);
-            (r, g, b, a) = (mixk(0, k[0]), mixk(8, k[1]), mixk(16, k[2]), 255.0);
-        } else {
-            // translucent colour over nothing keeps its alpha
-            (r, g, b, a) = (ch(c, 0), ch(c, 8), ch(c, 16), f64::from(ca));
-        }
-        if l != 0 {
-            let (lr, lg, lb) = (ch(l, 0), ch(l, 8), ch(l, 16));
-            if a < 255.0 {
-                // over transparency: premultiply what's there, add the light, divide by the new alpha
-                let pa = a / 255.0;
-                let (pr, pg, pb) = (r * pa + lr, g * pa + lg, b * pa + lb);
-                let na = js_min(1.0, js_max(pa, js_max(lr, js_max(lg, lb)) / 255.0));
-                if na > 0.0 {
-                    r = js_min(255.0, pr / na);
-                    g = js_min(255.0, pg / na);
-                    b = js_min(255.0, pb / na);
-                    a = na * 255.0;
-                }
-            } else {
-                r = js_min(255.0, r + lr);
-                g = js_min(255.0, g + lg);
-                b = js_min(255.0, b + lb);
-            }
-        }
-        *o = [clamp_u8(r), clamp_u8(g), clamp_u8(b), clamp_u8(a)];
+        let ground = bg
+            .and_then(|b| b.get(i * 4..i * 4 + 3))
+            .and_then(|k| <[u8; 3]>::try_from(k).ok());
+        *o = composite_px(c, l, ground);
     }
+}
+
+/// One pixel of [`composite`]: colour word `c` (ABGR) over `ground` (RGB, `None` for transparent),
+/// plus light word `l` (xBGR, top byte ignored), as RGBA8. Over transparency, light becomes colour with alpha
+/// its brightest channel and rgb `light * 255 / alpha`, which reads as additive over dark backgrounds
+/// (pixelfx `composite` with lightK 1; beanfx `pfx.composite`). So light alone over nothing,
+/// `composite_px(0, l, None)`, is the straight-alpha pixel that adds `l` when drawn additively.
+pub fn composite_px(c: u32, l: u32, ground: Option<[u8; 3]>) -> [u8; 4] {
+    let l = l & 0x00ff_ffff;
+    let ch = |v: u32, s: u32| f64::from((v >> s) & 255);
+    let ca = c >> 24;
+    let (mut r, mut g, mut b, mut a);
+    if ca == 255 {
+        (r, g, b, a) = (ch(c, 0), ch(c, 8), ch(c, 16), 255.0);
+    } else if let Some([kr, kg, kb]) = ground {
+        let f = f64::from(ca) / 255.0;
+        let mixk = |s: u32, k: u8| ch(c, s) * f + f64::from(k) * (1.0 - f);
+        (r, g, b, a) = (mixk(0, kr), mixk(8, kg), mixk(16, kb), 255.0);
+    } else {
+        // translucent colour over nothing keeps its alpha
+        (r, g, b, a) = (ch(c, 0), ch(c, 8), ch(c, 16), f64::from(ca));
+    }
+    if l != 0 {
+        let (lr, lg, lb) = (ch(l, 0), ch(l, 8), ch(l, 16));
+        if a < 255.0 {
+            // over transparency: premultiply what's there, add the light, divide by the new alpha
+            let pa = a / 255.0;
+            let (pr, pg, pb) = (r * pa + lr, g * pa + lg, b * pa + lb);
+            let na = js_min(1.0, js_max(pa, js_max(lr, js_max(lg, lb)) / 255.0));
+            if na > 0.0 {
+                r = js_min(255.0, pr / na);
+                g = js_min(255.0, pg / na);
+                b = js_min(255.0, pb / na);
+                a = na * 255.0;
+            }
+        } else {
+            r = js_min(255.0, r + lr);
+            g = js_min(255.0, g + lg);
+            b = js_min(255.0, b + lb);
+        }
+    }
+    [clamp_u8(r), clamp_u8(g), clamp_u8(b), clamp_u8(a)]
 }
 
 #[cfg(test)]

@@ -4,7 +4,9 @@
 //! Canvas 2D: each frame clears the canvas (or fills the background), then draws the back layer of every
 //! effect, then the front layer of every effect. Each layer is its colour drawn normally and its light drawn
 //! with `globalCompositeOperation = "lighter"` (additive, saturating), upscaled by an integer scale with
-//! image smoothing off. The decisions live in [`stage`] (plain Rust, tested natively); this file only blits.
+//! image smoothing off. Each effect gets room round its canvas (half its longer side) and no edge fade, so glow
+//! that spills past its canvas shows in full. The decisions live in [`stage`] (plain Rust, tested natively);
+//! this file only blits.
 #![forbid(unsafe_code)]
 
 pub mod stage;
@@ -16,8 +18,8 @@ use std::rc::{Rc, Weak};
 use js_sys::Uint8ClampedArray;
 use pixfx_core::Frame;
 use pixfx_effects::effect;
-use pixfx_wasm::{Player, parse_options};
-use stage::{Pass, Scene, color_rgba, light_rgba};
+use pixfx_wasm::parse_options;
+use stage::{Pass, Scene, color_rgba, light_rgba, live_player};
 use wasm_bindgen::prelude::*;
 use web_sys::{
     CanvasRenderingContext2d, HtmlCanvasElement, ImageData, OffscreenCanvas,
@@ -61,7 +63,7 @@ impl Stage {
     /// handle. `opts`: `undefined` or `{seed?, flip?, angle?, light?, palette?: string[], ...extra}`.
     pub fn play(&mut self, id: &str, x: f64, y: f64, opts: JsValue) -> Result<u32, JsError> {
         let fx = effect(id).ok_or_else(|| JsError::new(&format!("unknown effect {id:?}")))?;
-        let player = Player::new(fx, parse_options(&opts)?);
+        let player = live_player(fx, parse_options(&opts)?);
         let surface = Surface::new(player.frame())?;
         let mut r = self.renderer.borrow_mut();
         Ok(r.scene.play(player, x, y, surface)?)

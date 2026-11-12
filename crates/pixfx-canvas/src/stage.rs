@@ -1,13 +1,25 @@
-//! What the canvas renderer decides, in plain Rust: which effects play, where, at what scale, in which order
-//! their layers are drawn, when finished ones go, and the pixels each layer becomes. No browser types, so it
-//! is tested natively; [`crate::Stage`] blits what this produces.
+//! What the canvas renderer decides, in plain Rust: which effects play, where, how much room round them, at
+//! what scale, in which order their layers are drawn, when finished ones go, and the pixels each layer
+//! becomes. No browser types, so it is tested natively; [`crate::Stage`] blits what this produces.
 
 use std::fmt;
 use std::num::NonZeroU32;
 
 use pixfx_core::math::js_round;
-use pixfx_core::{Frame, Layer, valid_dt};
+use pixfx_core::{Effect, Frame, Layer, Meta, Options, composite_px, valid_dt};
 use pixfx_wasm::Player;
+
+/// Empty pixels the stage gives an effect on every side of its canvas, so glow that spills past the canvas
+/// shows instead of being cut: half the canvas's longer side, as pixfx-gpui does.
+pub fn margin(meta: &Meta) -> u32 {
+    meta.size.0.max(meta.size.1) / 2
+}
+
+/// `effect` with `opts` as the stage plays it: on its canvas plus [`margin`], so nothing at the canvas edge is
+/// faded or cut.
+pub fn live_player(effect: &'static dyn Effect, opts: Options) -> Player {
+    Player::new(effect, opts, margin(effect.meta()))
+}
 
 /// A target rectangle in canvas pixels (game pixels times the scale).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -130,20 +142,22 @@ impl<T> Scene<T> {
             .map(|e| self.rect_of(e))
     }
 
+    /// The instance's frame (its canvas plus margin) placed so the effect's origin lands on `e.at`.
     fn rect_of(&self, e: &Entry<T>) -> Rect {
         let s = u64::from(self.scale.get());
         let m = e.player.meta();
+        let pad = i64::from(e.player.margin());
+        let frame = e.player.frame();
+        let corner = |at: i64, origin: i32| {
+            at.saturating_sub(i64::from(origin))
+                .saturating_sub(pad)
+                .saturating_mul(s as i64)
+        };
         Rect {
-            x: e.at
-                .0
-                .saturating_sub(i64::from(m.origin.0))
-                .saturating_mul(s as i64),
-            y: e.at
-                .1
-                .saturating_sub(i64::from(m.origin.1))
-                .saturating_mul(s as i64),
-            w: u64::from(m.size.0) * s,
-            h: u64::from(m.size.1) * s,
+            x: corner(e.at.0, m.origin.0),
+            y: corner(e.at.1, m.origin.1),
+            w: u64::from(frame.w) * s,
+            h: u64::from(frame.h) * s,
         }
     }
 
@@ -203,16 +217,15 @@ pub fn color_rgba(frame: &Frame, out: &mut [u8]) -> bool {
     any
 }
 
-/// Light words (xBGR) as RGBA bytes into `out` (`w * h * 4`) for drawing with `"lighter"` (dst += src): lit
-/// pixels are their RGB at alpha 255, unlit ones are fully transparent so a transparent canvas stays clear
-/// there. True if any pixel is lit.
+/// Light words (xBGR) as RGBA bytes into `out` (`w * h * 4`) for drawing with `"lighter"` (dst += src): each
+/// lit pixel is light over transparency as [`composite_px`] makes it (alpha its brightest channel, rgb
+/// `light * 255 / alpha`), so it adds its light to an opaque canvas and shows as that light's colour on a
+/// transparent one; unlit pixels are fully transparent. True if any pixel is lit.
 pub fn light_rgba(frame: &Frame, out: &mut [u8]) -> bool {
     let mut any = false;
     for (&l, o) in frame.light.iter().zip(out.as_chunks_mut::<4>().0) {
-        let [r, g, b, _] = l.to_le_bytes();
-        let lit = l & 0x00ff_ffff != 0;
-        *o = [r, g, b, if lit { 255 } else { 0 }];
-        any |= lit;
+        *o = composite_px(0, l, None);
+        any |= l & 0x00ff_ffff != 0;
     }
     any
 }

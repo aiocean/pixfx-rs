@@ -5,7 +5,7 @@
 use std::num::NonZeroU32;
 
 use js_sys::{Object, Reflect};
-use pixfx_canvas::stage::{Scene, color_rgba, light_rgba};
+use pixfx_canvas::stage::{Scene, color_rgba, light_rgba, live_player};
 use pixfx_core::Layer;
 use pixfx_effects::effect;
 use pixfx_wasm::{Player, parse_options};
@@ -14,7 +14,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 fn spawn(id: &str, opts: &JsValue) -> Result<Player, JsValue> {
     let fx = effect(id).ok_or("not registered")?;
-    Ok(Player::new(fx, parse_options(opts).map_err(JsValue::from)?))
+    Ok(live_player(fx, parse_options(opts).map_err(JsValue::from)?))
 }
 
 #[wasm_bindgen_test]
@@ -36,11 +36,10 @@ fn plays_fire_side_by_side_and_stops_them() -> Result<(), JsValue> {
             .update(1.0 / 30.0)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let mut passes = 0;
-        let mut bytes = vec![0u8; 112 * 148 * 4];
         let ok: Result<(), ()> = scene.draw(|pass, frame, _| {
             passes += 1;
-            let n = frame.w as usize * frame.h as usize * 4;
-            let shown = color_rgba(frame, &mut bytes[..n]) | light_rgba(frame, &mut bytes[..n]);
+            let mut bytes = vec![0u8; frame.w as usize * frame.h as usize * 4];
+            let shown = color_rgba(frame, &mut bytes) | light_rgba(frame, &mut bytes);
             if pass.layer == Layer::Front && shown {
                 lit_fronts += 1;
             }

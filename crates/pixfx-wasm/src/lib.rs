@@ -80,7 +80,7 @@ impl Fx {
         let fx = find(id)?;
         let opts = parse_options(&opts)?;
         Ok(Fx {
-            player: Player::new(fx, opts),
+            player: Player::new(fx, opts, 0),
         })
     }
 
