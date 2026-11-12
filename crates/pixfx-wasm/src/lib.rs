@@ -84,9 +84,16 @@ impl Fx {
         })
     }
 
-    /// Advance by `dt` seconds (at most 0.25, in 1/120 s sub-steps).
-    pub fn update(&mut self, dt: f64) {
+    /// Advance by `dt` seconds (at most 0.25, in 1/120 s sub-steps). `dt` must be a finite number >= 0; any
+    /// other value (NaN, a missing argument, a negative step) is an error and leaves the instance as it was.
+    pub fn update(&mut self, dt: f64) -> Result<(), JsError> {
+        if !(dt.is_finite() && dt >= 0.0) {
+            return Err(JsError::new(&format!(
+                "dt must be a finite number of seconds >= 0, not {dt}"
+            )));
+        }
         self.player.update(dt);
+        Ok(())
     }
 
     /// Let it end: loops fade out, one-shots are cut short.

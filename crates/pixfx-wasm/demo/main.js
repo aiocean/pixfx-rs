@@ -22,7 +22,8 @@ let last = performance.now();
 let windowStart = last;
 let windowFrames = 0;
 function frame(now) {
-  fx.update((now - last) / 1000);
+  // the first rAF timestamp can precede the performance.now() taken at start: never step backwards
+  fx.update(Math.max(0, now - last) / 1000);
   last = now;
   fx.draw("both");
   ctx.putImageData(new ImageData(fx.rgba(), fx.width(), fx.height()), 0, 0);

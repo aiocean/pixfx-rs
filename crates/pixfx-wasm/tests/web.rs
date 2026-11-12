@@ -57,7 +57,7 @@ fn frames_match_render_frames() -> Result<(), JsValue> {
     let mut stepped = 0;
     for n in [0usize, 1, 60] {
         while stepped < n {
-            live.update(1.0 / fps);
+            live.update(1.0 / fps).map_err(JsValue::from)?;
             stepped += 1;
         }
         live.draw("both").map_err(JsValue::from)?;
@@ -100,7 +100,7 @@ fn wrong_option_type_errors() -> Result<(), JsValue> {
 #[wasm_bindgen_test]
 fn rgba_is_frame_sized() -> Result<(), JsValue> {
     let mut live = Fx::new("fire/campfire", JsValue::UNDEFINED).map_err(JsValue::from)?;
-    live.update(0.1);
+    live.update(0.1).map_err(JsValue::from)?;
     live.draw("both").map_err(JsValue::from)?;
     let px = live.rgba();
     assert_eq!(px.length(), live.width() * live.height() * 4);
@@ -108,5 +108,29 @@ fn rgba_is_frame_sized() -> Result<(), JsValue> {
         px.to_vec().chunks(4).any(|p| p[3] > 0),
         "a lit campfire drew nothing"
     );
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn bad_dt_errors_and_leaves_time_alone() -> Result<(), JsValue> {
+    let mut live = Fx::new("fire/candle", JsValue::UNDEFINED).map_err(JsValue::from)?;
+    live.update(0.1).map_err(JsValue::from)?;
+    let before = live.t();
+    let Err(e) = live.update(f64::NAN) else {
+        return Err("update(NaN) was accepted".into());
+    };
+    let text = get(&JsValue::from(e), "message")?
+        .as_string()
+        .unwrap_or_default();
+    assert!(text.contains("dt"), "error does not name dt: {text}");
+    assert_eq!(live.t(), before, "update(NaN) moved time");
+    assert!(
+        live.update(f64::INFINITY).is_err(),
+        "update(Infinity) was accepted"
+    );
+    assert!(live.update(-1.0).is_err(), "update(-1) was accepted");
+    assert_eq!(live.t(), before, "a rejected update moved time");
+    live.update(0.0).map_err(JsValue::from)?;
+    assert_eq!(live.t(), before);
     Ok(())
 }
