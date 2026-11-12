@@ -1,7 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-default-members = ["crates/*"]
+# pixfx-gpui needs the local gpui fork at ../zed-gpui; it is its own workspace so the rest builds without it
+exclude = ["crates/pixfx-gpui"]
 
 [workspace.package]
 version = "0.1.0"

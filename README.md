@@ -23,11 +23,15 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`. Demo in `crates/pixfx-wasm/demo/`. |
 | `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick`. Demo in `crates/pixfx-canvas/demo/`. |
-| `crates/pixfx-gpui` | Live playback inside gpui. |
-| `examples/gpui-web` | A gpui web app that plays the candle and campfire. |
+| `crates/pixfx-gpui` | Live playback inside gpui. Needs the gpui fork (see [gpui](#gpui)). |
+| `examples/gpui-web` | A gpui web app that plays the candle and campfire. Needs the gpui fork. |
 
 Toolchain: `rust-toolchain.toml` pins the nightly and the wasm32 target. The commands below assume you are in
 the repo root.
+
+The root workspace holds every crate except `crates/pixfx-gpui`, so a fresh clone builds and tests without
+anything else. `crates/pixfx-gpui` and `examples/gpui-web` are separate workspaces that need a local gpui
+fork; see [gpui](#gpui).
 
 ## Render a sheet
 
@@ -94,7 +98,16 @@ Open http://127.0.0.1:8766/.
 
 ### gpui
 
-Needs the local gpui fork at `../zed-gpui`, branch `pixfx/additive-sprites`.
+`crates/pixfx-gpui` and `examples/gpui-web` need the local gpui fork checked out next to this repo at
+`../zed-gpui`, branch `pixfx/additive-sprites`. Without it, neither builds; everything else does.
+
+Test the gpui crate:
+
+```sh
+cargo test --manifest-path crates/pixfx-gpui/Cargo.toml
+```
+
+Run the demo:
 
 ```sh
 cd examples/gpui-web

@@ -1,9 +1,14 @@
+# Its own workspace: it needs the local gpui fork at ../../../zed-gpui, which the root workspace must build
+# without. Check it with `cargo test --manifest-path crates/pixfx-gpui/Cargo.toml`.
+[workspace]
+
 [package]
 name = "pixfx-gpui"
 description = "Live pixfx effects in gpui: colour painted normally, light painted additively"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
 
 [dependencies]
 anyhow = "=1.0.104"
@@ -11,5 +16,11 @@ gpui = { path = "../../../zed-gpui/crates/gpui", default-features = false }
 image = { version = "=0.25.10", default-features = false }
 pixfx-core = { path = "../pixfx-core" }
 
-[lints]
-workspace = true
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+disallowed_methods = "deny"
