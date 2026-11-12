@@ -1,0 +1,18 @@
+[package]
+name = "pixfx-export"
+description = "Export rendered pixfx effects: sprite sheets, beanfx JSON, gif"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+gif = "=0.14.2"
+png = "=0.18.1"
+pixfx-core = { path = "../pixfx-core" }
+serde_json = { version = "=1.0.154", features = ["preserve_order"] }
+
+[dev-dependencies]
+pixfx-effects = { path = "../pixfx-effects" }
+
+[lints]
+workspace = true

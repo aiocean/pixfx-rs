@@ -13,6 +13,7 @@ path = "src/main.rs"
 gif = "=0.14.2"
 pixfx-core = { path = "../pixfx-core" }
 pixfx-effects = { path = "../pixfx-effects" }
+pixfx-export = { path = "../pixfx-export" }
 
 [lints]
 workspace = true
