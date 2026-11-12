@@ -1,6 +1,6 @@
 # pixfx-phaser — pixfx effects in Phaser 4
 
-Date: 2026-11-13 · Status: draft for owner review
+Date: 2026-11-13 · Status: approved by owner 2026-11-13
 
 ## Intent
 
