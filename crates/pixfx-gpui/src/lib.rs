@@ -245,7 +245,7 @@ pub fn paint_fx(
 
 /// Device pixels per effect pixel: `scale` logical pixels at the window's scale factor, at least 1.
 fn device_scale(scale: u32, scale_factor: f32) -> u32 {
-    let k = (scale as f32 * scale_factor).round();
+    let k = libm::roundf(scale as f32 * scale_factor);
     if k >= 1.0 { k as u32 } else { 1 }
 }
 
