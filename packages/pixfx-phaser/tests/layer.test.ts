@@ -10,6 +10,7 @@ const { EffectManager } = await import("../src/effects");
 class FakeTexture implements GfxTexture {
   readonly pixels: Uint8ClampedArray;
   uploads = 0;
+  uploadsWhenDestroyed = 0;
   destroyed = false;
   constructor(
     readonly key: string,
@@ -20,6 +21,7 @@ class FakeTexture implements GfxTexture {
   }
   upload(): void {
     this.uploads += 1;
+    if (this.destroyed) this.uploadsWhenDestroyed += 1;
   }
   destroy(): void {
     this.destroyed = true;
@@ -252,4 +254,26 @@ test("play on a layer rejects unknown ids and invalid options without leaks", ()
   expect(() => layer.play("fake/spark", 0, 0, { seed: -1 })).toThrow(/seed/);
   expect(fx.stats()).toEqual({ engines: 0, textures: 4, images: 4 });
   expect(engine.live).toBe(0);
+});
+
+test("layer destroy with three members uploads nothing", () => {
+  const { gfx, fx } = setup({ color: 0xff0000ff, light: 0 });
+  const layer = fx.createLayer(BOUNDS);
+  for (let i = 0; i < 3; i++) layer.play("fake/spark", 105 + i, 205);
+  const before = gfx.textures.reduce((n, t) => n + t.uploads, 0);
+  layer.destroy();
+  expect(gfx.textures.reduce((n, t) => n + t.uploads, 0)).toBe(before);
+  expect(fx.stats()).toEqual(EMPTY);
+});
+
+test("a complete listener that destroys the layer leaves its textures untouched", () => {
+  const { gfx, fx } = setup({ color: 0xff0000ff, light: 0 });
+  const layer = fx.createLayer(BOUNDS);
+  const a = layer.play("fake/spark", 105, 205);
+  layer.play("fake/spark", 106, 205);
+  a.on("complete", () => layer.destroy());
+  fx.update(1100, 1);
+  expect(gfx.textures.reduce((n, t) => n + t.uploadsWhenDestroyed, 0)).toBe(0);
+  expect(gfx.textures.every((t) => t.destroyed)).toBe(true);
+  expect(fx.stats()).toEqual(EMPTY);
 });

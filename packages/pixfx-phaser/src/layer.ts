@@ -128,8 +128,8 @@ export class PixfxLayer {
   /** Destroy every member and free the layer's textures and images. Does nothing if already destroyed. */
   destroy(): void {
     if (this.destroyed) return;
-    for (const e of [...this.members]) e.destroy();
     this.destroyed = true;
+    for (const e of [...this.members]) e.destroy();
     for (const i of this.images) i.destroy();
     for (const t of this.textures) t.destroy();
     this.counts.images -= this.images.length;
@@ -146,7 +146,7 @@ export class PixfxLayer {
     } finally {
       this.updating = false;
     }
-    if (this.dirty) this.flush();
+    if (this.dirty && !this.destroyed) this.flush();
   }
 
   /** @internal A member changed what it shows: redraw now, or at the end of the running update. */
