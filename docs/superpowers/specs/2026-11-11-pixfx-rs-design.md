@@ -1,6 +1,6 @@
 # pixfx-rs — design
 
-Date: 2026-11-11 · Status: draft for owner approval
+Date: 2026-11-11 · Status: approved by owner 2026-11-12
 
 ## Intent
 
