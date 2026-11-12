@@ -28,6 +28,13 @@ export class EffectCore {
     this.dy = dy;
   }
 
+  /** Place the effect at a world position; it stops following any target. */
+  moveTo(x: number, y: number): void {
+    this.target = null;
+    this.x = x;
+    this.y = y;
+  }
+
   tick(dt: number): "running" | "completed" {
     if (this.state === "done" || this.state === "destroyed") return "running";
     if (this.target) {

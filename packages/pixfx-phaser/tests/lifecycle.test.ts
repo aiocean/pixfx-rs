@@ -73,3 +73,14 @@ test("unknown id throws and counts no instance", () => {
   expect(() => engine.create("nope/none", {})).toThrow(/nope\/none/);
   expect(engine.live).toBe(0);
 });
+
+test("moveTo places the effect and drops the follow target", () => {
+  const { core } = make();
+  const target = { x: 10, y: 20, active: true };
+  core.follow(target, 0, 0);
+  core.moveTo(30.4, 40);
+  expect(core.topLeft()).toEqual({ x: 30 - 4, y: 40 - 5 });
+  core.tick(0.1);
+  expect(core.topLeft()).toEqual({ x: 30 - 4, y: 40 - 5 });
+  expect(core.state).toBe("playing");
+});
