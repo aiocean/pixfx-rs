@@ -15,6 +15,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "perf": "bun perf/run.ts",
     "check": "bun run typecheck && bun run lint && bun run test"
   },
   "peerDependencies": {

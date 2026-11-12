@@ -190,7 +190,7 @@ test("colour composites source-over; light adds and saturates", () => {
   expect(backLight?.px(0, 0)).toEqual([255, 0, 0, 255]);
 });
 
-test("each tick clears the layer first, and uploads only when a member stepped", () => {
+test("each tick clears the layer first, and uploads only when a member moved or reached a new frame", () => {
   const { gfx, fx } = setup({ color: 0xff0000ff, light: 0 });
   const layer = fx.createLayer(BOUNDS);
   const e = layer.play("fake/spark", 104, 205);
@@ -204,8 +204,13 @@ test("each tick clears the layer first, and uploads only when a member stepped",
   e.setPosition(110, 205);
   fx.flushLayers();
   expect(gfx.textures[0]?.px(0, 0)).toEqual([0, 0, 0, 0]);
-  fx.update(16, 1);
-  expect(gfx.textures[0]?.uploads).toBeGreaterThan(uploads);
+  const moved = gfx.textures[0]?.uploads ?? 0;
+  expect(moved).toBeGreaterThan(uploads);
+  fx.update(16, 1); // t 0.016 s: still frame 0 at 30 fps, not moved
+  fx.flushLayers();
+  expect(gfx.textures[0]?.uploads).toBe(moved);
+  fx.update(20, 1); // t 0.036 s: frame 1
+  expect(gfx.textures[0]?.uploads).toBe(moved + 1);
 });
 
 test("members keep the effect API: complete, stop, destroy, follow, setDepths no-op", () => {

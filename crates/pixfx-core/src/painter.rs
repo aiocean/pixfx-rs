@@ -208,7 +208,14 @@ impl<'a> Painter<'a> {
         if k <= 0.004 {
             return;
         }
-        let Some(px) = self.index(sx, sy).and_then(|i| self.frame.light.get_mut(i)) else {
+        if let Some(i) = self.index(sx, sy) {
+            self.add_at(i, c, k);
+        }
+    }
+
+    /// [`Painter::add`] at a light index, with `k` already scaled by fade and light strength.
+    fn add_at(&mut self, i: usize, c: Rgba, k: f64) {
+        let Some(px) = self.frame.light.get_mut(i) else {
             return;
         };
         let d = *px;
@@ -498,23 +505,64 @@ impl<'a> Painter<'a> {
             return;
         }
         let (cx, cy) = (self.to_x(x, y), self.to_y(x, y));
-        let (x0, x1) = (libm::floor(cx - r), libm::ceil(cx + r));
-        let (y0, y1) = (libm::floor(cy - r), libm::ceil(cy + r));
+        // Only pixels that can change the frame are visited: those inside the frame, and those near enough
+        // the centre that `add` keeps their strength. Every visited pixel still runs the exact test and `add`,
+        // and a skipped pixel is one `add` would drop with no effect, so the frame is the same as visiting all.
+        let reach = self.glow_reach(k);
+        if reach <= 0.0 {
+            return;
+        }
+        let (x0, x1) = (
+            js_max(libm::floor(cx - r), self.ox),
+            js_min(libm::ceil(cx + r), self.ox + self.w - 1.0),
+        );
+        let (y0, y1) = (
+            js_max(libm::floor(cy - r), self.oy),
+            js_min(libm::ceil(cy + r), self.oy + self.h - 1.0),
+        );
+        let reach2 = reach * reach;
         let mut sy = y0;
         while sy <= y1 {
             let dy = (sy + 0.5 - cy) / r;
-            let mut sx = x0;
-            while sx <= x1 {
-                let dx = (sx + 0.5 - cx) / r;
-                let d = dx * dx + dy * dy;
-                if d < 1.0 {
-                    let f = 1.0 - libm::sqrt(d);
-                    self.add(sx, sy, c, f * f * k);
+            let room = reach2 - dy * dy;
+            if room > 0.0 {
+                // pixel centres within `half` of cx on this row; one pixel of slack each side for rounding
+                let half = libm::sqrt(room) * r;
+                let mut sx = js_max(x0, libm::floor(cx - half - 0.5) - 1.0);
+                let end = js_min(x1, libm::ceil(cx + half - 0.5) + 1.0);
+                // sx and sy are whole and inside the frame here, so `index` is this row's start plus the column
+                let row = (sy - self.oy) * self.w - self.ox;
+                while sx <= end {
+                    let dx = (sx + 0.5 - cx) / r;
+                    let d = dx * dx + dy * dy;
+                    if d < 1.0 {
+                        let f = 1.0 - libm::sqrt(d);
+                        // `add`, with the index known (a NaN strength is written, as `add` writes it)
+                        let kk = f * f * k * self.fade * self.light_k;
+                        if kk > 0.004 || kk.is_nan() {
+                            self.add_at((row + sx) as usize, c, kk);
+                        }
+                    }
+                    sx += 1.0;
                 }
-                sx += 1.0;
             }
             sy += 1.0;
         }
+    }
+
+    /// For a glow of strength `k`: the distance (as a fraction of its radius) beyond which `add` drops every
+    /// step, widened a little so rounding never cuts a pixel `add` would keep. `add` keeps a step when
+    /// `k·f²·fade·light_k > 0.004` with `f = 1 - distance`, so the cut is `1 - sqrt(0.004 / (k·fade·light_k))`.
+    /// 0 or less: the glow adds nothing anywhere. NaN or infinite strengths visit the whole radius (1).
+    fn glow_reach(&self, k: f64) -> f64 {
+        let kt = k * self.fade * self.light_k;
+        if !kt.is_finite() {
+            return 1.0;
+        }
+        if kt <= 0.004 {
+            return 0.0;
+        }
+        js_min(1.0, 1.0 - 0.999_999 * libm::sqrt(0.004 / kt))
     }
 
     /// Glow around a segment (a soft beam of light).

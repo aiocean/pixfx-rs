@@ -37,6 +37,11 @@ pub fn js_max(a: f64, b: f64) -> f64 {
 
 /// JS ToUint32 (`n >>> 0`): truncate toward zero, wrap modulo 2^32; NaN and infinities give 0.
 pub fn to_uint32(x: f64) -> u32 {
+    // Fast path for the common case (every pixel channel goes through here): inside (-2^31, 2^31) ToUint32 is
+    // the truncated value wrapped to 32 bits, which `as i32` computes exactly. NaN fails both tests.
+    if x > -2_147_483_648.0 && x < 2_147_483_648.0 {
+        return x as i32 as u32;
+    }
     if !x.is_finite() {
         return 0;
     }
@@ -245,5 +250,37 @@ mod tests {
         assert_eq!(to_int32(4_294_967_297.5), 1);
         assert_eq!(to_int32(-1.9), -1);
         assert_eq!(to_uint32(-1.0), u32::MAX);
+    }
+
+    /// The fast path and the fmod path agree on both sides of every boundary between them.
+    #[test]
+    fn to_uint32_fast_path_matches_fmod() {
+        let slow = |x: f64| libm::fmod(libm::trunc(x), 4_294_967_296.0) as i64 as u32;
+        for x in [
+            0.0,
+            -0.0,
+            0.4,
+            -0.4,
+            1.9,
+            -1.9,
+            255.99,
+            -255.99,
+            2_147_483_647.0,
+            2_147_483_647.9,
+            2_147_483_648.0,
+            -2_147_483_647.9,
+            -2_147_483_648.0,
+            -2_147_483_648.5,
+            4_294_967_295.5,
+            4_294_967_297.5,
+            -4_294_967_297.5,
+            1e15 + 0.5,
+            -1e15 - 0.5,
+        ] {
+            assert_eq!(to_uint32(x), slow(x), "x = {x}");
+        }
+        assert_eq!(to_uint32(f64::NAN), 0);
+        assert_eq!(to_uint32(f64::INFINITY), 0);
+        assert_eq!(to_uint32(f64::NEG_INFINITY), 0);
     }
 }

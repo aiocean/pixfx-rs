@@ -179,17 +179,35 @@ test("follow tracks the target on scene updates", () => {
   expect(gfx.images[0]?.x).toBe(202 - 4);
 });
 
-test("textures upload only when the effect stepped", () => {
+test("textures upload only when the effect reaches a new frame of its fps", () => {
   const { gfx, fx } = setup();
-  fx.play("fake/spark", 0, 0);
+  fx.play("fake/spark", 0, 0); // fake/spark: 30 fps
   const afterPlay = gfx.uploads();
   fx.update(16, 0);
   fx.update(16, Number.NaN);
   fx.update(-16, 1);
   fx.update(0, 1);
   expect(gfx.uploads()).toBe(afterPlay);
-  fx.update(16, 1);
+  fx.update(16, 1); // t 0.016 s: still frame 0
+  expect(gfx.uploads()).toBe(afterPlay);
+  fx.update(20, 1); // t 0.036 s: frame 1
   expect(gfx.uploads()).toBe(afterPlay + 4);
+  fx.update(16, 1); // t 0.052 s: frame 1
+  expect(gfx.uploads()).toBe(afterPlay + 4);
+  fx.update(16, 1); // t 0.068 s: frame 2
+  expect(gfx.uploads()).toBe(afterPlay + 8);
+});
+
+test("between effect frames a followed effect still moves every display frame", () => {
+  const { gfx, fx } = setup();
+  const target = { x: 10, y: 10, active: true };
+  fx.play("fake/spark", 0, 0).follow(target);
+  fx.update(10, 1);
+  const uploads = gfx.uploads();
+  target.x = 30;
+  fx.update(10, 1); // t 0.02 s: same frame 0, new position
+  expect(gfx.uploads()).toBe(uploads);
+  expect(gfx.images[0]?.x).toBe(30 - 4);
 });
 
 test("scene time drives the effect: delta times timeScale", () => {

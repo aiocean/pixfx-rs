@@ -43,10 +43,12 @@ class LayerSurface implements Surface {
   /** No-op: the layer owns the depths of its four images. */
   setDepths(): void {}
 
-  show(fx: FxLike, topLeft: { x: number; y: number }): void {
+  /** Redraw the layer when this member's pixels changed or it moved; a still, unchanged member costs nothing. */
+  show(fx: FxLike, topLeft: { x: number; y: number }, redraw: boolean): void {
+    const moved = this.fx !== fx || topLeft.x !== this.topLeft.x || topLeft.y !== this.topLeft.y;
     this.fx = fx;
     this.topLeft = topLeft;
-    this.layer.invalidate();
+    if (redraw || moved) this.layer.invalidate();
   }
 
   release(): void {
@@ -106,12 +108,12 @@ export class PixfxLayer {
   /** Play effect `id` with its origin at world (x, y), drawn into this layer. Throws on an unknown id or invalid options. */
   play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
     if (this.destroyed) throw new Error("pixfx: layer is destroyed");
-    const { fx } = spawnFx(this.engine(), id, opts);
+    const { fx, fps } = spawnFx(this.engine(), id, opts);
     this.counts.engines += 1;
     const surface = new LayerSurface(this);
     this.surfaces.add(surface);
     try {
-      const effect = new PixfxEffect(fx, x, y, surface, { back: 0, front: 1 }, this.counts, (e) => {
+      const effect = new PixfxEffect(fx, fps, x, y, surface, { back: 0, front: 1 }, this.counts, (e) => {
         this.members.delete(e);
       });
       this.members.add(effect);

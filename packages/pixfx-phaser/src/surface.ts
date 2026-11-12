@@ -1,6 +1,5 @@
 import type { Counts, Layer, Layers } from "./effect";
 import type { FxLike } from "./engine";
-import { colorToRgba, lightToRgba } from "./pixels";
 
 /** Where one effect draws: its own four images, or a share of a layer's. */
 export interface Surface {
@@ -49,9 +48,9 @@ export class OwnSurface implements Surface {
 
   private draw(fx: FxLike, which: "back" | "front", color: Layer, light: Layer): void {
     fx.draw(which);
-    colorToRgba(fx.color(), color.texture.pixels);
+    color.texture.pixels.set(fx.colorRgba());
     color.texture.upload();
-    lightToRgba(fx.light(), light.texture.pixels);
+    light.texture.pixels.set(fx.lightRgba());
     light.texture.upload();
   }
 }

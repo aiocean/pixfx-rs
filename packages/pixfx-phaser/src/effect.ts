@@ -33,10 +33,13 @@ export interface Layers {
  */
 export class PixfxEffect extends Phaser.Events.EventEmitter {
   private readonly core: EffectCore;
+  /** Index of the effect frame (at its authored fps) last drawn. */
+  private shown: number;
 
-  /** @internal Created by the plugin's `play()`. */
+  /** @internal Created by the plugin's `play()`. `fps` is the effect's authored frame rate (`meta.fps`). */
   constructor(
     private readonly fx: FxLike,
+    private readonly fps: number,
     x: number,
     y: number,
     private readonly surface: Surface,
@@ -47,6 +50,7 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     super();
     this.core = new EffectCore(fx, x, y);
     this.setDepths(depths.back, depths.front);
+    this.shown = this.frameIndex();
     this.render();
   }
 
@@ -83,7 +87,11 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     return this;
   }
 
-  /** @internal Advance by `dt` seconds of scene time; draws and uploads only when it stepped. */
+  /**
+   * @internal Advance by `dt` seconds of scene time. Draws and uploads only when the effect reached a new
+   * frame of its authored fps (the frame shown is the engine's frame at the current time); otherwise only
+   * moves the images, so a follow target is tracked every display frame.
+   */
   step(dt: number): void {
     if (dt <= 0 || this.core.state === "destroyed") return;
     if (this.core.tick(dt) === "completed") {
@@ -92,7 +100,17 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
       this.removeAllListeners();
       return;
     }
+    const frame = this.frameIndex();
+    if (frame === this.shown) {
+      this.place();
+      return;
+    }
+    this.shown = frame;
     this.render();
+  }
+
+  private frameIndex(): number {
+    return Math.floor(this.fx.t() * this.fps);
   }
 
   private render(): void {

@@ -45,6 +45,12 @@ export class FakeFx implements FxLike {
   light(): Uint32Array {
     return new Uint32Array(this.size[0] * this.size[1]);
   }
+  colorRgba(): Uint8ClampedArray {
+    return new Uint8ClampedArray(this.size[0] * this.size[1] * 4);
+  }
+  lightRgba(): Uint8ClampedArray {
+    return new Uint8ClampedArray(this.size[0] * this.size[1] * 4);
+  }
   free(): void {
     if (this.freed) throw new Error("double free");
     this.freed = true;

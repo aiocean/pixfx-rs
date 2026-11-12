@@ -30,7 +30,7 @@ export class EffectManager {
 
   /** Play effect `id` with its origin at world (x, y). Throws on an unknown id or invalid options. */
   play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
-    const { fx, play: p } = spawnFx(this.engine(), id, opts);
+    const { fx, play: p, fps } = spawnFx(this.engine(), id, opts);
     this.counts.engines += 1;
     const n = this.nextId++;
     const textures: GfxTexture[] = [];
@@ -52,7 +52,7 @@ export class EffectManager {
         frontColor: layer("front-color", "normal"),
         frontLight: layer("front-light", "add"),
       };
-      const effect = new PixfxEffect(fx, x, y, new OwnSurface(layers, this.counts), p.depth ?? DEFAULT_DEPTHS, this.counts, (e) =>
+      const effect = new PixfxEffect(fx, fps, x, y, new OwnSurface(layers, this.counts), p.depth ?? DEFAULT_DEPTHS, this.counts, (e) =>
         this.live.delete(e),
       );
       this.live.add(effect);

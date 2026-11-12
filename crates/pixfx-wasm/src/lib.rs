@@ -157,6 +157,21 @@ impl Fx {
         Uint32Array::from(self.player.frame().light.as_slice())
     }
 
+    /// Write the colour layer as RGBA8 bytes (straight alpha, `width * height * 4`) into this instance's byte
+    /// buffer and return the buffer's address in wasm memory. Read it as
+    /// `new Uint8ClampedArray(memory.buffer, ptr, width * height * 4)` before the next call on this instance:
+    /// no copy leaves wasm.
+    #[wasm_bindgen(js_name = colorRgbaPtr)]
+    pub fn color_rgba_ptr(&mut self) -> usize {
+        self.player.color_rgba().as_ptr() as usize
+    }
+
+    /// As [`Fx::color_rgba_ptr`] for the light layer: lit pixels `r, g, b, 255`, unlit `0, 0, 0, 0`.
+    #[wasm_bindgen(js_name = lightRgbaPtr)]
+    pub fn light_rgba_ptr(&mut self) -> usize {
+        self.player.light_rgba().as_ptr() as usize
+    }
+
     /// The canvas composited over transparency: RGBA8 bytes, ready for `new ImageData(px, width, height)`.
     pub fn rgba(&mut self) -> Uint8ClampedArray {
         Uint8ClampedArray::from(self.player.rgba())

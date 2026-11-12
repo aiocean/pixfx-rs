@@ -86,4 +86,85 @@ impl Player {
         composite(&self.frame, &mut self.rgba, None);
         &self.rgba
     }
+
+    /// The last drawn colour layer alone as RGBA8 bytes (`w * h * 4`, straight alpha): each ABGR word unpacked.
+    pub fn color_rgba(&mut self) -> &[u8] {
+        for (out, word) in self
+            .rgba
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(&self.frame.color)
+        {
+            *out = word.to_le_bytes();
+        }
+        &self.rgba
+    }
+
+    /// The last drawn light layer alone as RGBA8 bytes (`w * h * 4`): a lit pixel is `r, g, b, 255`, an unlit
+    /// one `0, 0, 0, 0`, so drawn with additive blending it adds exactly the light and nothing elsewhere.
+    pub fn light_rgba(&mut self) -> &[u8] {
+        for (out, word) in self
+            .rgba
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(&self.frame.light)
+        {
+            let rgb = word & 0x00ff_ffff;
+            *out = if rgb == 0 { 0u32 } else { rgb | 0xff00_0000 }.to_le_bytes();
+        }
+        &self.rgba
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Player;
+    use pixfx_core::{Layer, Options};
+    use pixfx_effects::effect;
+
+    /// A campfire drawn mid-loop, with glow room, so both layers hold many lit and many empty pixels.
+    fn drawn() -> Result<Player, &'static str> {
+        let fx = effect("fire/campfire").ok_or("campfire is not registered")?;
+        let mut p = Player::new(fx, Options::default(), fx.meta().glow_margin());
+        p.update(0.2);
+        p.draw(Layer::Both);
+        Ok(p)
+    }
+
+    #[test]
+    fn color_rgba_unpacks_every_abgr_word() -> Result<(), &'static str> {
+        let mut p = drawn()?;
+        let words = p.frame().color.clone();
+        let bytes = p.color_rgba().to_vec();
+        assert_eq!(bytes.len(), words.len() * 4);
+        for (i, w) in words.iter().enumerate() {
+            let want = [*w as u8, (w >> 8) as u8, (w >> 16) as u8, (w >> 24) as u8];
+            assert_eq!(bytes[i * 4..i * 4 + 4], want, "pixel {i}");
+        }
+        assert!(words.iter().any(|w| w >> 24 != 0) && words.contains(&0));
+        Ok(())
+    }
+
+    #[test]
+    fn light_rgba_is_opaque_where_lit_and_empty_elsewhere() -> Result<(), &'static str> {
+        let mut p = drawn()?;
+        let words = p.frame().light.clone();
+        let bytes = p.light_rgba().to_vec();
+        for (i, w) in words.iter().enumerate() {
+            let rgb = w & 0x00ff_ffff;
+            let want = if rgb == 0 {
+                [0, 0, 0, 0]
+            } else {
+                [rgb as u8, (rgb >> 8) as u8, (rgb >> 16) as u8, 255]
+            };
+            assert_eq!(bytes[i * 4..i * 4 + 4], want, "pixel {i}");
+        }
+        assert!(
+            words.iter().any(|w| w & 0x00ff_ffff == 0)
+                && words.iter().any(|w| w & 0x00ff_ffff != 0)
+        );
+        Ok(())
+    }
 }

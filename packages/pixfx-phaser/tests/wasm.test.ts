@@ -18,3 +18,25 @@ test.skipIf(!built)("the real wasm Fx accepts every documented play option (run 
   expect(fx.width()).toBeGreaterThan(0);
   fx.free();
 });
+
+// loadPixfx hands out views on wasm memory instead of copies; they must hold exactly the frame's words.
+test.skipIf(!built)("the loaded engine's RGBA views match the frame words (run `bun run build:wasm` if skipped)", async () => {
+  const { loadPixfx, spawnFx } = await import("../src/engine");
+  const engine = await loadPixfx();
+  const { fx } = spawnFx(engine, "fire/campfire", { seed: 3 });
+  for (let i = 0; i < 3; i++) {
+    fx.update(0.1);
+    fx.draw("front");
+    const words = fx.color();
+    const light = fx.light();
+    const rgba = Array.from(fx.colorRgba());
+    const lit = Array.from(fx.lightRgba());
+    expect(rgba.length).toBe(fx.width() * fx.height() * 4);
+    const want = Array.from(words).flatMap((w) => [w & 255, (w >>> 8) & 255, (w >>> 16) & 255, w >>> 24]);
+    const wantLit = Array.from(light).flatMap((w) => ((w & 0xffffff) === 0 ? [0, 0, 0, 0] : [w & 255, (w >>> 8) & 255, (w >>> 16) & 255, 255]));
+    expect(rgba).toEqual(want);
+    expect(lit).toEqual(wantLit);
+    expect(want.some((v) => v !== 0) && wantLit.some((v) => v !== 0)).toBe(true);
+  }
+  fx.free();
+});

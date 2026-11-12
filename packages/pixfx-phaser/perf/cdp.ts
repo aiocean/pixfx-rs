@@ -1,0 +1,97 @@
+// A minimal Chrome DevTools Protocol client: launch Chrome with a throwaway profile and drive its first page.
+import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { z } from "zod";
+
+const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+
+const targetsSchema = z.array(z.object({ type: z.string(), webSocketDebuggerUrl: z.string().optional() }));
+const replySchema = z.object({
+  id: z.number().optional(),
+  result: z.unknown().optional(),
+  error: z.object({ message: z.string() }).optional(),
+});
+const evaluateSchema = z.object({
+  result: z.object({ value: z.unknown().optional() }),
+  exceptionDetails: z.unknown().optional(),
+});
+
+export interface Browser {
+  /** Send one CDP command to the page; resolves with its `result`. */
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
+  /** Evaluate `expression` in the page (promises awaited) and return its JSON value. */
+  evaluate(expression: string): Promise<unknown>;
+  close(): void;
+}
+
+/** Launch Chrome (`PIXFX_CHROME` or the default macOS path) and connect to its page over CDP. */
+export async function launchChrome(port: number): Promise<Browser> {
+  const profile = mkdtempSync(join(tmpdir(), "pixfx-perf-chrome-"));
+  const proc = spawn(
+    process.env["PIXFX_CHROME"] ?? DEFAULT_CHROME,
+    [
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${profile}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+      // A measured page must keep full frame rate even when another window covers it.
+      "--disable-backgrounding-occluded-windows",
+      "--disable-renderer-backgrounding",
+      "--disable-background-timer-throttling",
+      "--window-size=1400,900",
+      "about:blank",
+    ],
+    { stdio: "ignore" },
+  );
+  let url: string | undefined;
+  for (let i = 0; i < 100 && !url; i++) {
+    try {
+      const targets = targetsSchema.parse(await (await fetch(`http://127.0.0.1:${port}/json`)).json());
+      url = targets.find((t) => t.type === "page")?.webSocketDebuggerUrl;
+    } catch {
+      // Chrome is still starting.
+    }
+    if (!url) await Bun.sleep(100);
+  }
+  if (!url) {
+    proc.kill();
+    throw new Error(`perf: Chrome did not open a debugging page on port ${port}`);
+  }
+  const ws = new WebSocket(url);
+  await new Promise<void>((resolve, reject) => {
+    ws.addEventListener("open", () => resolve(), { once: true });
+    ws.addEventListener("error", () => reject(new Error("perf: CDP socket failed to open")), { once: true });
+  });
+  let nextId = 0;
+  const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; method: string }>();
+  ws.addEventListener("message", (e) => {
+    const reply = replySchema.safeParse(JSON.parse(String(e.data)));
+    if (!reply.success || reply.data.id === undefined) return;
+    const p = pending.get(reply.data.id);
+    if (!p) return;
+    pending.delete(reply.data.id);
+    if (reply.data.error) p.reject(new Error(`${p.method}: ${reply.data.error.message}`));
+    else p.resolve(reply.data.result);
+  });
+  const send = (method: string, params: Record<string, unknown> = {}): Promise<unknown> =>
+    new Promise((resolve, reject) => {
+      const id = ++nextId;
+      pending.set(id, { resolve, reject, method });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+  return {
+    send,
+    async evaluate(expression) {
+      const r = evaluateSchema.parse(await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }));
+      if (r.exceptionDetails !== undefined) throw new Error(`perf: page threw: ${JSON.stringify(r.exceptionDetails)}`);
+      return r.result.value;
+    },
+    close() {
+      ws.close();
+      proc.kill();
+      rmSync(profile, { recursive: true, force: true });
+    },
+  };
+}
