@@ -66,7 +66,6 @@ export class PixfxLayer {
   private readonly members = new Set<PixfxEffect>();
   private readonly surfaces = new Set<LayerSurface>();
   private readonly layers: Layers;
-  private updating = false;
   private dirty = false;
   private destroyed = false;
 
@@ -140,19 +139,18 @@ export class PixfxLayer {
   /** @internal Advance every member by `dt` seconds, then redraw once if anything changed. */
   update(dt: number): void {
     if (dt <= 0 || this.destroyed) return;
-    this.updating = true;
-    try {
-      for (const e of [...this.members]) e.step(dt);
-    } finally {
-      this.updating = false;
-    }
-    if (this.dirty && !this.destroyed) this.flush();
+    for (const e of [...this.members]) e.step(dt);
+    this.flushIfDirty();
   }
 
-  /** @internal A member changed what it shows: redraw now, or at the end of the running update. */
+  /** @internal A member changed what it shows: mark for redraw at the next `flushIfDirty()` (the end of `update`, or the plugin's per-frame flush). */
   invalidate(): void {
     this.dirty = true;
-    if (!this.updating) this.flush();
+  }
+
+  /** @internal Redraw once if anything changed since the last redraw. Never touches a destroyed layer. */
+  flushIfDirty(): void {
+    if (this.dirty && !this.destroyed) this.flush();
   }
 
   /** @internal A member is gone. */

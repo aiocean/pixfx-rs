@@ -17,7 +17,7 @@
 - Package manager and test runner `bun`; demo built with Vite and no Vite plugins.
 - `phaser` is a peer dependency `^4.2.1` (dev dependency at `4.2.1` for the demo and types).
 - Rust: clippy `-D warnings`, `cargo fmt`, no unwrap/expect/panic, libm-only transcendental math (repo `clippy.toml`).
-- Every cargo command runs with `CARGO_BUILD_BUILD_DIR=<workspace dir>/target/build-dir` (the user's global config points build-dir at an unmounted volume).
+- Cargo uses the build-dir configured in `~/.cargo/config.toml`; run cargo commands as they are.
 - Light blend rule: dst.rgb += light.rgb, dst alpha unchanged; unlit light pixels upload as `0,0,0,0`; lit as `r,g,b,255`. Colour words are ABGR, light words xBGR.
 - Glow margin = `max(w, h) / 2` of `meta.size` (integer division).
 - Effect dt per frame = scene `update` delta (ms) / 1000 × `scene.time.timeScale`; values that are not finite or are < 0 become 0. The engine clamps a step at 0.25 s.

@@ -44,7 +44,7 @@ function phaserGfx(scene: Phaser.Scene): Gfx {
 
 /**
  * Scene plugin: install with `{ key: "pixfx", plugin: PixfxPlugin, mapping: "pixfx" }` in the game's
- * `plugins.scene`, then `this.pixfx.play(id, x, y, opts)`. Effects advance on scene time and are freed
+ * `plugins.scene`, then `this.pixfx.play(id, x, y, opts)`. Effects advance on scene time (after the scene's `update()` and physics, so `follow` sees final positions) and are freed
  * when the scene shuts down or is destroyed.
  */
 export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
@@ -60,7 +60,8 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
 
   override boot(): void {
     const events = this.host.sys.events;
-    events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    events.on(Phaser.Scenes.Events.POST_UPDATE, this.onUpdate);
+    events.on(Phaser.Scenes.Events.PRE_RENDER, this.onPreRender);
     events.on(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown);
     events.once(Phaser.Scenes.Events.DESTROY, this.onDestroy);
   }
@@ -85,7 +86,8 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     this.destroyed = true;
     this.effects.destroyAll();
     const events = this.host.sys.events;
-    events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    events.off(Phaser.Scenes.Events.POST_UPDATE, this.onUpdate);
+    events.off(Phaser.Scenes.Events.PRE_RENDER, this.onPreRender);
     events.off(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown);
     events.off(Phaser.Scenes.Events.DESTROY, this.onDestroy);
     super.destroy();
@@ -93,6 +95,10 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
 
   private readonly onUpdate = (_time: number, delta: number): void => {
     this.effects.update(delta, this.host.time.timeScale);
+  };
+
+  private readonly onPreRender = (): void => {
+    this.effects.flushLayers();
   };
 
   private readonly onShutdown = (): void => {

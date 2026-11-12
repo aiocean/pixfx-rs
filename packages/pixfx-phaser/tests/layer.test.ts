@@ -70,6 +70,9 @@ class FakeGfx implements Gfx {
     this.images.push(i);
     return i;
   }
+  uploads(): number {
+    return this.textures.reduce((n, t) => n + t.uploads, 0);
+  }
 }
 
 /** Every effect fills its colour with one ABGR word and its light with one xBGR word. */
@@ -161,6 +164,7 @@ test("an effect partly outside is drawn in part, clipped to the bounds", () => {
   const layer = fx.createLayer(BOUNDS);
   // Effect rect: x 96..104, y 195..201 -> overlap x 100..104, y 200..201.
   layer.play("fake/spark", 100, 200);
+  fx.flushLayers();
   const [backColor, backLight] = gfx.textures;
   expect(backColor?.px(0, 0)).toEqual([255, 0, 0, 255]);
   expect(backColor?.px(3, 0)).toEqual([255, 0, 0, 255]);
@@ -190,12 +194,15 @@ test("each tick clears the layer first, and uploads only when a member stepped",
   const { gfx, fx } = setup({ color: 0xff0000ff, light: 0 });
   const layer = fx.createLayer(BOUNDS);
   const e = layer.play("fake/spark", 104, 205);
+  fx.flushLayers();
   expect(gfx.textures[0]?.px(0, 0)).toEqual([255, 0, 0, 255]);
   const uploads = gfx.textures[0]?.uploads ?? 0;
   fx.update(0, 1);
   fx.update(16, 0);
+  fx.flushLayers();
   expect(gfx.textures[0]?.uploads).toBe(uploads);
   e.setPosition(110, 205);
+  fx.flushLayers();
   expect(gfx.textures[0]?.px(0, 0)).toEqual([0, 0, 0, 0]);
   fx.update(16, 1);
   expect(gfx.textures[0]?.uploads).toBeGreaterThan(uploads);
@@ -215,6 +222,7 @@ test("members keep the effect API: complete, stop, destroy, follow, setDepths no
   a.stop();
   b.destroy();
   expect(destroys).toBe(1);
+  fx.flushLayers();
   expect(gfx.textures[0]?.px(0, 0)).toEqual([255, 0, 0, 255]);
   fx.update(600, 1);
   expect(completes).toBe(1);
@@ -276,4 +284,46 @@ test("a complete listener that destroys the layer leaves its textures untouched"
   expect(gfx.textures.reduce((n, t) => n + t.uploadsWhenDestroyed, 0)).toBe(0);
   expect(gfx.textures.every((t) => t.destroyed)).toBe(true);
   expect(fx.stats()).toEqual(EMPTY);
+});
+
+test("k plays and moves in one frame cost one redraw (one upload per texture)", () => {
+  const { gfx, fx } = setup({ color: 0xff0000ff, light: 0 });
+  const layer = fx.createLayer(BOUNDS);
+  const members = Array.from({ length: 5 }, (_, i) => layer.play("fake/spark", 105 + i, 205));
+  for (const m of members) m.setPosition(106, 205);
+  expect(gfx.uploads()).toBe(0);
+  fx.flushLayers();
+  expect(gfx.textures.map((t) => t.uploads)).toEqual([1, 1, 1, 1]);
+  fx.flushLayers();
+  expect(gfx.uploads()).toBe(4);
+});
+
+test("update flushes once at its end, leaving nothing for the pre-render flush", () => {
+  const { gfx, fx } = setup({ color: 0xff0000ff, light: 0 });
+  const layer = fx.createLayer(BOUNDS);
+  layer.play("fake/spark", 105, 205);
+  layer.play("fake/spark", 106, 205);
+  fx.update(16, 1);
+  expect(gfx.textures.map((t) => t.uploads)).toEqual([1, 1, 1, 1]);
+  fx.flushLayers();
+  expect(gfx.uploads()).toBe(4);
+});
+
+test("a play while the scene is paused (no update) shows after the pre-render flush", () => {
+  const { gfx, fx } = setup({ color: 0xff0000ff, light: 0 });
+  const layer = fx.createLayer(BOUNDS);
+  layer.play("fake/spark", 104, 205);
+  expect(gfx.textures[0]?.written()).toBe(false);
+  fx.flushLayers();
+  expect(gfx.textures[0]?.px(0, 0)).toEqual([255, 0, 0, 255]);
+});
+
+test("a destroyed layer never flushes", () => {
+  const { gfx, fx } = setup({ color: 0xff0000ff, light: 0 });
+  const layer = fx.createLayer(BOUNDS);
+  layer.play("fake/spark", 104, 205);
+  layer.destroy();
+  fx.flushLayers();
+  expect(gfx.textures.reduce((n, t) => n + t.uploadsWhenDestroyed, 0)).toBe(0);
+  expect(gfx.uploads()).toBe(0);
 });

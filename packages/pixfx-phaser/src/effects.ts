@@ -85,6 +85,11 @@ export class EffectManager {
     for (const l of [...this.layers]) l.update(dt);
   }
 
+  /** Once per frame, before render: redraw every live layer that changed, so many plays or moves cost one redraw. */
+  flushLayers(): void {
+    for (const l of [...this.layers]) l.flushIfDirty();
+  }
+
   /** Destroy every effect and layer (scene shutdown or destroy). */
   destroyAll(): void {
     for (const l of [...this.layers]) l.destroy();

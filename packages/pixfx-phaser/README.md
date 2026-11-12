@@ -66,7 +66,8 @@ Options (all optional):
 | Option | Meaning |
 |---|---|
 | `seed` | Non-negative integer; same seed and same steps give the same pixels. |
-| `flip`, `angle`, `light`, `palette` | Passed to the effect (see `meta(id)` in `pixfx-wasm`). |
+| `flip`, `angle`, `palette` | Passed to the effect (see `meta(id)` in `pixfx-wasm`). |
+| `light` | Glow strength, a number: `0` is no glow, default `1`. |
 | `depth: {back, front}` | Depths of the back and front images. Default `{back: 0, front: 1}`. |
 | `scrollFactor` | Camera scroll factor of the images: `1` world space (default), `0` screen space (HUD effects). |
 
@@ -125,7 +126,7 @@ bunx vite build demo             # or build to demo/dist and serve that
 
 `?renderer=webgl` (default) or `?renderer=canvas`. Keys: `P` pause/resume, `S` time scale 1 ↔ 0.25,
 `X` stop the campfire, `D` destroy the walker the candle follows, `R` restart the scene.
-`window.pixfxDemo` exposes `scene`, `stats()` and the `events` log for checks.
+`window.pixfxDemo` exposes `scene`, `game`, `engine`, `stats()` and the `events` log for checks.
 
 ## Develop
 
