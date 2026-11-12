@@ -1,0 +1,13 @@
+[build]
+filehash = false
+
+[watch]
+watch = [".", "../../crates"]
+
+[serve]
+addresses = ["127.0.0.1"]
+port = 8090
+open = false
+
+# Shared-memory wasm (SharedArrayBuffer) needs cross-origin isolation.
+headers = { "Cross-Origin-Embedder-Policy" = "require-corp", "Cross-Origin-Opener-Policy" = "same-origin" }

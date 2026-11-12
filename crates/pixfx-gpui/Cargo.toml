@@ -1,0 +1,15 @@
+[package]
+name = "pixfx-gpui"
+description = "Live pixfx effects in gpui: colour painted normally, light painted additively"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "=1.0.104"
+gpui = { path = "../../../zed-gpui/crates/gpui", default-features = false }
+image = { version = "=0.25.10", default-features = false }
+pixfx-core = { path = "../pixfx-core" }
+
+[lints]
+workspace = true

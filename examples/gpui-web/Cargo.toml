@@ -1,0 +1,36 @@
+# Its own workspace: the wasm build needs the nightly flags in .cargo/config.toml (shared memory, build-std),
+# which must not apply to the native workspace at the repository root.
+[workspace]
+
+[package]
+name = "pixfx-gpui-web"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "pixfx-gpui-web"
+path = "main.rs"
+
+[dependencies]
+gpui = { path = "../../../zed-gpui/crates/gpui" }
+gpui_platform = { path = "../../../zed-gpui/crates/gpui_platform" }
+log = "=0.4.35"
+pixfx-core = { path = "../../crates/pixfx-core" }
+pixfx-effects = { path = "../../crates/pixfx-effects" }
+pixfx-gpui = { path = "../../crates/pixfx-gpui" }
+web-time = "=1.1.0"
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wasm-bindgen = "0.2"
+wasm_thread = { git = "https://github.com/zed-industries/wasm_thread", rev = "0cf96c7708dfb97ccf3da50347e25edcf75d6937", features = ["es_modules"] }
+web-sys = { version = "0.3", features = ["Location", "Window"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
