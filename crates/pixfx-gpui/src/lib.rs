@@ -141,7 +141,7 @@ impl FxView {
         }
     }
 
-    /// Advance by `dt` seconds of real time.
+    /// Advance by `dt` seconds of real time ([`Instance::update`]: a NaN, infinite or negative `dt` is ignored).
     pub fn tick(&mut self, dt: f64) {
         self.instance.update(dt);
         self.generation += 1;

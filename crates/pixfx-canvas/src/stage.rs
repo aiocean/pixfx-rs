@@ -6,7 +6,7 @@ use std::fmt;
 use std::num::NonZeroU32;
 
 use pixfx_core::math::js_round;
-use pixfx_core::{Frame, Layer};
+use pixfx_core::{Frame, Layer, valid_dt};
 use pixfx_wasm::Player;
 
 /// A target rectangle in canvas pixels (game pixels times the scale).
@@ -155,10 +155,10 @@ impl<T> Scene<T> {
             .map(|e| e.player.t())
     }
 
-    /// Advance every instance by `dt` seconds, then drop the ones that are done. A NaN, infinite or negative
-    /// `dt` is refused before any instance sees it: it would make their time NaN or run it backwards.
+    /// Advance every instance by `dt` seconds, then drop the ones that are done. A `dt` that fails
+    /// [`valid_dt`] (NaN, infinite or negative) is an error and changes nothing.
     pub fn update(&mut self, dt: f64) -> Result<(), StageError> {
-        if !(dt.is_finite() && dt >= 0.0) {
+        if !valid_dt(dt) {
             return Err(StageError::BadStep);
         }
         for e in &mut self.entries {

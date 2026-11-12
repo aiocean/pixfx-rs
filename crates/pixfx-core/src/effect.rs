@@ -176,9 +176,13 @@ impl Instance {
         }
     }
 
-    /// Advance by `dt` seconds, at most [`MAX_DT`].
+    /// Advance by `dt` seconds, at most [`MAX_DT`]. A step that fails [`valid_dt`] (NaN, infinite or
+    /// negative) is ignored and leaves the instance as it was: it would make the time NaN for good or run it
+    /// backwards. Shells that report such a step to their caller check [`valid_dt`] themselves first.
     pub fn update(&mut self, dt: f64) {
-        self.advance(js_min(dt, MAX_DT));
+        if valid_dt(dt) {
+            self.advance(js_min(dt, MAX_DT));
+        }
     }
 
     /// Advance by `dt` seconds in `max(1, ceil(dt * 120 - 1e-9))` equal sub-steps (pixelfx `update`).
@@ -231,6 +235,11 @@ impl Instance {
     pub fn t(&self) -> f64 {
         self.t
     }
+}
+
+/// Whether `dt` is a time step [`Instance::update`] takes: a finite number of seconds, 0 or more.
+pub fn valid_dt(dt: f64) -> bool {
+    dt.is_finite() && dt >= 0.0
 }
 
 /// The effect with this id in `list`.

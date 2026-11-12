@@ -10,7 +10,7 @@ pub use options::parse_options;
 pub use player::Player;
 
 use js_sys::{Array, Object, Reflect, Uint8ClampedArray, Uint32Array};
-use pixfx_core::{Effect, Layer, Meta};
+use pixfx_core::{Effect, Layer, Meta, valid_dt};
 use pixfx_effects::{EFFECTS, effect};
 use wasm_bindgen::prelude::*;
 
@@ -87,7 +87,7 @@ impl Fx {
     /// Advance by `dt` seconds (at most 0.25, in 1/120 s sub-steps). `dt` must be a finite number >= 0; any
     /// other value (NaN, a missing argument, a negative step) is an error and leaves the instance as it was.
     pub fn update(&mut self, dt: f64) -> Result<(), JsError> {
-        if !(dt.is_finite() && dt >= 0.0) {
+        if !valid_dt(dt) {
             return Err(JsError::new(&format!(
                 "dt must be a finite number of seconds >= 0, not {dt}"
             )));

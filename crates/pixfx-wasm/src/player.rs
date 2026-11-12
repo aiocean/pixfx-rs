@@ -36,7 +36,8 @@ impl Player {
         self.meta
     }
 
-    /// Advance by `dt` seconds ([`Instance::update`]: at most `MAX_DT`, in 1/120 s sub-steps).
+    /// Advance by `dt` seconds ([`Instance::update`]: at most `MAX_DT`, in 1/120 s sub-steps; a NaN, infinite or
+    /// negative `dt` is ignored).
     pub fn update(&mut self, dt: f64) {
         self.inst.update(dt);
     }

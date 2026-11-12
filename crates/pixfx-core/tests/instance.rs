@@ -96,6 +96,29 @@ fn huge_dt_is_clamped() {
 }
 
 #[test]
+fn bad_steps_are_ignored() {
+    use pixfx_core::effect::valid_dt;
+    let mut inst = Instance::new(&DOT_LOOP, Options::default());
+    inst.update(0.1);
+    let before = drawn(&inst);
+    for dt in [
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        -0.01,
+        -f64::MIN_POSITIVE,
+    ] {
+        assert!(!valid_dt(dt), "dt {dt}");
+        inst.update(dt);
+        assert_eq!(inst.t(), 0.1, "dt {dt} moved time");
+        assert_eq!(drawn(&inst), before, "dt {dt} ran a sub-step");
+    }
+    assert!(valid_dt(0.0) && valid_dt(0.25) && valid_dt(1e9));
+    inst.update(0.1);
+    assert_eq!(inst.t(), 0.2, "a good step after bad ones still advances");
+}
+
+#[test]
 fn non_loop_done_after_duration() {
     let mut inst = Instance::new(&DOT, Options::default());
     for _ in 0..3 {
