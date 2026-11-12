@@ -1,0 +1,12 @@
+[package]
+name = "pixfx-core"
+description = "Deterministic pixel-art effect core: frames, colour, painter, light (port of pixelfx)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm.workspace = true
+
+[lints]
+workspace = true
