@@ -3,3 +3,6 @@ target/
 
 # wasm-pack output for the pixfx-wasm demo
 crates/pixfx-wasm/demo/pkg/
+
+# wasm-pack output for the pixfx-canvas demo
+crates/pixfx-canvas/demo/pkg/
