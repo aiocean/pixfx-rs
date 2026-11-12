@@ -3,12 +3,16 @@
 #![forbid(unsafe_code)]
 
 pub mod color;
+pub mod effect;
 pub mod frame;
 pub mod math;
 pub mod painter;
+pub mod render;
 pub mod sim;
 
 pub use color::{ColorError, Rgba, hex};
+pub use effect::{Effect, EffectState, Instance, Layer, Meta, OptValue, Options, find};
 pub use frame::{Frame, composite};
 pub use math::{Rng, rand};
 pub use painter::Painter;
+pub use render::{Rendered, render_frames};

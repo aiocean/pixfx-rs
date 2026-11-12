@@ -14,3 +14,10 @@ version = "0.1.0"
 dependencies = [
  "libm",
 ]
+
+[[package]]
+name = "pixfx-effects"
+version = "0.1.0"
+dependencies = [
+ "pixfx-core",
+]
