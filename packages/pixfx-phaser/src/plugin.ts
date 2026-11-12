@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import type { Counts, PixfxEffect } from "./effect";
 import { EffectManager } from "./effects";
 import { getEngine } from "./engine";
+import type { LayerConfig, PixfxLayer } from "./layer";
 import type { Gfx } from "./gfx";
 
 /** Phaser-backed textures (canvas, nearest-filtered) and images (top-left origin) for one scene. */
@@ -69,7 +70,12 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     return this.effects.play(id, x, y, opts);
   }
 
-  /** Live engine instances, textures and images held by this scene's effects. */
+  /** Create a scene-wide layer: effects played into it share four textures covering `cfg.bounds`. Throws on an invalid config. */
+  createLayer(cfg: LayerConfig): PixfxLayer {
+    return this.effects.createLayer(cfg);
+  }
+
+  /** Live engine instances, textures and images held by this scene's effects and layers. */
   stats(): Counts {
     return this.effects.stats();
   }

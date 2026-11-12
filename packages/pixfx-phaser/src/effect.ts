@@ -3,7 +3,7 @@ import type { FxLike } from "./engine";
 import type { GfxImage, GfxTexture } from "./gfx";
 import type { FollowTarget } from "./lifecycle";
 import { EffectCore } from "./lifecycle";
-import { colorToRgba, lightToRgba } from "./pixels";
+import type { Surface } from "./surface";
 
 /** Live counts of what effects hold, read by `stats()` and the leak checks. */
 export interface Counts {
@@ -33,21 +33,19 @@ export interface Layers {
  */
 export class PixfxEffect extends Phaser.Events.EventEmitter {
   private readonly core: EffectCore;
-  private readonly all: readonly Layer[];
 
   /** @internal Created by the plugin's `play()`. */
   constructor(
     private readonly fx: FxLike,
     x: number,
     y: number,
-    private readonly layers: Layers,
+    private readonly surface: Surface,
     depths: { back: number; front: number },
     private readonly counts: Counts,
     private readonly onGone: (effect: PixfxEffect) => void,
   ) {
     super();
     this.core = new EffectCore(fx, x, y);
-    this.all = [layers.backColor, layers.backLight, layers.frontColor, layers.frontLight];
     this.setDepths(depths.back, depths.front);
     this.render();
   }
@@ -71,11 +69,9 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     return this;
   }
 
+  /** Set the depths of the back and front images. Changes nothing for an effect played in a layer: the layer owns the depths. */
   setDepths(back: number, front: number): this {
-    this.layers.backColor.image.setDepth(back);
-    this.layers.backLight.image.setDepth(back);
-    this.layers.frontColor.image.setDepth(front);
-    this.layers.frontLight.image.setDepth(front);
+    this.surface.setDepths(back, front);
     return this;
   }
 
@@ -100,22 +96,11 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
   }
 
   private render(): void {
-    this.drawLayer("back", this.layers.backColor, this.layers.backLight);
-    this.drawLayer("front", this.layers.frontColor, this.layers.frontLight);
-    this.place();
-  }
-
-  private drawLayer(which: "back" | "front", color: Layer, light: Layer): void {
-    this.fx.draw(which);
-    colorToRgba(this.fx.color(), color.texture.pixels);
-    color.texture.upload();
-    lightToRgba(this.fx.light(), light.texture.pixels);
-    light.texture.upload();
+    this.surface.show(this.fx, this.core.topLeft(), true);
   }
 
   private place(): void {
-    const p = this.core.topLeft();
-    for (const l of this.all) l.image.setPosition(p.x, p.y);
+    this.surface.show(this.fx, this.core.topLeft(), false);
   }
 
   /** Free everything once; false if it was already gone. */
@@ -123,12 +108,7 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     if (this.core.state === "destroyed") return false;
     this.core.destroy();
     this.counts.engines -= 1;
-    for (const l of this.all) {
-      l.image.destroy();
-      this.counts.images -= 1;
-      l.texture.destroy();
-      this.counts.textures -= 1;
-    }
+    this.surface.release();
     this.onGone(this);
     return true;
   }

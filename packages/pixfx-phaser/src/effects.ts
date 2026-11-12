@@ -3,13 +3,17 @@ import type { Counts, Layer, Layers } from "./effect";
 import { PixfxEffect } from "./effect";
 import type { Engine } from "./engine";
 import type { Gfx, GfxBlend, GfxImage, GfxTexture } from "./gfx";
-import { engineOptions, parsePlayOptions } from "./options";
+import { spawnFx } from "./engine";
+import { OwnSurface } from "./surface";
+import { PixfxLayer } from "./layer";
+import type { LayerConfig } from "./layer";
 
 const DEFAULT_DEPTHS = { back: 0, front: 1 };
 
 /** The per-effect objects of one scene: plays, ticks on scene time, and frees them. No Phaser calls. */
 export class EffectManager {
   private readonly live = new Set<PixfxEffect>();
+  private readonly layers = new Set<PixfxLayer>();
   private readonly counts: Counts = { engines: 0, textures: 0, images: 0 };
   private nextId = 0;
 
@@ -26,10 +30,7 @@ export class EffectManager {
 
   /** Play effect `id` with its origin at world (x, y). Throws on an unknown id or invalid options. */
   play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
-    const engine = this.engine();
-    const p = parsePlayOptions(opts);
-    if (!engine.effects().includes(id)) throw new Error(`pixfx: unknown effect "${id}"`);
-    const fx = engine.create(id, engineOptions(p, engine.meta(id).glowMargin));
+    const { fx, play: p } = spawnFx(this.engine(), id, opts);
     this.counts.engines += 1;
     const n = this.nextId++;
     const textures: GfxTexture[] = [];
@@ -51,7 +52,7 @@ export class EffectManager {
         frontColor: layer("front-color", "normal"),
         frontLight: layer("front-light", "add"),
       };
-      const effect = new PixfxEffect(fx, x, y, layers, p.depth ?? DEFAULT_DEPTHS, this.counts, (e) =>
+      const effect = new PixfxEffect(fx, x, y, new OwnSurface(layers, this.counts), p.depth ?? DEFAULT_DEPTHS, this.counts, (e) =>
         this.live.delete(e),
       );
       this.live.add(effect);
@@ -67,15 +68,26 @@ export class EffectManager {
     }
   }
 
+  /** A layer: effects played into it share four textures covering `cfg.bounds`. Throws on an invalid config. */
+  createLayer(cfg: LayerConfig): PixfxLayer {
+    const layer = new PixfxLayer(cfg, this.gfx, this.engine, `${this.keyPrefix}L${this.nextId++}-`, this.counts, (l) =>
+      this.layers.delete(l),
+    );
+    this.layers.add(layer);
+    return layer;
+  }
+
   /** One scene update: advance every effect by `delta` ms × `timeScale`. */
   update(deltaMs: number, timeScale: number): void {
     const dt = stepSeconds(deltaMs, timeScale);
     if (dt === 0) return;
     for (const e of [...this.live]) e.step(dt);
+    for (const l of [...this.layers]) l.update(dt);
   }
 
-  /** Destroy every effect (scene shutdown or destroy). */
+  /** Destroy every effect and layer (scene shutdown or destroy). */
   destroyAll(): void {
+    for (const l of [...this.layers]) l.destroy();
     for (const e of [...this.live]) e.destroy();
   }
 

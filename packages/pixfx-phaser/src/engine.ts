@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { EngineOptions } from "./options";
+import type { EngineOptions, PlayOptions } from "./options";
+import { engineOptions, parsePlayOptions } from "./options";
 
 export type { EngineOptions };
 
@@ -59,4 +60,11 @@ export async function loadPixfx(): Promise<Engine> {
 export function getEngine(): Engine {
   if (!loaded) throw new Error("pixfx: call await loadPixfx() before play()");
   return loaded;
+}
+
+/** Validate `opts` and create an engine instance for `id`; throws on an unknown id or invalid options. */
+export function spawnFx(engine: Engine, id: string, opts: unknown): { fx: FxLike; play: PlayOptions } {
+  const play = parsePlayOptions(opts);
+  if (!engine.effects().includes(id)) throw new Error(`pixfx: unknown effect "${id}"`);
+  return { fx: engine.create(id, engineOptions(play, engine.meta(id).glowMargin)), play };
 }
