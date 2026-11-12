@@ -183,6 +183,8 @@ fn bad_margin_errors() -> Result<(), JsValue> {
         JsValue::from(-1),
         JsValue::from(1.5),
         JsValue::from_str("x"),
+        JsValue::from(4097),
+        JsValue::from(4_294_967_295u32),
     ] {
         let Err(e) = Fx::new("fire/candle", obj(&[("margin", bad.clone())])?) else {
             return Err(format!("margin {bad:?} was accepted").into());
@@ -209,5 +211,13 @@ fn default_margin_unchanged() -> Result<(), JsValue> {
     live.draw("both").map_err(JsValue::from)?;
     assert_eq!(live.color().to_vec(), want.frame().color);
     assert_eq!(live.light().to_vec(), want.frame().light);
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn margin_cap_is_accepted() -> Result<(), JsValue> {
+    let live =
+        Fx::new("fire/candle", obj(&[("margin", JsValue::from(4096))])?).map_err(JsValue::from)?;
+    assert_eq!(live.width(), 56 + 2 * 4096);
     Ok(())
 }

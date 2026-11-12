@@ -5,9 +5,26 @@
 use std::fmt;
 use std::num::NonZeroU32;
 
+use js_sys::Reflect;
 use pixfx_core::math::js_round;
 use pixfx_core::{Effect, Frame, Layer, Options, composite_px, valid_dt};
-use pixfx_wasm::Player;
+use pixfx_wasm::{Player, parse_options};
+use wasm_bindgen::{JsError, JsValue};
+
+/// [`parse_options`] for [`crate::Stage::play`]: the stage sizes each effect's margin itself, so a `margin`
+/// option is an error.
+pub fn stage_options(v: &JsValue) -> Result<Options, JsError> {
+    let has_margin = v.is_object()
+        && Reflect::get(v, &JsValue::from_str("margin"))
+            .map_err(|_| JsError::new("could not read the options"))?
+            != JsValue::UNDEFINED;
+    if has_margin {
+        return Err(JsError::new(
+            "option margin is not supported: Stage sizes the margin itself",
+        ));
+    }
+    Ok(parse_options(v)?.0)
+}
 
 /// `effect` with `opts` as the stage plays it: on its canvas plus [`Meta::glow_margin`], so nothing at the
 /// canvas edge is faded or cut.

@@ -7,7 +7,10 @@ use wasm_bindgen::{JsError, JsValue};
 /// Largest integer a JS number holds exactly (`Number.MAX_SAFE_INTEGER`).
 const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 
-/// `undefined`/`null` (all defaults) or a plain object: `margin` (non-negative integer: empty pixels round the
+/// Largest `margin`: keeps `size + 2 * margin` and the canvas's pixel count far from overflow.
+pub const MAX_MARGIN: u32 = 4096;
+
+/// `undefined`/`null` (all defaults) or a plain object: `margin` (whole number up to [`MAX_MARGIN`]: empty pixels round the
 /// canvas, returned beside the options because it is the canvas's, not the effect's), `seed` (non-negative integer), `flip` (boolean),
 /// `angle` (radians), `light` (glow strength), `palette` (array of `"#rgb"`/`"#rrggbb"` strings); any other key is
 /// the effect's own option, a number or an array of hex colours. `x`/`y` are refused: an instance draws on its
@@ -29,7 +32,13 @@ pub fn parse_options(v: &JsValue) -> Result<(Options, u32), JsError> {
             continue;
         }
         match key.as_str() {
-            "margin" => margin = whole_number(&key, &val, u32::MAX.into())? as u32,
+            "margin" => {
+                margin = whole_number(&key, &val, MAX_MARGIN.into()).map_err(|_| {
+                    JsError::new(&format!(
+                        "option margin must be a whole number from 0 to {MAX_MARGIN}"
+                    ))
+                })? as u32;
+            }
             "seed" => opts.seed = Some(whole_number(&key, &val, MAX_SAFE_INTEGER)? as u64),
             "flip" => {
                 opts.flip = val

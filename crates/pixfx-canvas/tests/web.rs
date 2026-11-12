@@ -5,7 +5,7 @@
 use std::num::NonZeroU32;
 
 use js_sys::{Object, Reflect};
-use pixfx_canvas::stage::{Scene, color_rgba, light_rgba, live_player};
+use pixfx_canvas::stage::{Scene, color_rgba, light_rgba, live_player, stage_options};
 use pixfx_core::Layer;
 use pixfx_effects::effect;
 use pixfx_wasm::{Player, parse_options};
@@ -78,5 +78,28 @@ fn refuses_bad_steps_on_wasm() -> Result<(), JsValue> {
     assert!(scene.update(f64::NAN).is_err());
     assert!(scene.update(-1.0).is_err());
     assert_eq!(scene.t(h), Some(0.0));
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn stage_rejects_a_margin_option() -> Result<(), JsValue> {
+    for margin in [0, 8] {
+        let o = Object::new();
+        Reflect::set(&o, &"margin".into(), &JsValue::from(margin))?;
+        let Err(e) = stage_options(&o) else {
+            return Err("a margin option was accepted".into());
+        };
+        let text = Reflect::get(&JsValue::from(e), &"message".into())?
+            .as_string()
+            .unwrap_or_default();
+        assert!(
+            text.contains("margin"),
+            "error does not name margin: {text}"
+        );
+    }
+    let seeded = Object::new();
+    Reflect::set(&seeded, &"seed".into(), &JsValue::from(7))?;
+    assert!(stage_options(&seeded).is_ok());
+    assert!(stage_options(&JsValue::UNDEFINED).is_ok());
     Ok(())
 }
