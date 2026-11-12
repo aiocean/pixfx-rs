@@ -11,3 +11,6 @@ pixfx-core = { path = "../pixfx-core" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+wasm-bindgen-test = "=0.3.80"
