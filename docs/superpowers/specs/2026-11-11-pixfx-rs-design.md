@@ -36,9 +36,13 @@ runtimes (pixelfx is JS-only live; beanfx is Python-only offline and needs a sep
 5. **Live wasm engine** usable from a gpui-on-wasm game via a `pixfx-gpui` adapter.
 6. **JS-driven wasm engine** (`pixfx-wasm`): JS lists effects, spawns instances, steps them and reads
    frames.
-7. **Sound**: beanfx 0.3's synthesis (hit/charge/whoosh/tail cues from the effect's act and states; retro/soft/real
+7. **Canvas renderer** (`pixfx-canvas`): a wasm `Stage` mounted on a Canvas 2D that runs its own animation loop
+   (or is ticked by the host) and draws the effects JS places on it, back layers then front layers, colour
+   normally and light additively (`"lighter"`), upscaled by an integer scale. Each effect gets a margin of half its
+   canvas's longer side and no edge fade, so glow that spills past its canvas shows.
+8. **Sound**: beanfx 0.3's synthesis (hit/charge/whoosh/tail cues from the effect's act and states; retro/soft/real
    voices; metal, thunder, fire, ice, wind, arcane), exported as WAV natively and playable live on the web.
-8. **Claude Code skill** `/pixfx <description | image>`: research the subject, ask knob questions with ASCII
+9. **Claude Code skill** `/pixfx <description | image>`: research the subject, ask knob questions with ASCII
    previews, write a Rust effect module, render takes, look, refine, export. Knob set follows beanfx's
    `knobs/` (size, view, loop, timing, role, density, placement, clarity, style, palette, glow, shape, caster,
    combo, aura, states, sound).
@@ -107,16 +111,21 @@ pixfx-rs/
     pixfx-sfx      sound synthesis, pure: effect JSON/act -> PCM samples
     pixfx-export   native only: PNG/gif/strip, sheet packing, beanfx JSON, HTML preview, takes, WAV
     pixfx-cli      `pixfx render|sheet|takes|list|check|parity` over the above
-    pixfx-gpui     adapter: a gpui element/entity that ticks an effect and paints its frame
+    pixfx-gpui     adapter: a gpui element/entity that ticks an effect and paints its frame (its own
+                   workspace: it needs the gpui fork, which the rest of the repo builds without)
     pixfx-wasm     wasm-bindgen engine JS drives: list effects, spawn, step, read frames (demo/ page)
+    pixfx-canvas   wasm Canvas 2D renderer with its own loop: a Stage that plays effects where JS puts them
+                   (demo/ page); its decisions are plain Rust in `stage`, its blitting a thin shell
   examples/gpui-web  a minimal gpui wasm app playing effects (the integration proof)
   skill/pixfx      the Claude Code skill (SKILL.md, knobs/, research notes)
   casters/         beanfx's four bundled casters
   NOTICE.md
 ```
 
-Functional core, imperative shell: `pixfx-core`, `pixfx-effects`, `pixfx-sfx` are pure; files, windows and audio
-devices live only in `pixfx-export`, `pixfx-cli`, `pixfx-gpui`.
+Functional core, imperative shell: `pixfx-core`, `pixfx-effects`, `pixfx-sfx` are pure; files, windows, canvases,
+the browser's animation loop and audio devices live only in `pixfx-export`, `pixfx-cli`, `pixfx-gpui`,
+`pixfx-wasm`, `pixfx-canvas`. Rules every shell shares live in the core (a time step is valid when
+`pixfx_core::valid_dt` says so; `Instance::update` ignores any other).
 
 ### The effect contract
 
@@ -132,9 +141,10 @@ trait plus a static `Meta`:
 
 ### Determinism (native == wasm, exactly)
 
-- All transcendental math (`sin`, `cos`, `atan2`, `pow`, `exp`, `sqrt`, `hypot`) in core/effects/sfx goes through
-  the **`libm`** crate, never `std` float methods, so both targets run the same software implementation.
-  Enforced by a clippy `disallowed_methods` list.
+- All transcendental and rounding math (`sin`, `cos`, `atan2`, `pow`, `exp`, `sqrt`, `hypot`, `floor`, `round`,
+  `mul_add`, …) in core/effects/sfx goes through the **`libm`** crate, never `std` float methods, so both targets
+  run the same software implementation. Enforced by a clippy `disallowed_methods` list covering every such `f64`
+  and `f32` method (`clippy.toml`).
 - One seeded RNG/hash in core (port of pixelfx `Rng`/`rand` hashing); no OS randomness anywhere in the core.
 - No `HashMap` iteration order in draw paths.
 - f64 throughout the core (pixelfx uses JS doubles).

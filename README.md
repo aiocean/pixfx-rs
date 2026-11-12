@@ -29,6 +29,9 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 Toolchain: `rust-toolchain.toml` pins the nightly and the wasm32 target. The commands below assume you are in
 the repo root.
 
+Optional: cargo's intermediate build files can go in one shared directory with
+`export CARGO_BUILD_BUILD_DIR=$PWD/target/build-dir`. Nothing needs it.
+
 The root workspace holds every crate except `crates/pixfx-gpui`, so a fresh clone builds and tests without
 anything else. `crates/pixfx-gpui` and `examples/gpui-web` are separate workspaces that need a local gpui
 fork; see [gpui](#gpui).
@@ -49,8 +52,12 @@ Parity compares every pixel of every frame with pixelfx's own render. It needs N
 
 ```sh
 git clone https://github.com/patch-gg/pixelfx /tmp/pixelfx
+git -C /tmp/pixelfx checkout 044e12a
 cargo run -p pixfx-cli -- parity fire/candle --pixelfx /tmp/pixelfx --out target/parity
 ```
+
+The ports match pixelfx commit `044e12a` (0.3.1) with 0 differing pixels; a later pixelfx may have changed an
+effect.
 
 It prints `colour x% differ, light y% differ` and `PASS` or `FAIL` (gate: both at most 0.5%), and writes a
 side-by-side `target/parity/<id>.side.gif`. Without `--pixelfx` it uses `$PIXELFX`, then `./pixelfx`. Exit
@@ -111,11 +118,12 @@ Run the demo:
 
 ```sh
 cd examples/gpui-web
-CARGO_BUILD_BUILD_DIR=$PWD/target/build-dir trunk serve --release
+trunk serve --release
 ```
 
-Open http://127.0.0.1:8090/ and click the page once. Add `?backend=webgl` or `?backend=webgpu` to force a
-renderer. The first build takes about 5 minutes; later builds take seconds.
+Open http://127.0.0.1:8090/ and click the page once: gpui throttles a page that does not have focus, so the
+effects run slowly until the page is focused. Add `?backend=webgl` or `?backend=webgpu` to force a renderer.
+The first build takes about 5 minutes; later builds take seconds.
 
 ## Credits
 
