@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import type { Counts, PixfxEffect } from "./effect";
 import { EffectManager } from "./effects";
-import { getEngine } from "./engine";
+import { flushPixfx, getBackend } from "./load";
 import type { LayerConfig, PixfxLayer } from "./layer";
 import type { Gfx } from "./gfx";
 
@@ -12,11 +12,9 @@ function phaserGfx(scene: Phaser.Scene): Gfx {
       const tex = scene.textures.createCanvas(key, width, height);
       if (!tex) throw new Error(`pixfx: texture key "${key}" is already in use`);
       tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
-      const data = tex.imageData;
       return {
-        pixels: data.data,
-        upload() {
-          tex.putData(data, 0, 0);
+        upload(rgba) {
+          tex.putData(new ImageData(rgba, width, height), 0, 0);
           tex.refresh();
         },
         destroy() {
@@ -45,7 +43,8 @@ function phaserGfx(scene: Phaser.Scene): Gfx {
 /**
  * Scene plugin: install with `{ key: "pixfx", plugin: PixfxPlugin, mapping: "pixfx" }` in the game's
  * `plugins.scene`, then `this.pixfx.play(id, x, y, opts)`. Effects advance on scene time (after the scene's `update()` and physics, so `follow` sees final positions) and are freed
- * when the scene shuts down or is destroyed.
+ * when the scene shuts down or is destroyed. The work every scene queued is sent to the effect workers once per
+ * game step, after all scenes updated.
  */
 export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   private readonly host: Phaser.Scene;
@@ -55,7 +54,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   constructor(scene: Phaser.Scene, pluginManager: Phaser.Plugins.PluginManager, pluginKey: string) {
     super(scene, pluginManager, pluginKey);
     this.host = scene;
-    this.effects = new EffectManager(phaserGfx(scene), getEngine, `pixfx:${scene.sys.settings.key}:`);
+    this.effects = new EffectManager(phaserGfx(scene), getBackend, `pixfx:${scene.sys.settings.key}:`);
   }
 
   override boot(): void {
@@ -64,6 +63,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     events.on(Phaser.Scenes.Events.PRE_RENDER, this.onPreRender);
     events.on(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown);
     events.once(Phaser.Scenes.Events.DESTROY, this.onDestroy);
+    this.game.events.on(Phaser.Core.Events.POST_STEP, this.onPostStep);
   }
 
   /** Play effect `id` with its origin at world (x, y). Throws on an unknown id, invalid options, or before `loadPixfx()`. */
@@ -90,11 +90,17 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     events.off(Phaser.Scenes.Events.PRE_RENDER, this.onPreRender);
     events.off(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown);
     events.off(Phaser.Scenes.Events.DESTROY, this.onDestroy);
+    this.game.events.off(Phaser.Core.Events.POST_STEP, this.onPostStep);
     super.destroy();
   }
 
   private readonly onUpdate = (_time: number, delta: number): void => {
     this.effects.update(delta, this.host.time.timeScale);
+  };
+
+  /** Its own function per plugin: `off` removes every listener sharing a function, and each scene has a plugin. */
+  private readonly onPostStep = (): void => {
+    flushPixfx();
   };
 
   private readonly onPreRender = (): void => {

@@ -1,10 +1,14 @@
 // Stress page: many effects at once, measured per frame. Open `stress.html?n=100&mix=mixed&mode=objects`, or
 // `stress.html?sweep=10,25,50,100` to step through counts and print a table (also on `window.pixfxStress`).
-// Frame cost is main-thread time from Phaser's PRE_STEP to POST_RENDER (update, effect drawing, uploads and the
-// render submission); fps is game steps per second, which also drops when the GPU falls behind.
+// `workers=N` sets the effect workers (0: draw on the main thread; default: the package default) and
+// `slowdown=K` stretches each worker batch K times (phone emulation: Chrome cannot CPU-throttle workers).
+// Frame cost is main-thread time from Phaser's PRE_STEP to POST_RENDER (update, inline effect drawing, layer
+// uploads and the render submission; uploads of frames arriving from workers happen between steps and are not
+// in it); fps is game steps per second, which also drops when the GPU falls behind.
 import Phaser from "phaser";
 import type { Counts, PixfxEffect, PixfxLayer } from "../src";
 import { PixfxPlugin, loadPixfx } from "../src";
+import { defaultWorkers } from "../src/load";
 
 const WIDTH = 640;
 const HEIGHT = 360;
@@ -24,6 +28,8 @@ interface Config {
 }
 
 interface Result extends Config {
+  workers: number;
+  slowdown: number;
   fps: number;
   cpuMedian: number;
   cpuP95: number;
@@ -64,6 +70,8 @@ const base: Config = {
   follow: Math.min(1, Math.max(0, num("follow", 0))),
   churn: Math.max(0, num("churn", 0)),
 };
+const WORKERS = params.has("workers") ? Math.max(0, Math.floor(num("workers", 0))) : defaultWorkers(navigator.hardwareConcurrency);
+const SLOWDOWN = Math.max(1, num("slowdown", 1));
 const WARM_MS = num("warm", 1000);
 const MEASURE_MS = num("measure", 3000);
 
@@ -159,11 +167,11 @@ function rendererType(): number {
 }
 
 function row(r: Result): string {
-  return [r.mode, r.mix, r.n, r.follow, r.churn, r.fps, r.cpuMedian, r.cpuP95, r.stats.textures].map(String).join("\t");
+  return [r.mode, r.mix, r.n, r.follow, r.churn, r.workers, r.slowdown, r.fps, r.cpuMedian, r.cpuP95, r.stats.textures].map(String).join("\t");
 }
 
 async function main(): Promise<void> {
-  await loadPixfx();
+  await loadPixfx({ workers: WORKERS, slowdown: SLOWDOWN });
   const scene = new StressScene();
   const game = new Phaser.Game({
     type: rendererType(),
@@ -191,7 +199,7 @@ async function main(): Promise<void> {
 
   const hud = document.getElementById("hud");
   const results: Result[] = [];
-  const header = "mode\tmix\tn\tfollow\tchurn\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
+  const header = "mode\tmix\tn\tfollow\tchurn\tworkers\tslowdown\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
 
   async function run(cfg: Config): Promise<Result> {
     scene.cfg = cfg;
@@ -206,6 +214,8 @@ async function main(): Promise<void> {
     const sorted = [...samples].sort((a, b) => a - b);
     const r: Result = {
       ...cfg,
+      workers: WORKERS,
+      slowdown: SLOWDOWN,
       fps: round2((samples.length * 1000) / elapsed),
       cpuMedian: round2(percentile(sorted, 0.5)),
       cpuP95: round2(percentile(sorted, 0.95)),

@@ -1,7 +1,6 @@
-import type { FxLike } from "./engine";
 import { snap } from "./pixels";
 
-export type EffectState = "playing" | "stopping" | "done" | "destroyed";
+export type EffectState = "playing" | "stopping" | "destroyed";
 
 export interface FollowTarget {
   x: number;
@@ -9,15 +8,16 @@ export interface FollowTarget {
   active: boolean;
 }
 
-/** One playing effect: position, follow target, stop/complete/destroy state. No Phaser, no rendering. */
+/** One playing effect's place and state: position, follow target, playing/stopping/destroyed. No Phaser, no engine. */
 export class EffectCore {
   state: EffectState = "playing";
   private target: FollowTarget | null = null;
   private dx = 0;
   private dy = 0;
 
+  /** @param origin where the effect's origin sits on its canvas. */
   constructor(
-    private readonly fx: FxLike,
+    private readonly origin: { originX: number; originY: number },
     private x: number,
     private y: number,
   ) {}
@@ -35,38 +35,33 @@ export class EffectCore {
     this.y = y;
   }
 
-  tick(dt: number): "running" | "completed" {
-    if (this.state === "done" || this.state === "destroyed") return "running";
-    if (this.target) {
-      if (this.target.active) {
-        this.x = this.target.x + this.dx;
-        this.y = this.target.y + this.dy;
-      } else {
-        this.target = null;
-        this.stop();
-      }
+  /** Move to the follow target. Returns false when the target went inactive: it is dropped and the effect stays where it was. */
+  track(): boolean {
+    if (!this.target) return true;
+    if (!this.target.active) {
+      this.target = null;
+      return false;
     }
-    this.fx.update(dt);
-    if (this.fx.done()) {
-      this.state = "done";
-      return "completed";
-    }
-    return "running";
+    this.x = this.target.x + this.dx;
+    this.y = this.target.y + this.dy;
+    return true;
   }
 
-  stop(): void {
-    if (this.state !== "playing") return;
+  /** Playing → stopping; false in any other state. */
+  stop(): boolean {
+    if (this.state !== "playing") return false;
     this.state = "stopping";
-    this.fx.stop();
+    return true;
   }
 
-  destroy(): void {
-    if (this.state === "destroyed") return;
+  /** → destroyed; false if it already was. */
+  destroy(): boolean {
+    if (this.state === "destroyed") return false;
     this.state = "destroyed";
-    this.fx.free();
+    return true;
   }
 
   topLeft(): { x: number; y: number } {
-    return { x: snap(this.x) - this.fx.originX(), y: snap(this.y) - this.fx.originY() };
+    return { x: snap(this.x) - this.origin.originX, y: snap(this.y) - this.origin.originY };
   }
 }

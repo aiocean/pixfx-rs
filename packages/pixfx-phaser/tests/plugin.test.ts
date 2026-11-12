@@ -1,73 +1,16 @@
 import { expect, mock, test } from "bun:test";
 import EventEmitter from "eventemitter3";
-import type { Engine, EngineOptions, FxLike } from "../src/engine";
-import { getEngine } from "../src/engine";
-import type { Gfx, GfxBlend, GfxImage, GfxTexture } from "../src/gfx";
+import type { Backend } from "../src/backend";
+import type { EngineOptions, FxLike } from "../src/engine";
+import { InlineBackend } from "../src/inline";
+import { getBackend } from "../src/load";
 import { FakeEngine } from "./fake-engine";
+import { FakeGfx } from "./fake-gfx";
 
 // Phaser's runtime needs a DOM. Phaser.Events.EventEmitter is a thin wrapper over eventemitter3,
 // the only Phaser value the Phaser-free effect code uses, so the test supplies exactly that.
 void mock.module("phaser", () => ({ default: { Events: { EventEmitter } } }));
 const { EffectManager } = await import("../src/effects");
-
-class FakeTexture implements GfxTexture {
-  readonly pixels: Uint8ClampedArray;
-  uploads = 0;
-  destroyed = false;
-  constructor(
-    readonly key: string,
-    readonly width: number,
-    readonly height: number,
-  ) {
-    this.pixels = new Uint8ClampedArray(width * height * 4);
-  }
-  upload(): void {
-    this.uploads += 1;
-  }
-  destroy(): void {
-    this.destroyed = true;
-  }
-}
-
-class FakeImage implements GfxImage {
-  x = Number.NaN;
-  y = Number.NaN;
-  depth = Number.NaN;
-  destroyed = false;
-  constructor(
-    readonly key: string,
-    readonly blend: GfxBlend,
-    readonly scrollFactor: number,
-  ) {}
-  setPosition(x: number, y: number): void {
-    this.x = x;
-    this.y = y;
-  }
-  setDepth(depth: number): void {
-    this.depth = depth;
-  }
-  destroy(): void {
-    this.destroyed = true;
-  }
-}
-
-class FakeGfx implements Gfx {
-  readonly textures: FakeTexture[] = [];
-  readonly images: FakeImage[] = [];
-  texture(key: string, width: number, height: number): FakeTexture {
-    const t = new FakeTexture(key, width, height);
-    this.textures.push(t);
-    return t;
-  }
-  image(key: string, blend: GfxBlend, scrollFactor: number): FakeImage {
-    const i = new FakeImage(key, blend, scrollFactor);
-    this.images.push(i);
-    return i;
-  }
-  uploads(): number {
-    return this.textures.reduce((n, t) => n + t.uploads, 0);
-  }
-}
 
 /** Records the options handed to the engine. */
 class SpyEngine extends FakeEngine {
@@ -82,7 +25,8 @@ class SpyEngine extends FakeEngine {
 function setup() {
   const engine = new SpyEngine();
   const gfx = new FakeGfx();
-  const fx = new EffectManager(gfx, (): Engine => engine, "pixfx:test:");
+  const backend = new InlineBackend(engine);
+  const fx = new EffectManager(gfx, (): Backend => backend, "pixfx:test:");
   return { engine, gfx, fx };
 }
 
@@ -99,7 +43,7 @@ test("play of an unknown id throws naming the id and creates nothing", () => {
 
 test("play before loadPixfx throws the load error", () => {
   const gfx = new FakeGfx();
-  const fx = new EffectManager(gfx, getEngine, "pixfx:test:");
+  const fx = new EffectManager(gfx, getBackend, "pixfx:test:");
   expect(() => fx.play("fake/spark", 0, 0)).toThrow(new Error("pixfx: call await loadPixfx() before play()"));
   expect(fx.stats()).toEqual(EMPTY);
   expect(gfx.textures.length).toBe(0);

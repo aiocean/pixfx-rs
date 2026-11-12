@@ -1,12 +1,10 @@
 /** How an image blends onto what is beneath it. `add`: dst.rgb += src.rgb. */
 export type GfxBlend = "normal" | "add";
 
-/** A pixel-crisp RGBA texture the effect writes into, then uploads. */
+/** A pixel-crisp RGBA texture. */
 export interface GfxTexture {
-  /** `width × height × 4` RGBA bytes, row-major. */
-  readonly pixels: Uint8ClampedArray;
-  /** Push `pixels` to the renderer. */
-  upload(): void;
+  /** Show `rgba` (`width × height × 4` bytes, row-major, straight alpha); the bytes are copied, not kept. */
+  upload(rgba: Uint8ClampedArray<ArrayBuffer>): void;
   /** Remove the texture from the game. */
   destroy(): void;
 }

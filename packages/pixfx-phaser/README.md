@@ -55,6 +55,23 @@ class MyScene extends Phaser.Scene {
 
 `play()` before `loadPixfx()` has resolved throws `pixfx: call await loadPixfx() before play()`.
 
+### Worker threads
+
+`loadPixfx()` starts worker threads that draw the effects, one per core the main thread leaves free (1 to 4),
+each with its own copy of the engine. The pixels are exactly those the engine draws on the main thread; a new
+frame shows one display frame after the scene step that asked for it, and `"complete"` fires when the worker
+reports the effect finished. Each effect stays in one worker for its life. `play()` still validates the id and
+options on the main thread and throws at once.
+
+```ts
+await loadPixfx({ workers: 2 }); // a fixed number of workers
+await loadPixfx({ workers: 0 }); // draw on the main thread
+```
+
+Without `Worker` support effects draw on the main thread. Options apply to the first call; later calls return
+the loaded engine. The worker is bundled by Vite from `new Worker(new URL(...), { type: "module" })`, with no
+plugin.
+
 ## Play an effect
 
 `scene.pixfx.play(id, x, y, opts?)` places the effect's origin at world `(x, y)` and returns a `PixfxEffect`.

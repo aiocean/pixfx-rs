@@ -1,12 +1,14 @@
+import type { FrameBuffers } from "./backend";
 import type { Counts, Layer, Layers } from "./effect";
-import type { FxLike } from "./engine";
 
-/** Where one effect draws: its own four images, or a share of a layer's. */
+/** Where one effect is shown: its own four images, or a share of a layer's. */
 export interface Surface {
   /** Set the depths of the back and front image pairs (a shared surface ignores it). */
   setDepths(back: number, front: number): void;
-  /** Show `fx` with its top-left at `topLeft`; `redraw` is true when the effect's pixels changed. */
-  show(fx: FxLike, topLeft: { x: number; y: number }, redraw: boolean): void;
+  /** Show a new frame. Returns a frame no longer read (this one or an older one), or null. */
+  show(frame: FrameBuffers): FrameBuffers | null;
+  /** Put the effect's top-left at `topLeft`. */
+  moveTo(topLeft: { x: number; y: number }): void;
   /** Free what the surface holds for this effect. */
   release(): void;
 }
@@ -29,11 +31,17 @@ export class OwnSurface implements Surface {
     this.layers.frontLight.image.setDepth(front);
   }
 
-  show(fx: FxLike, topLeft: { x: number; y: number }, redraw: boolean): void {
-    if (redraw) {
-      this.draw(fx, "back", this.layers.backColor, this.layers.backLight);
-      this.draw(fx, "front", this.layers.frontColor, this.layers.frontLight);
-    }
+  /** Uploads at once, so the frame comes straight back. */
+  show(frame: FrameBuffers): FrameBuffers {
+    const [backColor, backLight, frontColor, frontLight] = frame;
+    this.layers.backColor.texture.upload(new Uint8ClampedArray(backColor));
+    this.layers.backLight.texture.upload(new Uint8ClampedArray(backLight));
+    this.layers.frontColor.texture.upload(new Uint8ClampedArray(frontColor));
+    this.layers.frontLight.texture.upload(new Uint8ClampedArray(frontLight));
+    return frame;
+  }
+
+  moveTo(topLeft: { x: number; y: number }): void {
     for (const l of this.all) l.image.setPosition(topLeft.x, topLeft.y);
   }
 
@@ -44,13 +52,5 @@ export class OwnSurface implements Surface {
       l.texture.destroy();
       this.counts.textures -= 1;
     }
-  }
-
-  private draw(fx: FxLike, which: "back" | "front", color: Layer, light: Layer): void {
-    fx.draw(which);
-    color.texture.pixels.set(fx.colorRgba());
-    color.texture.upload();
-    light.texture.pixels.set(fx.lightRgba());
-    light.texture.upload();
   }
 }

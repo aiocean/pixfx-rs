@@ -1,9 +1,11 @@
 import { z } from "zod";
+import type * as Wasm from "../wasm/pixfx_wasm.js";
 import type { EngineOptions, PlayOptions } from "./options";
 import { engineOptions, parsePlayOptions } from "./options";
 
 export type { EngineOptions };
 
+/** One engine instance of an effect. */
 export interface FxLike {
   update(dt: number): void;
   stop(): void;
@@ -14,8 +16,6 @@ export interface FxLike {
   originX(): number;
   originY(): number;
   draw(layer: "back" | "front"): void;
-  color(): Uint32Array;
-  light(): Uint32Array;
   /** The colour layer as RGBA bytes (straight alpha); a view valid until the next call on this instance. */
   colorRgba(): Uint8ClampedArray;
   /** The light layer as RGBA bytes (lit pixels opaque, unlit `0,0,0,0`); valid until the next call. */
@@ -45,15 +45,10 @@ export interface Engine {
   create(id: string, opts: EngineOptions): FxLike;
 }
 
-let loaded: Engine | null = null;
-
-/** Load the wasm module once and return the engine; `getEngine()` works after this resolves. */
-export async function loadPixfx(): Promise<Engine> {
-  if (loaded) return loaded;
-  const wasm = await import("../wasm/pixfx_wasm.js");
-  const { memory } = await wasm.default();
+/** The engine over an initialised wasm module (`memory` is what its default init resolved to). */
+export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engine {
   const ids = z.array(z.string()).parse(wasm.effects());
-  loaded = {
+  return {
     effects: () => ids,
     meta: (id) => effectMetaSchema.parse(wasm.meta(id)),
     create: (id, opts) => {
@@ -71,26 +66,26 @@ export async function loadPixfx(): Promise<Engine> {
         originX: () => fx.originX(),
         originY: () => fx.originY(),
         draw: (layer) => fx.draw(layer),
-        color: () => fx.color(),
-        light: () => fx.light(),
         colorRgba: () => view(fx.colorRgbaPtr()),
         lightRgba: () => view(fx.lightRgbaPtr()),
         free: () => fx.free(),
       };
     },
   };
-  return loaded;
 }
 
-export function getEngine(): Engine {
-  if (!loaded) throw new Error("pixfx: call await loadPixfx() before play()");
-  return loaded;
+/** A validated play: what to hand the engine, and the Phaser-side options. */
+export interface Prepared {
+  id: string;
+  play: PlayOptions;
+  engineOpts: EngineOptions;
+  fps: number;
 }
 
-/** Validate `opts` and create an engine instance for `id`; throws on an unknown id or invalid options. */
-export function spawnFx(engine: Engine, id: string, opts: unknown): { fx: FxLike; play: PlayOptions; fps: number } {
+/** Validate `opts` and `id` for `engine`; throws on an unknown id or invalid options. Creates nothing. */
+export function prepare(engine: Engine, id: string, opts: unknown): Prepared {
   const play = parsePlayOptions(opts);
   if (!engine.effects().includes(id)) throw new Error(`pixfx: unknown effect "${id}"`);
   const meta = engine.meta(id);
-  return { fx: engine.create(id, engineOptions(play, meta.glowMargin)), play, fps: meta.fps };
+  return { id, play, engineOpts: engineOptions(play, meta.glowMargin), fps: meta.fps };
 }

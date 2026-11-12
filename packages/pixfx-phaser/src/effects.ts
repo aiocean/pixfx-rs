@@ -1,9 +1,8 @@
 import { stepSeconds } from "./clock";
 import type { Counts, Layer, Layers } from "./effect";
 import { PixfxEffect } from "./effect";
-import type { Engine } from "./engine";
+import type { Backend } from "./backend";
 import type { Gfx, GfxBlend, GfxImage, GfxTexture } from "./gfx";
-import { spawnFx } from "./engine";
 import { OwnSurface } from "./surface";
 import { PixfxLayer } from "./layer";
 import type { LayerConfig } from "./layer";
@@ -19,25 +18,25 @@ export class EffectManager {
 
   /**
    * @param gfx creates textures and images.
-   * @param engine returns the loaded engine (throws before `loadPixfx()` resolves).
+   * @param backend returns where effects run (throws before `loadPixfx()` resolves).
    * @param keyPrefix makes texture keys unique in the game-wide texture manager.
    */
   constructor(
     private readonly gfx: Gfx,
-    private readonly engine: () => Engine,
+    private readonly backend: () => Backend,
     private readonly keyPrefix: string,
   ) {}
 
   /** Play effect `id` with its origin at world (x, y). Throws on an unknown id or invalid options. */
   play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
-    const { fx, play: p, fps } = spawnFx(this.engine(), id, opts);
+    const { instance, play: p } = this.backend().spawn(id, opts);
     this.counts.engines += 1;
     const n = this.nextId++;
     const textures: GfxTexture[] = [];
     const images: GfxImage[] = [];
     const layer = (name: string, blend: GfxBlend): Layer => {
       const key = `${this.keyPrefix}${n}-${name}`;
-      const texture = this.gfx.texture(key, fx.width(), fx.height());
+      const texture = this.gfx.texture(key, instance.shape.width, instance.shape.height);
       textures.push(texture);
       this.counts.textures += 1;
       const image = this.gfx.image(key, blend, p.scrollFactor);
@@ -52,7 +51,7 @@ export class EffectManager {
         frontColor: layer("front-color", "normal"),
         frontLight: layer("front-light", "add"),
       };
-      const effect = new PixfxEffect(fx, fps, x, y, new OwnSurface(layers, this.counts), p.depth ?? DEFAULT_DEPTHS, this.counts, (e) =>
+      const effect = new PixfxEffect(instance, x, y, new OwnSurface(layers, this.counts), p.depth ?? DEFAULT_DEPTHS, this.counts, (e) =>
         this.live.delete(e),
       );
       this.live.add(effect);
@@ -62,7 +61,7 @@ export class EffectManager {
       for (const t of textures) t.destroy();
       this.counts.images -= images.length;
       this.counts.textures -= textures.length;
-      fx.free();
+      instance.free();
       this.counts.engines -= 1;
       throw err;
     }
@@ -70,7 +69,7 @@ export class EffectManager {
 
   /** A layer: effects played into it share four textures covering `cfg.bounds`. Throws on an invalid config. */
   createLayer(cfg: LayerConfig): PixfxLayer {
-    const layer = new PixfxLayer(cfg, this.gfx, this.engine, `${this.keyPrefix}L${this.nextId++}-`, this.counts, (l) =>
+    const layer = new PixfxLayer(cfg, this.gfx, this.backend, `${this.keyPrefix}L${this.nextId++}-`, this.counts, (l) =>
       this.layers.delete(l),
     );
     this.layers.add(layer);

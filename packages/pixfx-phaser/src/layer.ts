@@ -1,8 +1,7 @@
 import { z } from "zod";
+import type { Backend, FrameBuffers, Shape } from "./backend";
 import type { Counts, Layer, Layers } from "./effect";
 import { PixfxEffect } from "./effect";
-import type { Engine, FxLike } from "./engine";
-import { spawnFx } from "./engine";
 import type { Gfx, GfxBlend, GfxImage, GfxTexture } from "./gfx";
 import { clipRect } from "./layout";
 import type { Rect } from "./layout";
@@ -33,22 +32,32 @@ export function parseLayerConfig(input: unknown): z.output<typeof layerConfigSch
   throw new Error(`pixfx: invalid layer config (${msg})`);
 }
 
-/** One member's share of a layer: remembers what the effect shows; the layer composites it. */
+/** One member's share of a layer: keeps the member's latest frame and place; the layer composites them. */
 class LayerSurface implements Surface {
-  fx: FxLike | null = null;
+  frame: FrameBuffers | null = null;
   topLeft = { x: 0, y: 0 };
 
-  constructor(private readonly layer: PixfxLayer) {}
+  constructor(
+    private readonly layer: PixfxLayer,
+    readonly shape: Shape,
+  ) {}
 
   /** No-op: the layer owns the depths of its four images. */
   setDepths(): void {}
 
-  /** Redraw the layer when this member's pixels changed or it moved; a still, unchanged member costs nothing. */
-  show(fx: FxLike, topLeft: { x: number; y: number }, redraw: boolean): void {
-    const moved = this.fx !== fx || topLeft.x !== this.topLeft.x || topLeft.y !== this.topLeft.y;
-    this.fx = fx;
+  /** Keep the new frame for the next composite; the previous one is no longer read. */
+  show(frame: FrameBuffers): FrameBuffers | null {
+    const old = this.frame;
+    this.frame = frame;
+    this.layer.invalidate();
+    return old;
+  }
+
+  /** Redraw the layer when the member moved; a still member costs nothing. */
+  moveTo(topLeft: { x: number; y: number }): void {
+    if (topLeft.x === this.topLeft.x && topLeft.y === this.topLeft.y) return;
     this.topLeft = topLeft;
-    if (redraw || moved) this.layer.invalidate();
+    this.layer.invalidate();
   }
 
   release(): void {
@@ -64,6 +73,8 @@ class LayerSurface implements Surface {
 export class PixfxLayer {
   private readonly bounds: Rect;
   private readonly textures: readonly GfxTexture[];
+  /** What the four textures show, composited here and uploaded on each redraw. */
+  private readonly pixels: Record<keyof Layers, Uint8ClampedArray<ArrayBuffer>>;
   private readonly images: readonly GfxImage[];
   private readonly members = new Set<PixfxEffect>();
   private readonly surfaces = new Set<LayerSurface>();
@@ -75,7 +86,7 @@ export class PixfxLayer {
   constructor(
     cfg: unknown,
     gfx: Gfx,
-    private readonly engine: () => Engine,
+    private readonly backend: () => Backend,
     keyPrefix: string,
     private readonly counts: Counts,
     private readonly onGone: (layer: PixfxLayer) => void,
@@ -100,6 +111,8 @@ export class PixfxLayer {
     };
     this.layers = layers;
     this.textures = made.map((l) => l.texture);
+    const bytes = (): Uint8ClampedArray<ArrayBuffer> => new Uint8ClampedArray(this.bounds.w * this.bounds.h * 4);
+    this.pixels = { backColor: bytes(), backLight: bytes(), frontColor: bytes(), frontLight: bytes() };
     this.images = made.map((l) => l.image);
     counts.textures += this.textures.length;
     counts.images += this.images.length;
@@ -108,19 +121,19 @@ export class PixfxLayer {
   /** Play effect `id` with its origin at world (x, y), drawn into this layer. Throws on an unknown id or invalid options. */
   play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
     if (this.destroyed) throw new Error("pixfx: layer is destroyed");
-    const { fx, fps } = spawnFx(this.engine(), id, opts);
+    const { instance } = this.backend().spawn(id, opts);
     this.counts.engines += 1;
-    const surface = new LayerSurface(this);
+    const surface = new LayerSurface(this, instance.shape);
     this.surfaces.add(surface);
     try {
-      const effect = new PixfxEffect(fx, fps, x, y, surface, { back: 0, front: 1 }, this.counts, (e) => {
+      const effect = new PixfxEffect(instance, x, y, surface, { back: 0, front: 1 }, this.counts, (e) => {
         this.members.delete(e);
       });
       this.members.add(effect);
       return effect;
     } catch (err) {
       this.surfaces.delete(surface);
-      fx.free();
+      instance.free();
       this.counts.engines -= 1;
       throw err;
     }
@@ -163,21 +176,35 @@ export class PixfxLayer {
 
   private flush(): void {
     this.dirty = false;
-    const { backColor, backLight, frontColor, frontLight } = this.layers;
-    for (const l of [backColor, backLight, frontColor, frontLight]) l.texture.pixels.fill(0);
+    const p = this.pixels;
+    for (const px of [p.backColor, p.backLight, p.frontColor, p.frontLight]) px.fill(0);
     for (const s of this.surfaces) {
-      if (!s.fx) continue;
-      this.compose(s.fx, s.topLeft, "back", backColor, backLight);
-      this.compose(s.fx, s.topLeft, "front", frontColor, frontLight);
+      if (!s.frame) continue;
+      const [backColor, backLight, frontColor, frontLight] = s.frame;
+      this.compose(s.shape, s.topLeft, backColor, backLight, p.backColor, p.backLight);
+      this.compose(s.shape, s.topLeft, frontColor, frontLight, p.frontColor, p.frontLight);
     }
-    for (const t of this.textures) t.upload();
+    const l = this.layers;
+    l.backColor.texture.upload(p.backColor);
+    l.backLight.texture.upload(p.backLight);
+    l.frontColor.texture.upload(p.frontColor);
+    l.frontLight.texture.upload(p.frontLight);
   }
 
-  private compose(fx: FxLike, at: { x: number; y: number }, which: "back" | "front", color: Layer, light: Layer): void {
-    const w = fx.width();
-    const clip = clipRect(this.bounds, { x: at.x, y: at.y, w, h: fx.height() });
+  /**
+   * Composite one side of a member: its colour RGBA read as ABGR words, its light RGBA as light words (alpha 255
+   * where lit, which `compositeLight` masks off).
+   */
+  private compose(
+    shape: Shape,
+    at: { x: number; y: number },
+    color: ArrayBuffer,
+    light: ArrayBuffer,
+    colorOut: Uint8ClampedArray,
+    lightOut: Uint8ClampedArray,
+  ): void {
+    const clip = clipRect(this.bounds, { x: at.x, y: at.y, w: shape.width, h: shape.height });
     if (!clip) return;
-    fx.draw(which);
     const blit = {
       srcX: clip.x - at.x,
       srcY: clip.y - at.y,
@@ -185,10 +212,10 @@ export class PixfxLayer {
       dstY: clip.y - this.bounds.y,
       w: clip.w,
       h: clip.h,
-      srcStride: w,
+      srcStride: shape.width,
       dstStride: this.bounds.w,
     };
-    compositeColor(fx.color(), color.texture.pixels, blit);
-    compositeLight(fx.light(), light.texture.pixels, blit);
+    compositeColor(new Uint32Array(color), colorOut, blit);
+    compositeLight(new Uint32Array(light), lightOut, blit);
   }
 }

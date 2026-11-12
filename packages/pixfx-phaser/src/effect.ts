@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import type { FxLike } from "./engine";
+import type { FrameBuffers, FxInstance } from "./backend";
 import type { GfxImage, GfxTexture } from "./gfx";
 import type { FollowTarget } from "./lifecycle";
 import { EffectCore } from "./lifecycle";
@@ -33,13 +33,10 @@ export interface Layers {
  */
 export class PixfxEffect extends Phaser.Events.EventEmitter {
   private readonly core: EffectCore;
-  /** Index of the effect frame (at its authored fps) last drawn. */
-  private shown: number;
 
-  /** @internal Created by the plugin's `play()`. `fps` is the effect's authored frame rate (`meta.fps`). */
+  /** @internal Created by the plugin's `play()`. */
   constructor(
-    private readonly fx: FxLike,
-    private readonly fps: number,
+    private readonly instance: FxInstance,
     x: number,
     y: number,
     private readonly surface: Surface,
@@ -48,15 +45,15 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     private readonly onGone: (effect: PixfxEffect) => void,
   ) {
     super();
-    this.core = new EffectCore(fx, x, y);
+    this.core = new EffectCore(instance.shape, x, y);
     this.setDepths(depths.back, depths.front);
-    this.shown = this.frameIndex();
-    this.render();
+    this.place();
+    instance.start({ frame: (f) => this.show(f), done: () => this.complete() });
   }
 
   /** Let it end: loops fade out, one-shots are cut short. Does nothing once finished. */
   stop(): this {
-    this.core.stop();
+    if (this.core.stop()) this.instance.stop();
     return this;
   }
 
@@ -81,50 +78,48 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
 
   /** Move to a world position; stops following. */
   setPosition(x: number, y: number): this {
-    if (this.core.state === "destroyed") return this;
+    if (this.gone()) return this;
     this.core.moveTo(x, y);
     this.place();
     return this;
   }
 
   /**
-   * @internal Advance by `dt` seconds of scene time. Draws and uploads only when the effect reached a new
-   * frame of its authored fps (the frame shown is the engine's frame at the current time); otherwise only
-   * moves the images, so a follow target is tracked every display frame.
+   * @internal Advance by `dt` seconds of scene time and move the images to the effect's place, so a follow
+   * target is tracked every display frame. New frames of the effect arrive from its instance (at once on the
+   * main thread, in the reply from a worker).
    */
   step(dt: number): void {
-    if (dt <= 0 || this.core.state === "destroyed") return;
-    if (this.core.tick(dt) === "completed") {
-      this.release();
-      this.emit("complete", this);
-      this.removeAllListeners();
-      return;
-    }
-    const frame = this.frameIndex();
-    if (frame === this.shown) {
-      this.place();
-      return;
-    }
-    this.shown = frame;
-    this.render();
+    if (dt <= 0 || this.gone()) return;
+    if (!this.core.track()) this.stop();
+    this.instance.advance(dt); // may complete the effect
+    if (!this.gone()) this.place();
   }
 
-  private frameIndex(): number {
-    return Math.floor(this.fx.t() * this.fps);
+  private gone(): boolean {
+    return this.core.state === "destroyed";
   }
 
-  private render(): void {
-    this.surface.show(this.fx, this.core.topLeft(), true);
+  private show(frame: FrameBuffers): void {
+    if (this.gone()) return;
+    const old = this.surface.show(frame);
+    if (old) this.instance.recycle(old);
   }
 
   private place(): void {
-    this.surface.show(this.fx, this.core.topLeft(), false);
+    this.surface.moveTo(this.core.topLeft());
+  }
+
+  private complete(): void {
+    if (!this.release()) return;
+    this.emit("complete", this);
+    this.removeAllListeners();
   }
 
   /** Free everything once; false if it was already gone. */
   private release(): boolean {
-    if (this.core.state === "destroyed") return false;
-    this.core.destroy();
+    if (!this.core.destroy()) return false;
+    this.instance.free();
     this.counts.engines -= 1;
     this.surface.release();
     this.onGone(this);
