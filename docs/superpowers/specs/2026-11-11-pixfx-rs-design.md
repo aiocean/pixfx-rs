@@ -158,8 +158,8 @@ falloff `(1-d)^2 * k`), composited on top; over transparency light becomes colou
 ### Live engine in gpui
 
 `pixfx-gpui` owns a frame buffer per effect instance, ticks it from gpui's frame callback, converts to
-`RenderImage` and paints it. Pixel-crisp scaling is done on the CPU (integer upscale to whole device pixels)
-because gpui samples images linearly; if the gpui change below adds a nearest sampler, use that instead.
+`RenderImage` at the effect's own size and paints it scaled with gpui's `SpriteFilter::Nearest`, so the GPU
+enlarges each effect pixel to a crisp block.
 
 **Additive light (top risk, first spike).** The colour layer paints as a normal alpha image; the light layer
 paints as an image with an *additive* blend mode. That requires a gpui change: a blend mode on

@@ -14,7 +14,6 @@ publish = false
 anyhow = "=1.0.104"
 gpui = { path = "../../../zed-gpui/crates/gpui", default-features = false }
 image = { version = "=0.25.10", default-features = false }
-libm = "0.2"
 pixfx-core = { path = "../pixfx-core" }
 
 [lints.rust]

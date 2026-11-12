@@ -1630,7 +1630,6 @@ dependencies = [
  "anyhow",
  "gpui",
  "image",
- "libm",
  "pixfx-core",
 ]
 
