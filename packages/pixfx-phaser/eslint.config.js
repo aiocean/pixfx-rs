@@ -1,7 +1,7 @@
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["wasm/", "node_modules/", "dist/"] },
+  { ignores: ["wasm/", "node_modules/", "**/dist/"] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: { parserOptions: { projectService: { allowDefaultProject: ["eslint.config.js"] }, tsconfigRootDir: import.meta.dirname } },

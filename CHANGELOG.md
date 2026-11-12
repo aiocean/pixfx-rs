@@ -11,4 +11,5 @@
 - `pixfx-wasm`: JS bindings (`effects`, `meta`, `Fx`) and a browser demo.
 - `pixfx-canvas`: a Canvas 2D renderer with its own loop (`Stage`), `update` + `drawLayer("back"|"front")` for hosts that draw sprites between an effect's layers, and a browser demo.
 - `pixfx-gpui` and `examples/gpui-web`: live playback inside gpui on the web.
+- `pixfx-phaser`: Phaser 4 scene plugin playing effects as per-effect images or in scene-wide layers, with a demo.
 - `parity/LEDGER.md`: record of approved parity misses (empty).
