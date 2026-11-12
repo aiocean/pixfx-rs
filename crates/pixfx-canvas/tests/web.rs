@@ -14,7 +14,10 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 fn spawn(id: &str, opts: &JsValue) -> Result<Player, JsValue> {
     let fx = effect(id).ok_or("not registered")?;
-    Ok(live_player(fx, parse_options(opts).map_err(JsValue::from)?))
+    Ok(live_player(
+        fx,
+        parse_options(opts).map_err(JsValue::from)?.0,
+    ))
 }
 
 #[wasm_bindgen_test]

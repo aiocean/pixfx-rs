@@ -2,9 +2,9 @@
 #![cfg(target_arch = "wasm32")]
 
 use js_sys::{Array, Object, Reflect};
-use pixfx_core::{Options, render_frames};
+use pixfx_core::{Layer, Options, render_frames};
 use pixfx_effects::effect;
-use pixfx_wasm::{Fx, effects, meta};
+use pixfx_wasm::{Fx, Player, effects, meta};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -132,5 +132,82 @@ fn bad_dt_errors_and_leaves_time_alone() -> Result<(), JsValue> {
     assert_eq!(live.t(), before, "a rejected update moved time");
     live.update(0.0).map_err(JsValue::from)?;
     assert_eq!(live.t(), before);
+    Ok(())
+}
+
+fn error_text(e: impl Into<JsValue>) -> String {
+    get(&e.into(), "message")
+        .ok()
+        .and_then(|m| m.as_string())
+        .unwrap_or_default()
+}
+
+#[wasm_bindgen_test]
+fn margin_option_grows_the_canvas() -> Result<(), JsValue> {
+    let fx = effect("fire/campfire").ok_or("campfire not registered")?;
+    let want = fx.meta();
+    let m = get(&meta("fire/campfire").map_err(JsValue::from)?, "glowMargin")?
+        .as_f64()
+        .ok_or("meta has no glowMargin")? as u32;
+    assert_eq!(m, want.glow_margin());
+    let live =
+        Fx::new("fire/campfire", obj(&[("margin", JsValue::from(m))])?).map_err(JsValue::from)?;
+    assert_eq!(live.width(), want.size.0 + 2 * m);
+    assert_eq!(live.height(), want.size.1 + 2 * m);
+    assert_eq!(live.origin_x(), want.origin.0 + m as i32);
+    assert_eq!(live.origin_y(), want.origin.1 + m as i32);
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn margin_frames_match_player() -> Result<(), JsValue> {
+    let fx = effect("fire/campfire").ok_or("campfire not registered")?;
+    let m = fx.meta().glow_margin();
+    let mut want = Player::new(fx, Options::default(), m);
+    let mut live =
+        Fx::new("fire/campfire", obj(&[("margin", JsValue::from(m))])?).map_err(JsValue::from)?;
+    for _ in 0..3 {
+        want.update(1.0 / 30.0);
+        live.update(1.0 / 30.0).map_err(JsValue::from)?;
+    }
+    want.draw(Layer::Both);
+    live.draw("both").map_err(JsValue::from)?;
+    assert_eq!(live.color().to_vec(), want.frame().color);
+    assert_eq!(live.light().to_vec(), want.frame().light);
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn bad_margin_errors() -> Result<(), JsValue> {
+    for bad in [
+        JsValue::from(-1),
+        JsValue::from(1.5),
+        JsValue::from_str("x"),
+    ] {
+        let Err(e) = Fx::new("fire/candle", obj(&[("margin", bad.clone())])?) else {
+            return Err(format!("margin {bad:?} was accepted").into());
+        };
+        let text = error_text(e);
+        assert!(
+            text.contains("margin"),
+            "error does not name margin: {text}"
+        );
+    }
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn default_margin_unchanged() -> Result<(), JsValue> {
+    let fx = effect("fire/candle").ok_or("candle not registered")?;
+    let mut want = Player::new(fx, Options::default(), 0);
+    let mut live = Fx::new("fire/candle", JsValue::UNDEFINED).map_err(JsValue::from)?;
+    assert_eq!((live.width(), live.height()), fx.meta().size);
+    assert_eq!(live.origin_x(), fx.meta().origin.0);
+    want.update(0.1);
+    live.update(0.1).map_err(JsValue::from)?;
+    want.draw(Layer::Both);
+    live.draw("both").map_err(JsValue::from)?;
+    assert_eq!(live.color().to_vec(), want.frame().color);
+    assert_eq!(live.light().to_vec(), want.frame().light);
     Ok(())
 }

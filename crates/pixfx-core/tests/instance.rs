@@ -381,3 +381,14 @@ fn find_looks_effects_up_by_id() {
     assert!(find(list, "test/nope").is_none());
     assert!(find(&[], "test/dot").is_none());
 }
+
+#[test]
+fn glow_margin_is_half_the_longer_side() {
+    // 64 x 4 canvas: the longer side decides
+    assert_eq!(dot_meta("test/dot", true).glow_margin(), 32);
+    let tall = Meta {
+        size: (30, 129),
+        ..dot_meta("test/tall", true)
+    };
+    assert_eq!(tall.glow_margin(), 64);
+}

@@ -4,9 +4,7 @@
 use std::error::Error;
 use std::num::NonZeroU32;
 
-use pixfx_canvas::stage::{
-    Pass, Rect, Scene, StageError, color_rgba, light_rgba, live_player, margin,
-};
+use pixfx_canvas::stage::{Pass, Rect, Scene, StageError, color_rgba, light_rgba, live_player};
 use pixfx_core::{
     Effect, EffectState, Frame, Layer, Meta, Options, Painter, Rgba, composite_px, render_frames,
 };
@@ -327,7 +325,7 @@ fn the_origin_lands_where_the_caller_put_it() -> Res {
     for id in ["fire/candle", "fire/campfire", "fire/brazier"] {
         let p = player(id)?;
         let (o, m) = (p.meta().origin, i64::from(p.margin()));
-        assert_eq!(p.margin(), margin(p.meta()));
+        assert_eq!(p.margin(), p.meta().glow_margin());
         let h = scene.play(p, 40.0, 90.0, ())?;
         let r = scene.rect(h).ok_or("no rect")?;
         assert_eq!(
@@ -376,7 +374,7 @@ fn player_frames_equal_render_frames_at_its_margin() -> Res {
         ..Options::default()
     };
     let fps = f64::from(fx.meta().fps);
-    for m in [0, margin(fx.meta())] {
+    for m in [0, fx.meta().glow_margin()] {
         let want = render_frames(fx, &opts, m).frames;
         let mut live = Player::new(fx, opts.clone(), m);
         let mut stepped = 0;

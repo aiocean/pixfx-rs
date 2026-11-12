@@ -7,14 +7,16 @@ use wasm_bindgen::{JsError, JsValue};
 /// Largest integer a JS number holds exactly (`Number.MAX_SAFE_INTEGER`).
 const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 
-/// `undefined`/`null` (all defaults) or a plain object: `seed` (non-negative integer), `flip` (boolean),
+/// `undefined`/`null` (all defaults) or a plain object: `margin` (non-negative integer: empty pixels round the
+/// canvas, returned beside the options because it is the canvas's, not the effect's), `seed` (non-negative integer), `flip` (boolean),
 /// `angle` (radians), `light` (glow strength), `palette` (array of `"#rgb"`/`"#rrggbb"` strings); any other key is
 /// the effect's own option, a number or an array of hex colours. `x`/`y` are refused: an instance draws on its
 /// own canvas at the effect's origin. A field of the wrong type is an error naming it.
-pub fn parse_options(v: &JsValue) -> Result<Options, JsError> {
+pub fn parse_options(v: &JsValue) -> Result<(Options, u32), JsError> {
     let mut opts = Options::default();
+    let mut margin = 0;
     if v.is_undefined() || v.is_null() {
-        return Ok(opts);
+        return Ok((opts, margin));
     }
     if !v.is_object() || Array::is_array(v) {
         return Err(JsError::new("options must be an object"));
@@ -27,7 +29,8 @@ pub fn parse_options(v: &JsValue) -> Result<Options, JsError> {
             continue;
         }
         match key.as_str() {
-            "seed" => opts.seed = Some(seed(&val)?),
+            "margin" => margin = whole_number(&key, &val, u32::MAX.into())? as u32,
+            "seed" => opts.seed = Some(whole_number(&key, &val, MAX_SAFE_INTEGER)? as u64),
             "flip" => {
                 opts.flip = val
                     .as_bool()
@@ -55,7 +58,7 @@ pub fn parse_options(v: &JsValue) -> Result<Options, JsError> {
             }
         }
     }
-    Ok(opts)
+    Ok((opts, margin))
 }
 
 fn number(key: &str, v: &JsValue) -> Result<f64, JsError> {
@@ -64,11 +67,10 @@ fn number(key: &str, v: &JsValue) -> Result<f64, JsError> {
         .ok_or_else(|| JsError::new(&format!("option {key} must be a finite number")))
 }
 
-fn seed(v: &JsValue) -> Result<u64, JsError> {
+fn whole_number(key: &str, v: &JsValue, max: f64) -> Result<f64, JsError> {
     v.as_f64()
-        .filter(|n| n.fract() == 0.0 && (0.0..=MAX_SAFE_INTEGER).contains(n))
-        .map(|n| n as u64)
-        .ok_or_else(|| JsError::new("option seed must be a non-negative integer"))
+        .filter(|n| n.fract() == 0.0 && (0.0..=max).contains(n))
+        .ok_or_else(|| JsError::new(&format!("option {key} must be a non-negative integer")))
 }
 
 fn ramp(key: &str, v: &JsValue) -> Result<Vec<Rgba>, JsError> {

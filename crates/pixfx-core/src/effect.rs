@@ -51,6 +51,12 @@ impl Meta {
         let (w, h) = (f64::from(self.size.0), f64::from(self.size.1));
         w >= 320.0 && (w / h - 16.0 / 9.0).abs() < 0.05
     }
+
+    /// Empty pixels worth giving the effect on every side of its canvas so glow that spills past it shows
+    /// instead of being cut: half the canvas's longer side.
+    pub fn glow_margin(&self) -> u32 {
+        self.size.0.max(self.size.1) / 2
+    }
 }
 
 /// Which part of an effect to draw: what goes behind a character, what goes in front, or both.

@@ -23,7 +23,7 @@ pub fn effects() -> Array {
         .collect()
 }
 
-/// `{id, name, desc, tags, size: [w, h], origin: [x, y], duration, loop, fps, seed}` for one effect.
+/// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed}` for one effect.
 #[wasm_bindgen]
 pub fn meta(id: &str) -> Result<JsValue, JsError> {
     meta_object(find(id)?.meta())
@@ -37,7 +37,7 @@ fn meta_object(m: &Meta) -> Result<JsValue, JsError> {
     let o = Object::new();
     let pair = |a: f64, b: f64| Array::of2(&a.into(), &b.into());
     let tags: Array = m.tags.iter().map(|t| JsValue::from_str(t)).collect();
-    let fields: [(&str, JsValue); 10] = [
+    let fields: [(&str, JsValue); 11] = [
         ("id", m.id.into()),
         ("name", m.name.into()),
         ("desc", m.desc.into()),
@@ -50,6 +50,7 @@ fn meta_object(m: &Meta) -> Result<JsValue, JsError> {
             "origin",
             pair(f64::from(m.origin.0), f64::from(m.origin.1)).into(),
         ),
+        ("glowMargin", m.glow_margin().into()),
         ("duration", m.duration.into()),
         ("loop", m.looping.into()),
         ("fps", m.fps.into()),
@@ -63,9 +64,10 @@ fn meta_object(m: &Meta) -> Result<JsValue, JsError> {
     Ok(o.into())
 }
 
-/// A live effect on its own canvas (`meta.size`, origin at `meta.origin`). Each animation frame: `update(dt)`,
+/// A live effect on its own canvas (`meta.size` plus `margin` empty pixels on every side, origin at
+/// `meta.origin + margin`; `meta(id).glowMargin` is the margin that fits an effect's glow). Each animation frame: `update(dt)`,
 /// `draw(layer)`, then read `rgba()` (or `color()` and `light()`). Light is eased out at the canvas edge
-/// unless the effect is full-screen, so frames match the effect's sprite sheet.
+/// unless the effect is full-screen or has a margin, so frames match the effect's sprite sheet.
 #[wasm_bindgen]
 pub struct Fx {
     player: Player,
@@ -73,14 +75,14 @@ pub struct Fx {
 
 #[wasm_bindgen]
 impl Fx {
-    /// Spawn effect `id`. `opts`: `undefined` or `{seed?, flip?, angle?, light?, palette?: string[], ...extra}`
+    /// Spawn effect `id`. `opts`: `undefined` or `{margin?, seed?, flip?, angle?, light?, palette?: string[], ...extra}`
     /// (see [`parse_options`]).
     #[wasm_bindgen(constructor)]
     pub fn new(id: &str, opts: JsValue) -> Result<Fx, JsError> {
         let fx = find(id)?;
-        let opts = parse_options(&opts)?;
+        let (opts, margin) = parse_options(&opts)?;
         Ok(Fx {
-            player: Player::new(fx, opts, 0),
+            player: Player::new(fx, opts, margin),
         })
     }
 
@@ -121,12 +123,12 @@ impl Fx {
     /// Where the effect's origin sits on the canvas.
     #[wasm_bindgen(js_name = originX)]
     pub fn origin_x(&self) -> i32 {
-        self.player.meta().origin.0
+        self.player.meta().origin.0 + self.player.margin() as i32
     }
 
     #[wasm_bindgen(js_name = originY)]
     pub fn origin_y(&self) -> i32 {
-        self.player.meta().origin.1
+        self.player.meta().origin.1 + self.player.margin() as i32
     }
 
     /// Clear the canvas and draw `"back"`, `"front"` or `"both"` at the current time.

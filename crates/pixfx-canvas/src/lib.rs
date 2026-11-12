@@ -66,7 +66,7 @@ impl Stage {
     /// handle. `opts`: `undefined` or `{seed?, flip?, angle?, light?, palette?: string[], ...extra}`.
     pub fn play(&mut self, id: &str, x: f64, y: f64, opts: JsValue) -> Result<u32, JsError> {
         let fx = effect(id).ok_or_else(|| JsError::new(&format!("unknown effect {id:?}")))?;
-        let player = live_player(fx, parse_options(&opts)?);
+        let player = live_player(fx, parse_options(&opts)?.0);
         let surface = Surface::new(player.frame())?;
         let mut r = self.renderer.borrow_mut();
         Ok(r.scene.play(player, x, y, surface)?)

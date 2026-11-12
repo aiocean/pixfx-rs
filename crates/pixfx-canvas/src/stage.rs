@@ -6,19 +6,13 @@ use std::fmt;
 use std::num::NonZeroU32;
 
 use pixfx_core::math::js_round;
-use pixfx_core::{Effect, Frame, Layer, Meta, Options, composite_px, valid_dt};
+use pixfx_core::{Effect, Frame, Layer, Options, composite_px, valid_dt};
 use pixfx_wasm::Player;
 
-/// Empty pixels the stage gives an effect on every side of its canvas, so glow that spills past the canvas
-/// shows instead of being cut: half the canvas's longer side, as pixfx-gpui does.
-pub fn margin(meta: &Meta) -> u32 {
-    meta.size.0.max(meta.size.1) / 2
-}
-
-/// `effect` with `opts` as the stage plays it: on its canvas plus [`margin`], so nothing at the canvas edge is
-/// faded or cut.
+/// `effect` with `opts` as the stage plays it: on its canvas plus [`Meta::glow_margin`], so nothing at the
+/// canvas edge is faded or cut.
 pub fn live_player(effect: &'static dyn Effect, opts: Options) -> Player {
-    Player::new(effect, opts, margin(effect.meta()))
+    Player::new(effect, opts, effect.meta().glow_margin())
 }
 
 /// A target rectangle in canvas pixels (game pixels times the scale).
