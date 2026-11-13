@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod fighter;
+pub mod light;
 pub mod stage;
 
 use std::cell::{Cell, RefCell};

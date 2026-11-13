@@ -249,6 +249,7 @@ dependencies = [
  "pixfx-core",
  "pixfx-effects",
  "pixfx-fighter",
+ "pixfx-light",
  "pixfx-wasm",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -294,6 +295,14 @@ dependencies = [
 
 [[package]]
 name = "pixfx-fighter"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "pixfx-core",
+]
+
+[[package]]
+name = "pixfx-light"
 version = "0.1.0"
 dependencies = [
  "libm",
