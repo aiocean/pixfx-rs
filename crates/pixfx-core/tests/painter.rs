@@ -175,3 +175,190 @@ fn reach_is_the_distance_to_the_farthest_frame_corner() {
     }
     assert!(f.color.iter().all(|&c| c == 0));
 }
+
+/// Frame hashes from `tests/golden/painter_shapes.mjs` (pixelfx 044e12a).
+#[test]
+fn shapes_match_pixelfx() {
+    use pixfx_core::color::hex;
+    use pixfx_core::frame::frame_hash;
+
+    let orange = hex("#ff8a2a").unwrap_or(Rgba::NONE);
+    let blue = hex("#3f8cff").unwrap_or(Rgba::NONE);
+    let purple = hex("#9a48ec").unwrap_or(Rgba::NONE);
+    let yellow = hex("#ffe26b").unwrap_or(Rgba::NONE);
+    type Draw = fn(&mut Painter, Rgba, Rgba, Rgba, Rgba);
+    type Case = (&'static str, bool, f64, u64, Draw);
+    let cases: [Case; 7] = [
+        (
+            "disc_soft",
+            false,
+            0.0,
+            0xa6d9_425d_cbd2_cd25,
+            |p, o, _, _, _| p.disc(0.0, -16.0, 9.0, o, 0.6),
+        ),
+        (
+            "disc_tiny",
+            false,
+            0.0,
+            0xabfd_01da_ef3f_6e27,
+            |p, o, _, _, _| p.disc(0.0, -16.0, 0.4, o, 1.0),
+        ),
+        (
+            "circle_fn",
+            false,
+            0.0,
+            0xdd29_8569_e4f9_1185,
+            |p, _, b, _, _| {
+                p.circle(
+                    0.0,
+                    -16.0,
+                    9.0,
+                    |d: f64, _: f64| if d < 0.5 { WHITE } else { b },
+                    1.0,
+                )
+            },
+        ),
+        (
+            "circle_tiny",
+            false,
+            0.0,
+            0x601d_c656_9710_d3ec,
+            |p, _, b, _, _| p.circle(0.0, -16.0, 0.5, b, 1.0),
+        ),
+        (
+            "ring_fn",
+            false,
+            0.0,
+            0x512b_fc52_e1a2_4802,
+            |p, _, _, v, _| p.ring(0.0, -16.0, 12.0, 3.0, v, |v: f64, _: f64| v),
+        ),
+        (
+            "light",
+            false,
+            0.0,
+            0xab08_116b_ef82_0aaa,
+            |p, _, _, _, y| p.light(3.0, -5.0, y, 0.7),
+        ),
+        (
+            "disc_mirrored_rotated",
+            true,
+            0.6,
+            0xc39e_3120_e7ba_e241,
+            |p, o, _, _, _| p.disc(0.0, -16.0, 9.0, o, 0.6),
+        ),
+    ];
+    for (name, flip, angle, want, draw) in cases {
+        let mut frame = Frame::new(64, 48, 0, 0);
+        let mut p = Painter::new(&mut frame);
+        p.place(32.0, 40.0, flip, angle);
+        draw(&mut p, orange, blue, purple, yellow);
+        assert_eq!(frame_hash(&frame), want, "{name}");
+    }
+}
+
+/// Frame hashes from `tests/golden/painter_shapes.mjs` (pixelfx 044e12a), drawn through pixelfx transitions
+/// `clipTo`: the painter keeps only writes whose local cell is inside the 320 x 180 screen.
+#[test]
+fn local_clip_matches_pixelfx() {
+    use pixfx_core::color::hex;
+    use pixfx_core::frame::frame_hash;
+
+    let orange = hex("#ff8a2a").unwrap_or(Rgba::NONE);
+    let yellow = hex("#ffe26b").unwrap_or(Rgba::NONE);
+    let straddle = |p: &mut Painter| {
+        p.glow(2.0, 3.0, 14.0, yellow, 0.8);
+        p.disc(1.0, 4.0, 9.0, orange, 0.6);
+        p.circle(-2.0, 6.0, 4.0, WHITE, 1.0);
+    };
+    let far = |p: &mut Painter| {
+        p.glow(318.0, 177.0, 14.0, yellow, 0.8);
+        p.disc(319.0, 176.0, 9.0, orange, 0.6);
+    };
+    type Case<'a> = (
+        &'static str,
+        (f64, f64, bool, f64),
+        u64,
+        &'a dyn Fn(&mut Painter),
+    );
+    let cases: [Case; 2] = [
+        (
+            "clip_origin_mirrored_rotated",
+            (32.0, 24.0, true, 0.6),
+            0x79a8_e5af_d0bd_b16f,
+            &straddle,
+        ),
+        (
+            "clip_far_corner",
+            (-288.0, -150.0, false, 0.0),
+            0x7e11_b54b_d5bf_93d1,
+            &far,
+        ),
+    ];
+    for (name, (x, y, flip, angle), want, draw) in cases {
+        let render = |clip: bool| {
+            let mut frame = Frame::new(64, 48, 0, 0);
+            let mut p = Painter::new(&mut frame);
+            p.place(x, y, flip, angle);
+            if clip {
+                p.clip_local(320.0, 180.0);
+            }
+            draw(&mut p);
+            frame_hash(&frame)
+        };
+        assert_eq!(render(true), want, "{name}");
+        // the shapes straddle the edge: without the clip they draw more
+        assert_ne!(render(false), want, "{name} unclipped");
+    }
+}
+
+#[test]
+fn reset_removes_the_clip() {
+    let mut f = Frame::new(8, 8, 0, 0);
+    let mut p = Painter::new(&mut f);
+    p.clip_local(2.0, 2.0);
+    p.put(5.0, 5.0, WHITE, 1.0);
+    p.reset();
+    p.put(6.0, 6.0, WHITE, 1.0);
+    assert_eq!(f.color.iter().filter(|&&c| c != 0).count(), 1);
+}
+
+/// Frame hashes from `tests/golden/unlight.mjs` (pixelfx 044e12a): shadow `unlight` is `each` over a box with
+/// `dim_light` on the pixels its `dark` test accepts.
+#[test]
+fn dim_light_matches_pixelfx_unlight() {
+    use pixfx_core::color::hex;
+    use pixfx_core::frame::frame_hash;
+
+    let violet = hex("#9d5cec").unwrap_or(Rgba::NONE);
+    let yellow = hex("#ffe26b").unwrap_or(Rgba::NONE);
+    let cases = [
+        ("unlight_all", 0.0, false, 0.0, 0x990d_c616_6efd_904e_u64),
+        (
+            "unlight_keep_third",
+            0.35,
+            false,
+            0.0,
+            0x3f1d_9c98_60ee_8778,
+        ),
+        (
+            "unlight_mirrored_rotated",
+            0.0,
+            true,
+            0.6,
+            0x61e5_c93e_9ea0_e405,
+        ),
+    ];
+    for (name, keep, flip, angle, want) in cases {
+        let mut frame = Frame::new(64, 48, 0, 0);
+        let mut p = Painter::new(&mut frame);
+        p.place(32.0, 40.0, flip, angle);
+        p.glow(0.0, -16.0, 18.0, violet, 0.9);
+        p.glow(6.0, -12.0, 9.0, yellow, 0.6);
+        p.each(-10.0, -26.0, 10.0, -6.0, |p, x, y, sx, sy| {
+            if x * x + (y + 16.0) * (y + 16.0) < 49.0 {
+                p.dim_light(sx, sy, keep);
+            }
+        });
+        assert_eq!(frame_hash(&frame), want, "{name}");
+    }
+}

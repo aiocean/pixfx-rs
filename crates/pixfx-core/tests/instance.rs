@@ -365,6 +365,26 @@ fn options_resolve_like_pixelfx() {
 }
 
 #[test]
+fn color_option_resolves_to_the_set_colour_or_the_default() {
+    let def = Rgba(74, 63, 105, 255);
+    let red = Rgba(255, 0, 0, 255);
+    let mut opts = Options::default();
+    opts.extra.insert("stone".into(), OptValue::Color(red));
+    opts.extra.insert(
+        "ramp".into(),
+        OptValue::Ramp(vec![red, Rgba(0, 0, 255, 255)]),
+    );
+    opts.extra.insert("one".into(), OptValue::Ramp(vec![red]));
+    opts.extra.insert("num".into(), OptValue::Num(3.0));
+    assert_eq!(opts.color_or("stone", def), red);
+    // unset, or set to another kind of value (a ramp of any length is not a colour): the default
+    assert_eq!(opts.color_or("unset", def), def);
+    assert_eq!(opts.color_or("ramp", def), def);
+    assert_eq!(opts.color_or("one", def), def);
+    assert_eq!(opts.color_or("num", def), def);
+}
+
+#[test]
 fn screen_is_16_by_9_and_at_least_320_wide() {
     assert!(GLOW_SCREEN.meta().is_screen());
     assert!(!GLOW.meta().is_screen());

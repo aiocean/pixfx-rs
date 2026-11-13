@@ -7,7 +7,9 @@ pub mod effect;
 pub mod frame;
 pub mod math;
 pub mod painter;
+pub mod particles;
 pub mod render;
+pub mod shapes;
 pub mod sim;
 
 pub use color::{ColorError, Rgba, hex};
@@ -16,3 +18,7 @@ pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};
 pub use painter::Painter;
 pub use render::{Rendered, edge_fade, render_frames};
+pub use sim::{
+    Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particle, Particles,
+    ParticlesOpts, Piece, Spawn, band, crystal, flare, sparkle,
+};

@@ -221,3 +221,55 @@ fn margin_cap_is_accepted() -> Result<(), JsValue> {
     assert_eq!(live.width(), 56 + 2 * 4096);
     Ok(())
 }
+
+#[wasm_bindgen_test]
+fn hex_string_option_is_a_colour() -> Result<(), JsValue> {
+    use pixfx_core::{OptValue, Rgba};
+    use pixfx_wasm::parse_options;
+
+    let (opts, _) =
+        parse_options(&obj(&[("stone", JsValue::from_str("#ff0000"))])?).map_err(JsValue::from)?;
+    assert_eq!(
+        opts.extra.get("stone"),
+        Some(&OptValue::Color(Rgba(255, 0, 0, 255)))
+    );
+    let Err(e) = parse_options(&obj(&[("stone", JsValue::from_str("#zz0000"))])?) else {
+        return Err("a bad hex colour was accepted".into());
+    };
+    let text = error_text(e);
+    assert!(
+        text.contains("stone"),
+        "error does not name the field: {text}"
+    );
+    let Err(e) = parse_options(&obj(&[("stone", JsValue::from(true))])?) else {
+        return Err("a boolean option was accepted".into());
+    };
+    let text = error_text(e);
+    assert!(
+        text.contains("a hex colour"),
+        "error does not list hex colours: {text}"
+    );
+
+    // the colour reaches the effect: the rocks and dust of small-explosion change
+    let id = "explosions/small-explosion";
+    let fx = effect(id).ok_or("small-explosion not registered")?;
+    let mut want = Player::new(fx, opts, 0);
+    let mut plain = Player::new(fx, Options::default(), 0);
+    let mut live =
+        Fx::new(id, obj(&[("stone", JsValue::from_str("#ff0000"))])?).map_err(JsValue::from)?;
+    for _ in 0..30 {
+        want.update(1.0 / 30.0);
+        plain.update(1.0 / 30.0);
+        live.update(1.0 / 30.0).map_err(JsValue::from)?;
+    }
+    want.draw(Layer::Both);
+    plain.draw(Layer::Both);
+    live.draw("both").map_err(JsValue::from)?;
+    assert_eq!(live.color().to_vec(), want.frame().color);
+    assert_ne!(
+        want.frame().color,
+        plain.frame().color,
+        "stone changed nothing"
+    );
+    Ok(())
+}

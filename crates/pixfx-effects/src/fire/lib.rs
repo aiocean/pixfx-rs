@@ -21,13 +21,6 @@ pub type Noise<'a> = &'a dyn Fn(f64, f64, f64) -> f64;
 /// Tongue layers: `(width share, height share, step of the hot-first ramp)`.
 pub type Layers = [(f64, f64, usize)];
 
-/// A ramp resampled to exactly `N` steps (pixelfx `fit`), as an array so steps index without bounds checks
-/// failing.
-pub fn ramp<const N: usize>(r: &[Rgba]) -> [Rgba; N] {
-    let v = pixfx_core::color::fit(r, N);
-    core::array::from_fn(|i| v.get(i).copied().unwrap_or(Rgba::NONE))
-}
-
 /// Smooth value noise in [-1, 1] that repeats every `period` cells (a whole number).
 pub fn pnoise(x: f64, period: f64, seed: f64) -> f64 {
     let i = libm::floor(x);

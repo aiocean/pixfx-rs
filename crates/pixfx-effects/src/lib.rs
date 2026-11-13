@@ -3,10 +3,46 @@
 
 use pixfx_core::effect::{Effect, find};
 
+pub mod arcane;
+pub mod critters;
+pub mod explosions;
 pub mod fire;
+pub mod holy;
+pub mod ice;
+pub mod impacts;
+pub mod lightning;
+pub mod nature;
+pub mod pickups;
+pub mod projectiles;
+pub mod scifi;
+pub mod shadow;
+pub mod spawn;
+pub mod transitions;
 
 /// Every effect in this crate.
-pub static EFFECTS: &[&'static dyn Effect] = &[&fire::CANDLE, &fire::CAMPFIRE, &fire::BRAZIER];
+pub static EFFECTS: &[&'static dyn Effect] = &[
+    &fire::CANDLE,
+    &fire::CAMPFIRE,
+    &fire::BRAZIER,
+    &fire::SPIRIT_FLAME,
+    &impacts::PARRY,
+    &explosions::DIRT_EXPLOSION,
+    &explosions::SMALL_EXPLOSION,
+    &explosions::IMPLOSION,
+    &explosions::PLASMA_EXPLOSION,
+    &arcane::RUNE_CIRCLE,
+    &critters::WISP,
+    &spawn::POOF,
+    &holy::FEATHER_BURST,
+    &ice::ICICLE_FALL,
+    &scifi::JETPACK,
+    &lightning::BALL_LIGHTNING,
+    &nature::POISON_CLOUD,
+    &pickups::COIN_SPIN,
+    &projectiles::LASER_BOLT,
+    &transitions::BURN_AWAY,
+    &shadow::VOID_ORB,
+];
 
 /// The effect with this id (`fire/candle`).
 pub fn effect(id: &str) -> Option<&'static dyn Effect> {

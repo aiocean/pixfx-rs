@@ -5,13 +5,12 @@
 
 use core::f64::consts::PI;
 
-use pixfx_core::color::{Rgba, WHITE, mix};
+use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{js_max, js_min, js_round, rand};
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
 use super::lib::{
-    Burn, Hot, Life, LoopNoise, Tongue, burn, drift, ember, floor_light, hot_first, looped, ramp,
-    spark,
+    Burn, Hot, Life, LoopNoise, Tongue, burn, drift, ember, floor_light, hot_first, looped, spark,
 };
 
 pub struct Brazier;
