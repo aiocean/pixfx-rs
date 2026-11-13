@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use pixfx_core::{OptValue, Options, Rgba, hex};
+use pixfx_core::{Meta, OptValue, Options, Rgba, check_options, hex};
 use serde::Deserialize;
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use wasm_bindgen::{JsError, JsValue};
@@ -112,10 +112,11 @@ impl<'de> Visitor<'de> for ExtraVisitor {
 /// `undefined`/`null` (all defaults) or a plain object: `margin` (whole number up to [`MAX_MARGIN`]: empty pixels
 /// round the canvas, returned beside the options because it is the canvas's, not the effect's; `None` when not
 /// given), `seed` (non-negative integer), `flip` (boolean), `angle` (radians), `light` (glow strength), `palette`
-/// (array of `"#rgb"`/`"#rrggbb"` strings); any other key is the effect's own option, a number, a hex colour or an
-/// array of hex colours. `x`/`y` are refused: an instance draws on its own canvas at the effect's origin. A field
-/// of the wrong type is an error naming it.
-pub fn parse_options(v: &JsValue) -> Result<(Options, Option<u32>), JsError> {
+/// (array of `"#rgb"`/`"#rrggbb"` strings); any other key is one of the effect's own options ([`Meta::options`]):
+/// a number, a hex colour or an array of hex colours, as the effect declares it. `x`/`y` are refused: an instance
+/// draws on its own canvas at the effect's origin. A key the effect does not declare, or a field of the wrong
+/// type, is an error naming it.
+pub fn parse_options(meta: &Meta, v: &JsValue) -> Result<(Options, Option<u32>), JsError> {
     if v.is_undefined() || v.is_null() {
         return Ok((Options::default(), None));
     }
@@ -140,5 +141,6 @@ pub fn parse_options(v: &JsValue) -> Result<(Options, Option<u32>), JsError> {
         extra: w.extra.into_iter().map(|(k, Extra(v))| (k, v)).collect(),
         ..base
     };
+    check_options(meta, &opts).map_err(|e| JsError::new(&e.to_string()))?;
     Ok((opts, w.margin))
 }

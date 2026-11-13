@@ -74,7 +74,7 @@ impl Stage {
         #[wasm_bindgen(unchecked_optional_param_type = "FxOptions")] opts: JsValue,
     ) -> Result<u32, JsError> {
         let fx = effect(id).ok_or_else(|| JsError::new(&format!("unknown effect {id:?}")))?;
-        let player = live_player(fx, stage_options(&opts)?);
+        let player = live_player(fx, stage_options(fx.meta(), &opts)?);
         let surface = Surface::new(player.frame())?;
         let mut r = self.renderer.borrow_mut();
         Ok(r.scene.play(player, x, y, surface)?)

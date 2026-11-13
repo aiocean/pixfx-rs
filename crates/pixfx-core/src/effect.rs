@@ -6,6 +6,7 @@
 //! instance's time, fading it out after [`Instance::stop`].
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use crate::color::{Rgba, fit};
 use crate::frame::Frame;
@@ -23,8 +24,8 @@ pub const FADE: f64 = 0.3;
 /// Simulation sub-steps per second: `update(dt)` runs at least this finely whatever the caller's frame rate.
 const STEPS_PER_SECOND: f64 = 120.0;
 
-/// What an effect is: pixelfx `meta`, minus what the Rust port types elsewhere (options live in the effect,
-/// the backdrop belongs to the tools).
+/// What an effect is: pixelfx `meta`, minus what the Rust port types elsewhere (the palette's default lives in
+/// the effect, the backdrop belongs to the tools).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Meta {
     /// `category/name`, as pixelfx's file path under `src/fx` (`fire/candle`).
@@ -42,6 +43,10 @@ pub struct Meta {
     pub fps: u32,
     /// The seed used when the caller gives none (pixelfx `meta.options.seed`; every pixelfx effect has one).
     pub seed: u64,
+    /// The effect's own options beyond the ones every effect takes (pixelfx `meta.options` minus `palette` and
+    /// `seed`), each declared once with its default. The effect reads them through the same declarations
+    /// ([`Options::num`], [`Options::color`], [`Options::ramp`]); [`check_options`] refuses any other key.
+    pub options: &'static [OptSpec],
 }
 
 impl Meta {
@@ -146,6 +151,189 @@ impl Default for Options {
     }
 }
 
+/// One option an effect declares in [`Meta::options`]: its name and what it holds, with the default.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OptSpec {
+    pub name: &'static str,
+    pub kind: OptKind,
+}
+
+/// What an option holds, and its default.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum OptKind {
+    /// A number. `range` holds it to `lo..=hi` where it sizes a loop, so a huge number cannot hang the effect.
+    /// A NaN default means the effect picks the value itself (burn-away's seeded hole).
+    Num {
+        default: f64,
+        range: Option<(f64, f64)>,
+    },
+    /// One colour (pixelfx `stone: "#4a3f69"`).
+    Color { default: Rgba },
+    /// A colour ramp; a given ramp of another length is resampled to the default's.
+    Ramp { default: &'static [Rgba] },
+}
+
+impl OptKind {
+    /// What the kind holds, in words, for errors.
+    pub fn what(&self) -> &'static str {
+        match self {
+            OptKind::Num { .. } => "a number",
+            OptKind::Color { .. } => "a colour",
+            OptKind::Ramp { .. } => "a list of colours",
+        }
+    }
+
+    fn holds(&self, v: &OptValue) -> bool {
+        matches!(
+            (self, v),
+            (OptKind::Num { .. }, OptValue::Num(_))
+                | (OptKind::Color { .. }, OptValue::Color(_))
+                | (OptKind::Ramp { .. }, OptValue::Ramp(_))
+        )
+    }
+}
+
+/// A number option as the effect declares and reads it: `const HEIGHT: NumOpt = NumOpt::new("height", 22.0);`,
+/// listed in [`Meta::options`] as `HEIGHT.spec()`, read with [`Options::num`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NumOpt {
+    pub name: &'static str,
+    pub default: f64,
+    pub range: Option<(f64, f64)>,
+}
+
+impl NumOpt {
+    pub const fn new(name: &'static str, default: f64) -> Self {
+        Self {
+            name,
+            default,
+            range: None,
+        }
+    }
+
+    /// Held to `lo..=hi`, for an option that sizes a loop: the effect names the largest value it draws in
+    /// reasonable time.
+    pub const fn within(self, lo: f64, hi: f64) -> Self {
+        Self {
+            range: Some((lo, hi)),
+            ..self
+        }
+    }
+
+    pub const fn spec(&self) -> OptSpec {
+        OptSpec {
+            name: self.name,
+            kind: OptKind::Num {
+                default: self.default,
+                range: self.range,
+            },
+        }
+    }
+}
+
+/// A single-colour option, declared and read like [`NumOpt`] ([`Options::color`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ColorOpt {
+    pub name: &'static str,
+    pub default: Rgba,
+}
+
+impl ColorOpt {
+    pub const fn new(name: &'static str, default: Rgba) -> Self {
+        Self { name, default }
+    }
+
+    pub const fn spec(&self) -> OptSpec {
+        OptSpec {
+            name: self.name,
+            kind: OptKind::Color {
+                default: self.default,
+            },
+        }
+    }
+}
+
+/// A colour-ramp option, declared and read like [`NumOpt`] ([`Options::ramp`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RampOpt {
+    pub name: &'static str,
+    pub default: &'static [Rgba],
+}
+
+impl RampOpt {
+    pub const fn new(name: &'static str, default: &'static [Rgba]) -> Self {
+        Self { name, default }
+    }
+
+    pub const fn spec(&self) -> OptSpec {
+        OptSpec {
+            name: self.name,
+            kind: OptKind::Ramp {
+                default: self.default,
+            },
+        }
+    }
+}
+
+/// An option the effect does not take, or a value of the wrong kind for one it does.
+#[derive(Clone, Debug, PartialEq)]
+pub enum OptionError {
+    Unknown {
+        key: String,
+        effect: &'static str,
+        known: &'static [OptSpec],
+    },
+    Kind {
+        key: String,
+        effect: &'static str,
+        want: &'static str,
+    },
+}
+
+impl fmt::Display for OptionError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OptionError::Unknown { key, effect, known } => {
+                write!(f, "options.{key}: {effect} has no option {key:?}")?;
+                let mut names = known.iter().map(|o| o.name);
+                match names.next() {
+                    None => f.write_str("; it takes none of its own"),
+                    Some(first) => {
+                        write!(f, "; its own options are {first}")?;
+                        names.try_for_each(|n| write!(f, ", {n}"))
+                    }
+                }
+            }
+            OptionError::Kind { key, effect, want } => {
+                write!(f, "options.{key}: {effect}'s {key} is {want}")
+            }
+        }
+    }
+}
+
+/// Every one of `opts`' own options is one `meta` declares, holding the declared kind: what a host checks once
+/// where options arrive from outside (JS, a file), so a misspelt or foreign option is an error instead of
+/// being dropped.
+pub fn check_options(meta: &Meta, opts: &Options) -> Result<(), OptionError> {
+    for (key, v) in &opts.extra {
+        let Some(spec) = meta.options.iter().find(|o| o.name == key) else {
+            return Err(OptionError::Unknown {
+                key: key.clone(),
+                effect: meta.id,
+                known: meta.options,
+            });
+        };
+        if !spec.kind.holds(v) {
+            return Err(OptionError::Kind {
+                key: key.clone(),
+                effect: meta.id,
+                want: spec.kind.what(),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// pixelfx `resolveOptions` for one ramp: the caller's ramp, resampled to the default's length when it is
 /// a non-empty ramp of another length, else the default.
 fn resolve_ramp(given: Option<&[Rgba]>, default: &[Rgba]) -> Vec<Rgba> {
@@ -162,37 +350,35 @@ impl Options {
         resolve_ramp(self.palette.as_deref(), default)
     }
 
-    /// A ramp option, resolved against the effect's default as pixelfx `resolveOptions` does. A number given
-    /// for a ramp is ignored (pixelfx would pass it through and draw garbage).
-    pub fn ramp_or(&self, key: &str, default: &[Rgba]) -> Vec<Rgba> {
-        let given = match self.extra.get(key) {
+    /// A ramp option, resolved against its default as pixelfx `resolveOptions` does. A value of another kind is
+    /// ignored (pixelfx would pass a number through and draw garbage).
+    pub fn ramp(&self, o: &RampOpt) -> Vec<Rgba> {
+        let given = match self.extra.get(o.name) {
             Some(OptValue::Ramp(r)) => Some(r.as_slice()),
             _ => None,
         };
-        resolve_ramp(given, default)
+        resolve_ramp(given, o.default)
     }
 
-    /// A single-colour option (pixelfx `stone: "#4a3f69"`), or the effect's default when it is unset or not a
-    /// colour (a ramp given for it is not a colour).
-    pub fn color_or(&self, key: &str, default: Rgba) -> Rgba {
-        match self.extra.get(key) {
+    /// A single-colour option, or its default when it is unset or not a colour (a ramp is not a colour).
+    pub fn color(&self, o: &ColorOpt) -> Rgba {
+        match self.extra.get(o.name) {
             Some(OptValue::Color(c)) => *c,
-            _ => default,
+            _ => o.default,
         }
     }
 
-    /// A numeric option, or the effect's default when it is unset or not a number.
-    pub fn num_or(&self, key: &str, default: f64) -> f64 {
-        match self.extra.get(key) {
+    /// A number option, or its default when it is unset or not a number; held to its range if it has one. NaN
+    /// stays NaN, which draws nothing.
+    pub fn num(&self, o: &NumOpt) -> f64 {
+        let v = match self.extra.get(o.name) {
             Some(OptValue::Num(v)) => *v,
-            _ => default,
+            _ => o.default,
+        };
+        match o.range {
+            Some((lo, hi)) => clamp(v, lo, hi),
+            None => v,
         }
-    }
-
-    /// [`Options::num_or`] held to `lo..=hi`, for an option that sizes a loop: an effect names the largest value
-    /// it draws in reasonable time, so a huge number cannot hang it. NaN stays NaN, which draws nothing.
-    pub fn num_in(&self, key: &str, default: f64, lo: f64, hi: f64) -> f64 {
-        clamp(self.num_or(key, default), lo, hi)
     }
 }
 

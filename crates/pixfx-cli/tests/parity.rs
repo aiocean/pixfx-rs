@@ -116,6 +116,7 @@ static WALK_META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 1,
+    options: &[],
 };
 
 impl Effect for Walk {

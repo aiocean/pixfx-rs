@@ -5,10 +5,10 @@
 use pixfx_core::color::{Rgba, ramp};
 use pixfx_core::math::{TAU, clamp, js_max, js_min, js_round, js_sign, rng, smooth, tile_noise};
 use pixfx_core::particles::cycle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
-/// The widest cloud drawn (beyond pixelfx, which draws any spread; see the module doc).
-const MAX_SPREAD: f64 = 16.0;
+/// Held to 16 at most, the widest cloud drawn (beyond pixelfx, which draws any spread; see the module doc).
+const SPREAD: NumOpt = NumOpt::new("spread", 1.0).within(0.0, 16.0);
 
 pub struct PoisonCloud;
 
@@ -27,6 +27,7 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 3,
+    options: &[SPREAD.spec()],
 };
 
 const PALETTE: [Rgba; 8] = [
@@ -90,7 +91,7 @@ impl Effect for PoisonCloud {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
-            spread: opts.num_in("spread", 1.0, 0.0, MAX_SPREAD),
+            spread: opts.num(&SPREAD),
             seed: seed as f64,
         })
     }

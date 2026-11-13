@@ -6,7 +6,7 @@
 use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::math::{Rng, TAU, clamp, ease, js_min, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, flare};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
 
 pub struct Poof;
 
@@ -25,6 +25,7 @@ const META: Meta = Meta {
     looping: false,
     fps: 30,
     seed: 21,
+    options: &[STARS.spec()],
 };
 
 // meta.options
@@ -36,11 +37,13 @@ const PALETTE: [Rgba; 6] = [
     Rgba::hex24(0xf2f0fa),
     Rgba::hex24(0xffffff),
 ];
-const STARS: [Rgba; 3] = [
+const STARS: RampOpt = RampOpt::new(
+    "stars",
+    &[
     Rgba::hex24(0xffd84a),
     Rgba::hex24(0xfff3a6),
     Rgba::hex24(0xffffff),
-];
+]);
 
 const CY: f64 = -17.0;
 
@@ -77,7 +80,7 @@ impl Effect for Poof {
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let c: [Rgba; 6] = ramp(&opts.palette_or(&PALETTE));
-        let s: [Rgba; 3] = ramp(&opts.ramp_or("stars", &STARS));
+        let s: [Rgba; 3] = ramp(&opts.ramp(&STARS));
         let mut r = Rng::new(to_uint32(seed as f64));
         let mut ps = Particles::new(ParticlesOpts {
             ground: 0.0,

@@ -22,6 +22,7 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 5,
+    options: &[],
 };
 
 // the orb's centre and radius, the vortex's reach, the radius light bends to (Einstein ring), the loop

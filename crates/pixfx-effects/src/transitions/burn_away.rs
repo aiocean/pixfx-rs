@@ -12,7 +12,7 @@ use pixfx_core::math::{
     Rng, TAU, clamp, ease, fbm, js_max, js_min, js_round, noise, noise2, rand, smooth, to_uint32,
 };
 use pixfx_core::sim::{Flags, Kind, Lights, Particles, ParticlesOpts, SMOKE_RAMP, Spawn};
-use pixfx_core::{Effect, EffectState, Layer, Meta, OptValue, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
 use super::lib::{COLOR, Field, H, W, clip_to, field, life_left, pixels, rect, screen_meta};
 
@@ -36,6 +36,7 @@ const META: Meta = screen_meta(
     ],
     3.0,
     3,
+    &[COLOR.spec(), HOLE_X.spec(), HOLE_Y.spec()],
 );
 
 // meta.options
@@ -135,12 +136,14 @@ fn out_field(seed: f64, hole: (Option<f64>, Option<f64>)) -> (Field, f64, f64) {
     (f, ox, oy)
 }
 
-/// A position option the caller set to a finite number, if any (anything else leaves pixelfx's centre).
-fn num_given(opts: &Options, key: &str) -> Option<f64> {
-    match opts.extra.get(key) {
-        Some(OptValue::Num(v)) if v.is_finite() => Some(*v),
-        _ => None,
-    }
+/// Where the hole starts burning open, in screen pixels; unset (NaN), or any number not finite, leaves pixelfx's
+/// seeded centre on that axis.
+const HOLE_X: NumOpt = NumOpt::new("holeX", f64::NAN);
+const HOLE_Y: NumOpt = NumOpt::new("holeY", f64::NAN);
+
+/// A hole option's value if it is a finite number.
+fn finite(v: f64) -> Option<f64> {
+    v.is_finite().then_some(v)
 }
 
 // a flame standing on (x, y): four layers of the ramp, each narrower, shorter and hotter, swaying at the tip
@@ -183,11 +186,11 @@ impl Effect for BurnAway {
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let f: [Rgba; 9] = ramp(&opts.palette_or(&PALETTE));
-        let ink = opts.color_or("color", COLOR);
+        let ink = opts.color(&COLOR);
         let r = Rng::new(to_uint32(seed as f64));
         let fseed = seed as f64 * 13.0;
         let a = in_field(fseed);
-        let hole = (num_given(opts, "holeX"), num_given(opts, "holeY"));
+        let hole = (finite(opts.num(&HOLE_X)), finite(opts.num(&HOLE_Y)));
         let (b, ox, oy) = out_field(fseed + 1.0, hole);
         // per pixel: how hot the ember line burns there (two smooth fields), and the odd fleck that glows on
         // (ph: a smooth phase 0..63 that the flicker tables are read with; jit: a ragged char rim)

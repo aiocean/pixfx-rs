@@ -11,7 +11,7 @@ pub use options::{MAX_MARGIN, parse_options};
 pub use player::Player;
 
 use js_sys::{Array, Uint8ClampedArray, Uint32Array};
-use pixfx_core::{Effect, Layer, Meta, valid_dt};
+use pixfx_core::{Effect, Layer, Meta, OptKind, Rgba, valid_dt};
 use pixfx_effects::{EFFECTS, effect};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -51,9 +51,33 @@ struct MetaJs {
     fps: u32,
     /// Seeds are small; a JS number holds them exactly up to 2^53.
     seed: u64,
+    /// The effect's own options, beyond the ones every effect takes.
+    options: Vec<OptionJs>,
 }
 
-/// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed}` for one effect.
+/// One of an effect's own options as JS reads it: its name, what it holds and its default.
+#[derive(Serialize, tsify::Tsify)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[tsify(rename = "EffectOption")]
+enum OptionJs {
+    /// A number; `range` (`[lo, hi]`, or `null`) holds it where it sizes a loop. A `NaN` default means the effect
+    /// picks the value itself.
+    Num {
+        name: &'static str,
+        default: f64,
+        range: Option<(f64, f64)>,
+    },
+    /// One colour, `"#rrggbb"`.
+    Color { name: &'static str, default: Rgba },
+    /// A colour ramp; a ramp of another length is resampled to the default's.
+    Ramp {
+        name: &'static str,
+        default: &'static [Rgba],
+    },
+}
+
+/// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed, options}` for one
+/// effect; `options` lists its own options as `{name, kind: "num" | "color" | "ramp", default, range?}`.
 #[wasm_bindgen(unchecked_return_type = "EffectMeta")]
 pub fn meta(
     #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
@@ -78,6 +102,25 @@ fn meta_object(m: &Meta) -> Result<JsValue, JsError> {
         looping: m.looping,
         fps: m.fps,
         seed: m.seed,
+        options: m
+            .options
+            .iter()
+            .map(|o| match o.kind {
+                OptKind::Num { default, range } => OptionJs::Num {
+                    name: o.name,
+                    default,
+                    range,
+                },
+                OptKind::Color { default } => OptionJs::Color {
+                    name: o.name,
+                    default,
+                },
+                OptKind::Ramp { default } => OptionJs::Ramp {
+                    name: o.name,
+                    default,
+                },
+            })
+            .collect(),
     })
 }
 
@@ -102,7 +145,7 @@ impl Fx {
         #[wasm_bindgen(unchecked_optional_param_type = "FxOptions")] opts: JsValue,
     ) -> Result<Fx, JsError> {
         let fx = find(id)?;
-        let (opts, margin) = parse_options(&opts)?;
+        let (opts, margin) = parse_options(fx.meta(), &opts)?;
         Ok(Fx {
             player: Player::new(fx, opts, margin.unwrap_or(0)),
         })

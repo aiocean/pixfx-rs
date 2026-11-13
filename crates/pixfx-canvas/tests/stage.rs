@@ -33,6 +33,7 @@ const BLIP_META: Meta = Meta {
     looping: false,
     fps: 30,
     seed: 1,
+    options: &[],
 };
 
 struct BlipState;
@@ -66,6 +67,7 @@ const LAYERED_META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 1,
+    options: &[],
 };
 
 struct LayeredState;

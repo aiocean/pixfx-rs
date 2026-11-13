@@ -3,7 +3,7 @@
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{Rng, TAU, ease, js_max, js_min, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, sparkle};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{ColorOpt, Effect, EffectState, Layer, Meta, Options, Painter};
 
 use super::lib::{Feathers, NewFeather};
 
@@ -24,6 +24,7 @@ const META: Meta = Meta {
     looping: false,
     fps: 30,
     seed: 4,
+    options: &[GLOW.spec()],
 };
 
 // meta.options
@@ -35,7 +36,7 @@ const PALETTE: [Rgba; 6] = [
     Rgba::hex24(0xf4f3fa),
     Rgba::hex24(0xffffff),
 ];
-const GLOW: Rgba = Rgba::hex24(0xfff0c0);
+const GLOW: ColorOpt = ColorOpt::new("glow", Rgba::hex24(0xfff0c0));
 
 /// One lobe of the puff: soft, thrown out from the pop, swelling and thinning.
 struct Lobe {
@@ -52,7 +53,7 @@ impl Effect for FeatherBurst {
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let f: [Rgba; 6] = ramp(&opts.palette_or(&PALETTE));
-        let g = opts.color_or("glow", GLOW);
+        let g = opts.color(&GLOW);
         let mut r = Rng::new(to_uint32(seed as f64));
         let mut ps = Particles::new(ParticlesOpts {
             ground: f64::INFINITY,

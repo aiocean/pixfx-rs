@@ -8,7 +8,7 @@
 use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::math::{TAU, js_max, js_min, js_round, rand};
 use pixfx_core::sim::sparkle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
 use super::lib::beat;
 
@@ -34,6 +34,7 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 2,
+    options: &[LENGTH.spec()],
 };
 
 // meta.options
@@ -47,9 +48,9 @@ const PALETTE: [Rgba; 8] = [
     Rgba::hex24(0xffd0d4),
     Rgba::hex24(0xffffff),
 ];
-const LENGTH: f64 = 40.0;
-/// The longest bolt drawn (beyond pixelfx, which draws any length; see the module doc).
-const MAX_LENGTH: f64 = 4096.0;
+/// Held to 4096 at most, the longest bolt drawn (beyond pixelfx, which draws any length; see the module doc).
+const LENGTH: NumOpt = NumOpt::new("length", 40.0).within(0.0, 4096.0);
+
 
 impl Effect for LaserBolt {
     fn meta(&self) -> &Meta {
@@ -58,7 +59,7 @@ impl Effect for LaserBolt {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
-            length: opts.num_in("length", LENGTH, 0.0, MAX_LENGTH),
+            length: opts.num(&LENGTH),
             seed: seed as f64,
         })
     }

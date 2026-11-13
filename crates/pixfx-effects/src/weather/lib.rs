@@ -10,7 +10,7 @@
 
 use pixfx_core::color::Rgba;
 use pixfx_core::math::{clamp, js_max, js_min, js_round, rand};
-use pixfx_core::{Canvas, Meta, Options, Painter};
+use pixfx_core::{Canvas, Meta, NumOpt, Options, Painter};
 
 /// The longest side a weather canvas takes from its options: room for any screen at 2 screen pixels per
 /// pixel, and a frame small enough to allocate.
@@ -21,20 +21,30 @@ pub const MAX_SIDE: u32 = 2048;
 /// as far above the bottom as on the effect's own canvas, so the ground stays at the foot and a taller canvas
 /// adds sky. With neither option it is the effect's own canvas, so the default render is pixelfx's.
 pub fn sized(meta: &Meta, opts: &Options) -> Canvas {
-    let side = |key: &str, own: u32| {
-        let v = opts.num_or(key, f64::from(own));
+    let side = |o: &NumOpt, own: u32| {
+        let v = opts.num(o);
         if v.is_finite() {
             clamp(js_round(v), 1.0, f64::from(MAX_SIDE)) as u32
         } else {
             own
         }
     };
-    let (w, h) = (side("width", meta.size.0), side("height", meta.size.1));
+    let (wo, ho) = size_options(meta.size);
+    let (w, h) = (side(&wo, meta.size.0), side(&ho, meta.size.1));
     let below = meta.size.1 as i32 - meta.origin.1;
     Canvas {
         size: (w, h),
         origin: ((w / 2) as i32, h as i32 - below),
     }
+}
+
+/// The `width` and `height` options of a weather effect whose own canvas is `size`: [`sized`] reads them, the
+/// effect lists them in its meta.
+pub const fn size_options(size: (u32, u32)) -> (NumOpt, NumOpt) {
+    (
+        NumOpt::new("width", size.0 as f64),
+        NumOpt::new("height", size.1 as f64),
+    )
 }
 
 /// `n` things spread over `span` pixels as the effect spreads them over its own `own` pixels: as dense on a

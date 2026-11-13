@@ -7,7 +7,7 @@
 use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::math::{TAU, clamp, rng};
 use pixfx_core::particles::cycle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
 
 use super::lib::{PLASMA, VOLT, crackle, flight, spark, stroke, zigzag};
 
@@ -34,7 +34,11 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 9,
+    options: &[SPARKS.spec()],
 };
+
+// meta.options
+const SPARKS: RampOpt = RampOpt::new("sparks", &PLASMA);
 
 const FPS: f64 = 30.0;
 const N: f64 = 120.0;
@@ -48,7 +52,7 @@ impl Effect for BallLightning {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&VOLT)),
-            s: ramp(&opts.ramp_or("sparks", &PLASMA)),
+            s: ramp(&opts.ramp(&SPARKS)),
             seed: seed as f64,
         })
     }

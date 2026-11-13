@@ -7,7 +7,7 @@ use core::f64::consts::PI;
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{Rng, clamp, js_max, js_min, js_round, rand, to_uint32};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter, RampOpt};
 
 use super::lib::{
     BACK_LAYERS, Hot, LAYERS, Layers, Life, LoopNoise, drift, ember, fire_puff_up, flame_tongue,
@@ -31,6 +31,7 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 3,
+    options: &[WOOD.spec(), HEIGHT.spec()],
 };
 
 // meta.options
@@ -45,15 +46,17 @@ const PALETTE: [Rgba; 9] = [
     Rgba::hex24(0xfff3a6),
     Rgba::hex24(0xffffff),
 ];
-const WOOD: [Rgba; 6] = [
+const WOOD: RampOpt = RampOpt::new(
+    "wood",
+    &[
     Rgba::hex24(0x0e080a),
     Rgba::hex24(0x24130f),
     Rgba::hex24(0x3b2216),
     Rgba::hex24(0x5a3520),
     Rgba::hex24(0x8a5a34),
     Rgba::hex24(0xb9884f),
-];
-const HEIGHT: f64 = 22.0;
+]);
+const HEIGHT: NumOpt = NumOpt::new("height", 22.0);
 
 const D: f64 = META.duration;
 const NL: LoopNoise = LoopNoise(D);
@@ -105,8 +108,8 @@ impl Effect for Campfire {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             f: ramp(&opts.palette_or(&PALETTE)),
-            w: ramp(&opts.ramp_or("wood", &WOOD)),
-            height: opts.num_or("height", HEIGHT),
+            w: ramp(&opts.ramp(&WOOD)),
+            height: opts.num(&HEIGHT),
             s: seed as f64,
         })
     }

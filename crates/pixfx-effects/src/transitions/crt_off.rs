@@ -30,6 +30,7 @@ const META: Meta = screen_meta(
     ],
     2.0,
     1,
+    &[COLOR.spec()],
 );
 
 // meta.options
@@ -90,7 +91,7 @@ impl Effect for CrtOff {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
-            ink: opts.color_or("color", COLOR),
+            ink: opts.color(&COLOR),
             seed: seed as f64,
         })
     }

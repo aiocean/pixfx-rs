@@ -9,18 +9,18 @@
 
 use pixfx_core::color::{Rgba, WHITE};
 use pixfx_core::math::{TAU, clamp, js_min};
-use pixfx_core::{Meta, Painter};
+use pixfx_core::{ColorOpt, Meta, OptSpec, Painter};
 
 pub const W: usize = 320;
 pub const H: usize = 180;
 const WF: f64 = W as f64;
 const HF: f64 = H as f64;
 
-/// The cover colour every transition defaults to (pixelfx `screenMeta` `options.color`).
-pub const COLOR: Rgba = Rgba::hex24(0x0b0a10);
+/// The cover colour every transition takes, black by default (pixelfx `screenMeta` `options.color`).
+pub const COLOR: ColorOpt = ColorOpt::new("color", Rgba::hex24(0x0b0a10));
 
 /// The meta every transition shares; pass what differs. `tags` are the whole list, pixelfx's
-/// `["transition", "screen", ...tags, "one-shot"]`.
+/// `["transition", "screen", ...tags, "one-shot"]`. `options` are all the transition takes, [`COLOR`] among them.
 pub const fn screen_meta(
     id: &'static str,
     name: &'static str,
@@ -28,6 +28,7 @@ pub const fn screen_meta(
     tags: &'static [&'static str],
     duration: f64,
     seed: u64,
+    options: &'static [OptSpec],
 ) -> Meta {
     Meta {
         id,
@@ -40,6 +41,7 @@ pub const fn screen_meta(
         looping: false,
         fps: 30,
         seed,
+        options,
     }
 }
 

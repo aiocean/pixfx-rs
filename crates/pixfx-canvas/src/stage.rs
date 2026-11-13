@@ -6,15 +6,15 @@ use std::fmt;
 use std::num::NonZeroU32;
 
 use pixfx_core::math::js_round;
-use pixfx_core::{Effect, Frame, Layer, Options, Placement, composite_px, valid_dt};
+use pixfx_core::{Effect, Frame, Layer, Meta, Options, Placement, composite_px, valid_dt};
 use pixfx_wasm::{Player, parse_options};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsError, JsValue};
 
 /// [`parse_options`] for [`crate::Stage::play`]: the stage sizes each effect's margin itself, so a `margin`
 /// option is an error.
-pub fn stage_options(v: &JsValue) -> Result<Options, JsError> {
-    let (opts, margin) = parse_options(v)?;
+pub fn stage_options(meta: &Meta, v: &JsValue) -> Result<Options, JsError> {
+    let (opts, margin) = parse_options(meta, v)?;
     if margin.is_some() {
         return Err(JsError::new(
             "options.margin is not supported: Stage sizes the margin itself",
