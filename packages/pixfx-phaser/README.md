@@ -119,7 +119,9 @@ hit is. Their `feel` option scales the cues (0 to 2, default 1), and `feel: 0` s
 
 - a hit-stop freezes every effect in the scene, and `feel.timeScale` (0 in a hit-stop, a fraction in slow
   motion, else 1) lets the game freeze its own world with them;
-- the shake moves the main camera's view for the render only, so its scroll and follow are untouched;
+- the shake moves and tilts the main camera's view for the render only, so its scroll, follow and rotation are
+  untouched. Each hit adds 0.3 (light) to 0.6 (heavy) trauma, which drains 1 a second; the camera moves up to
+  16 game pixels and tilts up to 0.05 radians times trauma squared, along smooth Perlin noise;
 - the flash lifts the view toward white.
 
 ```ts
@@ -136,7 +138,7 @@ player.setVelocityX(speed * this.pixfx.feel.timeScale);
 | `slow(secs, speed)` | Slow motion at `speed` (0 to 1) for `secs`, after any freeze. |
 | `setShakeStrength(k)` / `setFlashStrength(k)` | Player settings: 1 as designed, 0 off (still camera, no flash). |
 | `setEnabled(false)` | Leave the answer to the game. Effects play at scene time and `"cue"` events still fire. |
-| `shake`, `flash`, `trauma`, `frozen`, `timeScale` | This frame's answer, read-only. |
+| `shake`, `roll`, `flash`, `trauma`, `frozen`, `timeScale` | This frame's answer, read-only. |
 
 `"cue"` fires on the feel and on the effect (`effect.on("cue", ...)`) with `{t, pan, cue}`. A ripple's `x`/`y`
 and a sound's `x` are world positions. Ripples are data only; the plugin does not draw them. With worker

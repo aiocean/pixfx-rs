@@ -104,9 +104,9 @@ impl Default for Feel {
 
 #[wasm_bindgen]
 impl Feel {
-    /// `spec`: `undefined`, or `{shake?, shakeRate?, traumaDrain?, freezeCap?, flashFade?}` over the defaults
-    /// (3 game pixels of shake at full trauma, 12 noise cells a second, trauma drains 1.6 a second, a cue's
-    /// hit-stop at most 13/60 s, a flash fades 4 a second).
+    /// `spec`: `undefined`, or `{shake?, roll?, shakeRate?, traumaDrain?, freezeCap?, flashFade?}` over the
+    /// defaults (16 game pixels of shake and 0.05 radians of roll at full trauma, 12 noise cells a second, trauma
+    /// drains 1 a second, a cue's hit-stop at most 13/60 s, a flash fades 4 a second).
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_optional_param_type = "FeelSpec")] spec: JsValue,
@@ -161,6 +161,11 @@ impl Feel {
     pub fn shake(&self, strength: f64) -> Array {
         let (x, y) = self.inner.shake(strength);
         pair(x.into(), y.into())
+    }
+
+    /// How far the view tilts this frame, in radians (positive is clockwise). `strength` as in `shake`.
+    pub fn roll(&self, strength: f64) -> f64 {
+        self.inner.roll(strength)
     }
 
     /// How shaken the view is, 0 to 1.

@@ -120,7 +120,7 @@ pub fn cues_between(
 pub const FEEL: NumOpt = NumOpt::new("feel", 1.0).within(0.0, 2.0);
 
 /// The cues of an impact `t` seconds into an effect, centred on (`x`, `y`) in its own space. `weight` runs from 0
-/// (a pop) to 1 (a blast) and sets each answer the usual way: trauma grows with it (light hits stay subtle once the
+/// (a pop) to 1 (a blast) and sets each answer the usual way: trauma grows with it, 0.3 to 0.6 (light hits stay subtle once the
 /// game squares it), a hit-stop of 2 to 8 frames at 60 a second freezes play from a medium blow up, a screen ring
 /// pushes out from a medium-heavy one and a flash lifts the screen for a heavy one. The effect's [`FEEL`] option
 /// scales all of it; at 0 there are none.
@@ -132,7 +132,7 @@ pub fn impact(t: f64, weight: f64, x: f64, y: f64, opts: &Options) -> Vec<TimedC
     }
     let at = |cue| TimedCue { t, cue, pan: None };
     let mut out = vec![at(Cue::Shake {
-        trauma: clamp((0.15 + 0.55 * w) * k, 0.0, 1.0),
+        trauma: clamp((0.3 + 0.3 * w) * k, 0.0, 1.0),
     })];
     let frames = js_round((2.0 + 6.0 * w) * k.min(1.0));
     if w >= 0.3 && frames >= 1.0 {

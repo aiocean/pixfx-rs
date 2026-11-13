@@ -66,9 +66,11 @@ test("the player can turn shake and flash down or off", () => {
   fx.play("fake/spark", 0, 0);
   for (let i = 0; i < 7; i++) fx.update(16, 1);
   expect(feel.shake).toEqual([1, -1]);
+  expect(feel.roll).toBe(0.01);
   expect(feel.flash).toBe(0.5);
   feel.setShakeStrength(0).setFlashStrength(0.5);
   expect(feel.shake).toEqual([0, 0]);
+  expect(feel.roll).toBe(0);
   expect(feel.flash).toBe(0.25);
 });
 
@@ -82,6 +84,7 @@ test("off, effects play every second and the game still gets every cue", () => {
   expect(engine.created[0]?.elapsed).toBeCloseTo(0.16, 9);
   expect(types).toHaveLength(5);
   expect(feel.shake).toEqual([0, 0]);
+  expect(feel.roll).toBe(0);
   expect(feel.flash).toBe(0);
   expect(feel.timeScale).toBe(1);
   expect(engine.feels.every((f) => f.taken.length === 0)).toBe(true);

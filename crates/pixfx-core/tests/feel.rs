@@ -1,6 +1,7 @@
 //! The screen's answer to impacts, driven the way a game drives it: cues and impacts in, then real time passing.
 
-use pixfx_core::cue::{Cue, TimedCue};
+use pixfx_core::cue::{Cue, TimedCue, impact};
+use pixfx_core::effect::Options;
 use pixfx_core::feel::Feel;
 
 const FRAME: f64 = 1.0 / 60.0;
@@ -100,17 +101,22 @@ fn a_shake_sways_from_frame_to_frame_instead_of_jumping() {
     }
     let reach = seen.iter().map(|&(x, y)| x.abs().max(y.abs())).max();
     assert!(
-        reach >= Some(2),
+        reach >= Some(4),
         "a full shake reaches its pixels: {seen:?}"
     );
-    for w in seen.windows(2) {
-        let [(x0, y0), (x1, y1)] = [w[0], w[1]];
-        // a fresh random spot each frame would jump up to twice the reach
-        assert!(
-            (x1 - x0).abs() <= 2 && (y1 - y0).abs() <= 2,
-            "jumped: {seen:?}"
-        );
-    }
+    // A fresh random spot each frame moves about 4/3 as far as the offset itself (2a/3 against a/2 for uniform
+    // values in [-a, a]); a sway moves well under it.
+    let offset: i32 = seen.iter().map(|&(x, y)| x.abs() + y.abs()).sum();
+    let step: i32 = seen
+        .windows(2)
+        .map(|w| (w[1].0 - w[0].0).abs() + (w[1].1 - w[0].1).abs())
+        .sum();
+    assert!(step * 4 < offset * 3, "jumped: {seen:?}");
+    // the axes pass the centre at different moments: the screen does not snap back to rest
+    assert!(
+        seen.iter().skip(1).all(|&s| s != (0, 0)),
+        "at rest mid-shake: {seen:?}"
+    );
 }
 
 #[test]
@@ -130,4 +136,77 @@ fn the_shake_settles_and_the_player_can_turn_it_down_or_off() {
     assert!(half < full, "half {half}, full {full}");
     play_time(&mut feel, 60);
     assert_eq!(feel.shake(1.0), (0, 0));
+}
+
+#[test]
+fn trauma_drains_in_about_a_second() {
+    let mut feel = Feel::new();
+    feel.add_trauma(1.0);
+    play_time(&mut feel, 30);
+    assert!(
+        (feel.trauma() - 0.5).abs() < 1e-9,
+        "half a second: {}",
+        feel.trauma()
+    );
+    play_time(&mut feel, 30);
+    assert_eq!(feel.trauma(), 0.0);
+}
+
+#[test]
+fn the_screen_rolls_with_the_shake_smoothly_and_settles() {
+    let mut feel = Feel::new();
+    let max = feel.spec().roll;
+    assert_eq!(feel.roll(1.0), 0.0, "no trauma, no tilt");
+    feel.add_trauma(1.0);
+    let mut seen = Vec::new();
+    for _ in 0..30 {
+        let r = feel.roll(1.0);
+        assert!(r.abs() <= max, "within the max roll: {r}");
+        assert!(feel.roll(0.5).abs() <= r.abs());
+        assert_eq!(feel.roll(0.0), 0.0);
+        assert_eq!(feel.roll(f64::NAN), 0.0);
+        seen.push(r);
+        feel.advance(FRAME);
+    }
+    let reach = seen.iter().fold(0.0_f64, |m, r| m.max(r.abs()));
+    assert!(reach > max * 0.2, "a full shake tilts the screen: {seen:?}");
+    for w in seen.windows(2) {
+        // fresh random angles would jump by up to twice the max
+        assert!((w[1] - w[0]).abs() < max * 0.5, "jumped: {seen:?}");
+    }
+    play_time(&mut feel, 60);
+    assert_eq!(feel.roll(1.0), 0.0);
+}
+
+#[test]
+fn a_heavy_hit_shakes_clearly_and_a_light_one_stays_subtle() {
+    // the most the screen moves after one hit, wherever in the noise it lands
+    let peak = |weight: f64, start: u32| {
+        let mut feel = Feel::new();
+        play_time(&mut feel, start * 7);
+        feel.take(&impact(0.0, weight, 0.0, 0.0, &Options::default()));
+        (0..30)
+            .map(|_| {
+                let (x, y) = feel.shake(1.0);
+                feel.advance(FRAME);
+                x.abs().max(y.abs())
+            })
+            .max()
+            .unwrap_or(0)
+    };
+    let blasts: Vec<i32> = (0..20).map(|start| peak(1.0, start)).collect();
+    let pops: Vec<i32> = (0..20).map(|start| peak(0.0, start)).collect();
+    // wherever it lands in the noise, a blast moves the screen; on average 2 to 4 px
+    assert!(
+        blasts.iter().all(|&p| p >= 1),
+        "a blast always moves it: {blasts:?}"
+    );
+    assert!(
+        blasts.iter().sum::<i32>() >= 50,
+        "a blast moves it 2 to 4 px: {blasts:?}"
+    );
+    assert!(
+        pops.iter().all(|&p| p <= 1),
+        "a pop moves it 1 px at most: {pops:?}"
+    );
 }

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `pixfx-core`: the trauma shake follows the usual model on every axis: `Feel::roll(strength)` tilts the screen
+  (radians, `FeelSpec::roll`) next to `shake`'s x and y, each axis is the most it can move times trauma squared times
+  smooth Perlin noise (`math::perlin`, gradient noise that never comes to rest), `cue::impact` adds 0.3 to 0.6 trauma
+  per hit, trauma drains 1 a second, and the default shake is 16 game pixels and 0.05 radians at full trauma (a heavy
+  hit moves the screen 2 to 4 px, a light one 1 px; it was 1 px for both).
+- `pixfx-wasm`, `pixfx-canvas`: `Feel.roll(strength)` and `Stage.roll(strength)`; the Canvas stage's own loop leaves
+  roll out to keep the pixel grid. `pixfx-phaser`: `feel.roll`, and the plugin tilts the main camera by it for the
+  render, keeping the game's own rotation.
 - `pixfx-canvas`: `Stage.move(handle, x, y)` moves a playing effect without restarting it, for effects that follow
   the pointer or a sprite.
 - `site/`: landing page and docs, with an fx layer (`site/assets/fx.js`) that plays engine effects for the cursor,

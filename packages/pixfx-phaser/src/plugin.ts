@@ -49,8 +49,8 @@ function phaserGfx(scene: Phaser.Scene): Gfx {
  * game step, after all scenes updated.
  *
  * Game feel: `this.pixfx.feel` answers the cues effects fire. A hit-stop freezes the scene's effects (the game
- * reads `feel.timeScale` to freeze its own world), the shake moves the main camera's view for the render only
- * (its scroll and follow are untouched), and the flash lifts the view toward white. `this.pixfx.squash(sprite)`
+ * reads `feel.timeScale` to freeze its own world), the shake moves and tilts the main camera's view for the render
+ * only (its scroll, follow and rotation are untouched), and the flash lifts the view toward white. `this.pixfx.squash(sprite)`
  * gives a sprite squash, stretch and a blink on the same clock.
  */
 export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
@@ -59,8 +59,8 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   private destroyed = false;
   /** The scene's answer to impacts: camera shake, hit-stop, slow motion, flash, and every effect's cues. */
   readonly feel: PixfxFeel;
-  /** The main camera's place before this frame's shake, restored after the render. */
-  private moved: { camera: Phaser.Cameras.Scene2D.Camera; x: number; y: number } | null = null;
+  /** The main camera's place and tilt before this frame's shake, restored after the render. */
+  private moved: { camera: Phaser.Cameras.Scene2D.Camera; x: number; y: number; rotation: number } | null = null;
   private flashRect: Phaser.GameObjects.Rectangle | null = null;
   private readonly sprites = new Set<PixfxSpriteFeel>();
 
@@ -147,17 +147,23 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   private readonly onRender = (): void => {
     const m = this.moved;
     if (!m) return;
-    m.camera.setPosition(m.x, m.y);
+    m.camera.setPosition(m.x, m.y).setRotation(m.rotation);
     this.moved = null;
   };
 
-  /** Move the main camera's view by the shake (in screen pixels: game pixels × zoom) and show the flash over it. */
+  /**
+   * Move the main camera's view by the shake (in screen pixels: game pixels × zoom), tilt it by the roll, and show
+   * the flash over it.
+   */
   private showFeel(): void {
     const camera = this.host.cameras.main;
     const [dx, dy] = this.feel.shake;
-    if (dx !== 0 || dy !== 0) {
-      this.moved = { camera, x: camera.x, y: camera.y };
-      camera.setPosition(camera.x + dx * camera.zoom, camera.y + dy * camera.zoom);
+    const roll = this.feel.roll;
+    if (dx !== 0 || dy !== 0 || roll !== 0) {
+      // the game's own tilt: Phaser's types keep `rotation` private and give it through `toJSON`
+      const rotation = camera.toJSON().rotation;
+      this.moved = { camera, x: camera.x, y: camera.y, rotation };
+      camera.setPosition(camera.x + dx * camera.zoom, camera.y + dy * camera.zoom).setRotation(rotation + roll);
     }
     const flash = this.feel.flash;
     if (flash <= 0 && !this.flashRect) return;

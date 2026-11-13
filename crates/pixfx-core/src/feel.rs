@@ -1,16 +1,16 @@
 //! The game's answer to an impact, for any game: a camera shake driven by trauma, a hit-stop that freezes play
 //! for a few frames, slow motion, screen ripples and a flash. It takes the cues effects fire
 //! ([`crate::cue::Cue`]) and the game's own impacts ([`Feel::add_trauma`], [`Feel::freeze`], [`Feel::slow`]),
-//! and each frame tells the game how much play time passes ([`Feel::advance`]) and where the screen sits
-//! ([`Feel::shake`]).
+//! and each frame tells the game how much play time passes ([`Feel::advance`]), where the screen sits
+//! ([`Feel::shake`]) and how far it tilts ([`Feel::roll`]).
 //!
 //! The rules follow the usual game-feel practice: trauma 0 to 1 adds up per impact and drains over time, the
-//! shake is trauma squared (light hits stay subtle, heavy ones read as heavy) times smooth noise (the screen sways
-//! rather than jumping to a new spot each frame); hit-stops do not add up, the longest one wins, under a cap; the
+//! shake (x, y and roll) is a maximum times trauma squared (light hits stay subtle, heavy ones read as heavy) times
+//! smooth Perlin noise (the screen sways rather than jumping to a new spot each frame); hit-stops do not add up, the longest one wins, under a cap; the
 //! freeze runs on real time, and ripples and flash keep moving through it.
 
 use crate::cue::{Cue, TimedCue};
-use crate::math::{js_max, js_min, js_round, noise, to_int32};
+use crate::math::{js_max, js_min, js_round, perlin, to_int32};
 use crate::screen::Ripple;
 
 /// What is left of a timer after `dt`, counted in whole frames: what is left after the last one is rounding, not
@@ -30,6 +30,8 @@ fn run_down(left: f64, dt: f64) -> f64 {
 pub struct FeelSpec {
     /// Game pixels the screen moves at full trauma.
     pub shake: f64,
+    /// Radians the screen tilts at full trauma. A host that keeps a pixel grid (a canvas stage) leaves it out.
+    pub roll: f64,
     /// How fast the shake wanders: smooth noise at this many cells a second.
     pub shake_rate: f64,
     /// Trauma drains this much a second.
@@ -43,9 +45,10 @@ pub struct FeelSpec {
 impl Default for FeelSpec {
     fn default() -> Self {
         Self {
-            shake: 3.0,
+            shake: 16.0,
+            roll: 0.05,
             shake_rate: 12.0,
-            trauma_drain: 1.6,
+            trauma_drain: 1.0,
             freeze_cap: 13.0 / 60.0,
             flash_fade: 4.0,
         }
@@ -165,12 +168,29 @@ impl Feel {
     /// `strength` scales it for the player's setting: 1 as designed, 0 (or anything not above 0) holds the
     /// screen still.
     pub fn shake(&self, strength: f64) -> (i32, i32) {
-        let strength = if strength > 0.0 { strength } else { 0.0 };
-        let a = self.trauma * self.trauma * self.spec.shake * strength;
-        let t = self.clock * self.spec.shake_rate;
-        let x = to_int32(js_round(noise(t, 1.0) * a));
-        let y = to_int32(js_round(noise(t, 2.0) * a));
+        let a = self.amount(strength) * self.spec.shake;
+        let x = to_int32(js_round(self.wander(0.0) * a));
+        let y = to_int32(js_round(self.wander(1.0) * a));
         (x, y)
+    }
+
+    /// How far the screen tilts this frame, in radians (positive is clockwise on a y-down screen): trauma
+    /// squared times smooth noise, up to [`FeelSpec::roll`]. `strength` as in [`Feel::shake`].
+    pub fn roll(&self, strength: f64) -> f64 {
+        self.amount(strength) * self.spec.roll * self.wander(2.0)
+    }
+
+    /// Trauma squared at the player's `strength` (0 when it is not above 0).
+    fn amount(&self, strength: f64) -> f64 {
+        let strength = if strength > 0.0 { strength } else { 0.0 };
+        self.trauma * self.trauma * strength
+    }
+
+    /// One axis of the shake (`axis` 0, 1 or 2): smooth noise over real time with its own seed. Each axis reads
+    /// the noise a third of a cell apart, since Perlin noise is 0 at every whole cell: in step, every axis would
+    /// pass the centre together and the screen would snap back to rest each cell.
+    fn wander(&self, axis: f64) -> f64 {
+        perlin(self.clock * self.spec.shake_rate + axis / 3.0, axis + 1.0)
     }
 
     /// How shaken the screen is, 0 to 1.

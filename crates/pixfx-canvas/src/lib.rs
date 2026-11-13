@@ -201,6 +201,17 @@ impl Stage {
         pair(x.into(), y.into())
     }
 
+    /// How far the view tilts this frame, in radians (positive is clockwise), for a host that draws the stage
+    /// into a view it can rotate. The stage's own loop leaves it out to keep the pixel grid. `strength` as in
+    /// `shake`.
+    pub fn roll(&self, strength: f64) -> f64 {
+        self.renderer
+            .borrow()
+            .scene
+            .feel()
+            .map_or(0.0, |f| f.roll(strength))
+    }
+
     /// How hard the stage's own loop (`start`, `tick`) shakes the view: 1 as designed (the default), 0 not at
     /// all, for a player who turns shake off.
     #[wasm_bindgen(js_name = setShakeStrength)]

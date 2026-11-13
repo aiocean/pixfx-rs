@@ -67,7 +67,10 @@ export class FakeFx implements FxLike {
   }
 }
 
-/** A feel that keeps only what the glue needs: a hit-stop holds play, trauma shakes by one pixel, flash as given. */
+/**
+ * A feel that keeps only what the glue needs: a hit-stop holds play, trauma shakes by one pixel and tilts by 0.01
+ * radians, flash as given.
+ */
 export class FakeFeel implements FeelLike {
   taken: TimedCue[] = [];
   freed = false;
@@ -99,6 +102,9 @@ export class FakeFeel implements FeelLike {
   shake(strength: number): [number, number] {
     const d = this.shaken > 0 && strength > 0 ? 1 : 0;
     return [d, d === 0 ? 0 : -d];
+  }
+  roll(strength: number): number {
+    return this.shaken > 0 && strength > 0 ? 0.01 : 0;
   }
   trauma(): number {
     return this.shaken;

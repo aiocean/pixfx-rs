@@ -56,6 +56,8 @@ export interface FeelLike {
   advance(dt: number): number;
   /** Where the view sits, `[dx, dy]` in game pixels, at `strength` (1 as designed, 0 still). */
   shake(strength: number): [number, number];
+  /** How far the view tilts, in radians (positive is clockwise), at `strength`. */
+  roll(strength: number): number;
   trauma(): number;
   frozen(): boolean;
   /** How white the view is lifted, 0 to 1. */
@@ -131,6 +133,7 @@ export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engin
         slow: (secs, speed) => f.slow(secs, speed),
         advance: (dt) => f.advance(dt),
         shake: (strength) => pair.parse(f.shake(strength)),
+        roll: (strength) => f.roll(strength),
         trauma: () => f.trauma(),
         frozen: () => f.frozen(),
         flash: () => f.flash(),

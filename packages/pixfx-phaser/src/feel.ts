@@ -8,8 +8,8 @@ export type WorldCue = TimedCue;
 /**
  * A scene's answer to impacts (`scene.pixfx.feel`): the cues every effect fires (shake, hit-stop, ripple, flash,
  * sound) and the game's own impacts (`addTrauma`, `freeze`, `slow`) become one camera shake, one hit-stop that
- * freezes the scene's effects, slow motion and a flash. The plugin applies the shake to the main camera and the
- * flash over it; a game freezes its own world with `timeScale`.
+ * freezes the scene's effects, slow motion and a flash. The plugin moves and tilts the main camera by the shake
+ * and shows the flash over it; a game freezes its own world with `timeScale`.
  *
  * Emits `"cue"` with each cue any effect fires (`(cue: WorldCue, effect)`), whether or not the answer is on, so
  * the game plays sounds and reacts to anything else. No Phaser calls: the plugin does the drawing.
@@ -81,6 +81,12 @@ export class PixfxFeel extends Phaser.Events.EventEmitter {
   get shake(): [number, number] {
     const f = this.answering ? this.answer : null;
     return f ? f.shake(this.shakeK) : [0, 0];
+  }
+
+  /** How far the camera tilts this frame, in radians (positive is clockwise), at the player's shake strength. */
+  get roll(): number {
+    const f = this.answering ? this.answer : null;
+    return f ? f.roll(this.shakeK) : 0;
   }
 
   /** How white the view is lifted this frame, 0 to 1, at the player's flash strength. */

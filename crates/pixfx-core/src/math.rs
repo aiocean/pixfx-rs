@@ -221,6 +221,19 @@ pub fn noise(x: f64, seed: f64) -> f64 {
     lerp(rand(&[i, seed]), rand(&[i + 1.0, seed]), u) * 2.0 - 1.0
 }
 
+/// Smooth 1D Perlin (gradient) noise in [-1, 1]: 0 at every whole `x`, passing through it at a seeded slope, with
+/// a quintic fade so its rate of change is smooth too. Unlike [`noise`] it never comes to rest at a lattice point,
+/// so a value it drives keeps moving. Not part of pixelfx.
+pub fn perlin(x: f64, seed: f64) -> f64 {
+    let i = libm::floor(x);
+    let f = x - i;
+    let slope = |at: f64| rand(&[at, seed]) * 2.0 - 1.0;
+    let fade = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    // a single slope reaches at most 1/2 between lattice points: double it to fill [-1, 1]
+    let v = lerp(slope(i) * f, slope(i + 1.0) * (f - 1.0), fade) * 2.0;
+    clamp(v, -1.0, 1.0)
+}
+
 /// Smooth 2D value noise in [-1, 1].
 pub fn noise2(x: f64, y: f64, seed: f64) -> f64 {
     let (ix, iy) = (libm::floor(x), libm::floor(y));

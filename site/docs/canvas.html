@@ -120,6 +120,9 @@ addEventListener("pointermove", (e) =&gt; stage.move(wisp, e.offsetX / SCALE, e.
 <h3><code>shake(strength)</code> → [dx, dy]</h3>
 <p>Where the view sits this frame, in whole game pixels, from the trauma the cues and <code>addTrauma</code> built up. <code>strength</code> is the player's setting: 1 as designed, 0 holds the view still.</p>
 
+<h3><code>roll(strength)</code> → radians</h3>
+<p>How far the view tilts this frame (positive is clockwise), for a host that draws the stage into a view it can rotate. The stage's own loop leaves it out to keep the pixel grid.</p>
+
 <h3><code>setShakeStrength(strength)</code></h3>
 <p>How hard the stage's own loop shakes the view: 1 as designed (the default), 0 not at all.</p>
 

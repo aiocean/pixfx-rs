@@ -285,6 +285,9 @@ mod impact_cues {
         assert_eq!(kinds(&blow), ["shake", "hitstop", "ripple"]);
         assert_eq!(kinds(&blast), ["shake", "hitstop", "ripple", "flash"]);
         assert!(trauma(&pop) < trauma(&blow) && trauma(&blow) < trauma(&blast));
+        // a hit adds 0.3 (the lightest) to 0.6 (the heaviest) trauma
+        assert_eq!(trauma(&impact(0.0, 0.0, 0.0, 0.0, &o)), 0.3);
+        assert_eq!(trauma(&blast), 0.6);
         assert!(hitstop(&blow) < hitstop(&blast));
         // whole frames at 60 a second, at most 8
         assert_eq!(hitstop(&blast), 8.0 / 60.0);
