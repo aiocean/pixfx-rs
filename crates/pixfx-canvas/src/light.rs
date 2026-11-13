@@ -13,7 +13,7 @@ use web_sys::{
 };
 
 use crate::js_message;
-use crate::stage::light_rgba;
+use pixfx_scene::light_rgba;
 
 /// The lights on a `w` x `h` game-pixel scene, in the duel's style (`pixfx_light::Style::default()`).
 #[wasm_bindgen]

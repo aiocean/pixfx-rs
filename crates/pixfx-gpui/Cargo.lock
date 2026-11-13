@@ -2036,6 +2036,15 @@ dependencies = [
  "pixfx-core",
  "pixfx-draw",
  "pixfx-effects",
+ "pixfx-scene",
+]
+
+[[package]]
+name = "pixfx-scene"
+version = "0.1.0"
+dependencies = [
+ "pixfx-core",
+ "pixfx-draw",
 ]
 
 [[package]]

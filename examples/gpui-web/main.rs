@@ -10,7 +10,7 @@ use gpui::{
     point, prelude::*, px, rgb, size,
 };
 use pixfx_core::{Effect, Layer, Options};
-use pixfx_gpui::{FxFrames, FxView, paint_fx};
+use pixfx_gpui::{FxHandle, FxScene};
 use web_time::Instant;
 
 /// Logical pixels per effect pixel.
@@ -21,33 +21,40 @@ const GROUND: u32 = 0x1e1a24;
 const FPS_EVERY: f64 = 2.0;
 
 struct Campsite {
-    candle: FxView,
-    campfire: FxView,
-    /// The frames both effects paint from.
-    fx_frames: FxFrames,
+    /// The effects and the frames they paint from.
+    fx: FxScene,
+    candle: FxHandle,
+    campfire: FxHandle,
     last: Option<Instant>,
     frames: u32,
     since: Option<Instant>,
 }
 
 impl Campsite {
-    fn new(candle: &'static dyn Effect, campfire: &'static dyn Effect) -> Self {
-        Self {
-            candle: FxView::new(candle, Options::default()),
-            campfire: FxView::new(campfire, Options::default()),
-            fx_frames: FxFrames::default(),
+    fn new(
+        candle: &'static dyn Effect,
+        campfire: &'static dyn Effect,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let mut fx = FxScene::default();
+        let candle = fx.play(candle, Options::default())?;
+        let campfire = fx.play(campfire, Options::default())?;
+        Ok(Self {
+            fx,
+            candle,
+            campfire,
             last: None,
             frames: 0,
             since: None,
-        }
+        })
     }
 
     /// Advance both effects by the real time since the last frame.
     fn tick(&mut self, now: Instant) {
         if let Some(last) = self.last {
             let dt = now.duration_since(last).as_secs_f64();
-            self.candle.tick(dt);
-            self.campfire.tick(dt);
+            if let Err(error) = self.fx.tick(dt) {
+                log::error!("pixfx: failed to advance the effects: {error:#}");
+            }
         }
         self.last = Some(now);
         self.count_frame(now);
@@ -86,14 +93,12 @@ impl Campsite {
                 ground_y,
             )
         };
-        for (view, x) in [(&mut self.candle, 0.3), (&mut self.campfire, 0.62)] {
-            if let Err(error) =
-                paint_fx(view, &mut self.fx_frames, Layer::Both, at(x), SCALE, window)
-            {
+        for (fx, x) in [(self.candle, 0.3), (self.campfire, 0.62)] {
+            if let Err(error) = self.fx.paint(fx, Layer::Both, at(x), SCALE, window) {
                 log::error!("pixfx: failed to paint an effect: {error:#}");
             }
         }
-        if let Err(error) = self.fx_frames.end_frame(window) {
+        if let Err(error) = self.fx.end_frame(window) {
             log::error!("pixfx: failed to drop old effect frames: {error:#}");
         }
     }
@@ -123,13 +128,20 @@ fn run(application: Application) {
             log::error!("pixfx: fire/candle or fire/campfire is missing from pixfx-effects");
             return;
         };
+        let campsite = match Campsite::new(candle, campfire) {
+            Ok(campsite) => campsite,
+            Err(error) => {
+                log::error!("pixfx: failed to start the effects: {error}");
+                return;
+            }
+        };
         let bounds = Bounds::centered(None, size(px(1280.), px(720.)), cx);
         let opened = cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |_, cx| cx.new(|_| Campsite::new(candle, campfire)),
+            |_, cx| cx.new(|_| campsite),
         );
         if let Err(error) = opened {
             log::error!("pixfx: failed to open the window: {error:#}");

@@ -1,17 +1,16 @@
-//! The stage's pure logic, natively: removal of finished instances, draw order, and the frame-to-pixels
-//! conversion the canvas shell blits.
+//! The scene's logic, natively: removal of finished instances, draw order, shared frames, freeing surfaces, and
+//! the frame-to-pixels conversion a canvas shell blits.
 
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::num::NonZeroU32;
 
-use pixfx_canvas::stage::{Pass, Rect, Scene, Shell, StageEvent, color_rgba};
 use pixfx_core::{
-    Canvas, Effect, EffectState, Layer, Meta, OptValue, Options, Placement, render_frames,
+    Canvas, Effect, EffectState, Layer, Meta, OptValue, Options, Placement, Player, render_frames,
 };
 use pixfx_draw::{Frame, Painter, Rgba};
 use pixfx_effects::effect;
-use pixfx_wasm::Player;
+use pixfx_scene::{Pass, Rect, Scene, Shell, StageEvent, color_rgba};
 
 type Res = Result<(), Box<dyn Error>>;
 
@@ -21,6 +20,8 @@ struct Recorder {
     /// Layers drawn into a new surface or refilled.
     made: usize,
     refilled: usize,
+    /// Surfaces handed back with `free`.
+    freed: usize,
     shown: Vec<(Pass, Frame)>,
 }
 
@@ -38,6 +39,10 @@ impl Shell for Recorder {
     }
     fn show(&mut self, pass: Pass, surface: &Frame) -> Result<(), ()> {
         self.shown.push((pass, surface.clone()));
+        Ok(())
+    }
+    fn free(&mut self, _surface: Frame) -> Result<(), ()> {
+        self.freed += 1;
         Ok(())
     }
 }
@@ -620,5 +625,67 @@ fn a_baked_clip_is_shown_without_drawing() -> Res {
     scene.play(Player::live(fx, other), 60.0, 40.0)?;
     scene.update(0.0)?;
     assert_eq!(draw_once(&mut scene).made, 2);
+    Ok(())
+}
+
+/// Run `scene` in 1/30 s steps, drawing after each with `shell`, until no instance plays; at most `steps` steps.
+fn run_out(scene: &mut Scene<Frame>, shell: &mut Recorder, steps: usize) -> Res {
+    for _ in 0..steps {
+        if scene.handles().next().is_none() {
+            break;
+        }
+        scene.update(1.0 / 30.0)?;
+        assert_eq!(scene.draw(shell), Ok(()));
+    }
+    assert_eq!(scene.handles().count(), 0, "every instance ended");
+    Ok(())
+}
+
+#[test]
+fn every_surface_a_scene_drops_is_freed() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut shell = Recorder::default();
+    let fading = scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    scene.play(player("fire/candle")?, 60.0, 40.0)?;
+    scene.update(0.1)?;
+    assert_eq!(scene.draw(&mut shell), Ok(()));
+    scene.stop(fading);
+    let other = scene.handles().nth(1).ok_or("second candle")?;
+    // the fading one draws into its own surfaces; the other keeps sharing frames, then goes
+    scene.update(1.0 / 30.0)?;
+    assert_eq!(scene.draw(&mut shell), Ok(()));
+    assert!(scene.remove(other));
+    // a budget below one frame drops every shared frame not shown in the current draw
+    scene.set_frame_budget(1);
+    run_out(&mut scene, &mut shell, 600)?;
+    // one more draw hands over what the last update released
+    assert_eq!(scene.draw(&mut shell), Ok(()));
+    assert_eq!(scene.frame_bytes(), 0, "no shared frame left");
+    assert_eq!(shell.freed, shell.made, "every surface made was freed");
+    Ok(())
+}
+
+#[test]
+fn clearing_a_scene_frees_everything_it_holds() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut shell = Recorder::default();
+    let h = scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    scene.play(player("fire/candle")?, 60.0, 40.0)?;
+    scene.update(0.1)?;
+    assert_eq!(scene.draw(&mut shell), Ok(()));
+    scene.stop(h);
+    scene.update(1.0 / 30.0)?;
+    assert_eq!(scene.draw(&mut shell), Ok(()));
+    assert!(shell.made > 0);
+    assert_eq!(scene.clear(&mut shell), Ok(()));
+    assert_eq!(shell.freed, shell.made, "every surface made was freed");
+    assert_eq!(scene.frame_bytes(), 0);
+    assert_eq!(scene.handles().count(), 0);
+    let ends = scene
+        .drain_events()
+        .into_iter()
+        .filter(|e| matches!(e, StageEvent::End { .. }))
+        .count();
+    assert_eq!(ends, 2, "both instances end");
     Ok(())
 }

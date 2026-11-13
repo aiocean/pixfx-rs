@@ -87,6 +87,10 @@ the sessions working in its files, and re-read every file named below before edi
 
 ### Task 2: `pixfx-scene`, host-neutral `Scene`
 
+Done in two commits: 2a moves `Scene` and `Shell` (with `free` and `Scene::clear`) and the Canvas shell onto them;
+2b ports `pixfx-gpui` (Step 5), which needs a per-handle draw since gpui paints one view per effect. Review Focus 4
+(scale change) needs no test: surfaces hold frames in game pixels, and the scale only changes `Pass::rect`.
+
 **Files:**
 - Create: `crates/pixfx-scene/Cargo.toml`, `crates/pixfx-scene/src/lib.rs`
 - Move (git mv): `crates/pixfx-canvas/src/stage.rs` → `crates/pixfx-scene/src/scene.rs`, and

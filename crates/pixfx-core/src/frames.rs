@@ -92,4 +92,10 @@ impl<S> FrameStore<S> {
     pub fn bytes(&self) -> u64 {
         self.bytes
     }
+
+    /// Drop every held surface, whatever its age; returns them (a host frees what they hold).
+    pub fn clear(&mut self) -> Vec<S> {
+        self.bytes = 0;
+        self.held.drain().map(|(_, h)| h.surface).collect()
+    }
 }

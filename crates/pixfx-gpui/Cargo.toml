@@ -16,6 +16,7 @@ gpui = { path = "../../../zed-gpui/crates/gpui", default-features = false }
 image = { version = "=0.25.10", default-features = false }
 pixfx-core = { path = "../pixfx-core" }
 pixfx-draw = { path = "../pixfx-draw" }
+pixfx-scene = { path = "../pixfx-scene" }
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -1,0 +1,26 @@
+[package]
+name = "pixfx-scene"
+description = "What a pixfx stage shows and where: the effects playing, their placement, layers, shared frames and the answer to their cues, handed to any shell (Canvas 2D, Phaser, Pixi, gpui) through the Shell contract"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+pixfx-core = { path = "../pixfx-core" }
+pixfx-draw = { path = "../pixfx-draw" }
+serde = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+[dev-dependencies]
+pixfx-effects = { path = "../pixfx-effects" }
+pixfx-export = { path = "../pixfx-export" }
+
+[features]
+# serde for the values a host reads or passes (events, placement changes)
+serde = ["dep:serde", "pixfx-core/serde"]
+# TypeScript declarations for those values, for the wasm bindings
+ts = ["serde", "dep:tsify", "dep:wasm-bindgen", "pixfx-core/ts"]
+
+[lints]
+workspace = true

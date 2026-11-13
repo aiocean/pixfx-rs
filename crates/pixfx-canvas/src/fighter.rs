@@ -371,12 +371,12 @@ fn with_roll<T>(
 // ---------- drawing fighters ----------
 
 use crate::Surface;
-use crate::stage::{Pass, Rect};
 use pixfx_core::Layer;
 use pixfx_draw::{Frame, Rgba};
 use pixfx_fighter::look::Look;
 use pixfx_fighter::paint::{self, Appearance};
 use pixfx_fighter::status::{self, DomeStyle, Figure, Mark, Silhouette};
+use pixfx_scene::{Pass, Rect};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 /// Fighters, their marks and the dust they raise, drawn onto a canvas in game pixels upscaled by `scale`, colour

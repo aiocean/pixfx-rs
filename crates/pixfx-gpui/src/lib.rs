@@ -2,22 +2,24 @@
 //! with additive blending. Images are uploaded at the effect's own size and enlarged by the GPU with
 //! nearest-neighbour sampling, so the pixel art stays crisp.
 //!
-//! An effect's frame is rasterised and uploaded to gpui's sprite atlas (a [`RenderImage`] is immutable and
-//! cached by id) only when the effect reaches a frame not uploaded yet: views showing the same frame
-//! ([`pixfx_core::Player::shown`]) paint the same images from one [`FxFrames`] per window, which drops the
-//! least recently painted frames from the atlas past its byte budget. An effect fading out after
-//! [`FxView::stop`] paints its own images, redrawn once per frame of its clock.
+//! A [`Scene`] decides everything: an effect's frame is rasterised and uploaded to gpui's sprite atlas (a
+//! [`RenderImage`] is immutable and cached by id) only when the effect reaches a frame not uploaded yet, effects
+//! showing the same frame paint the same images, the least recently painted frames leave the atlas past its byte
+//! budget, and an effect fading out after [`FxScene::stop`] paints its own images, redrawn once per frame of its
+//! clock. This crate is the gpui shell: it uploads, paints and drops images ([`FxScene`]).
 #![forbid(unsafe_code)]
 
+use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use gpui::{
     Bounds, Corners, Pixels, Point, RenderImage, SpriteBlend, SpriteFilter, Window, point, px, size,
 };
 use image::{Frame as ImageFrame, RgbaImage};
-use pixfx_core::{Effect, FrameStore, Layer, Options, Player};
+use pixfx_core::{Effect, Layer, Options, Player};
 use pixfx_draw::Frame;
+use pixfx_scene::{Pass, Scene, Shell};
 
 /// A rectangle of source pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,8 +107,8 @@ struct Painted {
 }
 
 impl Painted {
-    /// Upload `frame`'s layers as images cropped to their drawn pixels; also returns the bytes they hold.
-    fn of(frame: &Frame) -> (Self, u64) {
+    /// Upload `frame`'s layers as images cropped to their drawn pixels.
+    fn of(frame: &Frame) -> Self {
         let w = frame.w;
         let sprite = |words: &[u32], mask: u32, bgra: fn(u32) -> [u8; 4]| {
             let rect = occupied(words, w, mask)?;
@@ -118,16 +120,10 @@ impl Painted {
                 rect,
             })
         };
-        let painted = Self {
+        Self {
             color: sprite(&frame.color, 0xff00_0000, color_bgra),
             light: sprite(&frame.light, 0x00ff_ffff, light_bgra),
-        };
-        let bytes = [&painted.color, &painted.light]
-            .into_iter()
-            .flatten()
-            .map(|s| u64::from(s.rect.w) * u64::from(s.rect.h) * 4)
-            .sum();
-        (painted, bytes)
+        }
     }
 
     fn images(self) -> impl Iterator<Item = Arc<RenderImage>> {
@@ -138,50 +134,108 @@ impl Painted {
     }
 }
 
-/// The frames uploaded to one window's atlas, shared by every [`FxView`] painted into it. Paint the views,
-/// then call [`FxFrames::end_frame`] once per window frame.
-#[derive(Default)]
-pub struct FxFrames {
-    store: FrameStore<Painted>,
-    /// Window frames ended so far: when each held frame was last painted.
-    now: u64,
-    /// Images no view paints any more, dropped from the atlas at the end of the frame.
+/// The effects painted into one window: a [`Scene`] decides what each effect shows, which frames are shared and
+/// when one leaves the atlas; this crate only uploads, paints and drops images. Paint each effect with
+/// [`FxScene::paint`], then call [`FxScene::end_frame`] once per window frame.
+pub struct FxScene {
+    scene: Scene<Painted>,
+    /// Images no effect paints any more, dropped from the atlas at the end of the frame.
     retired: Vec<Arc<RenderImage>>,
 }
 
-impl FxFrames {
-    /// Bytes the uploaded frames may hold ([`pixfx_core::FRAME_BUDGET`] unless set).
+impl Default for FxScene {
+    fn default() -> Self {
+        // effects sit at their view's origin in effect pixels; the view scales them as it paints
+        let mut scene = Scene::new(NonZeroU32::MIN);
+        // a gpui app answers cues with its own feel, if any
+        scene.set_feel(None);
+        Self {
+            scene,
+            retired: Vec::new(),
+        }
+    }
+}
+
+/// One effect playing in an [`FxScene`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct FxHandle(u32);
+
+impl FxScene {
+    /// Play `effect` on the canvas `opts` give it ([`Effect::canvas`]), with room round that canvas for glow that
+    /// spills past it ([`pixfx_core::Meta::glow_margin`] on every side).
+    pub fn play(&mut self, effect: &'static dyn Effect, opts: Options) -> Result<FxHandle> {
+        let handle = self
+            .scene
+            .play(Player::live(effect, opts), 0.0, 0.0)
+            .map_err(|e| anyhow!(e))?;
+        Ok(FxHandle(handle))
+    }
+
+    /// Advance every effect by `dt` seconds of real time; finished effects leave, their images dropped at the end
+    /// of the next frame. A NaN, infinite or negative `dt` is an error and changes nothing.
+    pub fn tick(&mut self, dt: f64) -> Result<()> {
+        self.scene.update(dt).map_err(|e| anyhow!(e))?;
+        Ok(())
+    }
+
+    /// Let it end: loops fade out, one-shots are cut short. False if it is gone.
+    pub fn stop(&mut self, fx: FxHandle) -> bool {
+        self.scene.stop(fx.0)
+    }
+
+    /// Drop it now; its images leave the atlas at the end of the next frame. False if it is gone.
+    pub fn remove(&mut self, fx: FxHandle) -> bool {
+        self.scene.remove(fx.0)
+    }
+
+    /// Whether it finished (or was removed).
+    pub fn done(&self, fx: FxHandle) -> bool {
+        !self.scene.handles().any(|h| h == fx.0)
+    }
+
+    /// Bytes the shared frames may hold ([`pixfx_core::FRAME_BUDGET`] unless set).
     pub fn set_budget(&mut self, bytes: u64) {
-        self.store.set_budget(bytes);
+        self.scene.set_frame_budget(bytes);
     }
 
-    /// Bytes the uploaded frames hold.
+    /// Bytes the shared frames hold.
     pub fn bytes(&self) -> u64 {
-        self.store.bytes()
+        self.scene.frame_bytes()
     }
 
-    /// Stop holding `view`'s own images (an effect removed while fading out); they are dropped from the atlas
-    /// at the end of the frame.
-    pub fn release(&mut self, view: FxView) {
-        self.retired.extend(
-            view.own
-                .into_iter()
-                .flatten()
-                .flat_map(|o| o.painted.images()),
-        );
+    /// Paint `layer` of `fx` with the effect's origin at `origin`, each effect pixel `scale` x `scale` logical
+    /// pixels (a `scale` of 0 paints as 1): colour with [`SpriteBlend::Normal`], then light with
+    /// [`SpriteBlend::Additive`], both enlarged by the GPU with [`SpriteFilter::Nearest`]. Call during gpui's paint
+    /// phase. False if `fx` is gone.
+    pub fn paint(
+        &mut self,
+        fx: FxHandle,
+        layer: Layer,
+        origin: Point<Pixels>,
+        scale: u32,
+        window: &mut Window,
+    ) -> Result<bool> {
+        let mut shell = GpuiShell {
+            window,
+            origin,
+            scale: scale.max(1) as f32,
+            retired: &mut self.retired,
+        };
+        self.scene.draw_handle(fx.0, layer, &mut shell)
     }
 
-    /// Call once after every view is painted: drops from `window`'s atlas the images replaced this frame and,
-    /// past the budget, the least recently painted frames (never one painted this frame).
+    /// Call once after every effect is painted: drops from `window`'s atlas the images replaced or released this
+    /// frame and, past the budget, the least recently painted frames (never one painted this frame).
     pub fn end_frame(&mut self, window: &mut Window) -> Result<()> {
-        let trimmed = self.store.trim(self.now);
-        self.now += 1;
+        let mut shell = GpuiShell {
+            window,
+            origin: point(px(0.), px(0.)),
+            scale: 1.0,
+            retired: &mut self.retired,
+        };
+        self.scene.end_frame(&mut shell)?;
         let mut dropping = Ok(());
-        for image in self
-            .retired
-            .drain(..)
-            .chain(trimmed.into_iter().flat_map(Painted::images))
-        {
+        for image in self.retired.drain(..) {
             // every image goes even if one fails, so a failing drop cannot leak the rest
             let dropped = window.drop_image(image);
             if dropping.is_ok() {
@@ -192,124 +246,63 @@ impl FxFrames {
     }
 }
 
-/// A fading effect's own images and the clock frame they were drawn on.
-struct Own {
-    painted: Painted,
-    drawn: u64,
-}
-
-/// A live effect: a [`Player`] advanced in real time, its frames painted from an [`FxFrames`].
-pub struct FxView {
-    player: Player,
-    /// Source pixels from the frame's top-left to the effect's origin.
-    pivot: (i32, i32),
-    /// Per layer, the images of the fade frame last painted.
-    own: [Option<Own>; 3],
-}
-
-impl FxView {
-    /// The effect at its origin, on the canvas `opts` give it ([`Effect::canvas`]), in a frame with room round
-    /// that canvas for glow that spills past it ([`pixfx_core::Meta::glow_margin`] on every side).
-    pub fn new(effect: &'static dyn Effect, opts: Options) -> Self {
-        let player = Player::live(effect, opts);
-        let (origin, margin) = (player.canvas().origin, player.margin() as i32);
-        Self {
-            pivot: (origin.0 + margin, origin.1 + margin),
-            player,
-            own: [None, None, None],
-        }
-    }
-
-    /// Advance by `dt` seconds of real time ([`Player::update`]: a NaN, infinite or negative `dt` is ignored).
-    pub fn tick(&mut self, dt: f64) {
-        self.player.update(dt);
-    }
-
-    /// Let it end: loops fade out, one-shots are cut short.
-    pub fn stop(&mut self) {
-        self.player.stop();
-    }
-
-    pub fn done(&self) -> bool {
-        self.player.done()
-    }
-}
-
-fn slot(layer: Layer) -> usize {
-    match layer {
-        Layer::Back => 0,
-        Layer::Front => 1,
-        Layer::Both => 2,
-    }
-}
-
-/// Paint `layer` of `view` with the effect's origin at `origin`, each effect pixel `scale` x `scale` logical
-/// pixels (a `scale` of 0 paints as 1): colour with [`SpriteBlend::Normal`], then light with
-/// [`SpriteBlend::Additive`], both enlarged by the GPU with [`SpriteFilter::Nearest`]. The frame is taken from
-/// `frames` and rasterised only when no view painted it yet. Call during gpui's paint phase, with the
-/// window's own `frames`.
-pub fn paint_fx(
-    view: &mut FxView,
-    frames: &mut FxFrames,
-    layer: Layer,
+/// The window's side of [`Shell`]: frames uploaded as images, images painted where a [`Pass`] says (in effect
+/// pixels from the view's origin), images let go of queued until the frame ends, never dropped mid-frame.
+struct GpuiShell<'a> {
+    window: &'a mut Window,
     origin: Point<Pixels>,
-    scale: u32,
-    window: &mut Window,
-) -> Result<()> {
-    let place = view.player.placement();
-    let player = &mut view.player;
-    let painted = match player.shown(place) {
-        // a running effect never has fade frames of its own: a stopped one stays stopped
-        Some(id) => frames.store.show(&id, layer, frames.now, || {
-            player.draw(layer, place);
-            Ok::<_, anyhow::Error>(Painted::of(player.frame()))
-        })?,
-        None => {
-            let clock = player.clock_frame();
-            let own = &mut view.own[slot(layer)];
-            if own.as_ref().is_none_or(|o| o.drawn != clock) {
-                player.draw(layer, place);
-                let (painted, _) = Painted::of(player.frame());
-                let replaced = own.replace(Own {
-                    painted,
-                    drawn: clock,
-                });
-                frames
-                    .retired
-                    .extend(replaced.into_iter().flat_map(|o| o.painted.images()));
-            }
-            match own {
-                Some(o) => &o.painted,
-                None => return Ok(()),
-            }
-        }
-    };
-    let s = scale.max(1) as f32;
-    for (sprite, blend) in [
-        (&painted.color, SpriteBlend::Normal),
-        (&painted.light, SpriteBlend::Additive),
-    ] {
-        let Some(sprite) = sprite else {
-            continue;
-        };
-        let corner = point(
-            origin.x + px((sprite.rect.x as i32 - view.pivot.0) as f32 * s),
-            origin.y + px((sprite.rect.y as i32 - view.pivot.1) as f32 * s),
-        );
-        let bounds = Bounds::new(
-            corner,
-            size(px(sprite.rect.w as f32 * s), px(sprite.rect.h as f32 * s)),
-        );
-        window.paint_image_blended(
-            bounds,
-            bounds,
-            Corners::default(),
-            sprite.image.clone(),
-            0,
-            false,
-            blend,
-            SpriteFilter::Nearest,
-        )?;
+    scale: f32,
+    retired: &'a mut Vec<Arc<RenderImage>>,
+}
+
+impl Shell for GpuiShell<'_> {
+    type Surface = Painted;
+    type Error = anyhow::Error;
+
+    fn make(&mut self, frame: &Frame) -> Result<Painted> {
+        Ok(Painted::of(frame))
     }
-    Ok(())
+
+    fn refill(&mut self, surface: &mut Painted, frame: &Frame) -> Result<()> {
+        let old = std::mem::replace(surface, Painted::of(frame));
+        self.retired.extend(old.images());
+        Ok(())
+    }
+
+    fn show(&mut self, pass: Pass, surface: &Painted) -> Result<()> {
+        let s = self.scale;
+        for (sprite, blend) in [
+            (&surface.color, SpriteBlend::Normal),
+            (&surface.light, SpriteBlend::Additive),
+        ] {
+            let Some(sprite) = sprite else {
+                continue;
+            };
+            // `pass.rect` is the frame's corner in effect pixels from the origin (the scene's scale is 1)
+            let corner = point(
+                self.origin.x + px((pass.rect.x as f32 + sprite.rect.x as f32) * s),
+                self.origin.y + px((pass.rect.y as f32 + sprite.rect.y as f32) * s),
+            );
+            let bounds = Bounds::new(
+                corner,
+                size(px(sprite.rect.w as f32 * s), px(sprite.rect.h as f32 * s)),
+            );
+            self.window.paint_image_blended(
+                bounds,
+                bounds,
+                Corners::default(),
+                sprite.image.clone(),
+                0,
+                false,
+                blend,
+                SpriteFilter::Nearest,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn free(&mut self, surface: Painted) -> Result<()> {
+        self.retired.extend(surface.images());
+        Ok(())
+    }
 }

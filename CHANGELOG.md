@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `pixfx-scene` (new): `Scene` and the `Shell` contract move out of `pixfx-canvas` (`pixfx_canvas::stage`) so every
+  shell shares them; `Shell` gains `free(surface)`, called for every surface the scene drops (past the frame budget,
+  or when its effect ends), and `Scene::clear` frees all of them for a host shutting down.
+- `pixfx-scene`: `Scene::draw_handle` shows one effect within a host frame and `Scene::end_frame` ends it, for a host
+  that paints each effect on its own. `pixfx-gpui`: `FxScene` (`play`, `tick`, `stop`, `remove`, `paint`, `end_frame`)
+  replaces `FxView`, `FxFrames` and `paint_fx`; it is a shell over `Scene`.
 - `pixfx-draw` (new): frames, colour, painter, shapes, blending, palettes, outline rings and `math` move out of
   `pixfx-core`; import them from `pixfx_draw` (`pixfx_draw::Frame`, `pixfx_draw::color::Rgba`, ...). `pixfx-core`
   keeps effects, particles, cues, feel and the player. `pixfx-light` depends on `pixfx-draw` only.

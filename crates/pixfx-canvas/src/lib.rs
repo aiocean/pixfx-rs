@@ -21,18 +21,18 @@
 
 pub mod fighter;
 pub mod light;
-pub mod stage;
 
 use std::cell::{Cell, RefCell};
 use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
 use js_sys::{Array, Uint8Array, Uint8ClampedArray};
-use pixfx_core::{Feel, Layer, Player};
+use pixfx_core::{Feel, Layer, Meta, Options, Player};
 use pixfx_draw::Frame;
 use pixfx_effects::effect;
+use pixfx_scene::{Pass, PlacementChange, Scene, Shell, color_rgba, light_rgba};
 use pixfx_wasm::js::{pair, parse, to_js};
-use stage::{Pass, PlacementChange, Scene, Shell, color_rgba, light_rgba, stage_options};
+use pixfx_wasm::parse_options;
 use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 use web_sys::{
@@ -457,6 +457,18 @@ impl Renderer {
 type Convert = fn(&Frame, &mut [u8]) -> bool;
 
 /// One drawn layer of one effect on scratch canvases: its colour and its light, each kept only if it shows.
+/// [`parse_options`] for [`Stage::play`]: the stage sizes each effect's margin itself, so a `margin` option is an
+/// error.
+fn stage_options(meta: &Meta, v: &JsValue) -> Result<Options, JsError> {
+    let (opts, margin) = parse_options(meta, v)?;
+    if margin.is_some() {
+        return Err(JsError::new(
+            "options.margin is not supported: Stage sizes the margin itself",
+        ));
+    }
+    Ok(opts)
+}
+
 /// Drawn once, then shown by every effect on that frame.
 struct Held {
     color: Option<OffscreenCanvas>,
@@ -526,6 +538,12 @@ impl Shell for CanvasShell<'_> {
                 .draw_image_with_offscreen_canvas_and_dw_and_dh(canvas, x, y, w, h)
                 .map_err(|e| js_message("drawImage failed", &e))?;
         }
+        Ok(())
+    }
+
+    /// Scratch canvases are garbage-collected once nothing holds them.
+    fn free(&mut self, surface: Held) -> Result<(), String> {
+        drop(surface);
         Ok(())
     }
 }

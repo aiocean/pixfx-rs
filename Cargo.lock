@@ -252,6 +252,7 @@ dependencies = [
  "pixfx-export",
  "pixfx-fighter",
  "pixfx-light",
+ "pixfx-scene",
  "pixfx-wasm",
  "serde",
  "tsify",
@@ -334,6 +335,19 @@ version = "0.1.0"
 dependencies = [
  "libm",
  "pixfx-draw",
+ "serde",
+ "tsify",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "pixfx-scene"
+version = "0.1.0"
+dependencies = [
+ "pixfx-core",
+ "pixfx-draw",
+ "pixfx-effects",
+ "pixfx-export",
  "serde",
  "tsify",
  "wasm-bindgen",

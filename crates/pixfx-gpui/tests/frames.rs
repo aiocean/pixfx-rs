@@ -6,11 +6,11 @@ use std::rc::Rc;
 
 use gpui::{Styled, TestAppContext, VisualTestContext, canvas, point, px, size};
 use pixfx_core::{Layer, Options};
-use pixfx_gpui::{FxFrames, FxView, paint_fx};
+use pixfx_gpui::{FxHandle, FxScene};
 
 struct Site {
-    views: Vec<FxView>,
-    frames: FxFrames,
+    effects: Vec<FxHandle>,
+    scene: FxScene,
 }
 
 /// Paint every view into the window once, as a window frame does, and return the bytes the frames hold.
@@ -24,40 +24,37 @@ fn paint(cx: &mut VisualTestContext, site: &Rc<RefCell<Site>>) -> u64 {
                 |_, _, _| {},
                 move |_, _, window, _| {
                     let mut site = painting.borrow_mut();
-                    let Site { views, frames } = &mut *site;
-                    for view in views.iter_mut() {
+                    let Site { effects, scene } = &mut *site;
+                    for &fx in effects.iter() {
                         assert!(
-                            paint_fx(
-                                view,
-                                frames,
-                                Layer::Both,
-                                point(px(100.), px(100.)),
-                                4,
-                                window
-                            )
-                            .is_ok()
+                            scene
+                                .paint(fx, Layer::Both, point(px(100.), px(100.)), 4, window)
+                                .is_ok()
                         );
                     }
-                    assert!(frames.end_frame(window).is_ok());
+                    assert!(scene.end_frame(window).is_ok());
                 },
             )
             .size_full()
         },
     );
-    site.borrow().frames.bytes()
+    site.borrow().scene.bytes()
 }
 
 fn site(ids: &[&str]) -> Rc<RefCell<Site>> {
-    let views = ids
+    let mut scene = FxScene::default();
+    let effects = ids
         .iter()
         .filter_map(|id| pixfx_effects::effect(id))
-        .map(|fx| FxView::new(fx, Options::default()))
+        .filter_map(|fx| scene.play(fx, Options::default()).ok())
         .collect::<Vec<_>>();
-    assert_eq!(views.len(), ids.len(), "every effect exists");
-    Rc::new(RefCell::new(Site {
-        views,
-        frames: FxFrames::default(),
-    }))
+    assert_eq!(effects.len(), ids.len(), "every effect exists");
+    Rc::new(RefCell::new(Site { effects, scene }))
+}
+
+/// Let `dt` seconds pass for every effect of `site`.
+fn tick(site: &Rc<RefCell<Site>>, dt: f64) {
+    assert!(site.borrow_mut().scene.tick(dt).is_ok());
 }
 
 #[gpui::test]
@@ -77,15 +74,9 @@ fn a_frame_is_uploaded_only_when_the_clock_reaches_a_new_one(cx: &mut TestAppCon
     let site = site(&["fire/campfire"]);
     let first = paint(cx, &site);
     // well within one frame of 1/30 s: the same frame, nothing new uploaded
-    site.borrow_mut()
-        .views
-        .iter_mut()
-        .for_each(|v| v.tick(0.001));
+    tick(&site, 0.001);
     assert_eq!(paint(cx, &site), first);
-    site.borrow_mut()
-        .views
-        .iter_mut()
-        .for_each(|v| v.tick(0.04));
+    tick(&site, 0.04);
     assert!(
         paint(cx, &site) > first,
         "the next frame is uploaded beside the first"
@@ -96,22 +87,22 @@ fn a_frame_is_uploaded_only_when_the_clock_reaches_a_new_one(cx: &mut TestAppCon
 fn frames_past_the_budget_leave_the_atlas_and_a_fading_view_holds_its_own(cx: &mut TestAppContext) {
     let cx = cx.add_empty_window();
     let site = site(&["fire/campfire"]);
-    site.borrow_mut().frames.set_budget(0);
+    site.borrow_mut().scene.set_budget(0);
     for _ in 0..5 {
         paint(cx, &site);
-        site.borrow_mut()
-            .views
-            .iter_mut()
-            .for_each(|v| v.tick(0.04));
+        tick(&site, 0.04);
     }
     // over a zero budget only the frame painted last stays: the next draw drops it
     let shown = paint(cx, &site);
     assert!(shown > 0);
-    site.borrow_mut().views.iter_mut().for_each(|v| v.stop());
-    site.borrow_mut()
-        .views
-        .iter_mut()
-        .for_each(|v| v.tick(0.04));
+    {
+        let mut site = site.borrow_mut();
+        let Site { effects, scene } = &mut *site;
+        effects.iter().for_each(|&fx| {
+            scene.stop(fx);
+        });
+    }
+    tick(&site, 0.04);
     assert_eq!(
         paint(cx, &site),
         0,

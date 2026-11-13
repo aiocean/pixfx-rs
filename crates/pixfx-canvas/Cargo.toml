@@ -16,6 +16,7 @@ pixfx-effects = { path = "../pixfx-effects", default-features = false }
 pixfx-export = { path = "../pixfx-export" }
 pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"] }
 pixfx-light = { path = "../pixfx-light", features = ["ts"] }
+pixfx-scene = { path = "../pixfx-scene", features = ["ts"] }
 pixfx-wasm = { path = "../pixfx-wasm", default-features = false }
 serde.workspace = true
 tsify.workspace = true

@@ -1,53 +1,47 @@
-//! What the canvas renderer decides, in plain Rust: which effects play, where, how much room round them, at
-//! what scale, in which order their layers are drawn, when finished ones go, the pixels each layer becomes,
-//! and the game's answer to the cues the effects fire (a [`Feel`]: shake, hit-stop, flash, ripples). No browser types, so it is tested natively; [`crate::Stage`] blits what this produces.
+//! What a stage shows and where, decided in plain Rust for every shell: which effects play, where, how much room
+//! round them, at what scale, in which order their layers are drawn, when finished ones go, which frames are drawn
+//! and shared, and the game's answer to the cues the effects fire (a [`Feel`]: shake, hit-stop, flash, ripples).
+//! A shell (Canvas 2D, Phaser, Pixi, gpui) only makes, refills, shows and frees surfaces as [`Shell`] says.
+#![forbid(unsafe_code)]
 
 use std::fmt;
 use std::num::NonZeroU32;
 
+use pixfx_core::Player;
 use pixfx_core::cue::Cue;
-use pixfx_core::{Feel, FrameId, FrameStore, Layer, Meta, Options, Placement, TimedCue, valid_dt};
+use pixfx_core::{Feel, FrameId, FrameStore, Layer, Placement, TimedCue, valid_dt};
 use pixfx_draw::math::clamp;
 use pixfx_draw::math::js_round;
 use pixfx_draw::{Frame, composite_px};
-use pixfx_wasm::{Player, parse_options};
-use serde::{Deserialize, Serialize};
-use wasm_bindgen::{JsError, JsValue};
 
-/// [`parse_options`] for [`crate::Stage::play`]: the stage sizes each effect's margin itself, so a `margin`
-/// option is an error.
-pub fn stage_options(meta: &Meta, v: &JsValue) -> Result<Options, JsError> {
-    let (opts, margin) = parse_options(meta, v)?;
-    if margin.is_some() {
-        return Err(JsError::new(
-            "options.margin is not supported: Stage sizes the margin itself",
-        ));
-    }
-    Ok(opts)
-}
-
-/// A change to where and how an effect draws, for [`crate::Stage::set`]: each field left out keeps its value.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, tsify::Tsify)]
-#[serde(deny_unknown_fields)]
+/// A change to where and how an effect draws ([`Scene::set`] after [`PlacementChange::over`]): each field left out
+/// keeps its value.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct PlacementChange {
     /// The effect's origin, in game pixels (rounded to a whole pixel).
-    #[serde(default)]
-    #[tsify(optional)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "ts", tsify(optional))]
     pub x: Option<f64>,
-    #[serde(default)]
-    #[tsify(optional)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "ts", tsify(optional))]
     pub y: Option<f64>,
     /// Mirror left-right.
-    #[serde(default)]
-    #[tsify(optional)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "ts", tsify(optional))]
     pub flip: Option<bool>,
     /// Rotation, radians.
-    #[serde(default)]
-    #[tsify(optional)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "ts", tsify(optional))]
     pub angle: Option<f64>,
     /// Glow strength.
-    #[serde(default)]
-    #[tsify(optional)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(feature = "ts", tsify(optional))]
     pub light: Option<f64>,
 }
 
@@ -82,8 +76,13 @@ pub struct Pass {
 }
 
 /// Something that happened on the stage, queued in order until the host drains it ([`Scene::drain_events`]).
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, tsify::Tsify)]
-#[serde(tag = "type", rename_all = "lowercase")]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize),
+    serde(tag = "type", rename_all = "lowercase")
+)]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub enum StageEvent {
     /// The instance is gone: it finished, faded out after a stop, or was removed.
     End { handle: u32 },
@@ -93,7 +92,7 @@ pub enum StageEvent {
     Cue {
         handle: u32,
         t: f64,
-        #[tsify(type = "number | null")]
+        #[cfg_attr(feature = "ts", tsify(type = "number | null"))]
         pan: Option<f64>,
         cue: Cue,
     },
@@ -121,8 +120,8 @@ impl fmt::Display for StageError {
 
 impl std::error::Error for StageError {}
 
-/// What a host does with drawn frames: keep one drawn layer of one effect in a surface (a scratch canvas), and
-/// draw a surface onto its canvas. The [`Scene`] decides what to draw and when: an effect is drawn only when what
+/// What a host does with drawn frames: keep one drawn layer of one effect in a surface (a scratch canvas, a
+/// texture, an image), draw a surface onto its screen, and free a surface the scene no longer needs. The [`Scene`] decides what to draw and when: an effect is drawn only when what
 /// it shows changes, and a frame other effects already show is drawn once and shared.
 pub trait Shell {
     type Surface;
@@ -133,6 +132,9 @@ pub trait Shell {
     fn refill(&mut self, surface: &mut Self::Surface, frame: &Frame) -> Result<(), Self::Error>;
     /// Draw `surface` into `pass.rect`: colour normally, then light additively.
     fn show(&mut self, pass: Pass, surface: &Self::Surface) -> Result<(), Self::Error>;
+    /// Let go of `surface`: the scene dropped it (past the frame budget, or its effect ended). A host whose
+    /// surfaces hold host objects releases them here, or queues them to release once the frame is painted.
+    fn free(&mut self, surface: Self::Surface) -> Result<(), Self::Error>;
 }
 
 /// A layer's own frame: the surface an effect fading after `stop()` draws into, and what it last drew there.
@@ -154,8 +156,8 @@ struct Entry<S> {
     /// How the player draws the effect on its own frame: `x`/`y` its origin there, the rest as the host sets.
     place: Placement,
     player: Player,
-    /// Its own frames while it fades out (back, front); shared frames live in the scene's store.
-    own: [Option<Own<S>>; 2],
+    /// Its own frames while it fades out (back, front, both); shared frames live in the scene's store.
+    own: [Option<Own<S>>; 3],
 }
 
 /// The playing instances, in the order they were played, the frames they share and the game-to-canvas scale.
@@ -174,6 +176,9 @@ pub struct Scene<S> {
     feel: Option<Feel>,
     /// The stage's width in game pixels, for a cue's pan; 0 leaves cues without pan.
     screen_w: f64,
+    /// Surfaces dropped since the last draw (past the frame budget, or their effect ended), handed to the shell's
+    /// [`Shell::free`] at the start of the next draw.
+    released: Vec<S>,
 }
 
 impl<S> Scene<S> {
@@ -187,6 +192,7 @@ impl<S> Scene<S> {
             events: Vec::new(),
             feel: Some(Feel::new()),
             screen_w: 0.0,
+            released: Vec::new(),
         }
     }
 
@@ -231,7 +237,7 @@ impl<S> Scene<S> {
             at,
             place: player.placement(),
             player,
-            own: [None, None],
+            own: [None, None, None],
         });
         Ok(handle)
     }
@@ -291,13 +297,14 @@ impl<S> Scene<S> {
 
     /// Drop the instance now, queueing its end; false if no instance has this handle.
     pub fn remove(&mut self, handle: u32) -> bool {
-        let before = self.entries.len();
-        self.entries.retain(|e| e.handle != handle);
-        let removed = self.entries.len() != before;
-        if removed {
-            self.events.push(StageEvent::End { handle });
-        }
-        removed
+        let Some(i) = self.entries.iter().position(|e| e.handle == handle) else {
+            return false;
+        };
+        let e = self.entries.remove(i);
+        self.released
+            .extend(e.own.into_iter().flatten().map(|o| o.surface));
+        self.events.push(StageEvent::End { handle });
+        true
     }
 
     /// The events since the last drain, oldest first; the queue is empty afterwards.
@@ -373,14 +380,15 @@ impl<S> Scene<S> {
                 pan: c.pan,
                 cue: c.cue,
             }));
-        let events = &mut self.events;
-        self.entries.retain(|e| {
-            let done = e.player.done();
-            if done {
-                events.push(StageEvent::End { handle: e.handle });
-            }
-            !done
-        });
+        let (done, playing): (Vec<_>, Vec<_>) = std::mem::take(&mut self.entries)
+            .into_iter()
+            .partition(|e| e.player.done());
+        self.entries = playing;
+        for e in done {
+            self.events.push(StageEvent::End { handle: e.handle });
+            self.released
+                .extend(e.own.into_iter().flatten().map(|o| o.surface));
+        }
         Ok(run)
     }
 
@@ -388,7 +396,8 @@ impl<S> Scene<S> {
     /// ([`pixfx_core::FRAME_BUDGET`] unless set). A frame shown in the current draw is never dropped.
     pub fn set_frame_budget(&mut self, bytes: u64) {
         self.store.set_budget(bytes);
-        self.store.trim(self.draws);
+        let dropped = self.store.trim(self.draws);
+        self.released.extend(dropped);
     }
 
     /// Bytes the shared frames hold now.
@@ -418,60 +427,126 @@ impl<S> Scene<S> {
         self.draw_layer(Layer::Front, shell)
     }
 
-    /// Show `layer` of every instance, oldest first. A running effect shows a shared frame: the first effect to
-    /// reach it draws it into a new surface, the rest show that surface. A fading effect shows its own surface,
-    /// drawn again only when its clock frame or placement changes. Stops at the first error the shell returns.
+    /// Show `layer` of every instance, oldest first, as one frame of the host: what [`Scene::draw_handle`] does for
+    /// each, then [`Scene::end_frame`]. A running effect shows a shared frame: the first effect to reach it draws
+    /// it into a new surface, the rest show that surface. A fading effect shows its own surface, drawn again only
+    /// when its clock frame or placement changes. Stops at the first error the shell returns.
     pub fn draw_layer<H: Shell<Surface = S>>(
         &mut self,
         layer: Layer,
         shell: &mut H,
     ) -> Result<(), H::Error> {
-        self.draws += 1;
-        let now = self.draws;
-        let own_slot = usize::from(layer != Layer::Back);
+        let now = self.draws + 1;
         for i in 0..self.entries.len() {
-            let Some(e) = self.entries.get(i) else { break };
-            let pass = Pass {
-                handle: e.handle,
-                layer,
-                rect: self.rect_of(e),
-            };
-            let Some(e) = self.entries.get_mut(i) else {
-                break;
-            };
-            match e.player.shown(e.place) {
-                Some(id) => {
-                    let surface = self.store.show(&id, layer, now, || {
+            self.show_entry(i, layer, now, shell)?;
+        }
+        self.end_frame(shell)
+    }
+
+    /// Show `layer` of the instance `handle` within the host's current frame, for a host that paints each effect
+    /// on its own (a gpui view per effect); call [`Scene::end_frame`] once every effect of the frame is shown.
+    /// `Ok(false)` if no instance has this handle.
+    pub fn draw_handle<H: Shell<Surface = S>>(
+        &mut self,
+        handle: u32,
+        layer: Layer,
+        shell: &mut H,
+    ) -> Result<bool, H::Error> {
+        let Some(i) = self.entries.iter().position(|e| e.handle == handle) else {
+            return Ok(false);
+        };
+        self.show_entry(i, layer, self.draws + 1, shell)?;
+        Ok(true)
+    }
+
+    /// End the host's frame: free the surfaces dropped since the last one (their effects ended) and, past the
+    /// frame budget, the least recently shown shared frames, never one shown in this frame.
+    pub fn end_frame<H: Shell<Surface = S>>(&mut self, shell: &mut H) -> Result<(), H::Error> {
+        self.draws += 1;
+        let dropped = self.store.trim(self.draws);
+        for surface in std::mem::take(&mut self.released)
+            .into_iter()
+            .chain(dropped)
+        {
+            shell.free(surface)?;
+        }
+        Ok(())
+    }
+
+    /// Show `layer` of entry `i`, marking the frames it shows as shown at `now`.
+    fn show_entry<H: Shell<Surface = S>>(
+        &mut self,
+        i: usize,
+        layer: Layer,
+        now: u64,
+        shell: &mut H,
+    ) -> Result<(), H::Error> {
+        let Some(e) = self.entries.get(i) else {
+            return Ok(());
+        };
+        let pass = Pass {
+            handle: e.handle,
+            layer,
+            rect: self.rect_of(e),
+        };
+        let Some(e) = self.entries.get_mut(i) else {
+            return Ok(());
+        };
+        match e.player.shown(e.place) {
+            Some(id) => {
+                let surface = self.store.show(&id, layer, now, || {
+                    e.player.draw(layer, e.place);
+                    let frame = e.player.frame();
+                    Ok((shell.make(frame)?, frame_bytes(frame)))
+                })?;
+                shell.show(pass, surface)?;
+            }
+            None => {
+                let drawn = (e.player.clock_frame(), e.place);
+                let slot = &mut e.own[own_slot(layer)];
+                match slot {
+                    Some(own) if own.drawn == drawn => {}
+                    Some(own) => {
                         e.player.draw(layer, e.place);
-                        let frame = e.player.frame();
-                        Ok((shell.make(frame)?, frame_bytes(frame)))
-                    })?;
-                    shell.show(pass, surface)?;
+                        shell.refill(&mut own.surface, e.player.frame())?;
+                        own.drawn = drawn;
+                    }
+                    None => {
+                        e.player.draw(layer, e.place);
+                        let surface = shell.make(e.player.frame())?;
+                        *slot = Some(Own { surface, drawn });
+                    }
                 }
-                None => {
-                    let drawn = (e.player.clock_frame(), e.place);
-                    let slot = &mut e.own[own_slot];
-                    match slot {
-                        Some(own) if own.drawn == drawn => {}
-                        Some(own) => {
-                            e.player.draw(layer, e.place);
-                            shell.refill(&mut own.surface, e.player.frame())?;
-                            own.drawn = drawn;
-                        }
-                        None => {
-                            e.player.draw(layer, e.place);
-                            let surface = shell.make(e.player.frame())?;
-                            *slot = Some(Own { surface, drawn });
-                        }
-                    }
-                    if let Some(own) = slot {
-                        shell.show(pass, &own.surface)?;
-                    }
+                if let Some(own) = slot {
+                    shell.show(pass, &own.surface)?;
                 }
             }
         }
-        self.store.trim(now);
         Ok(())
+    }
+
+    /// Free every surface the scene holds and every surface waiting to be freed, ending every instance: for a host
+    /// shutting down whose surfaces hold host objects. The scene is empty afterwards and can play again.
+    pub fn clear<H: Shell<Surface = S>>(&mut self, shell: &mut H) -> Result<(), H::Error> {
+        for e in std::mem::take(&mut self.entries) {
+            self.events.push(StageEvent::End { handle: e.handle });
+            self.released
+                .extend(e.own.into_iter().flatten().map(|o| o.surface));
+        }
+        self.released.extend(self.store.clear());
+        for surface in std::mem::take(&mut self.released) {
+            shell.free(surface)?;
+        }
+        Ok(())
+    }
+}
+
+/// Which of an entry's own surfaces holds `layer`.
+fn own_slot(layer: Layer) -> usize {
+    match layer {
+        Layer::Back => 0,
+        Layer::Front => 1,
+        Layer::Both => 2,
     }
 }
 
