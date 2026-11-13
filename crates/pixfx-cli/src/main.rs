@@ -2,12 +2,13 @@
 //!
 //!   pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
 //!
-//!   pixfx sheet <id> [--out DIR]
-//!   pixfx render <id> --gif [--scale N] [--out DIR]
+//!   pixfx sheet <id> [--outline WORD] [--out DIR]
+//!   pixfx render <id> --gif [--scale N] [--outline WORD] [--out DIR]
 //!
 //! `sheet` writes `<name>.png`, `<name>_color.png`, `<name>_light.png` and `<name>.json` (beanfx layout) for
 //! `<id>`; `render --gif` writes `<name>.gif`, each pixel blown up `N` times (default 4). `<name>` is `<id>`
-//! with `/` as `_`; `--out` defaults to `target/out`.
+//! with `/` as `_`; `--out` defaults to `target/out`. `--outline` outlines the effect: `off`, a preset (`dark`,
+//! `black`, `white`, `thick`) or a hex colour (`#ffcc00`); left out, it looks as designed.
 //!
 //! `parity` renders `<id>` with pixelfx (through `tools/pixelfx-ref.mjs`, under node) and with its pixfx port, prints
 //! how many pixels differ and whether that passes, and writes `<out>/<id>.side.gif` (pixelfx left, pixfx
@@ -21,12 +22,12 @@ use std::process::{Command, ExitCode};
 
 use pixfx_cli::opts::CliOpts;
 use pixfx_cli::parity::{compare, read_reference, write_side_gif};
-use pixfx_core::{Options, render_frames};
+use pixfx_core::{Options, Outline, render_frames};
 use pixfx_export::{write_gif, write_sheet};
 
 const USAGE: &str = "usage: pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
-       pixfx sheet <id> [--out DIR]
-       pixfx render <id> --gif [--scale N] [--out DIR]";
+       pixfx sheet <id> [--outline WORD] [--out DIR]
+       pixfx render <id> --gif [--scale N] [--outline WORD] [--out DIR]";
 
 /// What `pixfx sheet` and `pixfx render` produce.
 enum Export {
@@ -38,6 +39,7 @@ struct ExportArgs {
     id: String,
     out: PathBuf,
     export: Export,
+    outline: Option<Outline>,
 }
 
 /// The reference script, found from this crate's source so `pixfx` runs from any directory of the repo.
@@ -97,10 +99,15 @@ fn parse_parity(args: &[String]) -> Result<ParityArgs, String> {
 fn parse_export(cmd: &str, args: &[String]) -> Result<ExportArgs, String> {
     let (mut id, mut out) = (None, PathBuf::from("target/out"));
     let (mut gif, mut scale) = (false, 4);
+    let mut outline = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--out" => out = it.next().ok_or(USAGE)?.into(),
+            "--outline" => {
+                let word = it.next().ok_or(USAGE)?;
+                outline = Some(Outline::parse(word).map_err(|e| e.to_string())?);
+            }
             "--gif" if cmd == "render" => gif = true,
             "--scale" if cmd == "render" => {
                 scale = it
@@ -123,6 +130,7 @@ fn parse_export(cmd: &str, args: &[String]) -> Result<ExportArgs, String> {
         id: id.ok_or(USAGE)?,
         out,
         export,
+        outline,
     })
 }
 
@@ -131,7 +139,11 @@ fn export(a: &ExportArgs) -> Result<(), String> {
     let id = a.id.as_str();
     let effect = pixfx_effects::effect(id)
         .ok_or_else(|| format!("no pixfx effect {id} (not ported yet?)"))?;
-    let rendered = render_frames(effect, &Options::default(), 0);
+    let opts = Options {
+        outline: a.outline,
+        ..Options::default()
+    };
+    let rendered = render_frames(effect, &opts, 0);
     let name = id.replace('/', "_");
     std::fs::create_dir_all(&a.out).map_err(|e| format!("creating {}: {e}", a.out.display()))?;
     match a.export {

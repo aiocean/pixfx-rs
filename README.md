@@ -58,6 +58,31 @@ Effects say what an impact should do to the screen, and every host answers the s
   keeping its area. `Blink` blinks it while it cannot be hurt. In Phaser, use `scene.pixfx.squash(sprite)`. The
   fighter paints with the same rules.
 
+## Outlines
+
+Every effect takes an `outline` option. Left out, the effect looks as designed. A few effects draw an outline of
+their own: the explosions' rocks and clods, and the spinning coin. The option recolours that outline or turns it
+off. Any other effect gets a ring the engine draws round its shapes. Smoke, haze and lone motes, which the painter
+draws as a scatter of single pixels, get no ring.
+
+| `outline` | Result |
+|---|---|
+| left out | As designed. |
+| `false`, `"off"` | No outline, not even the effect's own. |
+| `true`, `"dark"` | The engine's dark 1 px outline (`#1a1422`). |
+| `"black"`, `"white"` | A 1 px outline in that colour; white reads over dark scenes. |
+| `"thick"` | Dark, 2 px, square corners. |
+| `"#ffcc00"` | A 1 px outline in any hex colour. |
+| `{color, width, corners}` | `color` is a preset name or a hex colour, `width` is 1 to 3, `corners` fills them (square) or leaves them cut (rounded). Each defaults to the dark 1 px ring. |
+
+The engine's ring goes in the colour layer, so the effect's glow still shows over it. Elsewhere, an effect's
+darkest palette step does the work of an edge (the candle's wax, the icicle, the hit stars), and the effect's
+`palette` and colour options recolour it. pixelfx has no outline option, so effects left without one match it.
+
+```sh
+cargo run -p pixfx-cli -- render fire/candle --gif --outline white
+```
+
 ## Render a sheet
 
 ```sh

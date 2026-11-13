@@ -48,9 +48,16 @@ impl Effect for CoinSpin {
     fn meta(&self) -> &Meta {
         &META
     }
+    /// The coin draws its own outline (its ramp's second-darkest step), which the `outline` option recolours or
+    /// drops.
+    fn draws_outline(&self) -> bool {
+        true
+    }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
+        let c: [Rgba; 8] = ramp(&opts.palette_or(&PALETTE));
         Box::new(State {
-            c: ramp(&opts.palette_or(&PALETTE)),
+            edge: opts.outline_color(c[1]),
+            c,
             seed: seed as f64,
         })
     }
@@ -58,6 +65,7 @@ impl Effect for CoinSpin {
 
 struct State {
     c: [Rgba; 8],
+    edge: Option<Rgba>,
     seed: f64,
 }
 
@@ -96,7 +104,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
     let facing = libm::fabs(libm::cos(th));
     p.glow(0.0, y, 20.0, c[4], 0.3 + 0.12 * facing);
     let mut layer = CoinLayer::new(32, 32);
-    let flash = coin3d(&mut layer, p, 0.0, y, R, TH, th, c);
+    let flash = coin3d(&mut layer, p, 0.0, y, R, TH, th, c, o.edge);
     p.glow(-1.0, y - 1.0, 12.0, c[6], 0.35 * flash);
     // a star glint where the flash leaves the rim
     if flash > 0.3 {

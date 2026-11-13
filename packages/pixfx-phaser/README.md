@@ -87,6 +87,7 @@ Options (all optional):
 | `light` | Glow strength, a number: `0` is no glow, default `1`. |
 | `depth: {back, front}` | Depths of the back and front images. Default `{back: 0, front: 1}`. |
 | `scrollFactor` | Camera scroll factor of the images: `1` world space (default), `0` screen space (HUD effects). |
+| `outline` | Outline round the effect: `true`, `false`, `"white"`, `"#ffcc00"`, `{color, width, corners}` (see the repo README's [Outlines](../../README.md#outlines)). Left out, the effect looks as designed. |
 
 Other numeric or array options are passed through to the effect.
 

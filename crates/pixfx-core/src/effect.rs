@@ -14,6 +14,7 @@ use crate::color::{Rgba, fit};
 use crate::cue::{TimedCue, cues_between, cues_of};
 use crate::frame::Frame;
 use crate::math::{clamp, js_max, js_min, js_round};
+use crate::outline::{Outline, ring_round};
 use crate::painter::Painter;
 use crate::state::StateMeta;
 
@@ -123,6 +124,11 @@ pub trait Effect: Send + Sync {
     fn act(&self) -> Option<Act> {
         None
     }
+    /// It draws an outline of its own, in the colour [`Options::outline_color`] gives (none when outlines are
+    /// off), so the engine does not ring it again. False by default: the engine rings it when the caller asks.
+    fn draws_outline(&self) -> bool {
+        false
+    }
 }
 
 /// One instance's state.
@@ -157,6 +163,8 @@ pub struct Options {
     /// Glow strength.
     pub light: f64,
     pub palette: Option<Vec<Rgba>>,
+    /// Its outline: unset looks as designed, `Off` has none, `On` rings it ([`crate::outline`]).
+    pub outline: Option<Outline>,
     /// The effect's own options by name (pixelfx `height`, `wood`, ...).
     pub extra: BTreeMap<String, OptValue>,
 }
@@ -171,6 +179,7 @@ impl Default for Options {
             seed: None,
             light: 1.0,
             palette: None,
+            outline: None,
             extra: BTreeMap::new(),
         }
     }
@@ -531,8 +540,21 @@ impl Instance {
     }
 
     /// Draw the current frame ([`Instance::frame`]) into `frame`, placed as `place` says: the state at its own
-    /// time, faded by the clock's time since [`Instance::stop`].
+    /// time, faded by the clock's time since [`Instance::stop`], ringed by its outline when the caller set one
+    /// (round what this call drew, not what `frame` held before).
     pub fn draw(&self, frame: &mut Frame, layer: Layer, place: Placement) {
+        let ring = match self.opts.outline {
+            Some(Outline::On(r)) if !self.effect.draws_outline() => Some(r),
+            _ => None,
+        };
+        let before = ring.map(|_| frame.color.clone());
+        self.paint(frame, layer, place);
+        if let (Some(r), Some(before)) = (ring, before) {
+            ring_round(frame, &before, r);
+        }
+    }
+
+    fn paint(&self, frame: &mut Frame, layer: Layer, place: Placement) {
         let meta = self.effect.meta();
         let mut p = Painter::new(frame);
         p.place(place.x, place.y, place.flip, place.angle);

@@ -11,3 +11,12 @@ test("an effect's own option must be a number, colour, list of colours or flag, 
   expect(engineOptions(p, 0)).toEqual({ stone: "#7a6a58", ramp: ["#000", "#fff"], width: 640, wet: true, margin: 0 });
   expect(() => parsePlayOptions({ width: { px: 640 } })).toThrow(/width/);
 });
+
+test("every effect takes an outline: on or off, a word, or a ring, handed to the engine as given", () => {
+  for (const outline of [true, false, "off", "white", "#ff00aa", { color: "black", width: 2, corners: true }]) {
+    expect(engineOptions(parsePlayOptions({ outline }), 0)).toEqual({ outline, margin: 0 });
+  }
+  expect(() => parsePlayOptions({ outline: { width: 4 } })).toThrow(/outline/);
+  expect(() => parsePlayOptions({ outline: { colour: "#fff" } })).toThrow(/outline/);
+  expect(() => parsePlayOptions({ outline: 2 })).toThrow(/outline/);
+});

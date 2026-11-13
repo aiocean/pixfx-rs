@@ -159,7 +159,8 @@ pub fn glint(p: &mut Painter, x: f64, y: f64, arm: f64, c: Rgba, k: f64) {
 /// A thick coin turning on its upright axis: radius r, thickness th, turned by theta (0 faces you). Each row
 /// shows the face (squashed by cos theta, a raised rim, a recessed field, an embossed star) and, beside it,
 /// the reeded edge band (th |sin theta| wide). Lit from the top left; the face flashes white as it squares
-/// to the light. Built in `l` with a dark outline. `c`: 8-step ramp. Returns the flash strength 0..1.
+/// to the light. Built in `l` with an outline of `edge` (none: no outline; pixelfx draws `c[1]`). `c`: 8-step
+/// ramp. Returns the flash strength 0..1.
 #[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
 pub fn coin3d(
     l: &mut CoinLayer,
@@ -170,6 +171,7 @@ pub fn coin3d(
     th: f64,
     theta: f64,
     c: &[Rgba; 8],
+    edge: Option<Rgba>,
 ) -> f64 {
     let ramp = |i: f64| c.get(i as usize).copied().unwrap_or(Rgba::NONE);
     let (ct, st) = (libm::cos(theta), libm::sin(theta));
@@ -260,7 +262,9 @@ pub fn coin3d(
         }
         Rgba::NONE
     });
-    l.outline(ramp(1.0));
+    if let Some(e) = edge {
+        l.outline(e);
+    }
     l.draw(p, 1.0);
     flash
 }
