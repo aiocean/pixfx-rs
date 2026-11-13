@@ -69,7 +69,8 @@ The Unix and FP ideas, made concrete for this codebase:
 
 ### The site
 - `duel.js` reads the body's numbers from `Body.defaults()`; the duplicated constants go.
-- The reflected bolt turns with `stage.set(handle, {flip})`.
+- The reflected bolt is played anew: it takes the reflector's palette, and a palette is fixed at spawn. `stage.set` is
+  for changes that keep the effect's look (placement, flip, angle, light).
 - Looks come from data (`look` presets), and `duel-light.js` becomes calls into pixfx-light.
 
 ## Verification
