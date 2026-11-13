@@ -109,7 +109,8 @@ export async function launchChrome(): Promise<Browser> {
   );
   let url: string | undefined;
   let port: number | null = null;
-  for (let i = 0; i < 100 && !url; i++) {
+  // A loaded machine can take many seconds to start Chrome: wait up to 30 s.
+  for (let i = 0; i < 300 && !url; i++) {
     port ??= readPort(profile);
     if (port !== null) {
       try {

@@ -68,7 +68,8 @@ async function open(b: Browser, query: string): Promise<void> {
   b.takeErrors(); // errors of the page being left are not this page's
   await b.send("Page.navigate", { url: `${ROOT}/stress.html?${query}` });
   await Bun.sleep(300);
-  await waitFor(b, "window.pixfxStress !== undefined", 20000);
+  // a loaded machine at 4x CPU throttle can take tens of seconds to load the page
+  await waitFor(b, "window.pixfxStress !== undefined", 60000);
 }
 
 async function sweep(b: Browser, query: string): Promise<Result[]> {

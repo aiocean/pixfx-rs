@@ -210,6 +210,7 @@ async function main(): Promise<void> {
   const header = "mode\tmix\tn\tfollow\tchurn\tseeds\tworkers\tslowdown\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
 
   async function run(cfg: Config): Promise<Result> {
+    game.loop.wake();
     scene.cfg = cfg;
     scene.scene.restart();
     await sleep(WARM_MS);
@@ -242,6 +243,8 @@ async function main(): Promise<void> {
   const counts = sweep ? sweep.split(",").map(Number).filter((v) => Number.isInteger(v) && v > 0) : [base.n];
   for (const n of counts) await run({ ...base, n });
   handle.done = true;
+  // A finished sweep stops drawing, so its heaviest scene does not hold up the page the harness opens next.
+  if (sweep) game.loop.sleep();
 }
 
 main().catch((err: unknown) => {
