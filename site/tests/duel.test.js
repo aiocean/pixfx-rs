@@ -177,7 +177,7 @@ describe("duel", () => {
     shooter.face = Math.sign(target.x - shooter.x);
     target.stats = { ...target.stats, dodge: 0 };
     // standing on the ground, steady, wherever an earlier bolt threw it
-    Object.assign(target, { air: 0, vy: 0, vx: 0, stun: 0, fly: false });
+    Object.assign(target, { air: 0, vy: 0, vx: 0, stun: 0, fly: false, down: null, wake: 0 });
     setup?.(target);
     shooter.act = { spell: "bolt", phase: "windup", t: SPELLS.bolt.windup - 1 / 60 };
     const hits = [];
@@ -346,4 +346,49 @@ describe("duel", () => {
       expect(closest).toBeGreaterThanOrEqual(16);
     }
   });
+
+  /** Two fighters face to face and frozen in thought, so a test decides everything they do. */
+  function standoff(seed = 2) {
+    const duel = arena(seed);
+    const [thunder, frost] = duel.fighters;
+    for (const f of duel.fighters) {
+      f.think = 1e9;
+      f.stats = { ...f.stats, dodge: 0 };
+    }
+    thunder.x = 100;
+    frost.x = 116;
+    thunder.face = 1;
+    frost.face = -1;
+    return { duel, thunder, frost };
+  }
+
+  /** Step until `done()` or `seconds` pass; returns the poses fighter `f` took, in order, and the seconds it took. */
+  function watch(duel, f, done, seconds = 4) {
+    const poses = [];
+    for (let i = 0; i < seconds * 60; i++) {
+      step(duel, 1 / 60);
+      if (poses.at(-1) !== f.pose) poses.push(f.pose);
+      if (done()) return { poses, t: (i + 1) / 60 };
+    }
+    return { poses, t: Infinity };
+  }
+
+  test("a heavy blow throws its target, which bounces, lies, gets up, and only then can be hit again", () => {
+    const { duel, thunder, frost } = standoff();
+    thunder.act = { spell: "palm", phase: "windup", t: SPELLS.palm.windup - 1 / 60 };
+    step(duel, 1 / 60);
+    expect(frost.down?.phase).toBe("air");
+    frost.down.quick = false;
+    const lands = [];
+    const { poses } = watch(duel, frost, () => {
+      for (const c of duel.out) if (c.type === "land") lands.push(c);
+      if (frost.down?.phase === "down") frost.down.quick = false;
+      return frost.down === null;
+    });
+    // up it goes, comes down, bounces off the floor once, lies there, sits up, kneels, and stands
+    expect(poses.indexOf("down")).toBeGreaterThan(poses.indexOf("fall"));
+    expect(poses.slice(poses.indexOf("down"))).toEqual(["down", "sit", "kneel", "crouch", "land"]);
+    expect(lands.length).toBe(2);
+  });
+
 });

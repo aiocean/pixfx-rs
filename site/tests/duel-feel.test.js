@@ -14,7 +14,7 @@ function fightTime(feel, seconds) {
 describe("feel", () => {
   test("a blow stops the fight for a few frames, then it runs on at full speed", () => {
     const feel = createFeel();
-    react(feel, [{ type: "hit", by: 0, damage: 12, share: 12, x: 50, y: 20 }]);
+    react(feel, [{ type: "hit", by: 0, spell: "slash", power: 5, launch: false, damage: 300, share: 12, x: 50, y: 20 }]);
     expect(advance(feel, FRAME)).toBe(0);
     const stopped = 0.5 - fightTime(feel, 0.5);
     expect(stopped).toBeGreaterThan(0.04);
@@ -23,16 +23,18 @@ describe("feel", () => {
   });
 
   test("a harder blow stops the fight longer and shakes the screen harder", () => {
-    const lost = (damage) => {
+    const lost = (hit) => {
       const feel = createFeel();
-      react(feel, [{ type: "hit", by: 0, damage, share: damage, x: 0, y: 0 }]);
+      react(feel, [{ type: "hit", by: 0, x: 0, y: 0, crit: false, ...hit }]);
       const trauma = feel.trauma;
       return [1 - fightTime(feel, 1), trauma];
     };
-    const [lightStop, lightShake] = lost(4);
-    const [heavyStop, heavyShake] = lost(20);
+    const [lightStop, lightShake] = lost({ spell: "slash", power: 5, launch: false, share: 4 });
+    const [heavyStop, heavyShake] = lost({ spell: "palm", power: 20, launch: true, share: 20 });
     expect(heavyStop).toBeGreaterThan(lightStop);
     expect(heavyShake).toBeGreaterThan(lightShake);
+    // never past the cap, even a crit that throws
+    expect(lost({ spell: "palm", power: 20, launch: true, crit: true, share: 30 })[0]).toBeLessThanOrEqual(13 / 60 + 1e-9);
   });
 
   test("a knockout plays out in slow motion, then the fight runs at full speed", () => {

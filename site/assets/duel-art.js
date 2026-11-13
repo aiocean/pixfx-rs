@@ -4,7 +4,7 @@
 //
 // A fighter is painted into a small buffer at one pixel per game pixel, outlined there (dark, or in its school's
 // glow while it gathers a spell, so the caster is plain to see), then drawn scaled onto the scene.
-import { RAGE } from "./duel.js";
+import { RAGE, SPELLS } from "./duel.js";
 
 /** Each school's colours, three tones where a part is shaded. */
 const LOOKS = {
@@ -40,31 +40,65 @@ function spriteBuffer() {
  * One fighter, feet at (f.x, ground - f.air), facing f.face: about 40 pixels tall, its body the 34 the effects are
  * drawn for (parry's blades meet 30 pixels up), its hair above that.
  */
-export function drawFighter(ctx, f, ground, s) {
+export function drawFighter(ctx, f, ground, s, jolt = [0, 0]) {
   // a dodge leaves an afterimage where the blow was aimed
-  if (f.dodged > 0 && f.hp > 0) blit(ctx, { ...f, x: f.x + f.face * 7, flash: 1 }, ground, s, f.dodged * 1.5);
-  blit(ctx, f, ground, s, 1);
+  if (f.dodged > 0 && f.hp > 0) blit(ctx, { ...f, x: f.x + f.face * 7, flash: 1 }, ground, s, f.dodged * 1.5, [0, 0]);
+  blit(ctx, f, ground, s, 1, jolt);
   if (f.hp > 0) drawStatus(ctx, f, ground, s);
 }
 
-function blit(ctx, f, ground, s, alpha) {
+/** Where a turning pose turns about, in pixels above the feet: a tumble round its middle, a roll round its ball. */
+const PIVOT = { tumble: 18, roll: 5 };
+
+/**
+ * Quarter turns a tumbling or rolling fighter has made: one every four frames (a turn 3.75 times a second), the
+ * way it is moving. Whole quarter turns keep every pixel on the grid.
+ */
+function quarterTurns(f) {
+  if (!(f.pose in PIVOT)) return 0;
+  const way = Math.sign(f.vx) || -f.face;
+  return (Math.floor(f.poseT * 15) % 4) * way;
+}
+
+function blit(ctx, f, ground, s, alpha, [jx, jy]) {
   const b = spriteBuffer();
   b.ctx.clearRect(0, 0, SPRITE.w, SPRITE.h);
-  paint(b.ctx, f);
+  // a tumble is the fighter flung spread-eagled, turned about its middle
+  paint(b.ctx, f.pose === "tumble" ? { ...f, pose: "spread" } : f);
+  const p = gathered(f);
   const gathering = f.pose === "channel" || f.pose === "cast";
   const glow = gathering ? LOOKS[f.school].glow : null;
   outline(b.ctx, glow && Math.sin(f.poseT * 18) > -0.4 ? glow : LOOKS[f.school].outline);
   ctx.imageSmoothingEnabled = false;
-  const x = Math.round(f.x) - SPRITE.cx;
-  const y = Math.round(ground - f.air) - SPRITE.feet;
-  // a caster's glow spills round it while it gathers
+  // the last fifth of a long wind-up trembles with the power held in
+  const tremble = p !== null && p > 0.8 && SPELLS[f.act.spell].windup >= 0.3 && Math.floor(f.poseT * 30) % 2 ? 1 : 0;
+  const x = Math.round(f.x) - SPRITE.cx + jx + tremble;
+  const y = Math.round(ground - f.air) - SPRITE.feet + jy;
+  // a caster's glow spills round it while it gathers, brighter as the spell builds
   if (glow) {
-    ctx.globalAlpha = alpha * (0.18 + 0.08 * Math.sin(f.poseT * 9));
+    // an aura in two hard-edged rings, the inner one brighter, swelling as the spell builds
+    const k = p ?? 1;
+    const cx = x + SPRITE.cx;
+    const cy = y + SPRITE.feet - 20;
     ctx.fillStyle = glow;
-    ctx.fillRect((x + SPRITE.cx - 12) * s, (y + SPRITE.feet - 40) * s, 25 * s, 40 * s);
+    for (const [rx, ry, a] of [[10 + 4 * k, 22 + 3 * k, 0.07], [7 + 2 * k, 17 + 2 * k, 0.09]]) {
+      ctx.globalAlpha = alpha * (a + 0.12 * k) * (0.85 + 0.15 * Math.sin(f.poseT * 9));
+      for (let row = -Math.round(ry); row <= Math.round(ry); row++) {
+        const half = Math.round(rx * Math.sqrt(1 - (row * row) / (ry * ry)));
+        ctx.fillRect((cx - half) * s, (cy + row) * s, (half * 2 + 1) * s, s);
+      }
+    }
   }
   ctx.globalAlpha = alpha;
-  ctx.drawImage(b.c, x * s, y * s, SPRITE.w * s, SPRITE.h * s);
+  const turn = quarterTurns(f);
+  if (turn) {
+    const pivot = SPRITE.feet - PIVOT[f.pose];
+    ctx.save();
+    ctx.translate((x + SPRITE.cx) * s, (y + pivot) * s);
+    ctx.rotate((turn * Math.PI) / 2);
+    ctx.drawImage(b.c, -SPRITE.cx * s, -pivot * s, SPRITE.w * s, SPRITE.h * s);
+    ctx.restore();
+  } else ctx.drawImage(b.c, x * s, y * s, SPRITE.w * s, SPRITE.h * s);
   ctx.globalAlpha = 1;
 }
 
@@ -91,6 +125,15 @@ function outline(bctx, color) {
   bctx.putImageData(img, 0, 0);
 }
 
+/** How each kind of spell is gathered: a summoning raises both arms, a palm draws back, a prayer joins the hands. */
+const GATHER = { zone: "summon", void: "summon", orb: "summon", bolt: "palm", blast: "palm", dash: "lunge", heal: "prayer", ward: "prayer", barrier: "cross", blink: "cross" };
+
+/** How far fighter f has gathered what it is winding up, 0 to 1; null when it is not winding anything up. */
+function gathered(f) {
+  if (!f.act || f.act.phase !== "windup") return null;
+  return Math.min(1, f.act.t / SPELLS[f.act.spell].windup);
+}
+
 /** Paint fighter f's pose into the sprite buffer. */
 function paint(bctx, f) {
   const c = LOOKS[f.school];
@@ -98,8 +141,8 @@ function paint(bctx, f) {
   // the colour a part is painted in: white in a hit's flash, ice when frozen, flickering when shocked
   const tint = (col) => {
     if (f.flash > 0) return "#ffffff";
-    if (pose === "frozen") return lum(col) > 0.7 ? ICE.light : lum(col) > 0.4 ? ICE.mid : ICE.dark;
-    if (pose === "shocked" && Math.sin(f.poseT * 70) > 0) return SHOCK;
+    if (f.frozen > 0) return lum(col) > 0.7 ? ICE.light : lum(col) > 0.4 ? ICE.mid : ICE.dark;
+    if (f.shocked > 0 && Math.sin(f.poseT * 70) > 0) return SHOCK;
     return col;
   };
   // a rect in the fighter's own frame: dx forward (toward where it faces), dy up from its feet
@@ -114,48 +157,130 @@ function paint(bctx, f) {
     for (let i = 0; i <= n; i++) dot(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), col);
   };
   const t = f.poseT;
-  const still = pose === "frozen";
+  const still = f.frozen > 0;
   const bob = still ? 0 : Math.sin(t * 3) > 0.6 ? 1 : 0;
   // cloth streams back from the way it moves, and sways a little when it does not
   const wind = still ? 0 : Math.max(-3, Math.min(3, -(f.vx ?? 0) * f.face * 0.03)) - 1 + Math.round(Math.sin(t * 4));
+  const out = f.hp <= 0;
+  // limbs thrown about while it flies: they swing every few frames
+  const flail = still ? 0 : Math.floor(t * 12) % 2;
 
-  if (pose === "down" || pose === "tumble") {
-    // lying on its back, robe spread, the sword dropped beside it; thrown through the air the same way
-    const up = pose === "tumble" ? 4 : 0;
-    px(-15, up, 22, 4, c.robe[1]);
-    px(-15, up + 3, 22, 1, c.robe[0]);
-    px(-15, up, 22, 1, c.robe[2]);
-    px(-6, up + 1, 3, 3, c.inner[0]);
-    px(-15, up + 1, 2, 2, c.trim[0]);
-    px(7, up, 6, 5, c.skin[0]);
-    px(7, up, 6, 1, c.skin[1]);
-    px(10, up + 3, 1, 1, c.outline);
-    px(12, up - 1, 5, 6, c.hair[1]);
-    if (pose === "down") {
-      line(-12, -1, 2, -1, c.blade[2]);
-      px(3, -1, 1, 1, c.trim[0]);
+  if (pose === "down") {
+    // flat on its back; a knocked-out fighter's eyes are crossed out and its sword lies dropped beside it
+    const breath = !out && !still && Math.floor(t * 2.5) % 2 ? 1 : 0;
+    lying(c, f, px, 0, 0, 0, breath, out ? "x" : "shut");
+    if (out) {
+      line(-6, -1, 10, -1, c.blade[2]);
+      px(11, -1, 1, 1, c.trim[0]);
     }
+    return;
+  }
+  if (pose === "launched") {
+    // thrown up and back: feet higher than its head, arms flung up past it
+    lying(c, f, px, 6, 3, 5 + flail, 0, "shut");
+    return;
+  }
+  if (pose === "fall") {
+    // falling flat on its back, arms and legs trailing up as it drops
+    lying(c, f, px, 6, 1, 7 - flail, 0, "shut");
+    return;
+  }
+  if (pose === "roll") {
+    // tucked into a ball for a quick rise; blit turns it a quarter at a time
+    px(-6, 1, 12, 9, c.robe[1]);
+    px(-5, 0, 10, 11, c.robe[1]);
+    px(-5, 0, 10, 1, c.robe[2]);
+    px(-6, 4, 12, 1, c.trim[0]);
+    px(1, 5, 5, 5, c.skin[0]);
+    px(1, 9, 5, 2, c.hair[1]);
+    px(-4, 1, 3, 2, c.boot);
+    return;
+  }
+  if (pose === "sit") {
+    // sitting up from the floor: legs out in front, leaning back on one hand, still dazed
+    px(10, 0, 3, 4, c.boot);
+    px(-2, 0, 12, 4, c.robe[1]);
+    px(-2, 3, 12, 1, c.robe[0]);
+    px(8, 0, 2, 4, c.trim[0]);
+    px(-7, 3, 9, 9, c.robe[1]);
+    px(-7, 3, 2, 9, c.robe[2]);
+    px(-7, 3, 9, 1, c.trim[0]);
+    line(-3, 5, 0, 11, c.inner[0]);
+    // the arm behind, propping it up from the floor
+    for (let i = 0; i <= 7; i++) px(-6 - Math.round(i * 0.75), 9 - i, 2, 1, c.robe[2]);
+    px(-6, 9, 2, 1, c.trim[0]);
+    px(-13, 0, 3, 2, c.skin[0]);
+    head(px, c, f, 12, -3, wind, "shut");
+    return;
+  }
+  if (pose === "duck") {
+    // dropped low under the blow, body bent level, an arm over the head
+    px(-5, 0, 4, 2, c.boot);
+    px(3, 0, 4, 2, c.boot);
+    px(-7, 2, 15, 5, c.robe[1]);
+    px(-7, 2, 15, 1, c.trim[0]);
+    px(-7, 2, 2, 5, c.robe[2]);
+    px(-5, 7, 11, 5, c.robe[1]);
+    px(-5, 11, 11, 1, c.robe[2]);
+    px(2, 7, 3, 4, c.inner[0]);
+    px(6, 6, 6, 6, c.skin[0]);
+    px(6, 6, 2, 6, c.skin[1]);
+    px(10, 8, 1, 1, c.outline);
+    px(5, 11, 8, 3, c.school === "thunder" ? c.hair[1] : c.hair[0]);
+    px(4, 12, 2, 2, c.school === "thunder" ? c.hair[1] : c.hair[0]);
+    px(3, 13, 3, 1, c.trim[0]);
+    px(6, 4, 5, 3, c.robe[1]);
+    px(11, 4, 2, 2, c.skin[0]);
+    line(-10, 6, -3, 3, c.blade[2]);
     return;
   }
 
   if (pose === "meditate") {
-    // cross-legged in the air, hands together before the chest, robe pooled round it
-    const up = 6 + bob;
-    px(-9, up, 19, 4, c.robe[1]);
-    px(-9, up, 19, 1, c.robe[2]);
-    px(-9, up + 3, 19, 1, c.trim[0]);
-    px(-5, up + 4, 10, 10, c.robe[1]);
-    px(-5, up + 4, 2, 10, c.robe[2]);
-    px(-1, up + 5, 2, 9, c.inner[0]);
-    px(-5, up + 7, 10, 2, c.inner[1]);
-    px(-1, up + 9, 3, 3, c.skin[0]);
-    head(px, c, f, up + 14, 0, wind);
+    // seated cross-legged on the floor, seen from the side: thighs out in front with a knee at the end and a foot
+    // turned up on top, the robe spread round the seat, back straight, hands resting on the knees; it breathes
+    const breath = still ? 0 : Math.floor(t * 1.5) % 2;
+    px(-8, 0, 20, 1, c.robe[2]);
+    px(-7, 1, 6, 3, c.robe[1]);
+    px(-7, 1, 2, 3, c.robe[2]);
+    px(-2, 1, 13, 3, c.robe[1]);
+    px(-2, 3, 12, 1, c.robe[0]);
+    px(11, 1, 1, 2, c.robe[1]);
+    px(1, 1, 9, 1, c.robe[2]);
+    px(5, 4, 3, 1, c.boot);
+    px(-8, 1, 1, 1, c.trim[0]);
+    px(-8, 0, 20, 1, c.trim[0]);
+    // the body, upright on the seat
+    const by = 4 + breath;
+    px(-5, by, 9, 9, c.robe[1]);
+    px(-5, by, 2, 9, c.robe[2]);
+    px(3, by + 1, 1, 8, c.robe[0]);
+    line(0, by + 2, 3, by + 8, c.inner[0]);
+    line(-1, by + 2, 2, by + 8, c.trim[0]);
+    px(-5, by, 9, 1, c.trim[0]);
+    // forearms along the thighs, hands on the knees, thumb and finger touching
+    px(1, by - 1, 7, 2, c.robe[1]);
+    px(1, by, 7, 1, c.trim[0]);
+    px(8, 4, 2, 2, c.skin[0]);
+    px(9, 6, 1, 1, c.skin[1]);
+    head(px, c, f, by + 9, 0, wind, "shut");
     return;
   }
 
-  const lean = pose === "hurt" || pose === "shocked" ? -2 : pose === "slash" ? 2 : pose === "cast" ? 1 : 0;
-  // knees drawn up in a jump; squashed for a moment on landing
-  const tuck = pose === "jump" ? 4 : pose === "land" ? 2 : 0;
+  const p = gathered(f);
+  const how = f.act ? GATHER[SPELLS[f.act.spell].kind] ?? "palm" : null;
+  // a fresh blow snaps it back; then it reels, bent over the hurt, lower the harder it was struck
+  const recoil = (pose === "hurt" && f.hitT < 0.1) || pose === "spread";
+  const reel = pose === "hurt" && !recoil;
+  // how far the body sinks: a crouch, a landing, a kneel, a reel, a stance braced to gather or to strike
+  const braced = (pose === "channel" && (how === "summon" || how === "palm")) || (pose === "draw" && f.air === 0);
+  const drop =
+    pose === "crouch" ? 4 : pose === "land" ? 3 : pose === "kneel" ? 7 : reel ? (f.hitPower >= 9 ? 5 : 3) :
+    pose === "channel" && how === "lunge" ? 4 : braced ? 2 : 0;
+  const lean =
+    recoil ? -3 : reel ? 2 : pose === "shocked" ? -2 : pose === "slash" ? 2 : pose === "cast" ? 1 :
+    pose === "channel" && how === "lunge" ? 2 : pose === "channel" && how === "palm" ? -1 : pose === "draw" ? -1 : 0;
+  // knees drawn up in a jump
+  const tuck = pose === "jump" ? 4 : 0;
 
   if (pose === "fly") {
     // riding its sword: the blade flat under its feet, a trail of light behind
@@ -167,13 +292,23 @@ function paint(bctx, f) {
     if (Math.sin(t * 20) > -0.3) line(-16 - (Math.round(t * 30) % 3), -2, -14, -2, c.glow);
   }
 
-  // feet
+  // feet: apart in a stance, staggering back from a blow, one knee on the floor in a kneel
   const stride = pose === "walk" ? (Math.sin(t * 12) > 0 ? 2 : -2) : 0;
-  px(-4 + stride, 0, 4, 2, c.boot);
-  px(1 - stride, 0, 4, 2, c.boot);
-  // the lower robe, flaring to the hem, open at the front over the inner robe
-  for (let dy = 2 + tuck; dy <= 15; dy++) {
-    const flare = Math.max(0, Math.round((8 - dy) / 2));
+  const spread = pose === "spread" ? 3 : drop > 0 && pose !== "kneel" ? 2 : 0;
+  if (pose === "kneel") {
+    px(4, 0, 4, 2, c.boot);
+    px(-7, 0, 5, 2, c.robe[2]);
+    px(-10, 0, 3, 1, c.boot);
+    px(3, 2, 6, 3, c.robe[1]);
+    px(3, 4, 6, 1, c.robe[0]);
+  } else {
+    px(-4 + stride - spread - (reel ? 2 : 0), 0, 4, 2, c.boot);
+    px(1 - stride + spread, 0, 4, 2, c.boot);
+  }
+  // the lower robe, flaring to the hem, open at the front over the inner robe; shorter as the knees bend
+  const top = 15 - drop;
+  for (let dy = 2 + tuck; dy <= top; dy++) {
+    const flare = Math.max(0, Math.round((8 - dy) / 2)) + (drop > 0 ? 1 : 0);
     const back = -5 - flare + (dy < 6 ? Math.min(0, wind) : 0);
     const front = 4 + Math.max(0, flare - 1);
     px(back, dy, front - back + 1, 1, c.robe[1]);
@@ -185,7 +320,7 @@ function paint(bctx, f) {
   px(-6, 3 + tuck, 1, 1, c.trim[1]);
 
   // the body: robe crossed over the inner robe, a sash with a jade pendant and a tail that streams back
-  const by = 16 - bob;
+  const by = 16 - bob - drop;
   px(-5 + lean, by, 10, 9, c.robe[1]);
   px(-5 + lean, by, 2, 9, c.robe[2]);
   px(3 + lean, by + 1, 1, 8, c.robe[0]);
@@ -199,30 +334,105 @@ function paint(bctx, f) {
   for (let i = 0; i < 6; i++) {
     dot(-6 + lean - i + Math.round(wind * i * 0.3), by + 1 - Math.round(i / 2) + (i > 3 ? Math.round(Math.sin(t * 6 + i)) : 0), c.inner[i < 3 ? 0 : 1]);
   }
-  head(px, c, f, by + 9, lean, wind);
+  // the head snaps back further than the body from a fresh blow, and hangs forward as it reels
+  const eye = recoil || reel || pose === "shocked" ? "shut" : pose === "channel" && how === "prayer" ? "shut" : "open";
+  head(px, c, f, by + 9, lean + (recoil ? -2 : reel ? 1 : 0), wind, eye);
 
   // arms and sword
   const sh = by + 7;
-  const sleeve = (dx, dy, w, h, shade = 1) => {
+  // a sleeve stands out from the robe behind it: the near arm a tone lighter, each edged dark along its back and top
+  const sleeve = (dx, dy, w, h, shade = 0) => {
+    const edge = shade === 2 ? c.outline : c.robe[2];
     px(dx + lean, dy, w, h, c.robe[shade]);
+    if (w > 2) px(dx + lean, dy, 1, h, edge);
+    if (h > 2) px(dx + lean, dy + h - 1, w, 1, edge);
     px(dx + lean, dy, w, 1, c.trim[0]);
   };
   const hand = (dx, dy) => px(dx + lean, dy, 2, 2, c.skin[0]);
-  if (pose === "channel" || pose === "cast") {
-    // the near arm out, palm open, qi gathering in it; the far hand at the chest
-    const reach = pose === "cast" ? 8 : 5;
-    sleeve(3, sh - 3, reach, 4);
-    px(3 + lean, sh - 3, 2, 4, c.robe[2]);
-    hand(3 + reach, sh - 2);
-    const r = pose === "cast" ? 2 : Math.sin(t * 30) > 0 ? 1 : 2;
-    px(5 + reach + lean, sh - 2 - (r - 1), r + 1, r + 1, c.glow);
-    dot(6 + reach + lean + r, sh + r, "#ffffff");
-    px(-1 + lean, sh - 2, 2, 2, c.skin[1]);
+  // qi drawn in from round about to a point, closer as the spell gathers
+  const motes = (cx, cy, k) => {
+    const r = 2 + Math.round((1 - k) * 11);
+    for (let i = 0; i < 4; i++) {
+      const a = t * 7 + (i * Math.PI) / 2;
+      dot(Math.round(cx + lean + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.7), i % 2 ? c.glow : "#ffffff");
+    }
+  };
+  const orb = (cx, cy, k) => {
+    const r = 1 + Math.round(2 * k);
+    px(cx + lean - Math.floor(r / 2), cy - Math.floor(r / 2), r, r, c.glow);
+    if (k > 0.5) dot(cx + lean, cy, "#ffffff");
+  };
+  if (pose === "channel") {
+    if (how === "summon") {
+      // both arms rise out to the sides and up as it gathers, a ball of qi swelling over the head between the hands
+      const up = Math.round(2 + 9 * p);
+      const out = Math.round(6 - 2 * p);
+      for (const [x0, side, shade] of [[-4, -1, 2], [3, 1, 1]]) {
+        const x1 = x0 + side * out;
+        line(x0 + lean, sh - 1, x1 + lean, sh - 1 + up, c.robe[shade]);
+        line(x0 + lean + side, sh - 1, x1 + lean + side, sh - 1 + up, c.robe[shade]);
+        dot(x0 + lean, sh - 1, c.trim[0]);
+        hand(x1 - (side < 0 ? 1 : 0), sh + up);
+      }
+      orb(0, sh + up + 4, p);
+      motes(0, sh + up + 4, p);
+      sword(px, line, c, "back", lean, by);
+    } else if (how === "palm" || how === "lunge") {
+      // the near palm drawn back to the hip, gathering; the far hand out before it, two fingers pointing
+      sleeve(-7, sh - 4, 5, 3, 2);
+      hand(-9, sh - 4);
+      orb(-9, sh - 3, p);
+      motes(-9, sh - 3, p);
+      sleeve(3, sh - 1, 4, 2);
+      hand(7, sh - 1);
+      px(9 + lean, sh, 2, 1, c.skin[0]);
+      sword(px, line, c, how === "lunge" ? "hip" : "back", lean, by);
+    } else if (how === "prayer") {
+      // the hands joined before the chest, eyes shut, qi rising round it
+      sleeve(-2, sh - 4, 4, 3, 2);
+      sleeve(1, sh - 4, 4, 3);
+      hand(4, sh - 3);
+      px(5 + lean, sh - 1, 1, 3, c.skin[0]);
+      for (let i = 0; i < 3; i++) dot(-6 + i * 6, ((Math.floor(t * 20) + i * 5) % 14) + by, c.glow);
+      sword(px, line, c, "back", lean, by);
+    } else {
+      // arms crossed before the chest, braced
+      line(-3 + lean, sh - 4, 6 + lean, sh, c.robe[2]);
+      line(-3 + lean, sh, 6 + lean, sh - 4, c.robe[1]);
+      hand(6, sh - 1);
+      hand(6, sh - 5);
+      sword(px, line, c, "hip", lean, by);
+    }
+  } else if (pose === "cast") {
+    if (how === "prayer" || how === "cross") {
+      // arms flung wide as the spell goes out
+      sleeve(-9, sh - 1, 4, 3, 2);
+      sleeve(5, sh - 1, 4, 3);
+      hand(-10, sh);
+      hand(9, sh);
+    } else {
+      // the near arm thrust out, palm open, the spell leaving it
+      sleeve(3, sh - 3, 8, 4);
+      px(3 + lean, sh - 3, 2, 4, c.robe[2]);
+      hand(11, sh - 2);
+      px(13 + lean, sh - 2, 3, 3, c.glow);
+      dot(15 + lean, sh + 1, "#ffffff");
+      px(-1 + lean, sh - 2, 2, 2, c.skin[1]);
+    }
     sword(px, line, c, "back", lean, by);
   } else if (pose === "draw") {
-    sleeve(-7, sh - 1, 4, 4, 2);
-    hand(-8, sh + 2);
-    sword(px, line, c, "raised", lean, by);
+    // the blade drawn back over the shoulder, higher the nearer the blow; from the air, held point down to plunge
+    if (f.act && SPELLS[f.act.spell].dive) {
+      sleeve(1, sh - 6, 3, 6);
+      hand(2, sh - 7);
+      line(3 + lean, sh - 8, 3 + lean, sh - 24, c.blade[1]);
+      line(4 + lean, sh - 8, 4 + lean, sh - 23, c.blade[0]);
+      px(1 + lean, sh - 7, 5, 1, c.trim[0]);
+    } else {
+      sleeve(-7, sh - 1, 4, 4, 2);
+      hand(-8, sh + 2);
+      sword(px, line, c, "raised", lean, by + Math.round(2 * (p ?? 1)));
+    }
   } else if (pose === "slash") {
     sleeve(3, sh - 2, 6, 3);
     hand(9, sh - 2);
@@ -241,8 +451,35 @@ function paint(bctx, f) {
     sleeve(5, sh - 1, 4, 3);
     hand(-10, sh - 1);
     hand(9, sh - 1);
+  } else if (recoil) {
+    // struck: arms thrown out behind and up
+    sleeve(-9, sh - 1, 4, 3, 2);
+    hand(-10, sh + 1);
+    sleeve(3, sh, 3, 4);
+    hand(4, sh + 4);
+    sword(px, line, c, "hip", lean, by);
+  } else if (reel) {
+    // clutching the chest where it was struck, the other arm hanging
+    sleeve(-7, sh - 8, 3, 9, 2);
+    sleeve(1, sh - 3, 4, 3);
+    hand(3, sh - 2);
+    sword(px, line, c, "hip", lean, by);
+  } else if (pose === "shocked") {
+    // locked rigid, arms jerking out
+    const j = Math.sin(t * 60) > 0 ? 1 : 0;
+    sleeve(-9, sh - 1 + j, 4, 2, 2);
+    sleeve(5, sh - j, 4, 2);
+    hand(-10, sh - 1 + j);
+    hand(9, sh - j);
+    sword(px, line, c, "hip", lean, by);
+  } else if (pose === "kneel") {
+    // a hand on the raised knee, pushing up
+    sleeve(-7, sh - 8, 3, 9, 2);
+    sleeve(3, sh - 5, 3, 5);
+    hand(4, sh - 6);
+    sword(px, line, c, "hip", lean, by);
   } else {
-    // idle, walk, jump, land, hurt, frozen, shocked: wide sleeves hanging, the sword at the hip
+    // idle, walk, jump, land, crouch, frozen: wide sleeves hanging, the sword at the hip
     sleeve(-7, sh - 8, 3, 9, 2);
     sleeve(4, sh - 8, 3, 9);
     px(4 + lean, sh - 8, 3, 1, c.trim[1]);
@@ -251,13 +488,69 @@ function paint(bctx, f) {
   }
 }
 
-function head(px, c, f, y, lean, wind) {
+/**
+ * A fighter on its back, `up` pixels off the floor: feet toward the foe, head away, its legs raised `legs` pixels
+ * and its arms flung up `arms` (0: along its sides), its chest lifting `breath`, its eyes open, shut or crossed out.
+ */
+function lying(c, f, px, up, legs, arms, breath, eye) {
+  const l = up + legs;
+  px(12, l, 3, 4, c.boot);
+  px(-1, up + Math.min(legs, 2), 13, 4, c.robe[1]);
+  px(-1, up + Math.min(legs, 2) + 3, 13, 1, c.robe[0]);
+  px(-1, up + Math.min(legs, 2), 13, 1, c.robe[2]);
+  px(10, up + Math.min(legs, 2), 2, 4, c.trim[0]);
+  px(-11, up, 11, 5 + breath, c.robe[1]);
+  px(-11, up, 11, 1, c.robe[2]);
+  px(-9, up + 4 + breath, 5, 1, c.inner[0]);
+  px(-8, up + 3 + breath, 3, 1, c.inner[1]);
+  px(-2, up, 1, 5 + breath, c.trim[0]);
+  if (arms > 0) {
+    // flung up and back past the head from the shoulders
+    for (const [x0, len, shade] of [[-10, arms, 1], [-8, arms - 2, 2]]) {
+      const x1 = x0 - Math.round(len * 0.6);
+      for (let i = 0; i <= len; i++) {
+        const x = Math.round(x0 + ((x1 - x0) * i) / len);
+        px(x, up + 5 + i, 2, 1, c.robe[shade]);
+      }
+      px(x1 - 1, up + 6 + len, 2, 2, c.skin[0]);
+    }
+  } else {
+    px(-9, up + 5 + breath, 7, 1, c.robe[2]);
+    px(-2, up + 5 + breath, 2, 1, c.skin[0]);
+  }
+  // the head, face up
+  px(-18, up, 7, 6, c.skin[0]);
+  px(-18, up, 7, 1, c.skin[1]);
+  if (eye === "x") {
+    px(-15, up + 3, 1, 1, c.outline);
+    px(-14, up + 4, 1, 1, c.outline);
+    px(-13, up + 3, 1, 1, c.outline);
+    px(-15, up + 5, 1, 1, c.outline);
+    px(-13, up + 5, 1, 1, c.outline);
+  } else px(-15, up + 4, 3, 1, c.outline);
+  if (f.school === "thunder") {
+    px(-21, up, 3, 6, c.hair[1]);
+    px(-23, up + 1, 2, 3, c.hair[1]);
+    px(-22, up + 4, 1, 1, c.trim[0]);
+    px(-25, up, 2, 1, c.ribbon[0]);
+  } else {
+    px(-21, up, 3, 6, c.hair[0]);
+    px(-29, up, 9, 2, c.hair[0]);
+    px(-29, up, 9, 1, c.hair[1]);
+    px(-20, up + 5, 2, 1, c.jade);
+  }
+}
+
+function head(px, c, f, y, lean, wind, eye = "open") {
   const t = f.poseT;
-  // neck, face, an eye and a brow
+  // neck, face, an eye (open, or screwed shut) and a brow
   px(-1 + lean, y, 2, 1, c.skin[1]);
   px(-3 + lean, y + 1, 7, 7, c.skin[0]);
   px(-3 + lean, y + 1, 2, 7, c.skin[1]);
-  px(2 + lean, y + 4, 1, 2, c.outline);
+  if (eye === "shut") {
+    px(1 + lean, y + 4, 3, 1, c.outline);
+    px(2 + lean, y + 2, 2, 1, c.skin[1]);
+  } else px(2 + lean, y + 4, 1, 2, c.outline);
   px(2 + lean, y + 6, 2, 1, c.hair[1]);
   px(3 + lean, y + 2, 1, 1, c.skin[1]);
   if (f.school === "thunder") {
@@ -430,6 +723,25 @@ function drawStatus(ctx, f, ground, s) {
  * Each qi streak (from duel-feel.js `streaks`): Thunder's a crooked line of lightning, Frost's a straight shimmer
  * of ice, from the caster's hand to where the spell lands.
  */
+/**
+ * Dust a body kicked up where it hit the floor: specks thrown out to both sides along the ground, rising a little and
+ * settling as they fade. `list` is the feel's dust: x, strength 0 to 1, and k, how far through its life.
+ */
+export function drawDust(ctx, list, ground, s) {
+  for (const d of list) {
+    const n = 2 + Math.round(3 * d.strength);
+    ctx.globalAlpha = 0.8 * (1 - d.k);
+    for (let i = 0; i < n; i++) {
+      const out = Math.round((3 + i * 3) * Math.sqrt(d.k) * (0.6 + d.strength));
+      const rise = Math.round(Math.sin(Math.PI * d.k) * (1 + ((i * 7) % 3)) * d.strength * 2);
+      ctx.fillStyle = i % 2 ? DUST_COLOR.light : DUST_COLOR.dark;
+      for (const side of [-1, 1]) ctx.fillRect(Math.round(d.x + side * out) * s, (ground - 1 - rise) * s, s * (i < 2 ? 2 : 1), s);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+const DUST_COLOR = { light: "#a89a88", dark: "#6e6458" };
+
 export function drawStreaks(ctx, list, duel, s) {
   for (const k of list) {
     const school = duel.fighters[k.by].school;
