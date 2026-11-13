@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+mod fireflies;
 mod snow;
 
+pub use fireflies::FIREFLIES;
 pub use snow::SNOW;

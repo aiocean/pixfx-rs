@@ -46,6 +46,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &shadow::VOID_ORB,
     &water::WATER_JET,
     &weather::SNOW,
+    &weather::FIREFLIES,
 ];
 
 /// The effect with this id (`fire/candle`).
