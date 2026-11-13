@@ -28,7 +28,7 @@ pub struct Seg {
 
 /// A hit star: tapered spikes in three passes (a rim, a body that's paler near the root, a hot core) round a
 /// hot heart. `sc` stretches the spikes, `th` thins them, `cols` are [rim, body, inner, core], `a` dithers it out.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
 pub fn star(
     p: &mut Painter,
     x: f64,
@@ -78,7 +78,7 @@ pub fn star(
 /// A ring that breaks into arcs: `segs` evenly round the ring. `brk` 0 draws a whole ring `th` thick; as `brk`
 /// grows each arc shrinks, tapers at both ends into a crescent and drifts out at its own speed. `c` is the
 /// outer edge's colour, `c2` the inner's; `sy` squashes it onto a plane; nothing is drawn below `max_y`.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
 pub fn broken_ring(
     p: &mut Painter,
     x: f64,
