@@ -2,7 +2,8 @@
 //! crates (a canvas renderer) use directly.
 
 use pixfx_core::{
-    Canvas, Effect, Frame, Instance, Layer, Meta, Options, Placement, composite, edge_fade,
+    Canvas, Effect, Frame, Instance, Layer, Meta, Options, Placement, TimedCue, composite,
+    edge_fade,
 };
 
 /// An effect instance and the canvas it draws into: the instance's canvas ([`Effect::canvas`]: `meta.size`
@@ -66,6 +67,12 @@ impl Player {
 
     pub fn stop(&mut self) {
         self.inst.stop();
+    }
+
+    /// The cues playback passed since the last call ([`Instance::take_cues`]), in this player's frame space: `x`/`y`
+    /// where [`Player::new`] put the effect's origin. Clears them.
+    pub fn take_cues(&mut self) -> Vec<TimedCue> {
+        self.inst.take_cues()
     }
 
     pub fn done(&self) -> bool {

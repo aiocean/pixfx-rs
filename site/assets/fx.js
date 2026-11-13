@@ -59,6 +59,8 @@ function createOverlay() {
   canvas.setAttribute("aria-hidden", "true");
   document.body.append(canvas);
   const stage = new Stage(canvas, SCALE);
+  // pointer fx decorate the page: they never shake or flash it
+  stage.setFeel(false);
   const fit = () => {
     canvas.width = Math.ceil(innerWidth / SCALE) * SCALE;
     canvas.height = Math.ceil(innerHeight / SCALE) * SCALE;

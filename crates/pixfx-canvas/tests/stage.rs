@@ -314,3 +314,154 @@ fn ended_effects_are_drained_once_in_order() -> Res {
     assert_eq!(scene.handles().collect::<Vec<_>>(), vec![kept]);
     Ok(())
 }
+
+/// A one-shot of 1 s that hits at 0.1 s: a ripple 3 px right of its origin, a hit-stop and a shake.
+struct Hitter;
+
+static HITTER: Hitter = Hitter;
+
+const HITTER_META: Meta = Meta {
+    id: "test/hitter",
+    name: "Hitter",
+    desc: "A one-shot that hits at 0.1 s.",
+    tags: &[],
+    size: (8, 6),
+    origin: (4, 5),
+    duration: 1.0,
+    looping: false,
+    fps: 30,
+    seed: 1,
+    state: None,
+    options: &[],
+};
+
+impl Effect for Hitter {
+    fn meta(&self) -> &Meta {
+        &HITTER_META
+    }
+    fn spawn(&self, _opts: &Options, _seed: u64) -> Box<dyn EffectState> {
+        Box::new(BlipState)
+    }
+    fn cues(&self, _opts: &Options) -> Vec<pixfx_core::TimedCue> {
+        use pixfx_core::Cue;
+        let at = |cue| pixfx_core::TimedCue {
+            t: 0.1,
+            cue,
+            pan: None,
+        };
+        vec![
+            at(Cue::Ripple {
+                x: 3.0,
+                y: -2.0,
+                r0: 0.0,
+                r1: 10.0,
+                dur: 0.3,
+                amp: 1.0,
+            }),
+            at(Cue::Hitstop { dur: 0.1 }),
+            at(Cue::Shake { trauma: 1.0 }),
+        ]
+    }
+}
+
+const FRAME: f64 = 1.0 / 60.0;
+
+#[test]
+fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
+    let mut scene = Scene::new(scale(1)?);
+    let hitter = scene.play(live_player(&HITTER, Options::default()), 0.0, 0.0, ())?;
+    let candle = scene.play(player("fire/candle")?, 0.0, 0.0, ())?;
+    // play until the hit lands
+    let mut played = 0.0;
+    while !scene.feel().is_some_and(|f| f.frozen()) {
+        played += scene.update(FRAME)?;
+        assert!(played < 0.2, "the hit at 0.1 s never froze play");
+    }
+    assert!(
+        played >= 0.1 - 1e-9,
+        "froze only once the hit landed: {played}"
+    );
+    let (t_hitter, t_candle) = (scene.t(hitter), scene.t(candle));
+    // the hit-stop holds every effect, and update says no time played
+    for _ in 0..5 {
+        assert_eq!(scene.update(FRAME)?, 0.0);
+    }
+    assert_eq!((scene.t(hitter), scene.t(candle)), (t_hitter, t_candle));
+    let mut thawed = false;
+    for _ in 0..3 {
+        thawed |= scene.update(FRAME)? > 0.0;
+    }
+    assert!(thawed, "play resumes after the stop");
+    assert!(scene.feel().is_some_and(|f| f.trauma() > 0.0));
+    Ok(())
+}
+
+#[test]
+fn cues_come_out_as_events_where_they_fire_on_the_stage() -> Res {
+    let mut scene = Scene::new(scale(1)?);
+    scene.set_screen_w(100.0);
+    let mirrored = scene.play(live_player(&HITTER, Options::default()), 50.0, 20.0, ())?;
+    scene.set(
+        mirrored,
+        Placement {
+            flip: true,
+            ..live_player(&HITTER, Options::default()).placement()
+        },
+    )?;
+    scene.move_to(mirrored, 50.0, 20.0)?;
+    for _ in 0..7 {
+        scene.update(FRAME)?;
+    }
+    let ripples: Vec<_> = scene
+        .drain_events()
+        .into_iter()
+        .filter_map(|e| match e {
+            StageEvent::Cue {
+                handle,
+                pan,
+                cue: pixfx_core::Cue::Ripple { x, y, .. },
+                ..
+            } => Some((handle, x, y, pan)),
+            _ => None,
+        })
+        .collect();
+    // 3 px right of the origin, mirrored by the flip set on the stage: 3 px left of (50, 20)
+    let [(handle, x, y, pan)] = ripples[..] else {
+        return Err(format!("one ripple, got {ripples:?}").into());
+    };
+    assert_eq!((handle, x, y), (mirrored, 47.0, 18.0));
+    // 47 of a 100 px stage is just left of the middle
+    assert!(pan.is_some_and(|p| (p + 0.06).abs() < 1e-9), "pan {pan:?}");
+    let r = scene
+        .feel()
+        .map(|f| f.ripples().to_vec())
+        .unwrap_or_default();
+    assert_eq!(
+        (r.len(), r.first().map(|r| (r.x, r.y))),
+        (1, Some((47.0, 18.0)))
+    );
+    Ok(())
+}
+
+#[test]
+fn a_host_with_its_own_answer_gets_the_cues_and_every_second() -> Res {
+    let mut scene = Scene::new(scale(1)?);
+    scene.set_feel(None);
+    scene.play(live_player(&HITTER, Options::default()), 0.0, 0.0, ())?;
+    let mut played = 0.0;
+    for _ in 0..20 {
+        played += scene.update(FRAME)?;
+    }
+    assert!(
+        (played - 20.0 * FRAME).abs() < 1e-12,
+        "nothing froze: {played}"
+    );
+    let cues = scene
+        .drain_events()
+        .iter()
+        .filter(|e| matches!(e, StageEvent::Cue { .. }))
+        .count();
+    assert_eq!(cues, 3);
+    assert!(scene.feel().is_none());
+    Ok(())
+}

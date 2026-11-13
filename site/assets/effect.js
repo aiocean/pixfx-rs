@@ -175,12 +175,22 @@ function createView(canvas, controls, code, id, m, box, scale) {
         if (resting >= REST) replay();
       }
       const ctx = canvas.getContext("2d");
+      // the effect's cues move the whole view (a hit's shake) and lift it toward white (its flash)
+      const [sx, sy] = stage.shake(reduceMotion ? 0 : 1);
+      ctx.save();
+      ctx.translate(sx * scale, sy * scale);
       ctx.fillStyle = COLORS.sky;
-      ctx.fillRect(0, 0, box.w * scale, box.ground * scale);
+      ctx.fillRect(-scale * 4, -scale * 4, (box.w + 8) * scale, (box.ground + 4) * scale);
       ctx.fillStyle = COLORS.ground;
-      ctx.fillRect(0, box.ground * scale, box.w * scale, (box.h - box.ground) * scale);
+      ctx.fillRect(-scale * 4, box.ground * scale, (box.w + 8) * scale, (box.h - box.ground + 4) * scale);
       stage.drawLayer("back");
       stage.drawLayer("front");
+      ctx.restore();
+      const flash = reduceMotion ? 0 : stage.flash();
+      if (flash > 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${flash})`;
+        ctx.fillRect(0, 0, box.w * scale, box.h * scale);
+      }
     },
     free: () => stage.free(),
   };

@@ -1,12 +1,16 @@
 //! What the canvas renderer decides, in plain Rust: which effects play, where, how much room round them, at
-//! what scale, in which order their layers are drawn, when finished ones go, and the pixels each layer
-//! becomes. No browser types, so it is tested natively; [`crate::Stage`] blits what this produces.
+//! what scale, in which order their layers are drawn, when finished ones go, the pixels each layer becomes,
+//! and the game's answer to the cues the effects fire (a [`Feel`]: shake, hit-stop, flash, ripples). No browser types, so it is tested natively; [`crate::Stage`] blits what this produces.
 
 use std::fmt;
 use std::num::NonZeroU32;
 
+use pixfx_core::cue::Cue;
+use pixfx_core::math::clamp;
 use pixfx_core::math::js_round;
-use pixfx_core::{Effect, Frame, Layer, Meta, Options, Placement, composite_px, valid_dt};
+use pixfx_core::{
+    Effect, Feel, Frame, Layer, Meta, Options, Placement, TimedCue, composite_px, valid_dt,
+};
 use pixfx_wasm::{Player, parse_options};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsError, JsValue};
@@ -85,11 +89,21 @@ pub struct Pass {
 }
 
 /// Something that happened on the stage, queued in order until the host drains it ([`Scene::drain_events`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, tsify::Tsify)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, tsify::Tsify)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum StageEvent {
     /// The instance is gone: it finished, faded out after a stop, or was removed.
     End { handle: u32 },
+    /// The instance fired a cue: `t` seconds into its playback, in game pixels on the stage (a ripple's or a
+    /// sound's `x`/`y`), `pan` -1 to 1 across the stage once its width is known. The stage's [`Feel`] has already
+    /// taken it; a sound is the host's to play.
+    Cue {
+        handle: u32,
+        t: f64,
+        #[tsify(type = "number | null")]
+        pan: Option<f64>,
+        cue: Cue,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -133,6 +147,10 @@ pub struct Scene<T> {
     entries: Vec<Entry<T>>,
     /// Events not yet drained, oldest first.
     events: Vec<StageEvent>,
+    /// The answer to the cues the effects fire; `None` when the host answers them with its own.
+    feel: Option<Feel>,
+    /// The stage's width in game pixels, for a cue's pan; 0 leaves cues without pan.
+    screen_w: f64,
 }
 
 impl<T> Scene<T> {
@@ -142,7 +160,31 @@ impl<T> Scene<T> {
             next: Some(1),
             entries: Vec::new(),
             events: Vec::new(),
+            feel: Some(Feel::new()),
+            screen_w: 0.0,
         }
+    }
+
+    /// The answer to the cues the effects fire: where the screen sits ([`Feel::shake`]), its flash and ripples.
+    /// `None` when the host answers them itself ([`Scene::set_feel`]).
+    pub fn feel(&self) -> Option<&Feel> {
+        self.feel.as_ref()
+    }
+
+    /// Change the answer: the game's own impacts ([`Feel::add_trauma`], [`Feel::freeze`], [`Feel::slow`]).
+    pub fn feel_mut(&mut self) -> Option<&mut Feel> {
+        self.feel.as_mut()
+    }
+
+    /// Answer cues with `feel` (the stage's own: freezes its effects, shakes, flashes), or with nothing: the host
+    /// has its own answer, fed from the `cue` events, and the stage plays every second `update` gives it.
+    pub fn set_feel(&mut self, feel: Option<Feel>) {
+        self.feel = feel;
+    }
+
+    /// The stage's width in game pixels, so a cue's pan follows where it fires; 0 leaves cues without pan.
+    pub fn set_screen_w(&mut self, w: f64) {
+        self.screen_w = if w.is_finite() && w > 0.0 { w } else { 0.0 };
     }
 
     pub fn scale(&self) -> NonZeroU32 {
@@ -278,16 +320,34 @@ impl<T> Scene<T> {
             .map(|e| e.player.t())
     }
 
-    /// Advance every instance by `dt` seconds, then drop the ones that are done, queueing their ends oldest
-    /// first. A `dt` that fails
-    /// [`valid_dt`] (NaN, infinite or negative) is an error and changes nothing.
-    pub fn update(&mut self, dt: f64) -> Result<(), StageError> {
+    /// Let `dt` real seconds pass: the [`Feel`] says how much of it the effects play (none in a hit-stop, a
+    /// fraction in slow motion), every instance advances by that, the cues they fire go to the feel and queue as
+    /// events, and the instances that are done go, their ends queued. Returns the seconds played, for a host that
+    /// freezes its own world with the effects. A `dt` that fails [`valid_dt`] (NaN, infinite or negative) is an
+    /// error and changes nothing.
+    pub fn update(&mut self, dt: f64) -> Result<f64, StageError> {
         if !valid_dt(dt) {
             return Err(StageError::BadStep);
         }
+        let run = self.feel.as_mut().map_or(dt, |f| f.advance(dt));
+        let mut fired = Vec::new();
         for e in &mut self.entries {
-            e.player.update(dt);
+            e.player.update(run);
+            for c in e.player.take_cues() {
+                fired.push((e.handle, on_stage(e, c, self.screen_w)));
+            }
         }
+        if let Some(feel) = &mut self.feel {
+            let cues: Vec<TimedCue> = fired.iter().map(|&(_, c)| c).collect();
+            feel.take(&cues);
+        }
+        self.events
+            .extend(fired.into_iter().map(|(handle, c)| StageEvent::Cue {
+                handle,
+                t: c.t,
+                pan: c.pan,
+                cue: c.cue,
+            }));
         let events = &mut self.events;
         self.entries.retain(|e| {
             let done = e.player.done();
@@ -296,7 +356,7 @@ impl<T> Scene<T> {
             }
             !done
         });
-        Ok(())
+        Ok(run)
     }
 
     /// Draw the back layer of every instance, then the front layer of every instance, oldest first, handing
@@ -331,6 +391,34 @@ impl<T> Scene<T> {
         }
         Ok(())
     }
+}
+
+/// Cue `c` of entry `e`, from its player's frame to the stage: its origin moves to where the entry sits, a flip
+/// the host set since it played mirrors it again (rotation is left out), and its pan follows `screen_w`.
+fn on_stage<T>(e: &Entry<T>, mut c: TimedCue, screen_w: f64) -> TimedCue {
+    let origin = e.player.placement();
+    let sx = if e.place.flip == origin.flip {
+        1.0
+    } else {
+        -1.0
+    };
+    let (ax, ay) = (e.at.0 as f64, e.at.1 as f64);
+    let to_x = |x: f64| ax + sx * (x - origin.x);
+    let mut world_x = ax;
+    match &mut c.cue {
+        Cue::Ripple { x, y, .. } => {
+            *x = to_x(*x);
+            *y = ay + (*y - origin.y);
+            world_x = *x;
+        }
+        Cue::Sound { x: Some(x), .. } => {
+            *x = to_x(*x);
+            world_x = *x;
+        }
+        _ => {}
+    }
+    c.pan = (screen_w > 0.0).then(|| clamp(world_x / screen_w * 2.0 - 1.0, -1.0, 1.0));
+    c
 }
 
 /// (`x`, `y`) as a whole game pixel, rounded as JS `Math.round` does; NaN or infinite is an error.

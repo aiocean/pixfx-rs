@@ -11,6 +11,10 @@ use crate::math::clamp;
 
 /// One thing an effect asks the game to do.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "lowercase"))]
+#[cfg_attr(feature = "ts", tsify(missing_as_null))]
 pub enum Cue {
     /// Camera shake, trauma 0..1 (the game squares it and decays it).
     Shake { trauma: f64 },
@@ -40,6 +44,9 @@ pub enum Cue {
 
 /// A cue and when it happens, in seconds of the effect's playback.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "ts", tsify(missing_as_null))]
 pub struct TimedCue {
     pub t: f64,
     pub cue: Cue,

@@ -7,6 +7,8 @@ use crate::math::js_round;
 /// A ring of screen distortion alive now: centred on (`x`, `y`) in the destination frame's pixels, growing from
 /// `r0` to `r1` over `dur` seconds, `age` seconds in.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Ripple {
     pub x: f64,
     pub y: f64,

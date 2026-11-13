@@ -82,6 +82,8 @@ function createHero(canvas, signal) {
     const arena = { left: Math.round((w - span) / 2), right: Math.round((w + span) / 2) };
 
     view.stage = new Stage(canvas, scale);
+    // the fight's own Feel answers every blow; the stage's effects just play the seconds it gives them
+    view.stage.setFeel(false);
     // the night over the whole scene: one fireflies canvas its size, the meadow on the dais (the effect's ground
     // is mid-width, 10 pixels above its canvas's foot)
     if (have.has(DECOR.night)) view.stage.play(DECOR.night, Math.floor(w / 2), ground, { width: w, height: ground + 10 });

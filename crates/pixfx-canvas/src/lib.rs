@@ -4,6 +4,13 @@
 //! A host that draws its own sprites between an effect's layers owns the loop: `update(dt)`, draw its ground,
 //! `drawLayer("back")`, draw its sprites, `drawLayer("front")`. `drawLayer` never clears.
 //!
+//! Game feel: effects fire cues (shake, hit-stop, ripple, flash, sound) on the frame they mean them. The stage
+//! answers them with one [`pixfx_core::Feel`]: a hit-stop freezes every effect for its frames, and `update`
+//! returns the seconds that played so the host freezes its own world with them. Its own loop also moves the
+//! view by the shake and lifts it toward white by the flash; a host that owns the loop reads `shake(strength)`
+//! and `flash()` and applies them to everything it draws. Cues also come out of `events()` as
+//! `{type: "cue", ...}`, for sounds and anything else the host does on them.
+//!
 //! Canvas 2D: each frame clears the canvas (or fills the background), then draws the back layer of every
 //! effect, then the front layer of every effect. Each layer is its colour drawn normally and its light drawn
 //! with `globalCompositeOperation = "lighter"` (additive, saturating), upscaled by an integer scale with
@@ -21,7 +28,7 @@ use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
 use js_sys::Uint8ClampedArray;
-use pixfx_core::{Frame, Layer};
+use pixfx_core::{Feel, Frame, Layer};
 use pixfx_effects::effect;
 use pixfx_wasm::js::{parse, to_js};
 use stage::{Pass, PlacementChange, Scene, color_rgba, light_rgba, live_player, stage_options};
@@ -59,6 +66,7 @@ impl Stage {
                 ctx,
                 scene: Scene::new(nonzero_scale(scale)?),
                 background: None,
+                shake_strength: 1.0,
             })),
             running: None,
         })
@@ -119,7 +127,8 @@ impl Stage {
     }
 
     /// What happened since the last call, oldest first, and empties the queue: `{type: "end", handle}` for
-    /// each effect that finished, faded out after `stop`, or was removed.
+    /// each effect that finished, faded out after `stop`, or was removed; `{type: "cue", handle, t, pan, cue}`
+    /// for each cue an effect fired (`cue.type`: `"shake"`, `"hitstop"`, `"ripple"`, `"flash"` or `"sound"`).
     #[wasm_bindgen(unchecked_return_type = "StageEvent[]")]
     pub fn events(&mut self) -> Result<JsValue, JsError> {
         to_js(&self.renderer.borrow_mut().scene.drain_events())
@@ -169,15 +178,103 @@ impl Stage {
             .map_err(|e| JsError::new(&e))
     }
 
-    /// Advance by `dt` seconds (finite, 0 or more) without drawing, for a host that draws its own sprites
+    /// Let `dt` real seconds (finite, 0 or more) pass without drawing, for a host that draws its own sprites
     /// between the layers: `update(dt)`, draw the ground, `drawLayer("back")`, draw sprites,
-    /// `drawLayer("front")`.
-    pub fn update(&mut self, dt: f64) -> Result<(), JsError> {
+    /// `drawLayer("front")`. Returns the seconds the effects played: none during a hit-stop, a fraction in slow
+    /// motion. Advance the host's own world by it to freeze with them.
+    pub fn update(&mut self, dt: f64) -> Result<f64, JsError> {
+        let mut r = self.renderer.borrow_mut();
+        r.measure();
+        r.scene.update(dt).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Where the view sits this frame, `[dx, dy]` in game pixels: the shake from the trauma the cues and
+    /// `addTrauma` built up. `strength` is the player's setting: 1 as designed, 0 holds the view still.
+    #[wasm_bindgen(unchecked_return_type = "[number, number]")]
+    pub fn shake(&self, strength: f64) -> Vec<i32> {
+        let (x, y) = self
+            .renderer
+            .borrow()
+            .scene
+            .feel()
+            .map_or((0, 0), |f| f.shake(strength));
+        vec![x, y]
+    }
+
+    /// How hard the stage's own loop (`start`, `tick`) shakes the view: 1 as designed (the default), 0 not at
+    /// all, for a player who turns shake off.
+    #[wasm_bindgen(js_name = setShakeStrength)]
+    pub fn set_shake_strength(&mut self, strength: f64) {
+        self.renderer.borrow_mut().shake_strength = if strength > 0.0 { strength } else { 0.0 };
+    }
+
+    /// How shaken the view is, 0 to 1.
+    pub fn trauma(&self) -> f64 {
+        self.renderer
+            .borrow()
+            .scene
+            .feel()
+            .map_or(0.0, Feel::trauma)
+    }
+
+    /// How white the view is lifted, 0 to 1.
+    pub fn flash(&self) -> f64 {
+        self.renderer.borrow().scene.feel().map_or(0.0, Feel::flash)
+    }
+
+    /// The screen ripples alive now: `{x, y, r0, r1, dur, amp, age}` in game pixels and seconds.
+    #[wasm_bindgen(unchecked_return_type = "Ripple[]")]
+    pub fn ripples(&self) -> Result<JsValue, JsError> {
+        to_js(
+            self.renderer
+                .borrow()
+                .scene
+                .feel()
+                .map_or(&[][..], Feel::ripples),
+        )
+    }
+
+    /// Answer cues on the stage (`true`, the default: hit-stops freeze its effects, its own loop shakes and
+    /// flashes), or leave them to the host (`false`: a host with its own answer, fed from the `cue` events; the
+    /// stage plays every second `update` gives it and `shake`, `flash` and `ripples` stay empty).
+    #[wasm_bindgen(js_name = setFeel)]
+    pub fn set_feel(&mut self, on: bool) {
         self.renderer
             .borrow_mut()
             .scene
-            .update(dt)
-            .map_err(|e| JsError::new(&e.to_string()))
+            .set_feel(on.then(Feel::new));
+    }
+
+    /// Play is frozen by a hit-stop now.
+    pub fn frozen(&self) -> bool {
+        self.renderer
+            .borrow()
+            .scene
+            .feel()
+            .is_some_and(Feel::frozen)
+    }
+
+    /// The game's own impact shakes the view: `k` (0 to 1) is added to the trauma.
+    #[wasm_bindgen(js_name = addTrauma)]
+    pub fn add_trauma(&mut self, k: f64) {
+        if let Some(f) = self.renderer.borrow_mut().scene.feel_mut() {
+            f.add_trauma(k);
+        }
+    }
+
+    /// The game's own hit-stop: freeze the effects (and, through `update`'s return, the host) for `secs`
+    /// seconds. Freezes do not add up; the longest wins.
+    pub fn freeze(&mut self, secs: f64) {
+        if let Some(f) = self.renderer.borrow_mut().scene.feel_mut() {
+            f.freeze(secs);
+        }
+    }
+
+    /// Slow motion: play runs at `speed` (0 to 1) of real time for the next `secs` seconds, after any freeze.
+    pub fn slow(&mut self, secs: f64, speed: f64) {
+        if let Some(f) = self.renderer.borrow_mut().scene.feel_mut() {
+            f.slow(secs, speed);
+        }
     }
 
     /// Draw `"back"` or `"front"` of every effect onto the canvas as it is: nothing is cleared (the host owns
@@ -213,10 +310,21 @@ struct Renderer {
     ctx: CanvasRenderingContext2d,
     scene: Scene<Surface>,
     background: Option<String>,
+    /// How hard the own loop shakes the view (1 as designed).
+    shake_strength: f64,
 }
 
 impl Renderer {
+    /// Tell the scene how wide the stage is in game pixels, so cue pans follow where they fire.
+    fn measure(&mut self) {
+        if let Some(canvas) = self.ctx.canvas() {
+            let scale = f64::from(self.scene.scale().get());
+            self.scene.set_screen_w(f64::from(canvas.width()) / scale);
+        }
+    }
+
     fn tick(&mut self, dt: f64) -> Result<(), String> {
+        self.measure();
         self.scene.update(dt).map_err(|e| e.to_string())?;
         let ctx = &self.ctx;
         let canvas = ctx.canvas().ok_or("the 2d context has no canvas")?;
@@ -230,8 +338,28 @@ impl Renderer {
             }
             None => ctx.clear_rect(0.0, 0.0, w, h),
         }
-        self.draw_layer(Layer::Back)?;
-        self.draw_layer(Layer::Front)
+        // the view moves by the shake and lifts toward white by the flash
+        let scale = f64::from(self.scene.scale().get());
+        let feel = self.scene.feel();
+        let (sx, sy) = feel.map_or((0, 0), |f| f.shake(self.shake_strength));
+        let flash = feel.map_or(0.0, Feel::flash);
+        ctx.save();
+        ctx.translate(f64::from(sx) * scale, f64::from(sy) * scale)
+            .map_err(|e| js_message("could not move the view", &e))?;
+        let drawn = self
+            .draw_layer(Layer::Back)
+            .and_then(|()| self.draw_layer(Layer::Front));
+        self.ctx.restore();
+        drawn?;
+        if flash > 0.0 {
+            let ctx = &self.ctx;
+            ctx.save();
+            ctx.set_global_alpha(flash);
+            ctx.set_fill_style_str("#ffffff");
+            ctx.fill_rect(0.0, 0.0, w, h);
+            ctx.restore();
+        }
+        Ok(())
     }
 
     /// One layer of every effect onto the canvas as it stands. Runs inside save/restore so the host's
