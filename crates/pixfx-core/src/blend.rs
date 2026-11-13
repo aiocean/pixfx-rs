@@ -46,7 +46,13 @@ pub fn over_premul(frame: &mut Frame, wx: i32, wy: i32, src: [u8; 4]) {
     let pm = |v: u8| mul_div255(u32::from(v), da);
     let oa = ch(src[3], da);
     let out = |s: u8, v: u8| unpremultiply(ch(s, pm(v)), oa) as u8;
-    *px = Rgba(out(src[0], d.0), out(src[1], d.1), out(src[2], d.2), oa as u8).pack();
+    *px = Rgba(
+        out(src[0], d.0),
+        out(src[1], d.1),
+        out(src[2], d.2),
+        oa as u8,
+    )
+    .pack();
 }
 
 /// An opaque colour `c` at coverage `cover`/256 over a premultiplied pixel (Skia `SkBlendARGB32`): how a canvas
@@ -57,7 +63,8 @@ pub fn cover_over(d: [u8; 4], c: Rgba, cover: i32) -> [u8; 4] {
     }
     let s = cover.max(0) as u32;
     let ds = 256 - ((255 * s) >> 8);
-    let ch = |sv: u8, dv: u8| (((u32::from(sv) * s) >> 8) + ((u32::from(dv) * ds) >> 8)).min(255) as u8;
+    let ch =
+        |sv: u8, dv: u8| (((u32::from(sv) * s) >> 8) + ((u32::from(dv) * ds) >> 8)).min(255) as u8;
     [ch(c.0, d[0]), ch(c.1, d[1]), ch(c.2, d[2]), ch(255, d[3])]
 }
 
@@ -103,7 +110,10 @@ fn unpremultiply(p: u32, a: u32) -> u32 {
 
 /// The colour word at world (`x`, `y`), if it is on the frame.
 fn pixel(frame: &mut Frame, x: i32, y: i32) -> Option<&mut u32> {
-    let (lx, ly) = (i64::from(x) - i64::from(frame.ox), i64::from(y) - i64::from(frame.oy));
+    let (lx, ly) = (
+        i64::from(x) - i64::from(frame.ox),
+        i64::from(y) - i64::from(frame.oy),
+    );
     if lx < 0 || ly < 0 || lx >= i64::from(frame.w) || ly >= i64::from(frame.h) {
         return None;
     }
