@@ -21,7 +21,7 @@ function appearance(f, jolt) {
     act = { how: GATHER[spell.kind] ?? "palm", dive: !!spell.dive, progress, long: spell.windup >= 0.3 };
   }
   return {
-    x: f.x, air: f.air, pose: f.pose, poseT: f.poseT, face: f.face, vx: f.vx, out: f.hp <= 0, flash: f.flash > 0,
+    x: f.x, air: f.air, pose: f.pose, poseT: f.poseT, face: f.face, vx: f.vx, vy: f.vy, out: f.hp <= 0, flash: f.flash > 0, untouchable: f.body.untouchable(),
     frozen: f.frozen > 0, shocked: f.shocked > 0, hitT: f.hitT, hitPower: f.hitPower, dodged: f.dodged, jolt, act,
   };
 }

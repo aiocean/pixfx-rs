@@ -54,21 +54,12 @@ impl Feel {
         self.inner.advance(dt)
     }
 
-    /// Where the screen sits this frame, `[dx, dy]` in game pixels; `rand()` gives numbers in [0, 1).
-    pub fn shake(&self, rand: &Function) -> Result<Vec<i32>, JsError> {
-        let mut failed = None;
-        let mut roll = || match rand.call0(&JsValue::NULL).map(|v| v.as_f64()) {
-            Ok(Some(v)) => v,
-            _ => {
-                failed = Some(());
-                0.0
-            }
-        };
-        let (x, y) = self.inner.shake(&mut roll);
-        match failed {
-            Some(()) => Err(JsError::new("shake: rand() must return a number")),
-            None => Ok(vec![x, y]),
-        }
+    /// Where the screen sits this frame, `[dx, dy]` in game pixels. `strength` is the player's shake setting: 1 as
+    /// designed, 0 holds the screen still.
+    #[wasm_bindgen(unchecked_return_type = "[number, number]")]
+    pub fn shake(&self, strength: f64) -> Vec<i32> {
+        let (x, y) = self.inner.shake(strength);
+        vec![x, y]
     }
 
     /// How far each fighter is jolted off its place: `[[dx, dy], [dx, dy]]`.
@@ -431,7 +422,7 @@ impl Sprites {
 
     /// Fighter `a` in `look` (a preset's name, `"thunder"` or `"frost"`, or a look object as `lookColors` reads
     /// it), its feet on the floor at row `ground` (game pixels). `a`:
-    /// `{x, air, pose, poseT, face, vx, out, flash, frozen, shocked, hitT, hitPower, dodged, jolt: [dx, dy],
+    /// `{x, air, pose, poseT, face, vx, vy, out, flash, untouchable, frozen, shocked, hitT, hitPower, dodged, jolt: [dx, dy],
     /// act: null | {how: "summon"|"palm"|"lunge"|"prayer"|"cross", dive, progress: number|null, long}}`. `marks`:
     /// null, or `{shield, barrier, rang, burning, defDown, silence, chilled, fury, poseT, dome: "banded"|"faceted",
     /// burn, shock, ice, t, seed}`, the last five drawing fire, lightning and frost over the body at time `t`,

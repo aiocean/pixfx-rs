@@ -14,12 +14,14 @@ fn standing(pose: Pose) -> Appearance {
         x: 48.0,
         air: 0.0,
         vx: 0.0,
+        vy: 0.0,
         out: false,
         flash: false,
         frozen: false,
         shocked: false,
         hit_t: 9.0,
         hit_power: 0.0,
+        untouchable: false,
         dodged: 0.0,
         act: None,
         jolt: [0, 0],
@@ -99,4 +101,118 @@ fn only_a_gathering_fighter_spills_a_translucent_aura() {
         },
     );
     assert!(translucent(&gathering) > 200, "an aura round the caster");
+}
+
+#[test]
+fn an_untouchable_fighter_blinks_and_a_touchable_one_does_not() {
+    let look = Look::thunder();
+    let at_t = |untouchable: bool, pose_t: f64| {
+        let a = Appearance {
+            untouchable,
+            pose_t,
+            ..standing(Pose::Idle)
+        };
+        drawn(&look, &a).color
+    };
+    // one fifteenth of a second in, a blink is on its faint beat
+    let beat = 1.5 / 15.0;
+    assert_eq!(
+        at_t(false, beat),
+        at_t(false, beat),
+        "drawing is deterministic"
+    );
+    assert_ne!(
+        at_t(true, beat),
+        at_t(false, beat),
+        "untouchable: faint on the off beat"
+    );
+    assert_eq!(
+        at_t(true, 0.5 / 15.0),
+        at_t(false, 0.5 / 15.0),
+        "untouchable: whole on the on beat"
+    );
+    let out = |untouchable: bool| {
+        let a = Appearance {
+            untouchable,
+            out: true,
+            pose_t: beat,
+            ..standing(Pose::Down)
+        };
+        drawn(&look, &a).color
+    };
+    assert_eq!(
+        out(true),
+        out(false),
+        "a knocked-out fighter does not blink"
+    );
+}
+
+/// The drawn body's top row, bottom row and width, from where it covers the frame.
+fn extent(f: &Frame) -> (u32, u32, u32) {
+    let covered = |x: u32, y: u32| f.color.get((y * f.w + x) as usize).is_some_and(|&c| c != 0);
+    let rows: Vec<u32> = (0..f.h)
+        .filter(|&y| (0..f.w).any(|x| covered(x, y)))
+        .collect();
+    let cols: Vec<u32> = (0..f.w)
+        .filter(|&x| (0..f.h).any(|y| covered(x, y)))
+        .collect();
+    let span = |v: &[u32]| {
+        (
+            v.first().copied().unwrap_or(0),
+            v.last().copied().unwrap_or(0),
+        )
+    };
+    let ((top, bottom), (left, right)) = (span(&rows), span(&cols));
+    (top, bottom, right - left + 1)
+}
+
+#[test]
+fn a_body_stretches_as_it_flies_fast_and_squashes_as_it_lands_feet_on_the_floor() {
+    let look = Look::thunder();
+    let jump = |vy: f64| {
+        extent(&drawn(
+            &look,
+            &Appearance {
+                vy,
+                ..standing(Pose::Jump)
+            },
+        ))
+    };
+    let (slow_top, slow_bottom, slow_w) = jump(0.0);
+    let (fast_top, fast_bottom, fast_w) = jump(220.0);
+    assert!(
+        fast_top < slow_top,
+        "taller when fast: {fast_top} vs {slow_top}"
+    );
+    assert!(
+        fast_w <= slow_w,
+        "no wider when stretched: {fast_w} vs {slow_w}"
+    );
+    assert_eq!(fast_bottom, slow_bottom, "feet stay where they were");
+    assert_eq!(
+        jump(-220.0),
+        (fast_top, fast_bottom, fast_w),
+        "falling stretches as rising does"
+    );
+
+    let land = |pose_t: f64| {
+        extent(&drawn(
+            &look,
+            &Appearance {
+                pose_t,
+                ..standing(Pose::Land)
+            },
+        ))
+    };
+    let (hit_top, hit_bottom, hit_w) = land(0.0);
+    let (after_top, after_bottom, after_w) = land(0.3);
+    assert!(
+        hit_top > after_top,
+        "shorter as it lands: {hit_top} vs {after_top}"
+    );
+    assert!(hit_w > after_w, "wider as it lands: {hit_w} vs {after_w}");
+    assert_eq!(
+        hit_bottom, after_bottom,
+        "the squash keeps its feet on the floor"
+    );
 }

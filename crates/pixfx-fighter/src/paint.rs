@@ -12,7 +12,7 @@ use crate::pose::{Gather, Pose};
 use core::f64::consts::PI;
 use libm::{cos, floor, sin, sqrt};
 use pixfx_core::blend::{cover_over, mul_div255, over_premul, straighten};
-use pixfx_core::math::{js_max, js_min, js_round};
+use pixfx_core::math::{ease, js_max, js_min, js_round};
 use pixfx_core::{Frame, Rgba};
 
 /// Sprite width and height, in pixels.
@@ -102,10 +102,15 @@ pub struct Appearance {
     pub air: f64,
     /// Horizontal speed, pixels a second: cloth streams back from it, a tumble turns its way.
     pub vx: f64,
+    /// Vertical speed, pixels a second: a body rising or falling fast stretches along it.
+    pub vy: f64,
     /// Knocked out: crossed-out eyes, sword dropped, no afterimage.
     pub out: bool,
     /// Drawn white for a hit's flash.
     pub flash: bool,
+    /// Nothing can touch it (on the floor, its grace after getting up, a spent juggle): it blinks, so the player
+    /// sees the protection the body's rules give it.
+    pub untouchable: bool,
     /// Drawn in ice, and still.
     pub frozen: bool,
     /// Flickering with lightning.
@@ -1018,6 +1023,59 @@ fn pivot(pose: Pose) -> Option<i32> {
     }
 }
 
+/// A body moving this fast up or down (a jump's take-off) is stretched all the way.
+const FULL_STRETCH_SPEED: f64 = 220.0;
+/// How tall a body is drawn at most while it flies fast, and at least on the frame it lands.
+const MOST_STRETCH: f64 = 1.15;
+const MOST_SQUASH: f64 = 0.8;
+/// A landing's squash eases back to the body's own shape over this long.
+const SQUASH_TIME: f64 = 0.12;
+
+/// How tall the body is drawn against its own height (its width the inverse, so it keeps its size): stretched along
+/// its flight while it rises or falls fast, squashed as it lands and easing back, itself otherwise. Frozen bodies
+/// and tumbling ones (turned, so their height is not up) keep their shape.
+fn stretch(a: &Appearance) -> f64 {
+    if a.frozen {
+        return 1.0;
+    }
+    match a.pose {
+        Pose::Jump | Pose::Launched | Pose::Fall => {
+            let k = js_min(1.0, a.vy.abs() / FULL_STRETCH_SPEED);
+            1.0 + (MOST_STRETCH - 1.0) * k
+        }
+        Pose::Land => {
+            let k = js_min(1.0, js_max(0.0, a.pose_t / SQUASH_TIME));
+            MOST_SQUASH + (1.0 - MOST_SQUASH) * ease::out_quad(k)
+        }
+        _ => 1.0,
+    }
+}
+
+/// `sprite` drawn `tall` times its height and `1 / tall` its width, in whole pixels (each drawn pixel takes the
+/// nearest painted one), about the feet so it stays on the floor.
+fn deform(sprite: &Sprite, tall: f64) -> Sprite {
+    if tall == 1.0 || !tall.is_finite() || tall <= 0.0 {
+        return sprite.clone();
+    }
+    let mut out = Sprite::default();
+    for y in 0..SPRITE as i32 {
+        let sy = FEET + js_round(f64::from(y - FEET) / tall) as i32;
+        for x in 0..SPRITE as i32 {
+            let sx = CX + js_round(f64::from(x - CX) * tall) as i32;
+            let inside = (0..SPRITE as i32).contains(&sx) && (0..SPRITE as i32).contains(&sy);
+            if !inside {
+                continue;
+            }
+            let from = sprite.px.get(sy as usize * SPRITE + sx as usize).copied();
+            if let (Some(p), Some(slot)) = (from, out.px.get_mut(y as usize * SPRITE + x as usize))
+            {
+                *slot = p;
+            }
+        }
+    }
+    out
+}
+
 /// Quarter turns a tumbling or rolling fighter has made: one every four frames, the way it is moving.
 fn quarter_turns(a: &Appearance) -> i32 {
     if pivot(a.pose).is_none() {
@@ -1039,12 +1097,22 @@ pub fn draw(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64) {
         };
         blit(frame, look, &ghost, ground_y, a.dodged * 1.5);
     }
-    blit(frame, look, a, ground_y, 1.0);
+    blit(frame, look, a, ground_y, untouchable_alpha(a));
+}
+
+/// How strongly a fighter is drawn: whole, or fading in and out every other fifteenth of a second while nothing
+/// can touch it. Faint, not gone, so the pose still reads.
+fn untouchable_alpha(a: &Appearance) -> f64 {
+    if a.untouchable && !a.out && floor(a.pose_t * 15.0) % 2.0 != 0.0 {
+        0.35
+    } else {
+        1.0
+    }
 }
 
 fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f64) {
     let t = a.pose_t;
-    let mut sprite = paint(look, a);
+    let mut sprite = deform(&paint(look, a), stretch(a));
     let windup = a.act.and_then(|k| k.windup);
     let p = windup.map(|w| w.progress);
     let glow = matches!(a.pose, Pose::Channel | Pose::Cast).then_some(look.glow);

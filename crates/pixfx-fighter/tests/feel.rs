@@ -76,14 +76,57 @@ fn a_knockout_plays_out_in_slow_motion_then_the_fight_runs_at_full_speed() {
 fn the_screen_settles_after_a_shake() {
     let mut feel = Feel::new();
     feel.react(&[hit(0, (0.0, false, false), 25.0, 25.0, (0.0, 0.0))]);
-    let most = |feel: &Feel| {
-        let (x, y) = feel.shake(&mut || 0.999);
-        (x.abs(), y.abs())
-    };
-    let (x, y) = most(&feel);
-    assert!(x.max(y) > 0);
+    let mut moved = false;
+    for _ in 0..10 {
+        let (x, y) = feel.shake(1.0);
+        moved |= x != 0 || y != 0;
+        feel.advance(FRAME);
+    }
+    assert!(moved);
     fight_time(&mut feel, 1.0);
-    assert_eq!(most(&feel), (0, 0));
+    assert_eq!(feel.shake(1.0), (0, 0));
+}
+
+#[test]
+fn a_shake_sways_from_frame_to_frame_instead_of_jumping() {
+    let mut feel = Feel::new();
+    feel.react(&[hit(0, (20.0, true, true), 25.0, 25.0, (0.0, 0.0))]);
+    let mut seen = Vec::new();
+    for _ in 0..20 {
+        seen.push(feel.shake(1.0));
+        feel.advance(FRAME);
+    }
+    let reach = seen.iter().map(|&(x, y)| x.abs().max(y.abs())).max();
+    assert!(
+        reach >= Some(2),
+        "a full shake reaches its pixels: {seen:?}"
+    );
+    for w in seen.windows(2) {
+        let [(x0, y0), (x1, y1)] = [w[0], w[1]];
+        // a fresh random spot each frame would jump up to twice the reach
+        assert!(
+            (x1 - x0).abs() <= 2 && (y1 - y0).abs() <= 2,
+            "jumped: {seen:?}"
+        );
+    }
+}
+
+#[test]
+fn the_player_can_turn_the_shake_down_or_off() {
+    let mut feel = Feel::new();
+    feel.react(&[hit(0, (20.0, true, true), 25.0, 25.0, (0.0, 0.0))]);
+    let mut full = 0;
+    let mut half = 0;
+    for _ in 0..30 {
+        let (x, y) = feel.shake(1.0);
+        full = full.max(x.abs().max(y.abs()));
+        let (x, y) = feel.shake(0.5);
+        half = half.max(x.abs().max(y.abs()));
+        assert_eq!(feel.shake(0.0), (0, 0));
+        assert_eq!(feel.shake(f64::NAN), (0, 0));
+        feel.advance(FRAME);
+    }
+    assert!(half < full, "half {half}, full {full}");
 }
 
 #[test]

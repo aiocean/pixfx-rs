@@ -131,7 +131,7 @@ function createHero(canvas, signal) {
     ctx.fillStyle = BACKDROP;
     ctx.fillRect(0, 0, w * scale, h * scale);
     ctx.save();
-    const [sx, sy] = view.feel.shake(Math.random);
+    const [sx, sy] = view.feel.shake(1);
     ctx.translate(sx * scale, sy * scale);
     drawScene(ctx, scene, view.duel.time, scale);
     view.stage.drawLayer("back");

@@ -7,7 +7,7 @@
 
 use pixfx_core::color::Rgba;
 use pixfx_core::frame::Frame;
-use pixfx_core::math::{js_max, js_min, js_round, to_int32};
+use pixfx_core::math::{js_max, js_min, js_round, noise, to_int32};
 use pixfx_core::screen::Ripple;
 
 /// Hit-stop, in frames at 60 a second, the way fighting games and Sakurai's Smash count it: both fighters freeze
@@ -76,6 +76,9 @@ pub struct FeelSpec {
     /// Trauma drains this fast per second; the shake is trauma squared times `shake` game pixels.
     pub trauma_drain: f64,
     pub shake: f64,
+    /// How fast the shake wanders: smooth noise at this many cells a second, so the screen sways from place to
+    /// place instead of jumping to a new random spot each frame.
+    pub shake_rate: f64,
     /// A fighter refusing to fall, a barrier ringing, two spells meeting.
     pub unyielding: Answer,
     pub block: Answer,
@@ -109,6 +112,7 @@ impl Default for FeelSpec {
             crit_trauma: 0.2,
             trauma_drain: 1.6,
             shake: 3.0,
+            shake_rate: 12.0,
             unyielding: Answer {
                 stop: 0.18,
                 trauma: 0.4,
@@ -342,6 +346,8 @@ pub struct Feel {
     tick: u64,
     ripples: Vec<Ripple>,
     flash: f64,
+    /// Real seconds gone by, for the shake's noise.
+    clock: f64,
 }
 
 fn hit_stop(stop: &Stop, power: f64, launch: bool, crit: bool, ranged: bool) -> f64 {
@@ -402,7 +408,9 @@ impl Feel {
         for c in cues {
             match c.cue {
                 Fx::Shake { trauma } => self.trauma = js_min(1.0, self.trauma + trauma),
-                Fx::Hitstop { dur } => self.stop = js_max(self.stop, js_min(self.spec.stop.cap / 60.0, dur)),
+                Fx::Hitstop { dur } => {
+                    self.stop = js_max(self.stop, js_min(self.spec.stop.cap / 60.0, dur))
+                }
                 Fx::Ripple {
                     x,
                     y,
@@ -550,6 +558,7 @@ impl Feel {
     /// Let `dt` real seconds pass. Returns how many seconds the fight should run for it: none during a hit-stop, a
     /// fraction in a knockout's slow motion.
     pub fn advance(&mut self, dt: f64) -> f64 {
+        self.clock += dt;
         self.trauma = js_max(0.0, self.trauma - self.spec.trauma_drain * dt);
         self.dusk = js_max(0.0, self.dusk - dt);
         // the screen's own clock: ripples and flash run on through a hit-stop
@@ -594,11 +603,15 @@ impl Feel {
         dt
     }
 
-    /// Where the screen sits this frame, in whole game pixels; `roll` gives numbers in [0, 1), x first.
-    pub fn shake(&self, roll: &mut dyn FnMut() -> f64) -> (i32, i32) {
-        let a = self.trauma * self.trauma * self.spec.shake;
-        let x = to_int32(js_round((roll() * 2.0 - 1.0) * a));
-        let y = to_int32(js_round((roll() * 2.0 - 1.0) * a));
+    /// Where the screen sits this frame, in whole game pixels: trauma squared times smooth noise over real time.
+    /// `strength` scales it for the player's setting: 1 as designed, 0 (or anything not above 0) holds the screen
+    /// still.
+    pub fn shake(&self, strength: f64) -> (i32, i32) {
+        let strength = if strength > 0.0 { strength } else { 0.0 };
+        let a = self.trauma * self.trauma * self.spec.shake * strength;
+        let t = self.clock * self.spec.shake_rate;
+        let x = to_int32(js_round(noise(t, 1.0) * a));
+        let y = to_int32(js_round(noise(t, 2.0) * a));
         (x, y)
     }
 
