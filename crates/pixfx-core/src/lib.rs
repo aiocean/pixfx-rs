@@ -9,11 +9,13 @@ pub mod cue;
 pub mod effect;
 pub mod feel;
 pub mod frame;
+pub mod key;
 pub mod math;
 pub mod outline;
 pub mod painter;
 pub mod palette;
 pub mod particles;
+pub mod player;
 pub mod render;
 pub mod screen;
 pub mod shapes;
@@ -30,9 +32,11 @@ pub use effect::{
 };
 pub use feel::{Feel, FeelSpec};
 pub use frame::{Frame, composite, composite_px, frame_hash};
+pub use key::{ClipKey, FrameId};
 pub use math::{Rng, rand};
 pub use outline::{Outline, OutlineError, Ring};
 pub use painter::Painter;
+pub use player::Player;
 pub use render::{Rendered, edge_fade, render_frames};
 pub use screen::{Ripple, flash, ripple};
 pub use sim::{

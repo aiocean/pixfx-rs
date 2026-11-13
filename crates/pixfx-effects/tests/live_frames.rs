@@ -78,3 +78,95 @@ fn live_play_draws_the_rendered_frame_for_its_clock() -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Two players of one effect with equal options show the same frame id whenever their clocks are on the same
+/// frame, and then draw byte-equal frames; a stopped player shows no shared frame.
+#[test]
+fn players_on_the_same_frame_id_draw_the_same_frame() -> Result<(), String> {
+    use pixfx_core::Player;
+    for &fx in EFFECTS {
+        let opts = Options::default();
+        let margin = fx.meta().glow_margin();
+        let (mut a, mut b) = (
+            Player::new(fx, opts.clone(), margin),
+            Player::new(fx, opts.clone(), margin),
+        );
+        let place = a.placement();
+        // b reaches the same clock by another road: a loop one whole loop ahead (it comes round to the same
+        // frame), and every step split in three
+        if fx.meta().looping {
+            let mut left = fx.meta().duration;
+            while left > 0.0 {
+                let dt = left.min(0.2);
+                b.update(dt);
+                left -= dt;
+            }
+        }
+        let mut agreed = 0;
+        for dt in host_steps(120) {
+            a.update(dt);
+            for _ in 0..3 {
+                b.update(dt / 3.0);
+            }
+            let (ia, ib) = (a.shown(place), b.shown(place));
+            if ia.is_none() || ia != ib {
+                continue;
+            }
+            a.draw(Layer::Both, place);
+            b.draw(Layer::Both, place);
+            if a.frame() != b.frame() {
+                return Err(format!("{}: same frame id, different pixels", fx.meta().id));
+            }
+            agreed += 1;
+        }
+        if agreed == 0 && fx.meta().looping {
+            return Err(format!(
+                "{}: the two players never met on a frame",
+                fx.meta().id
+            ));
+        }
+        a.stop();
+        if a.shown(place).is_some() {
+            return Err(format!(
+                "{}: a stopped player still shows a shared frame",
+                fx.meta().id
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// What a player draws, fading or not, changes only when its clock frame does: drawing twice within one clock
+/// frame gives the same pixels, so a host need not redraw on every display refresh.
+#[test]
+fn drawing_changes_only_with_the_clock_frame() -> Result<(), String> {
+    use pixfx_core::Player;
+    for &fx in EFFECTS {
+        let mut p = Player::new(fx, Options::default(), fx.meta().glow_margin());
+        let place = p.placement();
+        p.update(0.2);
+        p.stop();
+        for _ in 0..12 {
+            // a step that ends early in a frame, then one that stays inside it
+            p.update(1.0 / 90.0);
+            if p.done() {
+                break;
+            }
+            let before = p.clock_frame();
+            p.draw(Layer::Both, place);
+            let first = p.frame().clone();
+            p.update(1e-4);
+            if p.clock_frame() != before {
+                continue;
+            }
+            p.draw(Layer::Both, place);
+            if *p.frame() != first {
+                return Err(format!(
+                    "{}: redrawn within one clock frame, pixels changed",
+                    fx.meta().id
+                ));
+            }
+        }
+    }
+    Ok(())
+}

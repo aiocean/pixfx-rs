@@ -1,19 +1,21 @@
-//! One effect playing on its own canvas, in plain Rust: what [`crate::Fx`] wraps for JS and what other Rust
-//! crates (a canvas renderer) use directly.
+//! One effect playing on its own canvas: what every host plays through (the wasm `Fx`, the canvas stage, gpui).
 
-use pixfx_core::{
-    Canvas, Effect, Frame, Instance, Layer, Meta, Options, Placement, TimedCue, composite,
-    edge_fade,
-};
+use crate::cue::TimedCue;
+use crate::effect::{Canvas, Effect, Instance, Layer, Meta, Options, Placement};
+use crate::frame::{Frame, composite};
+use crate::key::{ClipKey, FrameId};
+use crate::render::edge_fade;
 
 /// An effect instance and the canvas it draws into: the instance's canvas ([`Effect::canvas`]: `meta.size`
 /// unless its options size it) plus `margin` empty pixels on every side, with the effect's origin at the
 /// canvas origin plus `margin`. While its clock is on frame k ([`Player::frame_index`]), `draw(Layer::Both)`
-/// leaves the frame equal to [`pixfx_core::render_frames`] frame k at the same margin, whatever steps the clock
+/// leaves the frame equal to [`crate::render_frames`] frame k at the same margin, whatever steps the clock
 /// took: margin 0 eases light out at the canvas edge (as the sprite sheet does), a margin leaves room for glow
 /// that spills past the canvas and fades nothing.
 pub struct Player {
     inst: Instance,
+    /// The options the instance was spawned with (its origin on this player's frame): part of its frames' key.
+    opts: Options,
     meta: &'static Meta,
     canvas: Canvas,
     margin: u32,
@@ -36,7 +38,8 @@ impl Player {
         // the frame's top-left sits `margin` up and left of the effect canvas's, as in `render_frames`
         let corner = -(margin as i32);
         Self {
-            inst: Instance::new(effect, at_origin),
+            inst: Instance::new(effect, at_origin.clone()),
+            opts: at_origin,
             meta,
             canvas,
             margin,
@@ -84,6 +87,24 @@ impl Player {
         self.inst.frame()
     }
 
+    /// Frames of `1 / fps` its clock has passed ([`Instance::clock_frame`]): what it draws changes only when this
+    /// does (or the placement does), so a host redraws on a change and not on every display refresh.
+    pub fn clock_frame(&self) -> u64 {
+        self.inst.clock_frame()
+    }
+
+    /// The frame `draw(_, place)` would draw now, or none while the effect fades out after [`Player::stop`] (a
+    /// fade frame is its own). Players showing the same [`FrameId`] draw byte-equal frames.
+    pub fn shown(&self, place: Placement) -> Option<FrameId> {
+        if self.inst.stopped() {
+            return None;
+        }
+        Some(FrameId {
+            key: ClipKey::new(self.meta.id, &self.opts, self.margin, place),
+            index: self.inst.frame(),
+        })
+    }
+
     /// Seconds since the instance started.
     pub fn t(&self) -> f64 {
         self.inst.t()
@@ -97,7 +118,7 @@ impl Player {
 
     /// Clear the frame and draw `layer` at the current time, placed as `place` says (`x`/`y` in this player's
     /// frame). With margin 0, light is eased out at the canvas edge unless the effect is full-screen (as
-    /// [`pixfx_core::render_frames`] does).
+    /// [`crate::render_frames`] does).
     pub fn draw(&mut self, layer: Layer, place: Placement) {
         self.frame.clear();
         self.inst.draw(&mut self.frame, layer, place);

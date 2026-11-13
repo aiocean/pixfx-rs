@@ -558,9 +558,12 @@ impl Instance {
         let meta = self.effect.meta();
         let mut p = Painter::new(frame);
         p.place(place.x, place.y, place.flip, place.angle);
+        // the fade follows the clock snapped down to its frame, so it changes once a frame like everything else
+        // drawn and does not depend on when the host draws
+        let shown_t = self.clock_frame() as f64 / f64::from(meta.fps);
         p.fade = match self.stop_at {
             None => 1.0,
-            Some(s) => clamp(1.0 - (self.t - s) / FADE, 0.0, 1.0),
+            Some(s) => clamp(1.0 - (shown_t - s) / FADE, 0.0, 1.0),
         };
         p.light_k = place.light;
         let t = if meta.looping {
@@ -581,6 +584,17 @@ impl Instance {
         if self.stop_at.is_none() {
             self.stop_at = Some(self.t);
         }
+    }
+
+    /// Frames of `1 / fps` the clock has passed, unwrapped: it changes exactly when anything drawn can change
+    /// (the frame, or the fade after [`Instance::stop`]). A host redraws when it changes.
+    pub fn clock_frame(&self) -> u64 {
+        libm::floor(self.t * f64::from(self.effect.meta().fps) + FRAME_SLACK) as u64
+    }
+
+    /// Whether [`Instance::stop`] was called: from then on it fades out.
+    pub fn stopped(&self) -> bool {
+        self.stop_at.is_some()
     }
 
     pub fn done(&self) -> bool {
