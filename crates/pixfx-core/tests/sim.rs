@@ -287,3 +287,27 @@ fn draw_where_draws_the_system_minus_the_dropped_particles() {
         );
     }
 }
+
+#[test]
+fn set_time_moves_the_twinkle_of_a_drawn_star() {
+    use pixfx_core::Layer;
+    use pixfx_core::Rng;
+    use pixfx_core::color::WHITE;
+    use pixfx_core::sim::{Kind, Particles, ParticlesOpts, Spawn};
+
+    let star_at = |t: f64| {
+        let mut ps = Particles::new(ParticlesOpts::default());
+        ps.spawn(
+            &mut Rng::new(1),
+            Spawn {
+                size: 0.5,
+                col: Some(WHITE),
+                ..Spawn::new(Kind::Star, 0.0, -30.0, 0.0, 0.0, 1.0)
+            },
+        );
+        ps.set_time(t);
+        draw(|p| ps.draw(p, Layer::Both))
+    };
+    assert_eq!(star_at(0.37), star_at(0.37));
+    assert_ne!(star_at(0.0), star_at(0.37));
+}
