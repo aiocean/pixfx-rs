@@ -56,13 +56,19 @@ fn freeze_holds_time() {
 
 #[test]
 fn phases_change_at_bounds() {
-    let mut p = Performance::new(act(0.2, 0.3, vec![], vec![]), 0.5);
+    let mut p = Performance::new(act(0.25, 0.25, vec![], vec![]), 0.5);
     assert_eq!(p.phase(), Phase::Windup);
-    p.step(0.25);
+    p.step(0.125);
+    assert_eq!(p.phase(), Phase::Windup);
+    p.step(0.125); // t = 0 exactly
     assert_eq!(p.phase(), Phase::Strike);
-    p.step(0.45);
+    p.step(0.375);
+    assert_eq!(p.phase(), Phase::Strike);
+    p.step(0.125); // t = duration exactly
     assert_eq!(p.phase(), Phase::Recover);
-    p.step(0.3);
+    p.step(0.125);
+    assert_eq!(p.phase(), Phase::Recover);
+    p.step(0.125); // t = duration + recovery exactly
     assert_eq!(p.phase(), Phase::Done);
 }
 

@@ -19,7 +19,7 @@ pub struct Contact {
     /// How hard a target is pushed back; 0 when the blow does not move a target.
     pub push: f64,
     /// The index (0, 1, ...) of the only target it hits; every target when `None`.
-    pub at: Option<f64>,
+    pub at: Option<usize>,
 }
 
 /// A puff of dust kicked up at the feet.
@@ -66,7 +66,8 @@ pub enum ActEvent {
 }
 
 /// An act playing: a clock from the wind-up through the effect to the recovery, held still during a contact's
-/// freeze.
+/// freeze. The consumer owns the shake: [`Contact::shake`] and [`Contact::amp`] are data for the host's `Feel`;
+/// a performance only reports the contact.
 #[derive(Clone, Debug)]
 pub struct Performance {
     act: Act,
