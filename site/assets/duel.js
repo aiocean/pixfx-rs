@@ -15,12 +15,12 @@ const CHEST = 20;
 const HALF_WIDTH = 6;
 
 const WALK = 52;
-const JUMP_SPEED = 200;
+const JUMP_SPEED = 220;
 const GRAVITY = 520;
 /** Near the top of an arc gravity eases, so a jump hangs a moment before it falls (the apex hang). */
 const APEX = { speed: 45, gravity: 0.45 };
 /** Flying: how fast a fighter climbs or sinks toward the height it wants, the highest it goes, and its qi cost. */
-const FLY = { rate: 7, max: 140, top: 64, cost: 5 };
+const FLY = { rate: 7, max: 160, top: 96, cost: 3 };
 /** A blow this strong or stronger throws the target up into the air. */
 const LAUNCH = { damage: 12, speed: 130, perDamage: 5 };
 /** Rage is a small whole-number pool: a point for each blow landed; when full, the school's ultimate. */
@@ -52,7 +52,7 @@ const WARD = { share: 0.18, time: 6 };
  * harder, shields itself, and every spell it casts charges its rage (attuned).
  */
 export const STATS = {
-  thunder: { hp: 2500, atk: 330, pdef: 130, mdef: 110, crit: 0.18, critDamage: 1.6, dodge: 0.05, fury: true, unyielding: true, attuned: false },
+  thunder: { hp: 2700, atk: 345, pdef: 130, mdef: 110, crit: 0.18, critDamage: 1.6, dodge: 0.05, fury: true, unyielding: true, attuned: false },
   frost: { hp: 2450, atk: 370, pdef: 105, mdef: 165, crit: 0.15, critDamage: 1.7, dodge: 0.11, fury: false, unyielding: false, attuned: true },
 };
 
@@ -70,9 +70,9 @@ const STAGGER = 0.38;
 const GUARD_COST = 8;
 /** The share of a blocked blow's damage that still lands. */
 const CHIP = 0.15;
-const KNOCKBACK = 70;
-/** How close two bodies can stand: the space each one takes up, and a pixel between. */
-const PERSONAL = 2 * HALF_WIDTH + 2;
+const KNOCKBACK = 130;
+/** How close two bodies can stand: the space each one takes up, and a little room between. */
+const PERSONAL = 2 * HALF_WIDTH + 6;
 const ROUND_PAUSE = 3.2;
 
 const CAST_CIRCLE = "arcane/rune-circle";
@@ -84,16 +84,16 @@ const CLASH = "impacts/parry";
  * is left out of the fight (slash and block need none).
  */
 export const SPELLS = {
-  slash: { kind: "melee", type: "physical", cost: 0, windup: 0.2, recover: 0.32, cooldown: 0.7, range: 20, damage: 6 },
+  slash: { kind: "melee", type: "physical", cost: 0, windup: 0.2, recover: 0.32, cooldown: 0.7, range: 24, damage: 6 },
   // Thunder: a flash of lightning that carries the body through the foe and out the other side
   step: { kind: "dash", type: "physical", fx: "spawn/poof", cost: 16, windup: 0.26, recover: 0.32, cooldown: 3.4, distance: 72, damage: 11 },
   // Thunder: a gold seal opens on the ground under the foe, and a thunderclap bursts from it
   seal: {
     kind: "zone", type: "magic", fx: "explosions/plasma-explosion", cost: 20, windup: 0.3, recover: 0.3, cooldown: 2.4,
-    sigil: 0.4, impact: 0.08, radius: 16, damage: 14, notice: 0, height: CHEST, shock: true,
+    sigil: 0.4, impact: 0.08, radius: 16, damage: 16, notice: 0, height: CHEST, shock: true,
   },
   // Frost: a lotus of ice shards blooms from the palm at close range, and cracks the foe's guard
-  lotus: { kind: "blast", type: "magic", fx: "holy/feather-burst", cost: 16, windup: 0.3, recover: 0.3, cooldown: 2.2, range: 34, damage: 13, defDown: 3 },
+  lotus: { kind: "blast", type: "magic", fx: "holy/feather-burst", cost: 16, windup: 0.3, recover: 0.3, cooldown: 2.2, range: 40, damage: 13, defDown: 3 },
   // Frost: a pale fire that does not warm, lit under the foe; it burns whoever stands in it
   frostfire: {
     kind: "void", type: "magic", fx: "fire/spirit-flame", cost: 22, windup: 0.4, recover: 0.3, cooldown: 5,
@@ -105,7 +105,7 @@ export const SPELLS = {
     sigil: 0.35, impact: 0.08, radius: 16, damage: 18, notice: 0, height: CHEST, freeze: 0.6,
   },
   // from above: drop onto the foe sword first, and crack the ground if it lands there
-  dive: { kind: "melee", type: "physical", dive: true, cost: 8, windup: 0.22, recover: 0.4, cooldown: 1.6, range: 22, damage: 13, speed: 260, slamFx: "explosions/dirt-explosion" },
+  dive: { kind: "melee", type: "physical", dive: true, cost: 8, windup: 0.22, recover: 0.4, cooldown: 1.6, range: 26, damage: 13, speed: 260, slamFx: "explosions/dirt-explosion" },
   bolt: { kind: "bolt", type: "magic", fx: "projectiles/laser-bolt", cost: 12, windup: 0.28, recover: 0.22, cooldown: 1.3, speed: 230, damage: 9, shock: true },
   orb: {
     kind: "orb", type: "magic", fx: "lightning/ball-lightning", hitFx: "explosions/plasma-explosion", burn: true,
@@ -120,7 +120,7 @@ export const SPELLS = {
     impact: 1.02, radius: 18, damage: 18, notice: 0.15, height: CHEST, pull: 60, reach: 52, pullUntil: 0.8,
   },
   // a thunderclap from the open palm, at arm's length
-  palm: { kind: "blast", type: "physical", stealRage: 1, fx: "explosions/plasma-explosion", cost: 18, windup: 0.32, recover: 0.35, cooldown: 2.8, range: 30, damage: 14, shock: true },
+  palm: { kind: "blast", type: "physical", stealRage: 1, fx: "explosions/plasma-explosion", cost: 18, windup: 0.32, recover: 0.35, cooldown: 2.8, range: 38, damage: 14, shock: true },
   // ultimates, cast with full rage. Thunder: three thunderclaps fall one after another where the foe will be.
   tribulation: {
     kind: "zone", type: "magic", fx: "explosions/plasma-explosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
@@ -148,7 +148,7 @@ export const SPELLS = {
  */
 export const SCHOOLS = {
   thunder: {
-    name: "Thunder", spells: ["slash", "dive", "palm", "step", "seal", "bolt", "orb", "blink", "heal", "tribulation"], range: 52, aggression: 1.15, sky: 0,
+    name: "Thunder", spells: ["slash", "dive", "palm", "step", "seal", "bolt", "orb", "blink", "heal", "tribulation"], range: 64, aggression: 1.15, sky: 22,
     bolt: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#ffe98a", "#fff6c4", "#ffffff"],
     circle: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"],
     // every effect a Thunder spell plays is drawn in gold and white, so it is plain whose it is
@@ -163,7 +163,7 @@ export const SCHOOLS = {
     },
   },
   frost: {
-    name: "Frost", spells: ["slash", "dive", "lotus", "collapse", "shatter", "frostfire", "bolt", "icicle", "void", "blink", "ward", "prison"], range: 84, aggression: 1.1, sky: 26,
+    name: "Frost", spells: ["slash", "dive", "lotus", "collapse", "shatter", "frostfire", "bolt", "icicle", "void", "blink", "ward", "prison"], range: 100, aggression: 1.1, sky: 48,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
     // every effect a Frost spell plays is drawn in ice blue and white
@@ -202,8 +202,9 @@ function random(seed) {
  * A new duel in the arena from `left` to `right` (game pixels), standing on `ground`. `has(id)` says whether an
  * effect is in the registry.
  */
-export function createDuel({ seed = 1, left, right, ground, has }) {
-  const duel = { seed, rng: random(seed), left, right, ground, has, time: 0, round: 0, wins: [0, 0], key: 0, shots: [], pause: 0, out: [] };
+export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top }) {
+  // `sky`: how high above the ground a fighter may fly, below whatever hangs over the arena
+  const duel = { seed, rng: random(seed), left, right, ground, has, top: Math.min(FLY.top, sky), time: 0, round: 0, wins: [0, 0], key: 0, shots: [], pause: 0, out: [] };
   const usable = (name) => {
     const fx = SPELLS[name].fx;
     return !fx || has(fx);
@@ -335,7 +336,7 @@ function body(duel, me, foe, dt) {
     me.vy = -SPELLS.dive.speed;
   } else if (me.fly) {
     me.vy = clamp((me.hover - me.air) * FLY.rate, -FLY.max, FLY.max);
-    me.air = clamp(me.air + me.vy * dt, 0, FLY.top);
+    me.air = clamp(me.air + me.vy * dt, 0, duel.top);
   } else if (me.air > 0 || me.vy > 0) {
     const g = Math.abs(me.vy) < APEX.speed ? GRAVITY * APEX.gravity : GRAVITY;
     const falling = -me.vy;
@@ -527,7 +528,7 @@ function hurt(duel, f, power, dir, spell) {
   if (by.stats.fury) by.fury = Math.min(FURY.max, by.fury + 1);
   f.flash = 0.18;
   f.stun = STAGGER;
-  f.vx += dir * KNOCKBACK * (power >= LAUNCH.damage ? 1.6 : 1);
+  f.vx += dir * KNOCKBACK * (power >= LAUNCH.damage ? 1.7 : 1);
   f.fly = false;
   // a heavy blow throws it up, where it can be hit again before it lands
   if (power >= LAUNCH.damage) f.vy = Math.max(f.vy, LAUNCH.speed + power * LAUNCH.perDamage);
@@ -837,7 +838,7 @@ function dangers(duel, me) {
       // on the sword: rise over it, or sink under it
       if (me.qi > 12 && tti > 0.15) {
         const over = s.y + 4;
-        if (over < FLY.top) out.push({ spell: "fly", hover: over, score: urgency * 1.15 });
+        if (over < duel.top) out.push({ spell: "fly", hover: over, score: urgency * 1.15 });
         if (me.fly && s.y > BODY + 2) out.push({ spell: "fly", hover: 0, score: urgency * 1.1 });
       }
       if (ready(me, "bolt") && tti > 0.3) out.push({ spell: "bolt", target: null, score: urgency * 0.9 });
@@ -980,7 +981,7 @@ function positions(duel, me, foe) {
   const has = (...kinds) => me.spells.some((name) => kinds.includes(SPELLS[name].kind));
   // and with too little qi to cast, it closes in to use the sword
   const casting = me.qi >= 25;
-  const range = casting && has("bolt", "orb", "zone", "void") ? SCHOOLS[me.school].range : casting && has("blast", "dash") ? 26 : SPELLS.slash.range - 4;
+  const range = casting && has("bolt", "orb", "zone", "void") ? SCHOOLS[me.school].range : casting && has("blast", "dash") ? 34 : SPELLS.slash.range - 4;
   const off = Math.abs(d) - range;
   const out = [{ spell: "wait", score: 0.4 }];
   // inside the foe's sword reach with no blade of my own ready: get out of it
@@ -1003,9 +1004,11 @@ function positions(duel, me, foe) {
   }
   // the height I want: my school's while I have the qi, the foe's when I must close in with a blade
   let want = me.qi > 40 && has("bolt", "orb", "zone", "void") ? SCHOOLS[me.school].sky : 0;
-  if (!casting || Math.abs(d) < 40) want = foe.air > 16 && me.qi > 20 ? Math.min(FLY.top, foe.air) : want;
+  if (!casting || Math.abs(d) < 40) want = foe.air > 16 && me.qi > 20 ? Math.min(duel.top, foe.air) : want;
   const flying = me.fly ? me.hover : 0;
-  if (Math.abs(flying - want) > 8) out.push({ spell: "fly", hover: want, score: 0.9 });
+  if (Math.abs(flying - want) > 8) out.push({ spell: "fly", hover: want, score: 1.2 });
+  // light on its feet: on the ground and out of reach, it bounds about rather than walking flat
+  if (me.air === 0 && !me.fly && Math.abs(d) > SPELLS.slash.range + 10 && duel.rng() < 0.5) out.push({ spell: "jump", score: 1.3 });
   const threatened = duel.shots.some((s) => s.owner !== me.index);
   if (me.qi < 45 && Math.abs(d) > 70 && !threatened && !foe.act && me.air === 0 && !me.fly) out.push({ spell: "meditate", score: 2.2 - me.qi / 40 });
   return out;

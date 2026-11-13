@@ -117,11 +117,13 @@ function createHero(canvas, signal) {
     // a brazier at each end of the arena lights it
     if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
     view.feel = createFeel();
-    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id) });
     // the bars go just under the page's top bar, which lies over the hero
     // (its links can wrap past its own box on a narrow screen, so measure what is in it)
     const topbar = Math.max(0, ...[...document.querySelectorAll(".topbar, .topbar *")].map((el) => el.getBoundingClientRect().bottom));
     const barTop = Math.max(6, Math.ceil((topbar - rect.top) / scale) + 6);
+    // fighters fly no higher than keeps their heads (about 44 pixels tall) under the bars
+    const sky = ground - (barTop + BARS_TALL + 13) - 46;
+    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky });
     view.layout = { scale, w, h, ground, barTop, scene: createScene(w, h, ground, barTop + BARS_TALL) };
     // a still frame shows the fight under way
     if (reduceMotion) {

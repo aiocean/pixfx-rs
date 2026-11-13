@@ -285,7 +285,7 @@ describe("duel", () => {
     expect(strike.x).toBe(140);
     expect((strike.i - mark.i) / 60).toBeCloseTo(SPELLS.seal.sigil, 1);
   });
-  test("two fighters on the ground never stand inside each other", () => {
+  test("two fighters on the ground keep a little room between them", () => {
     for (const seed of [1, 2, 3, 4, 5]) {
       const duel = arena(seed);
       const [a, b] = duel.fighters;
@@ -297,7 +297,7 @@ describe("duel", () => {
         step(duel, 1 / 60);
         if (duel.winner === null && Math.abs(a.air - b.air) < 20) closest = Math.min(closest, Math.abs(a.x - b.x));
       }
-      expect(closest).toBeGreaterThanOrEqual(12);
+      expect(closest).toBeGreaterThanOrEqual(16);
     }
   });
 });
