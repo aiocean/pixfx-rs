@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod color;
+pub mod cue;
 pub mod effect;
 pub mod frame;
 pub mod math;
@@ -13,6 +14,7 @@ pub mod shapes;
 pub mod sim;
 
 pub use color::{ColorError, Rgba, hex};
+pub use cue::{Cue, TimedCue, cues_between, cues_of};
 pub use effect::{Effect, EffectState, Instance, Layer, Meta, OptValue, Options, find, valid_dt};
 pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};

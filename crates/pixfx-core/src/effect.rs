@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 
 use crate::color::{Rgba, fit};
+use crate::cue::{TimedCue, cues_between, cues_of};
 use crate::frame::Frame;
 use crate::math::{clamp, js_max, js_min};
 use crate::painter::Painter;
@@ -73,6 +74,10 @@ pub trait Effect: Send + Sync {
     /// Fresh state for one instance (pixelfx `create(opts)`; a draw-only module returns state holding just
     /// its resolved options). `seed` is the caller's seed or [`Meta::seed`].
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState>;
+    /// The game-feel cues this effect fires, in its own space and time (pixelfx `cues(o)`); none by default.
+    fn cues(&self, _opts: &Options) -> Vec<TimedCue> {
+        Vec::new()
+    }
 }
 
 /// One instance's state.
@@ -183,19 +188,36 @@ pub struct Instance {
     opts: Options,
     t: f64,
     stop_at: Option<f64>,
+    cues: Vec<TimedCue>,
+    fired: Vec<TimedCue>,
+    screen_w: f64,
 }
 
 impl Instance {
     pub fn new(effect: &'static dyn Effect, opts: Options) -> Self {
         let seed = opts.seed.unwrap_or(effect.meta().seed);
         let state = effect.spawn(&opts, seed);
+        let cues = cues_of(effect, &opts);
         Self {
             effect,
             state,
             opts,
             t: 0.0,
             stop_at: None,
+            cues,
+            fired: Vec::new(),
+            screen_w: 0.0,
         }
+    }
+
+    /// The screen width that sets the stereo pan of fired cues; 0 (the default) leaves them without pan.
+    pub fn set_screen_w(&mut self, screen_w: f64) {
+        self.screen_w = screen_w;
+    }
+
+    /// The cues playback has passed since the last call, in world space and time order; clears them.
+    pub fn take_cues(&mut self) -> Vec<TimedCue> {
+        std::mem::take(&mut self.fired)
     }
 
     /// Advance by `dt` seconds, at most [`MAX_DT`]. A step that fails [`valid_dt`] (NaN, infinite or
@@ -203,8 +225,20 @@ impl Instance {
     /// backwards. Shells that report such a step to their caller check [`valid_dt`] themselves first.
     pub fn update(&mut self, dt: f64) {
         if valid_dt(dt) {
-            self.advance(js_min(dt, MAX_DT));
+            let dt = js_min(dt, MAX_DT);
+            if self.stop_at.is_none() {
+                self.fire_cues(self.t, self.t + dt);
+            }
+            self.advance(dt);
         }
+    }
+
+    /// Record the cues in `(t0, t1]`; a cue at time 0 fires on the first update (pixelfx `fire`).
+    fn fire_cues(&mut self, t0: f64, t1: f64) {
+        let from = if t0 == 0.0 { -1e-9 } else { t0 };
+        let meta = self.effect.meta();
+        let hit = cues_between(&self.cues, from, t1, meta, &self.opts, self.screen_w);
+        self.fired.extend(hit);
     }
 
     /// Advance by `dt` seconds in `max(1, ceil(dt * 120 - 1e-9))` equal sub-steps (pixelfx `update`).
