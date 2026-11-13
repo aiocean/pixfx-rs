@@ -1,11 +1,14 @@
 //! Shared by the screen transitions: a 320 x 180 screen with its origin at the top-left. Each one covers the
 //! screen in `color` by about 45% of its duration, holds, then uncovers so the last frame is empty.
 //!
-//! Port of pixelfx `src/fx/transitions/_lib.js`: the helpers burn-away uses (`W`, `H`, `screenMeta`, `clipTo`,
-//! `rect`, `field`, `pixels`, `lifeLeft`).
+//! Port of pixelfx `src/fx/transitions/_lib.js`: the helpers the transitions use (`W`, `H`, `screenMeta`,
+//! `clipTo`, `rect`, `field`, `pixels`, `lifeLeft`, `glint`).
+//!
+//! `glint` is adapted from Sprite Fusion's open-source sparkle (https://www.spritefusion.com/pixel-art-vfx/sparkle),
+//! MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::Rgba;
-use pixfx_core::math::{clamp, js_min};
+use pixfx_core::color::{Rgba, WHITE};
+use pixfx_core::math::{TAU, clamp, js_min};
 use pixfx_core::{Meta, Painter};
 
 pub const W: usize = 320;
@@ -186,4 +189,47 @@ impl Pixels<'_, '_> {
 /// Particle lives cut so nothing outlives the effect: the smaller of life and what's left before `end`.
 pub fn life_left(life: f64, t: f64, end: f64) -> f64 {
     js_min(life, end - t)
+}
+
+/// A spinning 8-ray glint at (x, y): long rays white at the heart, `c1` in the middle and `c2` at the tips,
+/// short diagonals, the long rays thickened near the heart, and two lights. `ang` spins it; `a` fades it
+/// (dithered).
+#[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
+pub fn glint(p: &mut Painter, x: f64, y: f64, len: f64, ang: f64, c1: Rgba, c2: Rgba, a: f64) {
+    if len < 0.8 || a <= 0.0 {
+        return;
+    }
+    for i in 0..8 {
+        let diag = i % 2 == 1;
+        let an = ang + (f64::from(i) * TAU) / 8.0;
+        let l = if diag { len * 0.42 } else { len };
+        let (ca, sa) = (libm::cos(an), libm::sin(an));
+        let mut d = 0.0;
+        while d <= l {
+            let u = d / l;
+            let c = if diag {
+                if u < 0.5 { c1 } else { c2 }
+            } else if u < 0.3 {
+                WHITE
+            } else if u < 0.65 {
+                c1
+            } else {
+                c2
+            };
+            p.dot(
+                x + ca * d,
+                y + sa * d,
+                c,
+                a * if u < 0.7 { 1.0 } else { 1.0 - (u - 0.7) / 0.35 },
+            );
+            if !diag && u < 0.22 && len > 4.0 {
+                p.dot(x + ca * d - sa, y + sa * d + ca, c1, a);
+                p.dot(x + ca * d + sa, y + sa * d - ca, c1, a);
+            }
+            d += 0.5;
+        }
+    }
+    p.dot(x, y, WHITE, a);
+    p.glow(x, y, 4.0 + len * 1.4, c1, 0.5 * a);
+    p.glow(x, y, 2.0 + len * 0.5, WHITE, 0.4 * a);
 }

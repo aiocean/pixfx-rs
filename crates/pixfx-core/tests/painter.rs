@@ -322,6 +322,29 @@ fn reset_removes_the_clip() {
     assert_eq!(f.color.iter().filter(|&&c| c != 0).count(), 1);
 }
 
+/// pixelfx weather `clip`: the box is the canvas around the origin, so it starts at a negative local corner.
+#[test]
+fn clip_box_keeps_the_canvas_around_the_origin() {
+    let mut f = Frame::new(8, 8, 0, 0);
+    let mut p = Painter::new(&mut f);
+    p.place(4.0, 4.0, false, 0.0);
+    p.clip_box(-3.0, -2.0, 2.0, 3.0);
+    for y in -4..4 {
+        for x in -4..4 {
+            p.px(f64::from(x), f64::from(y), WHITE);
+        }
+    }
+    // local x -3..2 and y -2..3 map to screen x 1..5 and y 2..7
+    for (i, &c) in f.color.iter().enumerate() {
+        let (x, y) = (i % 8, i / 8);
+        assert_eq!(
+            c != 0,
+            (1..6).contains(&x) && (2..7).contains(&y),
+            "({x}, {y})"
+        );
+    }
+}
+
 /// Frame hashes from `tests/golden/unlight.mjs` (pixelfx 044e12a): shadow `unlight` is `each` over a box with
 /// `dim_light` on the pixels its `dark` test accepts.
 #[test]
