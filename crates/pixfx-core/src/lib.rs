@@ -10,6 +10,7 @@ pub mod math;
 pub mod painter;
 pub mod particles;
 pub mod render;
+pub mod screen;
 pub mod shapes;
 pub mod sim;
 pub mod state;
@@ -23,6 +24,7 @@ pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};
 pub use painter::Painter;
 pub use render::{Rendered, edge_fade, render_frames};
+pub use screen::{Ripple, flash, ripple};
 pub use sim::{
     Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particle, Particles,
     ParticlesOpts, Piece, Spawn, band, crystal, flare, sparkle,
