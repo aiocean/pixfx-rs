@@ -81,8 +81,9 @@ const SNOW: Rgba = Rgba::hex24(0xbff2ff);
 const SEAL: Rgba = Rgba::hex24(0xc9c3e6);
 const FURY: Rgba = Rgba::hex24(0xffc23d);
 
-/// Fill the whole-pixel box (x, y, w, h) with `c` at alpha `a`, source-over into the colour layer (see [`over`]).
-fn fill(frame: &mut Frame, x: i32, y: i32, w: i32, h: i32, c: Rgba, a: f64) {
+/// Fill the whole-pixel box (x, y, w, h) with `c` at alpha `a`, source-over into the colour layer (see [`over`]):
+/// a canvas `fillRect` under `globalAlpha`, the way the duel drew its marks and dust.
+pub(crate) fn fill(frame: &mut Frame, x: i32, y: i32, w: i32, h: i32, c: Rgba, a: f64) {
     let a = clamp(a, 0.0, 1.0);
     if a <= 0.0 {
         return;
