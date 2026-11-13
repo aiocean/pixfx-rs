@@ -15,6 +15,8 @@ const CHEST = 20;
 const HALF_WIDTH = 6;
 
 const WALK = 52;
+/** Walking away from the foe is slower than walking toward it, as in fighting games, so no one can run away forever. */
+const BACKWALK = 0.75;
 const JUMP_SPEED = 220;
 const GRAVITY = 520;
 /** Near the top of an arc gravity eases, so a jump hangs a moment before it falls (the apex hang). */
@@ -77,10 +79,10 @@ const WARD = { share: 0.18, time: 6 };
  * Each school's fighter: full life, attack, the two defences, crit chance and crit damage, dodge, and its passives.
  * Thunder is a body and sword cultivator: tough, hits harder the longer it fights (fury), and once a round stands
  * up from a killing blow with 1 life (unyielding). Frost is a spell cultivator: frailer, harder to pin down, crits
- * harder, shields itself, and every spell it casts charges its rage (attuned).
+ * harder, shields itself, and every second spell it casts charges its rage (attuned).
  */
 export const STATS = {
-  thunder: { hp: 2500, atk: 318, pdef: 130, mdef: 110, crit: 0.18, critDamage: 1.6, dodge: 0.05, fury: true, unyielding: true, attuned: false },
+  thunder: { hp: 2500, atk: 345, pdef: 130, mdef: 110, crit: 0.18, critDamage: 1.6, dodge: 0.05, fury: true, unyielding: true, attuned: false },
   frost: { hp: 2450, atk: 370, pdef: 105, mdef: 165, crit: 0.15, critDamage: 1.7, dodge: 0.11, fury: false, unyielding: false, attuned: true },
 };
 
@@ -93,6 +95,17 @@ const MEDITATE_REGEN = 16;
 /** How long a fighter takes to notice something new, and how often it thinks. */
 const REACTION = 0.16;
 const THINK = 0.12;
+/**
+ * How a fighter picks its moments, after Sirlin's Playing to Win: attacking at the first chance is predictable, so
+ * after it commits to an attack it takes a breath in neutral (`tempo` in its school, seconds, spread by `spread`)
+ * and attacks again sooner only to punish an opening. An attack is worth what it is likely to land, less what it
+ * costs if it misses: the hardest blow the foe, free to answer, can land on it before it recovers, weighed at `risk`.
+ * Standing in reach doing nothing is no safer, so that cost lowers an attack's worth but never below `floor` of it.
+ * Ahead on life a fighter weighs the cost up to `lead` times more and plays safe; behind, less, and takes its chances.
+ */
+const MIND = { spread: 0.8, risk: 0.6, floor: 0.3, lead: 0.8 };
+/** What a fighter has learnt of how often each of its attacks lands on this foe counts as this many tries at first. */
+const PRIOR = 6;
 /** Qi a block costs. */
 const GUARD_COST = 8;
 /** The share of a blocked blow's damage that still lands. */
@@ -178,12 +191,14 @@ export const SPELLS = {
 };
 
 /**
- * The two schools: their spells, the distance each likes to fight at, how eager it is, the height it likes to hover
- * at while it has the qi (`sky`; Frost casts from the air, Thunder fights on the ground), and its colours.
+ * The two schools: their spells, the distance each likes to fight at, how eager it is, how long it takes a breath
+ * after each attack (`tempo`, seconds), the distance it keeps when its qi runs low (`dry`: Thunder presses in to sword's
+ * length, Frost stays at middle distance while its qi gathers again), the height it likes to hover at while it has the qi
+ * (`sky`; Frost casts from the air, Thunder fights on the ground), and its colours.
  */
 export const SCHOOLS = {
   thunder: {
-    name: "Thunder", spells: ["slash", "dive", "palm", "step", "seal", "bolt", "orb", "bell", "blink", "heal", "tribulation"], range: 64, aggression: 1.15, sky: 22,
+    name: "Thunder", spells: ["slash", "dive", "palm", "step", "seal", "bolt", "orb", "bell", "blink", "heal", "tribulation"], range: 64, dry: SPELLS.slash.range - 4, aggression: 1.15, tempo: 0.8, sky: 22,
     bolt: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#ffe98a", "#fff6c4", "#ffffff"],
     circle: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"],
     // every effect a Thunder spell plays is drawn in gold and white, so it is plain whose it is
@@ -198,7 +213,7 @@ export const SCHOOLS = {
     },
   },
   frost: {
-    name: "Frost", spells: ["slash", "dive", "lotus", "collapse", "shatter", "frostfire", "bolt", "icicle", "void", "mirror", "blink", "ward", "prison"], range: 100, aggression: 1.1, sky: 48,
+    name: "Frost", spells: ["slash", "dive", "lotus", "collapse", "shatter", "frostfire", "bolt", "icicle", "void", "mirror", "blink", "ward", "prison"], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
     // every effect a Frost spell plays is drawn in ice blue and white
@@ -259,7 +274,7 @@ export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top }
 }
 
 function fighter(index, school, spells) {
-  return { index, school, spells, stats: STATS[school], x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0, down: null, wake: 0, hitT: 9, hitPower: 0, squat: 0, leap: 0, duck: 0 };
+  return { index, school, spells, stats: STATS[school], x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0, down: null, wake: 0, hitT: 9, hitPower: 0, squat: 0, leap: 0, duck: 0, calm: 0, attune: 0, read: { tried: {}, landed: {} } };
 }
 
 function startRound(duel) {
@@ -270,7 +285,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0, down: null, wake: 0, hitT: 9, hitPower: 0, squat: 0, leap: 0, duck: 0 });
+    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0, calm: 0, down: null, wake: 0, hitT: 9, hitPower: 0, squat: 0, leap: 0, duck: 0 });
     f.x = duel.left + span * (f.index === 0 ? 0.22 : 0.78);
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
@@ -343,6 +358,7 @@ function body(duel, me, foe, dt) {
   me.stun = Math.max(0, me.stun - dt);
   me.wake = Math.max(0, me.wake - dt);
   me.duck = Math.max(0, me.duck - dt);
+  me.calm = Math.max(0, me.calm - dt);
   if (me.down) downed(duel, me, foe, dt);
   me.frozen = Math.max(0, me.frozen - dt);
   me.shocked = Math.max(0, me.shocked - dt);
@@ -374,7 +390,8 @@ function body(duel, me, foe, dt) {
 
   // feet: walking or flying across (only when free), knockback, then up and down
   const free = !me.act && !reeling(me) && !me.medit && me.frozen === 0 && me.shocked === 0 && me.squat === 0 && me.duck === 0;
-  const walk = free && me.guard === 0 ? me.intent.move * WALK * (me.chilled > 0 ? 0.45 : 1) : 0;
+  const away = Math.sign(me.intent.move) === -Math.sign(foe.x - me.x);
+  const walk = free && me.guard === 0 ? me.intent.move * WALK * (me.chilled > 0 ? 0.45 : 1) * (away ? BACKWALK : 1) : 0;
   // a body sliding along the floor on its back stops sooner
   me.vx *= Math.exp((me.down?.phase === "down" ? -12 : -6) * dt);
   const x = me.x + (walk + me.vx) * dt;
@@ -558,6 +575,11 @@ function begin(duel, me, name, target) {
   }
   me.cool[name] = spell.cooldown + spell.windup;
   me.act = { spell: name, phase: "windup", t: 0, target };
+  // an attack is a commitment: a breath in neutral follows it, and it counts toward what the fighter learns
+  if (spell.damage) {
+    me.calm = SCHOOLS[me.school].tempo * (1 - MIND.spread / 2 + MIND.spread * duel.rng());
+    me.read.tried[name] = (me.read.tried[name] ?? 0) + 1;
+  }
   setMeditating(duel, me, false);
   // longer casts stand in a rune circle while they gather
   if (spell.kind !== "melee" && spell.kind !== "blink" && spell.kind !== "dash" && spell.kind !== "barrier" && duel.has(CAST_CIRCLE)) {
@@ -568,7 +590,10 @@ function begin(duel, me, name, target) {
 /** The moment a spell lands: it hits, flies, falls or heals. */
 function release(duel, me, foe, spell) {
   const g = duel.ground;
-  if (me.stats.attuned && spell.kind !== "melee" && !spell.ultimate && spell.cost > 0) gainRage(me, 1);
+  if (me.stats.attuned && spell.kind !== "melee" && !spell.ultimate && spell.cost > 0) {
+    me.attune++;
+    if (me.attune % 2 === 0) gainRage(me, 1);
+  }
   if (spell.kind === "melee") {
     me.vx += me.face * 50;
     if (spell.dive) {
@@ -731,6 +756,7 @@ function hurt(duel, f, power, dir, spell) {
   emit(duel, { type: "hit", by: by.index, spell, power, launch: heavy, damage: amount, crit, share, x: f.x, y: f.air + CHEST });
   // rage for the blow: an attuned fighter's spells were paid for when cast, so only its blade earns here
   if (!s?.ultimate && !(by.stats.attuned && s?.kind !== "melee")) gainRage(by, 1);
+  by.read.landed[spell] = (by.read.landed[spell] ?? 0) + 1;
   if (by.stats.fury) by.fury = Math.min(FURY.max, by.fury + 1);
   f.flash = FLASH;
   f.hitT = 0;
@@ -895,6 +921,10 @@ function shot(duel, s, dt) {
       s.vx = -s.vx;
       s.x += Math.sign(s.vx) * 10;
       turnAside(duel, foe, s.x, g - s.y);
+      // the effect cannot turn round in flight: the old bolt goes out and a new one flies back, facing its new way
+      // and in the colours of the one who sent it back
+      stopShot(duel, s);
+      s.key = play(duel, spell.fx, s.x, g - s.y, { palette: SCHOOLS[foe.school].bolt, flip: s.vx < 0, seed: foe.index + 7 });
       return;
     }
     if (overlaps(foe, s.x, s.y, 3)) {
@@ -1154,11 +1184,30 @@ function attacks(duel, me, foe) {
   const busy = outFor(foe) + (foe.act ? SPELLS[foe.act.spell][foe.act.phase] - foe.act.t + (foe.act.phase === "windup" ? SPELLS[foe.act.spell].recover : 0) : 0);
   // a foe on the floor cannot be touched: a blow is only worth starting if it lands once the foe is up (a meaty)
   const open = openIn(foe);
+  const free = !reeling(foe) && !foe.act && foe.frozen === 0 && foe.shocked === 0;
+  // an opening to punish: the foe down, staggered, recovering from a move, or held in a long cast; a blow it is
+  // winding up is no opening (striking into it only trades)
+  const fact = foe.act ? SPELLS[foe.act.spell] : null;
+  const striking = fact && (fact.kind === "melee" || fact.kind === "blast" || fact.kind === "dash");
+  const opening =
+    outFor(foe) + foe.frozen + foe.shocked +
+    (!fact ? 0 : foe.act.phase === "recover" ? fact.recover - foe.act.t : striking ? 0 : fact.windup - foe.act.t + fact.recover);
+  // ahead on life, a miss costs more than it gains; behind, less
+  const lead = clamp((me.hp - foe.hp) / 40, -1, 1);
   const out = [];
   const value = (name, chance, lands = SPELLS[name].windup) => {
     const s = SPELLS[name];
     if (lands < open) return 0;
-    return ((s.damage ?? 0) * chance * school.aggression) / (0.5 + s.windup + s.cost / 40);
+    // in a breath after its last attack, a fighter only punishes: the foe must still be open when this lands
+    if (me.calm > 0 && opening < lands) return 0;
+    // a raised barrier turns everything but an ultimate aside: wait it out
+    if (foe.barrier > 0 && !s.ultimate) chance *= 0.05;
+    // what it has seen this attack do against this foe
+    const tried = me.read.tried[name] ?? 0;
+    chance = (chance * PRIOR + (me.read.landed[name] ?? 0)) / (PRIOR + tried);
+    const gain = (s.damage ?? 0) * chance * school.aggression;
+    const risk = free ? MIND.risk * punisher(foe, me, s.recover) * (1 - chance) * (1 + MIND.lead * lead) : 0;
+    return Math.max(gain * MIND.floor, gain - risk) / (0.5 + s.windup + s.cost / 40);
   };
   if (ready(me, "dive") && me.air - foe.air > 14 && d < 44) {
     out.push({ spell: "dive", score: value("dive", busy > SPELLS.dive.windup ? 0.9 : foe.guard > 0 ? 0.25 : 0.6) });
@@ -1176,7 +1225,8 @@ function attacks(duel, me, foe) {
     out.push({ spell: "bolt", score: value("bolt", chance, travel) });
   }
   if (ready(me, "orb") && d > 40 && !duel.shots.some((s) => s.kind === "orb" && s.owner === me.index)) {
-    out.push({ spell: "orb", score: value("orb", 0.5) });
+    // a slow ball that hunts the foe down: from far off it holds the space between and seldom misses in the end
+    out.push({ spell: "orb", score: value("orb", d > 80 ? 0.8 : 0.5) });
   }
   for (const name of ["tribulation", "prison"]) {
     if (!ready(me, name)) continue;
@@ -1221,17 +1271,47 @@ function attacks(duel, me, foe) {
   return out;
 }
 
+/**
+ * The hardest blow `foe` could land on `me` within `time` seconds (my recovery after a miss): an attack it has ready
+ * that reaches me from where it stands and lands in time.
+ */
+function punisher(foe, me, time) {
+  const d = Math.abs(foe.x - me.x);
+  const level = Math.abs(foe.air - me.air);
+  let most = 0;
+  for (const name of foe.spells) {
+    const s = SPELLS[name];
+    if (!s.damage || s.ultimate || !ready(foe, name)) continue;
+    let lands = Infinity;
+    if (s.kind === "melee" && !s.dive && d < s.range + HALF_WIDTH && level < CHEST) lands = s.windup;
+    else if (s.kind === "blast" && d < s.range + HALF_WIDTH && level < BODY) lands = s.windup;
+    else if (s.kind === "dash" && d < s.distance && level < CHEST) lands = s.windup;
+    else if (s.kind === "bolt" && level < BODY) lands = s.windup + d / s.speed;
+    if (lands <= time + REACTION) most = Math.max(most, s.damage);
+  }
+  return most;
+}
+
 /** Moving to the distance I fight best at, meditating when it is quiet, or waiting. */
 function positions(duel, me, foe) {
   const d = foe.x - me.x;
   // the distance a fighter keeps comes from what it can use: its school's range with spells that fly or fall,
   // arm's length with a palm blast, sword's length with nothing else
   const has = (...kinds) => me.spells.some((name) => kinds.includes(SPELLS[name].kind));
-  // and with too little qi to cast, it closes in to use the sword
+  // and with too little qi to cast, its school's `dry` distance
+  const school = SCHOOLS[me.school];
   const casting = me.qi >= 25;
-  const range = casting && has("bolt", "orb", "zone", "void") ? SCHOOLS[me.school].range : casting && has("blast", "dash") ? 34 : SPELLS.slash.range - 4;
+  const range = !casting ? school.dry : has("bolt", "orb", "zone", "void") ? school.range : has("blast", "dash") ? 34 : SPELLS.slash.range - 4;
   const off = Math.abs(d) - range;
   const out = [{ spell: "wait", score: 0.4 }];
+  // after an exchange, or with the foe behind a barrier, back off to spacing and let it come (footsies): out of its
+  // sword's reach at least, and most of the way back to its own range
+  const reach = Math.max(SPELLS.slash.range + HALF_WIDTH + 6, range * 0.8);
+  if ((me.calm > 0 || foe.barrier > 0) && Math.abs(d) < reach && Math.abs(foe.air - me.air) < CHEST && !reeling(foe)) {
+    const back = -Math.sign(d) || 1;
+    const room = back < 0 ? me.x - duel.left : duel.right - me.x;
+    if (room > 14) out.push({ spell: "move", move: back, score: 2.4 });
+  }
   // inside the foe's sword reach with no blade of my own ready: get out of it
   if (Math.abs(d) < SPELLS.slash.range + 4 && me.air - foe.air < CHEST && !ready(me, "slash")) {
     const back = -Math.sign(d) || 1;
