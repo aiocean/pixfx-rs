@@ -2,6 +2,8 @@
 // `stress.html?sweep=10,25,50,100` to step through counts and print a table (also on `window.pixfxStress`).
 // `workers=N` sets the effect workers (0: draw on the main thread; default: the package default) and
 // `slowdown=K` stretches each worker batch K times (phone emulation: Chrome cannot CPU-throttle workers).
+// `seeds=shared` gives every effect of one id the same seed, so identical effects share frames; the default gives
+// each its own.
 // Frame cost is main-thread time from Phaser's PRE_STEP to POST_RENDER (update, inline effect drawing, layer
 // uploads and the render submission; uploads of frames arriving from workers happen between steps and are not
 // in it); fps is game steps per second, which also drops when the GPU falls behind.
@@ -9,6 +11,8 @@ import Phaser from "phaser";
 import type { Counts, PixfxEffect, PixfxLayer } from "../src";
 import { PixfxPlugin, loadPixfx } from "../src";
 import { defaultWorkers } from "../src/load";
+import type { Seeds } from "./seeds";
+import { seedsParam, stressSeed } from "./seeds";
 
 const WIDTH = 640;
 const HEIGHT = 360;
@@ -25,6 +29,8 @@ interface Config {
   follow: number;
   /** Effects stopped and replaced per second. */
   churn: number;
+  /** One seed per effect, or one per id ([`stressSeed`]). */
+  seeds: Seeds;
 }
 
 interface Result extends Config {
@@ -69,6 +75,7 @@ const base: Config = {
   mode: params.get("mode") === "layer" ? "layer" : "objects",
   follow: Math.min(1, Math.max(0, num("follow", 0))),
   churn: Math.max(0, num("churn", 0)),
+  seeds: seedsParam(params.get("seeds")),
 };
 const WORKERS = params.has("workers") ? Math.max(0, Math.floor(num("workers", 0))) : defaultWorkers(navigator.hardwareConcurrency);
 const SLOWDOWN = Math.max(1, num("slowdown", 1));
@@ -129,16 +136,17 @@ class StressScene extends Phaser.Scene {
     }
   }
 
-  private pickId(): string {
+  private pickIndex(): number {
     const i = this.cfg.mix === "mixed" ? this.spawned % IDS.length : IDS.findIndex((id) => id === `fire/${this.cfg.mix}`);
-    return IDS[i] ?? IDS[0];
+    return i < 0 ? 0 : i;
   }
 
   private spawn(): { fx: PixfxEffect; x: number; y: number } {
     const x = Math.round(30 + this.rand() * (WIDTH - 60));
     const y = Math.round(90 + this.rand() * (HEIGHT - 100));
-    const opts = { seed: 1 + this.spawned };
-    const id = this.pickId();
+    const i = this.pickIndex();
+    const id = IDS[i] ?? IDS[0];
+    const opts = { seed: stressSeed(this.cfg.seeds, this.spawned, i) };
     this.spawned += 1;
     const fx = this.layer ? this.layer.play(id, x, y, opts) : this.pixfx.play(id, x, y, { ...opts, depth: { back: y, front: y + 0.5 } });
     this.live.push(fx);
@@ -167,7 +175,7 @@ function rendererType(): number {
 }
 
 function row(r: Result): string {
-  return [r.mode, r.mix, r.n, r.follow, r.churn, r.workers, r.slowdown, r.fps, r.cpuMedian, r.cpuP95, r.stats.textures].map(String).join("\t");
+  return [r.mode, r.mix, r.n, r.follow, r.churn, r.seeds, r.workers, r.slowdown, r.fps, r.cpuMedian, r.cpuP95, r.stats.textures].map(String).join("\t");
 }
 
 async function main(): Promise<void> {
@@ -199,7 +207,7 @@ async function main(): Promise<void> {
 
   const hud = document.getElementById("hud");
   const results: Result[] = [];
-  const header = "mode\tmix\tn\tfollow\tchurn\tworkers\tslowdown\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
+  const header = "mode\tmix\tn\tfollow\tchurn\tseeds\tworkers\tslowdown\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
 
   async function run(cfg: Config): Promise<Result> {
     scene.cfg = cfg;
