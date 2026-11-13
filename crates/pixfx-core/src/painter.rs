@@ -95,8 +95,8 @@ pub struct Painter<'a> {
     pub fade: f64,
     /// Light strength applied to every light amount.
     pub light_k: f64,
-    /// The local box `[0, w) x [0, h)` writes are kept inside, if any (see [`Painter::clip_local`]).
-    clip: Option<(f64, f64)>,
+    /// The local box `[x0, x1) x [y0, y1)` writes are kept inside, if any (see [`Painter::clip_box`]).
+    clip: Option<[f64; 4]>,
 }
 
 impl<'a> Painter<'a> {
@@ -148,21 +148,27 @@ impl<'a> Painter<'a> {
     /// whose `put`, `add` and `blendPx` check `inside` first). Follows later placement, and lasts until
     /// [`Painter::reset`] or the end of this painter's use.
     pub fn clip_local(&mut self, w: f64, h: f64) -> &mut Self {
-        self.clip = Some((w, h));
+        self.clip_box(0.0, 0.0, w, h)
+    }
+
+    /// [`Painter::clip_local`] for any local box `[x0, x1) x [y0, y1)`: pixelfx weather `clip`, whose box is the
+    /// canvas around the effect's origin (`x0 = -origin_x`), where transitions' `clipTo` has the origin at its corner.
+    pub fn clip_box(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) -> &mut Self {
+        self.clip = Some([x0, y0, x1, y1]);
         self
     }
 
     /// Whether the clip drops a write to screen pixel (sx, sy): its cell centre, in local space, is outside
     /// the clip box. A NaN cell fails every comparison and is dropped, as in pixelfx.
     fn clipped(&self, sx: f64, sy: f64) -> bool {
-        let Some((w, h)) = self.clip else {
+        let Some([x0, y0, x1, y1]) = self.clip else {
             return false;
         };
         let (lx, ly) = (
             self.from_x(sx + 0.5, sy + 0.5),
             self.from_y(sx + 0.5, sy + 0.5),
         );
-        !(lx >= 0.0 && ly >= 0.0 && lx < w && ly < h)
+        !(lx >= x0 && ly >= y0 && lx < x1 && ly < y1)
     }
 
     // ---- transforms: local (effect) space <-> screen (frame) space
