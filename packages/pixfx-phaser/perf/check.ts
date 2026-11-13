@@ -8,7 +8,6 @@ import type { Browser } from "./cdp";
 import { launchChrome, timeoutMessage } from "./cdp";
 import { ROOT, startServer } from "./server";
 
-const CDP_PORT = 9334;
 const SRC = `/@fs${join(import.meta.dir, "..", "src")}`;
 
 async function waitFor(b: Browser, expression: string, timeoutMs: number): Promise<void> {
@@ -86,7 +85,7 @@ const SAME_PIXELS = `(async () => {
 
 async function main(): Promise<void> {
   const stopServer = await startServer();
-  const b = await launchChrome(CDP_PORT);
+  const b = await launchChrome();
   let failed = false;
   const check = (name: string, ok: boolean, detail: string): void => {
     console.log(`${ok ? "PASS" : "FAIL"} ${name}: ${detail}`);

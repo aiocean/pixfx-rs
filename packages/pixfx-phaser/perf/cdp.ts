@@ -1,6 +1,6 @@
 // A minimal Chrome DevTools Protocol client: launch Chrome with a throwaway profile and drive its first page.
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
@@ -53,6 +53,25 @@ export function timeoutMessage(expression: string, errors: readonly string[]): s
   return errors.length === 0 ? `${head}; the page reported no errors` : `${head}; page errors:\n${errors.map((e) => `  ${e}`).join("\n")}`;
 }
 
+/**
+ * The debugging port Chrome picked, from the `DevToolsActivePort` file it writes in its profile (the port, a newline,
+ * the browser's socket path), or null while the file is missing or half written.
+ */
+export function devToolsPort(text: string): number | null {
+  const lines = text.split("\n");
+  if (lines.length < 2) return null;
+  const port = Number(lines[0]);
+  return Number.isInteger(port) && port > 0 && port < 65536 ? port : null;
+}
+
+function readPort(profile: string): number | null {
+  try {
+    return devToolsPort(readFileSync(join(profile, "DevToolsActivePort"), "utf8"));
+  } catch {
+    return null; // not written yet
+  }
+}
+
 export interface Browser {
   /** Send one CDP command to the page; resolves with its `result`. */
   send(method: string, params?: Record<string, unknown>): Promise<unknown>;
@@ -65,13 +84,17 @@ export interface Browser {
   close(): void;
 }
 
-/** Launch Chrome (`PIXFX_CHROME` or the default macOS path) and connect to its page over CDP. */
-export async function launchChrome(port: number): Promise<Browser> {
+/**
+ * Launch Chrome (`PIXFX_CHROME` or the default macOS path) and connect to its page over CDP. Chrome picks a free
+ * debugging port and writes it in its own profile, so runs started at the same time (another session's) each get
+ * their own browser instead of sharing one through a fixed port.
+ */
+export async function launchChrome(): Promise<Browser> {
   const profile = mkdtempSync(join(tmpdir(), "pixfx-perf-chrome-"));
   const proc = spawn(
     process.env["PIXFX_CHROME"] ?? DEFAULT_CHROME,
     [
-      `--remote-debugging-port=${port}`,
+      "--remote-debugging-port=0",
       `--user-data-dir=${profile}`,
       "--no-first-run",
       "--no-default-browser-check",
@@ -85,18 +108,22 @@ export async function launchChrome(port: number): Promise<Browser> {
     { stdio: "ignore" },
   );
   let url: string | undefined;
+  let port: number | null = null;
   for (let i = 0; i < 100 && !url; i++) {
-    try {
-      const targets = targetsSchema.parse(await (await fetch(`http://127.0.0.1:${port}/json`)).json());
-      url = targets.find((t) => t.type === "page")?.webSocketDebuggerUrl;
-    } catch {
-      // Chrome is still starting.
+    port ??= readPort(profile);
+    if (port !== null) {
+      try {
+        const targets = targetsSchema.parse(await (await fetch(`http://127.0.0.1:${port}/json`)).json());
+        url = targets.find((t) => t.type === "page")?.webSocketDebuggerUrl;
+      } catch {
+        // Chrome is still starting.
+      }
     }
     if (!url) await Bun.sleep(100);
   }
   if (!url) {
     proc.kill();
-    throw new Error(`perf: Chrome did not open a debugging page on port ${port}`);
+    throw new Error(port === null ? "perf: Chrome did not write its debugging port" : `perf: Chrome did not open a debugging page on port ${port}`);
   }
   const ws = new WebSocket(url);
   await new Promise<void>((resolve, reject) => {

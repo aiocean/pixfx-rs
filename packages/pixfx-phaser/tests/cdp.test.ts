@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { pageError, timeoutMessage } from "../perf/cdp";
+import { devToolsPort, pageError, timeoutMessage } from "../perf/cdp";
 
 describe("pageError", () => {
   test("an uncaught exception gives its description", () => {
@@ -44,5 +44,18 @@ describe("timeoutMessage", () => {
 
   test("says when the page reported none", () => {
     expect(timeoutMessage("window.x", [])).toBe("perf: timed out waiting for window.x; the page reported no errors");
+  });
+});
+
+describe("devToolsPort", () => {
+  test("reads the port Chrome wrote on the first line", () => {
+    expect(devToolsPort("53117\n/devtools/browser/0b1c\n")).toBe(53117);
+  });
+
+  test("a file Chrome has not finished writing gives no port", () => {
+    expect(devToolsPort("")).toBeNull();
+    expect(devToolsPort("531")).toBeNull();
+    expect(devToolsPort("abc\n/devtools/browser/x\n")).toBeNull();
+    expect(devToolsPort("0\n/devtools/browser/x\n")).toBeNull();
   });
 });

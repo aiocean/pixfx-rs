@@ -15,7 +15,6 @@ import type { Category } from "./profile";
 import { CATEGORIES, categoryTimes, cpuProfileSchema } from "./profile";
 import { ROOT, startServer } from "./server";
 
-const CDP_PORT = 9333;
 const COUNTS = (process.env["PIXFX_PERF_COUNTS"] ?? "10,20,25,50,100,200,400").split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0);
 const PROFILE_N = Number(process.env["PIXFX_PERF_PROFILE_N"] ?? 100);
 const THROTTLES = [1, 4];
@@ -26,6 +25,7 @@ const POOLS = [
 ];
 const SCENARIOS = [
   { name: "fires, one object each", query: "mix=mixed&mode=objects" },
+  { name: "fires, one object each, shared seeds (identical fires share frames)", query: "mix=mixed&mode=objects&seeds=shared" },
   { name: "fires, one shared layer", query: "mix=mixed&mode=layer" },
   { name: "game-like: half follow sprites, 10 replaced/s", query: "mix=mixed&mode=objects&follow=0.5&churn=10" },
 ];
@@ -38,6 +38,7 @@ const resultSchema = z.object({
   mix: z.string(),
   follow: z.number(),
   churn: z.number(),
+  seeds: z.string(),
   fps: z.number(),
   cpuMedian: z.number(),
   cpuP95: z.number(),
@@ -107,7 +108,7 @@ function table(rs: Result[]): string {
 
 async function main(): Promise<void> {
   const stopServer = await startServer();
-  const b = await launchChrome(CDP_PORT);
+  const b = await launchChrome();
   const out: { throttle: number; pool: string; scenario: string; results: Result[] }[] = [];
   const profiles: ProfileRow[] = [];
   try {
