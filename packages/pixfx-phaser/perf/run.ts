@@ -92,7 +92,14 @@ async function open(b: Browser, query: string): Promise<void> {
 
 async function sweep(b: Browser, query: string): Promise<Result[]> {
   await open(b, `${query}&sweep=${COUNTS.join(",")}`);
-  await waitFor(b, "window.pixfxStress.done === true", COUNTS.length * 8000 + 20000, () => failIfReloaded(b));
+  // Each count takes its warm-up and measure time plus the frames in flight, which at 4x CPU with hundreds of effects
+  // run for seconds each; so give up only when a count makes no progress for a minute, not on a total.
+  for (let seen = 0; ; ) {
+    const progressed = `window.pixfxStress.done === true || window.pixfxStress.results.length > ${seen}`;
+    await waitFor(b, progressed, 60000, () => failIfReloaded(b));
+    if ((await b.evaluate("window.pixfxStress.done")) === true) break;
+    seen = z.number().parse(await b.evaluate("window.pixfxStress.results.length"));
+  }
   return z.array(resultSchema).parse(await b.evaluate("window.pixfxStress.results"));
 }
 
