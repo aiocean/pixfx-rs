@@ -414,6 +414,83 @@ impl<'a> Painter<'a> {
         });
     }
 
+    /// A translucent disc: puffs of smoke, vapour, dust. c and a may be functions of (d: 0 centre to 1 rim,
+    /// angle).
+    pub fn disc(&mut self, cx: f64, cy: f64, r: f64, c: impl Param2<Rgba>, a: impl Param2<f64>) {
+        if r < 0.5 {
+            return self.blend(cx, cy, c.at(0.0, 0.0), a.at(0.0, 0.0));
+        }
+        self.each(cx - r, cy - r, cx + r, cy + r, |p, x, y, sx, sy| {
+            let (dx, dy) = (x - cx, y - cy);
+            let d2 = dx * dx + dy * dy;
+            if d2 > r * r {
+                return;
+            }
+            let (d, ang) = (libm::sqrt(d2) / r, libm::atan2(dy, dx));
+            p.blend_px(sx, sy, c.at(d, ang), a.at(d, ang));
+        });
+    }
+
+    /// Filled disc. c and a may be functions of (d: 0 centre to 1 rim, angle).
+    pub fn circle(&mut self, cx: f64, cy: f64, r: f64, c: impl Param2<Rgba>, a: impl Param2<f64>) {
+        if r < 0.6 {
+            return self.dot(cx, cy, c.at(0.0, 0.0), a.at(0.0, 0.0));
+        }
+        self.shade(cx - r, cy - r, cx + r, cy + r, |x, y, o| {
+            let (dx, dy) = (x - cx, y - cy);
+            let d2 = dx * dx + dy * dy;
+            if d2 > r * r {
+                return None;
+            }
+            let (d, ang) = (libm::sqrt(d2) / r, libm::atan2(dy, dx));
+            o.c = c.at(d, ang);
+            o.a = a.at(d, ang);
+            None
+        });
+    }
+
+    /// Ring from radius r - w to r. c and a may be functions of (v: 0 inner to 1 outer, angle).
+    pub fn ring(
+        &mut self,
+        cx: f64,
+        cy: f64,
+        r: f64,
+        w: f64,
+        c: impl Param2<Rgba>,
+        a: impl Param2<f64>,
+    ) {
+        let r0 = js_max(0.0, r - w);
+        self.shade(cx - r, cy - r, cx + r, cy + r, |x, y, o| {
+            let (dx, dy) = (x - cx, y - cy);
+            let d2 = dx * dx + dy * dy;
+            if d2 > r * r || d2 < r0 * r0 {
+                return None;
+            }
+            let v = if w > 0.0 {
+                // JS `r - r0 || 1`: a zero (or NaN) span counts as 1
+                let span = r - r0;
+                (libm::sqrt(d2) - r0)
+                    / if span == 0.0 || span.is_nan() {
+                        1.0
+                    } else {
+                        span
+                    }
+            } else {
+                1.0
+            };
+            let ang = libm::atan2(dy, dx);
+            o.c = c.at(v, ang);
+            o.a = a.at(v, ang);
+            None
+        });
+    }
+
+    /// Add light to one pixel at a local point.
+    pub fn light(&mut self, x: f64, y: f64, c: Rgba, k: f64) {
+        let (sx, sy) = (self.cell_x(x, y), self.cell_y(x, y));
+        self.add(sx, sy, c, k);
+    }
+
     /// Filled rectangle.
     pub fn rect(&mut self, x: f64, y: f64, w: f64, h: f64, c: Rgba, a: f64) {
         if self.sn == 0.0 {

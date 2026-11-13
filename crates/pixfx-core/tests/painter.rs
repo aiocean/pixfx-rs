@@ -175,3 +175,83 @@ fn reach_is_the_distance_to_the_farthest_frame_corner() {
     }
     assert!(f.color.iter().all(|&c| c == 0));
 }
+
+/// Frame hashes from `tests/golden/painter_shapes.mjs` (pixelfx 044e12a).
+#[test]
+fn shapes_match_pixelfx() {
+    use pixfx_core::color::hex;
+    use pixfx_core::frame::frame_hash;
+
+    let orange = hex("#ff8a2a").unwrap_or(Rgba::NONE);
+    let blue = hex("#3f8cff").unwrap_or(Rgba::NONE);
+    let purple = hex("#9a48ec").unwrap_or(Rgba::NONE);
+    let yellow = hex("#ffe26b").unwrap_or(Rgba::NONE);
+    type Draw = fn(&mut Painter, Rgba, Rgba, Rgba, Rgba);
+    type Case = (&'static str, bool, f64, u64, Draw);
+    let cases: [Case; 7] = [
+        (
+            "disc_soft",
+            false,
+            0.0,
+            0xa6d9_425d_cbd2_cd25,
+            |p, o, _, _, _| p.disc(0.0, -16.0, 9.0, o, 0.6),
+        ),
+        (
+            "disc_tiny",
+            false,
+            0.0,
+            0xabfd_01da_ef3f_6e27,
+            |p, o, _, _, _| p.disc(0.0, -16.0, 0.4, o, 1.0),
+        ),
+        (
+            "circle_fn",
+            false,
+            0.0,
+            0xdd29_8569_e4f9_1185,
+            |p, _, b, _, _| {
+                p.circle(
+                    0.0,
+                    -16.0,
+                    9.0,
+                    |d: f64, _: f64| if d < 0.5 { WHITE } else { b },
+                    1.0,
+                )
+            },
+        ),
+        (
+            "circle_tiny",
+            false,
+            0.0,
+            0x601d_c656_9710_d3ec,
+            |p, _, b, _, _| p.circle(0.0, -16.0, 0.5, b, 1.0),
+        ),
+        (
+            "ring_fn",
+            false,
+            0.0,
+            0x512b_fc52_e1a2_4802,
+            |p, _, _, v, _| p.ring(0.0, -16.0, 12.0, 3.0, v, |v: f64, _: f64| v),
+        ),
+        (
+            "light",
+            false,
+            0.0,
+            0xab08_116b_ef82_0aaa,
+            |p, _, _, _, y| p.light(3.0, -5.0, y, 0.7),
+        ),
+        (
+            "disc_mirrored_rotated",
+            true,
+            0.6,
+            0xc39e_3120_e7ba_e241,
+            |p, o, _, _, _| p.disc(0.0, -16.0, 9.0, o, 0.6),
+        ),
+    ];
+    for (name, flip, angle, want, draw) in cases {
+        let mut frame = Frame::new(64, 48, 0, 0);
+        let mut p = Painter::new(&mut frame);
+        p.place(32.0, 40.0, flip, angle);
+        draw(&mut p, orange, blue, purple, yellow);
+        assert_eq!(frame_hash(&frame), want, "{name}");
+    }
+}
