@@ -8,10 +8,10 @@ use pixfx_core::{
 
 /// An effect instance and the canvas it draws into: the instance's canvas ([`Effect::canvas`]: `meta.size`
 /// unless its options size it) plus `margin` empty pixels on every side, with the effect's origin at the
-/// canvas origin plus `margin`. After the n-th `update(1 / fps)`,
-/// `draw(Layer::Both)` leaves the frame equal to [`pixfx_core::render_frames`] frame n at the same margin:
-/// margin 0 eases light out at the canvas edge (as the sprite sheet does), a margin leaves room for glow that
-/// spills past the canvas and fades nothing.
+/// canvas origin plus `margin`. While its clock is on frame k ([`Player::frame_index`]), `draw(Layer::Both)`
+/// leaves the frame equal to [`pixfx_core::render_frames`] frame k at the same margin, whatever steps the clock
+/// took: margin 0 eases light out at the canvas edge (as the sprite sheet does), a margin leaves room for glow
+/// that spills past the canvas and fades nothing.
 pub struct Player {
     inst: Instance,
     meta: &'static Meta,
@@ -59,8 +59,8 @@ impl Player {
         self.margin
     }
 
-    /// Advance by `dt` seconds ([`Instance::update`]: at most `MAX_DT`, in 1/120 s sub-steps; a NaN, infinite or
-    /// negative `dt` is ignored).
+    /// Advance the clock by `dt` seconds ([`Instance::update`]: at most `MAX_DT`; a NaN, infinite or negative
+    /// `dt` is ignored).
     pub fn update(&mut self, dt: f64) {
         self.inst.update(dt);
     }
@@ -77,6 +77,11 @@ impl Player {
 
     pub fn done(&self) -> bool {
         self.inst.done()
+    }
+
+    /// The frame the effect shows ([`Instance::frame`]): a host redraws when it changes.
+    pub fn frame_index(&self) -> u64 {
+        self.inst.frame()
     }
 
     /// Seconds since the instance started.

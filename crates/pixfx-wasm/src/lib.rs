@@ -198,6 +198,13 @@ impl Fx {
         to_js(&cues)
     }
 
+    /// The frame the effect shows: k while its clock is on frame k of `render_frames`, wrapped round a loop.
+    /// Redraw when it changes.
+    #[wasm_bindgen(js_name = frameIndex)]
+    pub fn frame_index(&self) -> u32 {
+        u32::try_from(self.player.frame_index()).unwrap_or(u32::MAX)
+    }
+
     /// Seconds since the instance started.
     pub fn t(&self) -> f64 {
         self.player.t()

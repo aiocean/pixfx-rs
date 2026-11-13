@@ -3,7 +3,7 @@
 
 use crate::effect::{Effect, Instance, Layer, Options};
 use crate::frame::Frame;
-use crate::math::{js_max, js_round};
+use crate::math::js_round;
 
 /// An effect's frames, each `w` x `h` (its canvas, [`Effect::canvas`], plus the margin) with its top-left at
 /// (-margin, -margin) in effect canvas space.
@@ -22,8 +22,8 @@ pub struct Rendered {
 /// Pixels over which [`edge_fade`] eases light out at the canvas edge.
 const EDGE: u32 = 8;
 
-/// Render every frame of one loop or one-shot at the effect's fps: `max(1, round(duration * fps))` frames
-/// for a loop, one more for a one-shot (its last moment). Frame i is drawn after i steps of `1 / fps`.
+/// Render every frame of one loop or one-shot ([`crate::effect::Meta::frames`]): frame k is the effect after k
+/// ticks of `1 / fps`, the frame a live [`Instance`] shows while its clock is on it.
 /// The effect sits at its origin on the canvas `opts` give it ([`Effect::canvas`]) whatever `opts.x` and
 /// `opts.y` say. Without a margin, light is eased out at the canvas edge (full-screen effects excepted) so a
 /// glow cut off by the edge does not show as a box.
@@ -31,9 +31,7 @@ pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -
     let meta = effect.meta();
     let canvas = effect.canvas(opts);
     let (w, h) = (canvas.size.0 + margin * 2, canvas.size.1 + margin * 2);
-    let fps = meta.fps;
-    let last = if meta.looping { 0.0 } else { 1.0 };
-    let n = js_max(1.0, js_round(meta.duration * f64::from(fps)) + last) as usize;
+    let n = meta.frames();
     let at_origin = Options {
         x: f64::from(canvas.origin.0),
         y: f64::from(canvas.origin.1),
@@ -42,12 +40,10 @@ pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -
     let mut inst = Instance::new(effect, at_origin);
     let fade = margin == 0 && !meta.is_screen();
     let corner = -(margin as i32);
-    let mut frames = Vec::with_capacity(n);
-    for i in 0..n {
-        if i > 0 {
-            // unclamped: renders step exactly as pixelfx, whatever the fps
-            inst.advance(1.0 / f64::from(fps));
-        }
+    let mut frames = Vec::with_capacity(n as usize);
+    for k in 0..n {
+        // unclamped by MAX_DT: renders step exactly as pixelfx, whatever the fps
+        inst.seek(k);
         let mut frame = Frame::new(w, h, corner, corner);
         inst.draw(&mut frame, Layer::Both, inst.placement());
         if fade {
@@ -58,7 +54,7 @@ pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -
     Rendered {
         w,
         h,
-        fps,
+        fps: meta.fps,
         origin: canvas.origin,
         margin,
         frames,

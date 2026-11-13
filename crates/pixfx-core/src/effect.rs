@@ -2,8 +2,9 @@
 //!
 //! An effect is a static [`Effect`]: its [`Meta`] plus a way to spawn state. Effects crates list theirs in a
 //! static slice; [`find`] looks one up by id.
-//! An [`Instance`] owns one spawned [`EffectState`], advances it in fixed sub-steps and draws it at the
-//! instance's time, fading it out after [`Instance::stop`].
+//! An [`Instance`] owns one spawned [`EffectState`] and shows it frame by frame at the effect's fps: frame k is
+//! the state after k ticks of `1 / fps`, whatever steps the host's clock takes, so live play draws exactly the
+//! frames [`crate::render::render_frames`] renders. It fades the effect out after [`Instance::stop`].
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -12,7 +13,7 @@ use crate::act::Act;
 use crate::color::{Rgba, fit};
 use crate::cue::{TimedCue, cues_between, cues_of};
 use crate::frame::Frame;
-use crate::math::{clamp, js_max, js_min};
+use crate::math::{clamp, js_max, js_min, js_round};
 use crate::painter::Painter;
 use crate::state::StateMeta;
 
@@ -24,8 +25,12 @@ pub const MAX_DT: f64 = 0.25;
 /// Seconds an instance takes to fade out after [`Instance::stop`] (pixelfx `FADE`).
 pub const FADE: f64 = 0.3;
 
-/// Simulation sub-steps per second: `update(dt)` runs at least this finely whatever the caller's frame rate.
+/// Simulation sub-steps per second: a tick of `1 / fps` runs in sub-steps at least this fine.
 const STEPS_PER_SECOND: f64 = 120.0;
+
+/// Slack when turning a time into a frame index, so a clock that adds up `1 / fps` k times reaches frame k
+/// despite rounding (k ticks of 1/30 can sum to a hair under k/30).
+const FRAME_SLACK: f64 = 1e-6;
 
 /// What an effect is: pixelfx `meta`, minus what the Rust port types elsewhere (the palette's default lives in
 /// the effect, the backdrop belongs to the tools).
@@ -60,6 +65,13 @@ impl Meta {
     pub fn is_screen(&self) -> bool {
         let (w, h) = (f64::from(self.size.0), f64::from(self.size.1));
         w >= 320.0 && (w / h - 16.0 / 9.0).abs() < 0.05
+    }
+
+    /// Frames in one loop or one-shot at the effect's fps: `max(1, round(duration * fps))` for a loop, one more
+    /// for a one-shot (its last moment). Frame k is the effect after k ticks of `1 / fps`.
+    pub fn frames(&self) -> u64 {
+        let last = if self.looping { 0.0 } else { 1.0 };
+        js_max(1.0, js_round(self.duration * f64::from(self.fps)) + last) as u64
     }
 
     /// Empty pixels worth giving the effect on every side of its canvas so glow that spills past it shows
@@ -416,7 +428,13 @@ pub struct Instance {
     effect: &'static dyn Effect,
     state: Box<dyn EffectState>,
     opts: Options,
+    seed: u64,
+    /// The host's clock: seconds since the start. Cues, stop and the end follow it.
     t: f64,
+    /// Ticks of `1 / fps` the state has taken since it was spawned: the frame it shows.
+    tick: u64,
+    /// The state's own time: `1 / fps` added once per tick, as the render adds it.
+    tick_t: f64,
     stop_at: Option<f64>,
     cues: Vec<TimedCue>,
     fired: Vec<TimedCue>,
@@ -432,7 +450,10 @@ impl Instance {
             effect,
             state,
             opts,
+            seed,
             t: 0.0,
+            tick: 0,
+            tick_t: 0.0,
             stop_at: None,
             cues,
             fired: Vec::new(),
@@ -450,7 +471,8 @@ impl Instance {
         std::mem::take(&mut self.fired)
     }
 
-    /// Advance by `dt` seconds, at most [`MAX_DT`]. A step that fails [`valid_dt`] (NaN, infinite or
+    /// Advance the clock by `dt` seconds, at most [`MAX_DT`], firing the cues it passes, and bring the state to
+    /// the frame the clock is on ([`Instance::frame`]). A step that fails [`valid_dt`] (NaN, infinite or
     /// negative) is ignored and leaves the instance as it was: it would make the time NaN for good or run it
     /// backwards. Shells that report such a step to their caller check [`valid_dt`] themselves first.
     pub fn update(&mut self, dt: f64) {
@@ -460,7 +482,42 @@ impl Instance {
             if self.stop_at.is_none() && dt > 0.0 {
                 self.fire_cues(self.t, self.t + dt);
             }
-            self.advance(dt);
+            self.t += dt;
+            self.seek(self.frame_at(self.t));
+        }
+    }
+
+    /// The frame the clock `t` is on: `floor(t * fps)`, wrapped round a loop, held at a one-shot's last frame.
+    fn frame_at(&self, t: f64) -> u64 {
+        let meta = self.effect.meta();
+        let k = libm::floor(t * f64::from(meta.fps) + FRAME_SLACK) as u64;
+        let n = meta.frames();
+        if meta.looping { k % n } else { k.min(n - 1) }
+    }
+
+    /// The frame the state shows: ticks of `1 / fps` since it was spawned (a loop's restart from frame 0
+    /// respawns it).
+    pub fn frame(&self) -> u64 {
+        self.tick
+    }
+
+    /// Bring the state to frame `k`: tick forward, or respawn and tick from 0 when `k` is behind (a loop that
+    /// came round). The same seed gives the same frames each time round.
+    pub(crate) fn seek(&mut self, k: u64) {
+        if k < self.tick {
+            self.state = self.effect.spawn(&self.opts, self.seed);
+            self.tick = 0;
+            self.tick_t = 0.0;
+        }
+        let dt = 1.0 / f64::from(self.effect.meta().fps);
+        while self.tick < k {
+            self.tick_t += dt;
+            self.tick += 1;
+            // pixelfx `update`: max(1, ceil(dt * 120)) equal sub-steps
+            let n = js_max(1.0, libm::ceil(dt * STEPS_PER_SECOND - 1e-9));
+            for _ in 0..n as u64 {
+                self.state.update(dt / n);
+            }
         }
     }
 
@@ -473,18 +530,8 @@ impl Instance {
         self.fired.extend(hit);
     }
 
-    /// Advance by `dt` seconds in `max(1, ceil(dt * 120 - 1e-9))` equal sub-steps (pixelfx `update`).
-    pub(crate) fn advance(&mut self, dt: f64) {
-        self.t += dt;
-        // NaN steps run no sub-steps, as JS's `i < NaN` loop
-        let n = js_max(1.0, libm::ceil(dt * STEPS_PER_SECOND - 1e-9));
-        for _ in 0..n as u64 {
-            self.state.update(dt / n);
-        }
-    }
-
-    /// Draw into `frame` at the current time, placed as `place` says: loops wrap, one-shots hold their last
-    /// moment.
+    /// Draw the current frame ([`Instance::frame`]) into `frame`, placed as `place` says: the state at its own
+    /// time, faded by the clock's time since [`Instance::stop`].
     pub fn draw(&self, frame: &mut Frame, layer: Layer, place: Placement) {
         let meta = self.effect.meta();
         let mut p = Painter::new(frame);
@@ -495,9 +542,9 @@ impl Instance {
         };
         p.light_k = place.light;
         let t = if meta.looping {
-            self.t % meta.duration
+            self.tick_t % meta.duration
         } else {
-            js_min(self.t, meta.duration)
+            js_min(self.tick_t, meta.duration)
         };
         if layer != Layer::Front {
             self.state.draw(&mut p, t, Layer::Back);
