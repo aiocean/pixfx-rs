@@ -74,7 +74,7 @@ impl Feel {
     /// How dark an ultimate's dusk makes the sky at its darkest.
     #[wasm_bindgen(js_name = duskDepth)]
     pub fn dusk_depth() -> f64 {
-        feel::DUSK.depth
+        feel::FeelSpec::default().dusk.depth
     }
 
     /// How dark the sky is, 0 up to the dusk's depth.
@@ -223,7 +223,7 @@ fn cue(e: &JsValue) -> Result<Option<Cue>, JsError> {
 
 // ---------- the body ----------
 
-use pixfx_fighter::body::{self as b, Arena, Blow, Doing, Drive, Motion, Phase};
+use pixfx_fighter::body::{self as b, Arena, Blow, BodySpec, Doing, Drive, Motion, Phase};
 use pixfx_fighter::pose::Pose;
 
 /// A fighter's body for JS: its fields as properties, the duel's body steps as methods. Poses are the strings the
@@ -267,14 +267,114 @@ fields! {
     pose_t / set_pose_t: "poseT" => pose_t,
 }
 
+/// Every number of a [`BodySpec`] with its JS name (`juggleLimit`, a whole count, is read on its own).
+macro_rules! spec_fields {
+    ($($f:ident : $js:literal),* $(,)?) => {
+        /// `spec` as a plain object with camelCase keys.
+        fn spec_js(spec: &BodySpec) -> Result<JsValue, JsError> {
+            object(&[
+                $(($js, spec.$f.into()),)*
+                ("juggleLimit", spec.juggle_limit.into()),
+            ])
+        }
+
+        /// The default spec with the numbers `o` gives over it; a key that is there must be a number.
+        fn spec_of(o: &JsValue) -> Result<BodySpec, JsError> {
+            let mut spec = BodySpec::default();
+            if o.is_undefined() || o.is_null() {
+                return Ok(spec);
+            }
+            $(if let Some(v) = number_at(o, $js)? {
+                spec.$f = v;
+            })*
+            if let Some(v) = number_at(o, "juggleLimit")? {
+                spec.juggle_limit = v.max(0.0) as u32;
+            }
+            Ok(spec)
+        }
+    };
+}
+
+spec_fields! {
+    body: "body",
+    chest: "chest",
+    half_width: "halfWidth",
+    room: "room",
+    walk: "walk",
+    backwalk: "backwalk",
+    chill: "chill",
+    jump_speed: "jumpSpeed",
+    gravity: "gravity",
+    apex_speed: "apexSpeed",
+    apex_gravity: "apexGravity",
+    fly_rate: "flyRate",
+    fly_max: "flyMax",
+    launch_damage: "launchDamage",
+    launch_speed: "launchSpeed",
+    launch_per_damage: "launchPerDamage",
+    launch_pop: "launchPop",
+    launch_spin: "launchSpin",
+    hitstun_base: "hitstunBase",
+    hitstun_per: "hitstunPer",
+    juggle_decay: "juggleDecay",
+    knockdown_bounce: "knockdownBounce",
+    knockdown_keep: "knockdownKeep",
+    knockdown_lie: "knockdownLie",
+    knockdown_rise: "knockdownRise",
+    knockdown_quick: "knockdownQuick",
+    knockdown_flop: "knockdownFlop",
+    knockdown_roll: "knockdownRoll",
+    knockdown_roll_distance: "knockdownRollDistance",
+    knockdown_grace: "knockdownGrace",
+    jump_squat: "jumpSquat",
+    landing_soft: "landingSoft",
+    landing_hard: "landingHard",
+    duck: "duck",
+    flash: "flash",
+    bounce: "bounce",
+    hard_landing: "hardLanding",
+    knockback: "knockback",
+    freeze_knockback: "freezeKnockback",
+    launch_knockback: "launchKnockback",
+    wall_keep: "wallKeep",
+    soft_landing: "softLanding",
+    slide: "slide",
+    slide_down: "slideDown",
+}
+
+/// `o[key]` as a number: `None` when absent, an error naming the key when it is something else.
+fn number_at(o: &JsValue, key: &str) -> Result<Option<f64>, JsError> {
+    let v = Reflect::get(o, &JsValue::from_str(key))
+        .map_err(|_| JsError::new("a body spec must be an object"))?;
+    if v.is_undefined() {
+        return Ok(None);
+    }
+    v.as_f64()
+        .map(Some)
+        .ok_or_else(|| JsError::new(&format!("body spec: {key} must be a number")))
+}
+
 #[wasm_bindgen]
 impl Body {
-    /// A body standing at `x`, facing right.
+    /// A body standing at `x`, facing right, built as `spec` says: omitted, the site's duel's body
+    /// ([`Body::defaults`]); an object, those defaults with the numbers it gives over them (`{gravity: 400}`).
     #[wasm_bindgen(constructor)]
-    pub fn new(x: f64) -> Body {
-        Body {
-            inner: b::Body::new(x),
-        }
+    pub fn new(x: f64, spec: JsValue) -> Result<Body, JsError> {
+        Ok(Body {
+            inner: b::Body::with_spec(x, spec_of(&spec)?),
+        })
+    }
+
+    /// The default body's numbers, `{body, chest, halfWidth, walk, jumpSpeed, gravity, …}`: the rules read them
+    /// instead of copying them, and pass back the ones they change to the constructor.
+    pub fn defaults() -> Result<JsValue, JsError> {
+        spec_js(&BodySpec::default())
+    }
+
+    /// This body's numbers, as [`Body::defaults`] gives them.
+    #[wasm_bindgen(getter)]
+    pub fn spec(&self) -> Result<JsValue, JsError> {
+        spec_js(&self.inner.spec)
     }
 
     #[wasm_bindgen(getter)]
@@ -358,7 +458,7 @@ impl Body {
         b::separate(&mut a.inner, &mut b.inner, &arena_of(arena));
     }
 
-    /// Whether a blow of `power` throws (a freezing one never does).
+    /// Whether a blow of `power` throws a default body (a freezing one never does).
     pub fn heavy(power: f64, freeze: bool) -> bool {
         Blow {
             power,
@@ -366,7 +466,7 @@ impl Body {
             freeze,
             flying: false,
         }
-        .heavy()
+        .heavy(&BodySpec::default())
     }
 
     /// The knockout throws the loser off its feet, away from the foe at `foe_x`.
@@ -544,10 +644,10 @@ use crate::Surface;
 use crate::stage::{Pass, Rect};
 use pixfx_core::color::to_hex;
 use pixfx_core::{Frame, Layer, Rgba};
-use pixfx_fighter::look::Look;
+use pixfx_fighter::look::{Hairdo, Look};
 use pixfx_fighter::paint::{self, Appearance, Windup};
 use pixfx_fighter::pose::Gather;
-use pixfx_fighter::status::{self, DomeStyle, Marks};
+use pixfx_fighter::status::{self, DomeStyle, Figure, Mark, Silhouette};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 /// Fighters, their marks and the dust they raise, drawn onto a canvas in game pixels upscaled by `scale`, colour
@@ -594,14 +694,16 @@ impl Sprites {
         self.frame.clear();
     }
 
-    /// Fighter `a` in look `"thunder"` or `"frost"`, its feet on the floor at row `ground` (game pixels). `a`:
+    /// Fighter `a` in `look` (a preset's name, `"thunder"` or `"frost"`, or a look object as `lookColors` reads
+    /// it), its feet on the floor at row `ground` (game pixels). `a`:
     /// `{x, air, pose, poseT, face, vx, out, flash, frozen, shocked, hitT, hitPower, dodged, jolt: [dx, dy],
     /// act: null | {how: "summon"|"palm"|"lunge"|"prayer"|"cross", dive, progress: number|null, long}}`. `marks`:
     /// null, or `{shield, barrier, rang, burning, defDown, silence, chilled, fury, poseT, dome: "banded"|"faceted",
-    /// burn, shock, ice, t, seed}`, the last six drawing fire, lightning and frost over the body at time `t`.
+    /// burn, shock, ice, t, seed}`, the last five drawing fire, lightning and frost over the body at time `t`,
+    /// following the shape of its pose.
     pub fn fighter(
         &mut self,
-        look: &str,
+        look: &JsValue,
         a: &JsValue,
         ground: f64,
         marks: &JsValue,
@@ -610,35 +712,57 @@ impl Sprites {
         let a = appearance(a)?;
         paint::draw(&mut self.frame, &look, &a, ground);
         if marks.is_object() {
-            let m = Marks {
-                shield: flag(marks, "shield"),
-                barrier: flag(marks, "barrier"),
-                rang: flag(marks, "rang"),
-                burning: flag(marks, "burning"),
-                def_down: flag(marks, "defDown"),
-                silence: flag(marks, "silence"),
-                chilled: flag(marks, "chilled"),
-                fury: num(marks, "fury").max(0.0) as u32,
-                pose_t: num(marks, "poseT"),
-                dome: if text(marks, "dome") == "faceted" {
+            // the marks in the order the duel has always drawn them
+            let mut m = Vec::new();
+            if flag(marks, "shield") {
+                m.push(Mark::Shield);
+            }
+            if flag(marks, "barrier") {
+                let style = if text(marks, "dome") == "faceted" {
                     DomeStyle::Faceted
                 } else {
                     DomeStyle::Banded
-                },
-                glow: look.glow,
+                };
+                m.push(Mark::Barrier {
+                    style,
+                    glow: look.glow,
+                    rang: flag(marks, "rang"),
+                });
+            }
+            for (key, mark) in [
+                ("burning", Mark::Burning),
+                ("defDown", Mark::DefDown),
+                ("silence", Mark::Silence),
+                ("chilled", Mark::Chilled),
+            ] {
+                if flag(marks, key) {
+                    m.push(mark);
+                }
+            }
+            m.push(Mark::Fury(num(marks, "fury").max(0.0) as u32));
+            let figure = Figure {
+                feet_x: a.x,
+                feet_y: ground - a.air,
+                face: a.face,
+                silhouette: Silhouette::of(a.pose),
             };
-            let (fx, fy) = (a.x, ground - a.air);
             let (t, seed) = (num(marks, "t"), num(marks, "seed").max(0.0) as u32);
             if flag(marks, "burn") {
-                status::draw_burning(&mut self.frame, t, seed, fx, fy, 1.0);
+                status::draw_burning(&mut self.frame, t, seed, &figure, 1.0);
             }
             if flag(marks, "ice") {
-                status::draw_frozen(&mut self.frame, t, seed, fx, fy, 1.0);
+                status::draw_frozen(&mut self.frame, t, seed, &figure, 1.0);
             }
             if flag(marks, "shock") {
-                status::draw_shocked(&mut self.frame, t, seed, fx, fy, 1.0);
+                status::draw_shocked(&mut self.frame, t, seed, &figure, 1.0);
             }
-            status::draw_marks(&mut self.frame, &m, fx, fy);
+            status::draw_marks(
+                &mut self.frame,
+                &m,
+                num(marks, "poseT"),
+                figure.feet_x,
+                figure.feet_y,
+            );
         }
         Ok(())
     }
@@ -652,7 +776,7 @@ impl Sprites {
     /// look `look`, twice the sprite's size, filling the `size`-pixel square at (`x`, `y`), at opacity `alpha`.
     pub fn portrait(
         &mut self,
-        look: &str,
+        look: &JsValue,
         a: &JsValue,
         x: i32,
         y: i32,
@@ -714,8 +838,11 @@ impl Sprites {
 }
 
 /// A look's colours the host draws its own parts in: `{glow, outline, ribbon: [light, dark]}` as `#rrggbb`.
+/// `look` is a preset's name (`"thunder"`, `"frost"`) or a whole look: `{robe: [3], inner: [2], trim: [2],
+/// hair: [2], skin: [2], boot, blade: [3], jade, ribbon: [2], glow, outline, hairdo: "topknot" | "flowing"}`, each
+/// colour `"#rrggbb"`, lists light to dark.
 #[wasm_bindgen(js_name = lookColors)]
-pub fn look_colors(look: &str) -> Result<JsValue, JsError> {
+pub fn look_colors(look: &JsValue) -> Result<JsValue, JsError> {
     let l = look_of(look)?;
     let ribbon: Array = l.ribbon.iter().map(|&c| JsValue::from(to_hex(c))).collect();
     object(&[
@@ -725,14 +852,71 @@ pub fn look_colors(look: &str) -> Result<JsValue, JsError> {
     ])
 }
 
-fn look_of(name: &str) -> Result<Look, JsError> {
-    match name {
-        "thunder" => Ok(Look::thunder()),
-        "frost" => Ok(Look::frost()),
-        other => Err(JsError::new(&format!(
-            "unknown look {other:?}: expected \"thunder\" or \"frost\""
-        ))),
+/// A look: a preset by name, or read from an object (see [`look_colors`]).
+fn look_of(v: &JsValue) -> Result<Look, JsError> {
+    if let Some(name) = v.as_string() {
+        return Look::preset(&name).ok_or_else(|| {
+            JsError::new(&format!(
+                "unknown look {name:?}: expected \"thunder\", \"frost\" or a look object"
+            ))
+        });
     }
+    if !v.is_object() {
+        return Err(JsError::new("a look must be a preset's name or an object"));
+    }
+    let hairdo = match text(v, "hairdo").as_str() {
+        "topknot" => Hairdo::Topknot,
+        "flowing" => Hairdo::Flowing,
+        other => {
+            return Err(JsError::new(&format!(
+                "look.hairdo: expected \"topknot\" or \"flowing\", got {other:?}"
+            )));
+        }
+    };
+    Ok(Look {
+        robe: shades(v, "robe")?,
+        inner: shades(v, "inner")?,
+        trim: shades(v, "trim")?,
+        hair: shades(v, "hair")?,
+        skin: shades(v, "skin")?,
+        boot: colour(v, "boot")?,
+        blade: shades(v, "blade")?,
+        jade: colour(v, "jade")?,
+        ribbon: shades(v, "ribbon")?,
+        glow: colour(v, "glow")?,
+        outline: colour(v, "outline")?,
+        hairdo,
+    })
+}
+
+/// `o[key]` as a `"#rrggbb"` colour.
+fn colour(o: &JsValue, key: &str) -> Result<Rgba, JsError> {
+    let s = Reflect::get(o, &JsValue::from_str(key))
+        .ok()
+        .and_then(|v| v.as_string())
+        .ok_or_else(|| JsError::new(&format!("look.{key}: expected a \"#rrggbb\" colour")))?;
+    pixfx_core::color::hex(&s).map_err(|e| JsError::new(&format!("look.{key}: {e}")))
+}
+
+/// `o[key]` as a list of exactly `N` colours, light to dark.
+fn shades<const N: usize>(o: &JsValue, key: &str) -> Result<[Rgba; N], JsError> {
+    let list = Reflect::get(o, &JsValue::from_str(key)).unwrap_or(JsValue::UNDEFINED);
+    let wrong = || {
+        JsError::new(&format!(
+            "look.{key}: expected a list of {N} \"#rrggbb\" colours"
+        ))
+    };
+    if !Array::is_array(&list) || Array::from(&list).length() as usize != N {
+        return Err(wrong());
+    }
+    let list = Array::from(&list);
+    let mut out = [Rgba::NONE; N];
+    for (i, slot) in out.iter_mut().enumerate() {
+        let s = list.get(i as u32).as_string().ok_or_else(wrong)?;
+        *slot = pixfx_core::color::hex(&s)
+            .map_err(|e| JsError::new(&format!("look.{key}[{i}]: {e}")))?;
+    }
+    Ok(out)
 }
 
 fn text(e: &JsValue, key: &str) -> String {
