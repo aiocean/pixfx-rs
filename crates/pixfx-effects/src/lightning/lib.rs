@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use pixfx_core::Painter;
 use pixfx_core::color::Rgba;
-use pixfx_core::math::{Rng, js_max, js_min, js_round};
+use pixfx_core::math::{Rng, js_max, js_min, js_round, or_one};
 use pixfx_core::sim::GRAVITY;
 
 /// Default palette, dark to bright: deep violet shadow, electric blue, icy white.
@@ -309,7 +309,7 @@ pub fn flight(x: f64, y: f64, vx: f64, vy: f64, age: f64, floor: f64) -> (f64, f
 /// A spark drawn the way the simulation draws one (a streak stretched by speed, a hot head, light), for pure loops.
 pub fn spark(p: &mut Painter, x: f64, y: f64, vx: f64, vy: f64, k: f64, s: &[Rgba; 4]) {
     let h = libm::hypot(vx, vy);
-    let sp = if h == 0.0 { 1.0 } else { h };
+    let sp = or_one(h);
     let (ux, uy) = (vx / sp, vy / sp);
     let head = if k > 0.6 {
         s[0]

@@ -1,5 +1,7 @@
 //! Explosion: port of pixelfx `src/fx/explosions/small-explosion.js`.
 //!
+//! Beyond pixelfx: the `size` option is held to 0..=16, so a huge number cannot hang the particle loops.
+//!
 //! The particle recipe (fire puffs that cool into smoke, sparks, embers, burning brands, grit, rocks, scorch) is
 //! adapted from Sprite Fusion's open-source explosion (https://www.spritefusion.com/pixel-art-vfx/explosion),
 //! MIT License, Copyright (c) 2026 Hugo Duprez.
@@ -45,6 +47,8 @@ const PALETTE: [Rgba; 8] = [
 ];
 const STONE: Rgba = Rgba::hex24(0x4a3f69);
 const SIZE: f64 = 1.0;
+/// The largest explosion drawn (beyond pixelfx, which draws any size; see the module doc).
+const MAX_SIZE: f64 = 16.0;
 
 const D: f64 = META.duration;
 const SOOT: Rgba = Rgba::hex24(0x0d0a12);
@@ -159,7 +163,7 @@ impl Effect for SmallExplosion {
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let f: [Rgba; 8] = ramp(&opts.palette_or(&PALETTE));
-        let s = opts.num_or("size", SIZE);
+        let s = opts.num_in("size", SIZE, 0.0, MAX_SIZE);
         let rad = 18.0 * s;
         let power = 0.9 * libm::pow(s, 0.8);
         let earth = 1.6;
