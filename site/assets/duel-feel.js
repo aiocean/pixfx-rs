@@ -13,11 +13,13 @@ const SHAKE = 3;
 const KO = { stop: 0.25, speed: 0.35, slow: 1.2 };
 /** Damage numbers rise this many pixels over their life. */
 const NUMBER = { rise: 14, life: 0.8 };
+/** A streak of qi from a caster to where its spell lands shows this long. */
+const STREAK = 0.28;
 /** An ultimate dims the sky this much, fading over this many seconds. */
 const DUSK = { depth: 0.55, time: 0.9 };
 
 export function createFeel() {
-  return { stop: 0, slow: 0, trauma: 0, dusk: 0, numbers: [] };
+  return { stop: 0, slow: 0, trauma: 0, dusk: 0, numbers: [], streaks: [] };
 }
 
 /** Take in what the duel just did (its `step` commands; the effect ones are ignored). */
@@ -48,6 +50,8 @@ export function react(feel, commands) {
       feel.stop = Math.max(feel.stop, KO.stop);
       feel.slow = KO.slow;
       feel.trauma = Math.min(1, feel.trauma + 0.8);
+    } else if (c.type === "streak") {
+      feel.streaks.push({ ...c, t: 0 });
     } else if (c.type === "ultimate") {
       feel.stop = Math.max(feel.stop, 0.1);
       feel.dusk = DUSK.time;
@@ -70,6 +74,8 @@ export function advance(feel, dt) {
   feel.dusk = Math.max(0, feel.dusk - dt);
   for (const n of feel.numbers) n.t += dt;
   feel.numbers = feel.numbers.filter((n) => n.t < NUMBER.life);
+  for (const k of feel.streaks) k.t += dt;
+  feel.streaks = feel.streaks.filter((k) => k.t < STREAK);
   if (feel.stop > 0) {
     feel.stop = Math.max(0, feel.stop - dt);
     return 0;
@@ -105,4 +111,9 @@ export function numbers(feel) {
     by: n.by,
     kind: n.kind,
   }));
+}
+
+/** Each qi streak: from where, to where (heights up from the ground), whose, and how faded (1 new, 0 gone). */
+export function streaks(feel) {
+  return feel.streaks.map((k) => ({ x0: k.x0, y0: k.y0, x1: k.x1, y1: k.y1, by: k.by, fade: 1 - k.t / STREAK }));
 }

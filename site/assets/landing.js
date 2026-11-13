@@ -3,8 +3,8 @@
 // draws its own sprites, then the front layers.
 import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 import { DECOR, createDuel, step } from "./duel.js";
-import { drawBars, drawFighter, drawNumbers } from "./duel-art.js";
-import { advance, createFeel, dusk, numbers, react, shake } from "./duel-feel.js";
+import { drawBars, drawFighter, drawNumbers, drawStreaks } from "./duel-art.js";
+import { advance, createFeel, dusk, numbers, react, shake, streaks } from "./duel-feel.js";
 import { createScene, drawScene } from "./duel-scene.js";
 
 /** Behind the hero's scene while the screen shakes. */
@@ -166,6 +166,7 @@ function createHero(canvas, signal) {
     }
     for (const f of view.duel.fighters) drawFighter(ctx, f, ground, scale);
     view.stage.drawLayer("front");
+    drawStreaks(ctx, streaks(view.feel), view.duel, scale);
     drawNumbers(ctx, numbers(view.feel), view.duel, scale);
     ctx.restore();
     drawBars(ctx, view.duel, scale, view.layout.barTop);

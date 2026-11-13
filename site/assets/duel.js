@@ -71,6 +71,8 @@ const GUARD_COST = 8;
 /** The share of a blocked blow's damage that still lands. */
 const CHIP = 0.15;
 const KNOCKBACK = 70;
+/** How close two bodies can stand: the space each one takes up, and a pixel between. */
+const PERSONAL = 2 * HALF_WIDTH + 2;
 const ROUND_PAUSE = 3.2;
 
 const CAST_CIRCLE = "arcane/rune-circle";
@@ -82,7 +84,26 @@ const CLASH = "impacts/parry";
  * is left out of the fight (slash and block need none).
  */
 export const SPELLS = {
-  slash: { kind: "melee", type: "physical", cost: 0, windup: 0.2, recover: 0.32, cooldown: 0.55, range: 20, damage: 8 },
+  slash: { kind: "melee", type: "physical", cost: 0, windup: 0.2, recover: 0.32, cooldown: 0.7, range: 20, damage: 6 },
+  // Thunder: a flash of lightning that carries the body through the foe and out the other side
+  step: { kind: "dash", type: "physical", fx: "spawn/poof", cost: 16, windup: 0.26, recover: 0.32, cooldown: 3.4, distance: 72, damage: 11 },
+  // Thunder: a gold seal opens on the ground under the foe, and a thunderclap bursts from it
+  seal: {
+    kind: "zone", type: "magic", fx: "explosions/plasma-explosion", cost: 20, windup: 0.3, recover: 0.3, cooldown: 2.4,
+    sigil: 0.4, impact: 0.08, radius: 16, damage: 17, notice: 0, height: CHEST, shock: true,
+  },
+  // Frost: a lotus of ice shards blooms from the palm at close range, and cracks the foe's guard
+  lotus: { kind: "blast", type: "magic", fx: "holy/feather-burst", cost: 16, windup: 0.3, recover: 0.3, cooldown: 2.2, range: 34, damage: 13, defDown: 3 },
+  // Frost: a pale fire that does not warm, lit under the foe; it burns whoever stands in it
+  frostfire: {
+    kind: "void", type: "magic", fx: "fire/spirit-flame", cost: 22, windup: 0.4, recover: 0.3, cooldown: 5,
+    life: 2.6, height: 0, pull: 0, reach: 18, under: 18, tick: 5, damage: 6, chill: true,
+  },
+  // Frost: a blue seal under the foe that shatters into a burst of cold, freezing it
+  shatter: {
+    kind: "zone", type: "magic", fx: "explosions/plasma-explosion", cost: 22, windup: 0.35, recover: 0.3, cooldown: 3,
+    sigil: 0.35, impact: 0.08, radius: 16, damage: 18, notice: 0, height: CHEST, freeze: 0.6,
+  },
   // from above: drop onto the foe sword first, and crack the ground if it lands there
   dive: { kind: "melee", type: "physical", dive: true, cost: 8, windup: 0.22, recover: 0.4, cooldown: 1.6, range: 22, damage: 13, speed: 260, slamFx: "explosions/dirt-explosion" },
   bolt: { kind: "bolt", type: "magic", fx: "projectiles/laser-bolt", cost: 12, windup: 0.28, recover: 0.22, cooldown: 1.3, speed: 230, damage: 9, shock: true },
@@ -96,7 +117,7 @@ export const SPELLS = {
   // implosion sucks in until 0.8 s and pops at 1.02 s (pixelfx explosions/implosion.js SUCK, STILL)
   collapse: {
     kind: "zone", type: "magic", silence: 1.5, fx: "explosions/implosion", cost: 26, windup: 0.5, recover: 0.3, cooldown: 2.4,
-    impact: 1.02, radius: 18, damage: 18, notice: 0.15, height: CHEST, pull: 30, reach: 46, pullUntil: 0.8,
+    impact: 1.02, radius: 18, damage: 18, notice: 0.15, height: CHEST, pull: 60, reach: 52, pullUntil: 0.8,
   },
   // a thunderclap from the open palm, at arm's length
   palm: { kind: "blast", type: "physical", stealRage: 1, fx: "explosions/plasma-explosion", cost: 18, windup: 0.32, recover: 0.35, cooldown: 2.8, range: 30, damage: 14, shock: true },
@@ -113,7 +134,7 @@ export const SPELLS = {
   // void-orb hangs 62 px over its origin (pixelfx shadow/void-orb.js Y) and loops every 3.2 s
   void: {
     kind: "void", type: "magic", fx: "shadow/void-orb", endFx: "explosions/implosion",
-    cost: 60, windup: 0.9, recover: 0.45, cooldown: 11, life: 3.2, height: 62, pull: 34, reach: 90, under: 22, dps: 8, damage: 10,
+    cost: 60, windup: 0.9, recover: 0.45, cooldown: 11, life: 3.2, height: 62, pull: 34, reach: 90, under: 22, tick: 4, damage: 10,
   },
   heal: { kind: "heal", fx: "holy/feather-burst", cost: 40, windup: 0.85, recover: 0.3, cooldown: 9, amount: 20 },
   // a shell of frost qi that takes blows for the caster until it breaks
@@ -127,14 +148,35 @@ export const SPELLS = {
  */
 export const SCHOOLS = {
   thunder: {
-    name: "Thunder", spells: ["slash", "dive", "palm", "bolt", "orb", "blink", "heal", "tribulation"], range: 52, aggression: 1.15, sky: 0,
+    name: "Thunder", spells: ["slash", "dive", "palm", "step", "seal", "bolt", "orb", "blink", "heal", "tribulation"], range: 52, aggression: 1.15, sky: 0,
     bolt: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#ffe98a", "#fff6c4", "#ffffff"],
     circle: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"],
+    // every effect a Thunder spell plays is drawn in gold and white, so it is plain whose it is
+    tint: {
+      "explosions/plasma-explosion": {
+        palette: ["#1a0e04", "#4a2a08", "#9a5a10", "#e0a020", "#ffd84a", "#fff3b0", "#ffffff"],
+        accent: ["#2a1408", "#7a3a10", "#e07a1a", "#ffc23d", "#fff0b0"],
+      },
+      "spawn/poof": { palette: ["#3a2a10", "#7a5a20", "#c09040", "#ffd84a", "#fff3b0", "#ffffff"], stars: ["#ffd84a", "#fff3b0", "#ffffff"] },
+      "holy/feather-burst": { palette: ["#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"] },
+      "explosions/dirt-explosion": { fire: ["#4a2a08", "#9a5a10", "#e0a020", "#ffc23d", "#ffd84a", "#ffe98a", "#fff6c4", "#ffffff"] },
+    },
   },
   frost: {
-    name: "Frost", spells: ["slash", "dive", "bolt", "icicle", "collapse", "void", "blink", "ward", "prison"], range: 84, aggression: 1.1, sky: 26,
+    name: "Frost", spells: ["slash", "dive", "lotus", "collapse", "shatter", "frostfire", "bolt", "icicle", "void", "blink", "ward", "prison"], range: 84, aggression: 1.1, sky: 26,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
+    // every effect a Frost spell plays is drawn in ice blue and white
+    tint: {
+      "explosions/plasma-explosion": {
+        palette: ["#0a1430", "#16306a", "#2c58aa", "#4a9ae0", "#8fd8ff", "#dcfbff", "#ffffff"],
+        accent: ["#0a1830", "#1a4a80", "#3a8bd8", "#a6ecff", "#ffffff"],
+      },
+      "explosions/implosion": { palette: ["#060a18", "#10224a", "#1e4a8a", "#3a8bd8", "#8fd8ff", "#dcfbff", "#ffffff"] },
+      "holy/feather-burst": { palette: ["#1e3f80", "#2c58aa", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"], glow: "#a6ecff" },
+      "fire/spirit-flame": { palette: ["#0a1430", "#16306a", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"] },
+      "spawn/poof": { palette: ["#16306a", "#2c58aa", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"], stars: ["#a6ecff", "#dcfbff", "#ffffff"] },
+    },
   },
 };
 
@@ -176,7 +218,7 @@ export function createDuel({ seed = 1, left, right, ground, has }) {
 }
 
 function fighter(index, school, spells) {
-  return { index, school, spells, stats: STATS[school], x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0 };
+  return { index, school, spells, stats: STATS[school], x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0 };
 }
 
 function startRound(duel) {
@@ -187,7 +229,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0 });
+    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0 });
     f.x = duel.left + span * (f.index === 0 ? 0.22 : 0.78);
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
@@ -220,8 +262,34 @@ function tick(duel, dt) {
     mind(duel, me, foe, dt);
     body(duel, me, foe, dt);
   }
+  separate(duel, a, b);
   for (const s of [...duel.shots]) shot(duel, s, dt);
   for (const f of duel.fighters) if (f.hp <= 0 && duel.winner === null) knockOut(duel, f);
+}
+
+/**
+ * Two bodies cannot stand in one place: when they overlap at the same height each is pushed half the overlap
+ * apart, and neither keeps walking into the other. One far enough above the other passes over it.
+ */
+function separate(duel, a, b) {
+  if (a.hp <= 0 || b.hp <= 0 || Math.abs(a.air - b.air) >= BODY - 6) return;
+  const dx = b.x - a.x;
+  const overlap = PERSONAL - Math.abs(dx);
+  if (overlap <= 0) return;
+  // exactly on top of each other: part them along the way they face
+  const dir = dx !== 0 ? Math.sign(dx) : a.face;
+  const lo = duel.left + HALF_WIDTH;
+  const hi = duel.right - HALF_WIDTH;
+  a.x = clamp(a.x - (dir * overlap) / 2, lo, hi);
+  b.x = clamp(b.x + (dir * overlap) / 2, lo, hi);
+  // against a wall one side cannot give: the other takes the rest
+  const left = PERSONAL - Math.abs(b.x - a.x);
+  if (left > 0) {
+    if (a.x === lo || a.x === hi) b.x = clamp(b.x + dir * left, lo, hi);
+    else a.x = clamp(a.x - dir * left, lo, hi);
+  }
+  if (Math.sign(a.vx) === dir) a.vx = 0;
+  if (Math.sign(b.vx) === -dir) b.vx = 0;
 }
 
 // ---------- bodies: moving, casting, getting hit ----------
@@ -236,6 +304,7 @@ function body(duel, me, foe, dt) {
   me.defDown = Math.max(0, me.defDown - dt);
   me.silence = Math.max(0, me.silence - dt);
   me.dodged = Math.max(0, me.dodged - dt);
+  me.chilled = Math.max(0, me.chilled - dt);
   me.shieldT = Math.max(0, me.shieldT - dt);
   if (me.shieldT === 0) me.shield = 0;
   burning(duel, me, dt);
@@ -249,7 +318,7 @@ function body(duel, me, foe, dt) {
 
   // feet: walking or flying across (only when free), knockback, then up and down
   const free = !me.act && me.stun === 0 && !me.medit && me.frozen === 0 && me.shocked === 0;
-  const walk = free && me.guard === 0 ? me.intent.move * WALK : 0;
+  const walk = free && me.guard === 0 ? me.intent.move * WALK * (me.chilled > 0 ? 0.45 : 1) : 0;
   me.vx *= Math.exp(-6 * dt);
   const x = me.x + (walk + me.vx) * dt;
   const lo = duel.left + HALF_WIDTH, hi = duel.right - HALF_WIDTH;
@@ -325,7 +394,7 @@ function begin(duel, me, name, target) {
   me.act = { spell: name, phase: "windup", t: 0, target };
   setMeditating(duel, me, false);
   // longer casts stand in a rune circle while they gather
-  if (spell.windup >= 0.4 && duel.has(CAST_CIRCLE)) {
+  if (spell.kind !== "melee" && spell.kind !== "blink" && spell.kind !== "dash" && duel.has(CAST_CIRCLE)) {
     me.act.circle = play(duel, CAST_CIRCLE, me.x, duel.ground, { palette: SCHOOLS[me.school].circle, seed: me.index + 1 });
   }
 }
@@ -335,12 +404,12 @@ function release(duel, me, foe, spell) {
   const g = duel.ground;
   if (me.stats.attuned && spell.kind !== "melee" && !spell.ultimate && spell.cost > 0) gainRage(me, 1);
   if (spell.kind === "melee") {
-    me.vx += me.face * 90;
+    me.vx += me.face * 50;
     if (spell.dive) {
       me.fly = false;
       // a dive that ends on the ground cracks it
       if (me.air < 2 && spell.slamFx && duel.has(spell.slamFx)) {
-        play(duel, spell.slamFx, me.x + me.face * 6, g, { size: 0.6, seed: Math.floor(duel.rng() * 1e6) });
+        cast(duel, me, spell.slamFx, me.x + me.face * 6, g, { size: 0.6 });
         emit(duel, { type: "land", x: me.x, strength: 1 });
       }
     }
@@ -366,12 +435,16 @@ function release(duel, me, foe, spell) {
     // what hangs in the air (a collapse) gathers at the foe's height; what falls (an icicle) hits the floor
     const air = spell.grounded ? 0 : foe.air;
     // a barrage falls strike after strike, each where the foe will be when it lands
+    // a sealed spell first marks the spot with the caster's seal, which the foe can see and leave
+    const sigil = spell.sigil ?? 0;
+    const mark = sigil > 0 && duel.has(CAST_CIRCLE) ? play(duel, CAST_CIRCLE, x, g - air, { palette: SCHOOLS[me.school].circle, seed: me.index + 11 }) : null;
     for (let k = 0; k < (spell.strikes ?? 1); k++) {
-      duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, air, t: -k * (spell.every ?? 0), key: null, spell, follow: k > 0 });
+      duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, air, t: -k * (spell.every ?? 0) - sigil, lead: sigil, key: k === 0 ? mark : null, spell, follow: k > 0 });
     }
+    streak(duel, me, x, air + (spell.height ?? 0));
   } else if (spell.kind === "blast") {
     const x = me.x + me.face * spell.range * 0.7;
-    play(duel, spell.fx, x, g - CHEST - me.air, { seed: Math.floor(duel.rng() * 1e6) });
+    cast(duel, me, spell.fx, x, g - CHEST - me.air);
     if (Math.abs(foe.x - me.x) <= spell.range + HALF_WIDTH && Math.abs(foe.air - me.air) < BODY && foe.hp > 0) {
       if (blocks(foe, me.x, spell.damage)) clash(duel, foe.x - me.face * 4, g - CHEST - foe.air, [foe]);
       else {
@@ -381,22 +454,37 @@ function release(duel, me, foe, spell) {
     }
   } else if (spell.kind === "void") {
     const x = clamp(foe.x, duel.left + 10, duel.right - 10);
-    const key = play(duel, spell.fx, x, g, { seed: me.index + 5 });
-    duel.shots.push({ kind: "void", owner: me.index, x, t: 0, key, spell });
+    const key = cast(duel, me, spell.fx, x, g, { seed: me.index + 5 });
+    duel.shots.push({ kind: "void", name: me.act.spell, owner: me.index, x, t: 0, tick: 0, key, spell });
+    streak(duel, me, x, spell.height ? spell.height : 4);
+  } else if (spell.kind === "dash") {
+    // gone in a flash and back a stride past the foe, cutting through it on the way
+    const from = me.x;
+    const to = clamp(me.x + me.face * spell.distance, duel.left + HALF_WIDTH, duel.right - HALF_WIDTH);
+    cast(duel, me, spell.fx, from, g - me.air);
+    me.x = to;
+    cast(duel, me, spell.fx, to, g - me.air);
+    emit(duel, { type: "streak", by: me.index, x0: from, y0: me.air + CHEST, x1: to, y1: me.air + CHEST });
+    const lo = Math.min(from, to) - HALF_WIDTH;
+    const hi = Math.max(from, to) + HALF_WIDTH;
+    if (foe.x > lo && foe.x < hi && Math.abs(foe.air - me.air) < BODY && foe.hp > 0) {
+      if (blocks(foe, from, spell.damage)) clash(duel, foe.x, g - CHEST - foe.air, [foe]);
+      else hurt(duel, foe, spell.damage, me.face, me.act.spell);
+    }
   } else if (spell.kind === "heal") {
     const gained = Math.min(100 - me.hp, spell.amount);
     me.hp += gained;
     emit(duel, { type: "heal", by: me.index, amount: Math.round((gained / 100) * me.stats.hp), x: me.x, y: me.air + CHEST });
-    play(duel, spell.fx, me.x, g - BODY - me.air, { seed: Math.floor(duel.rng() * 1e6) });
+    cast(duel, me, spell.fx, me.x, g - BODY - me.air);
   } else if (spell.kind === "ward") {
     me.shield = Math.round(WARD.share * me.stats.hp);
     me.shieldT = WARD.time;
     emit(duel, { type: "ward", by: me.index, amount: me.shield, x: me.x, y: me.air + CHEST });
-    play(duel, spell.fx, me.x, g - BODY - me.air, { palette: SCHOOLS[me.school].circle, seed: Math.floor(duel.rng() * 1e6) });
+    cast(duel, me, spell.fx, me.x, g - BODY - me.air);
   } else if (spell.kind === "blink") {
-    play(duel, spell.fx, me.x, g - me.air, { seed: Math.floor(duel.rng() * 1e6) });
+    cast(duel, me, spell.fx, me.x, g - me.air);
     me.x = clamp(me.act.target, duel.left + HALF_WIDTH, duel.right - HALF_WIDTH);
-    play(duel, spell.fx, me.x, g - me.air, { seed: Math.floor(duel.rng() * 1e6) });
+    cast(duel, me, spell.fx, me.x, g - me.air);
   }
 }
 
@@ -604,7 +692,9 @@ function shot(duel, s, dt) {
     }
     if (!s.shown && s.t >= 0) {
       s.shown = true;
-      play(duel, spell.fx, s.x, g - spell.height - s.air, { seed: Math.floor(duel.rng() * 1e6) });
+      if (s.key !== null) emit(duel, { type: "stop", key: s.key });
+      s.key = null;
+      cast(duel, duel.fighters[s.owner], spell.fx, s.x, g - spell.height - s.air);
     }
     if (s.t < 0) return;
     // a collapse drags the foe toward its heart while it sucks in
@@ -627,13 +717,23 @@ function shot(duel, s, dt) {
   } else if (s.kind === "void") {
     // the vortex drags the foe in, and burns while it stands under it
     const dx = s.x - foe.x;
-    if (Math.abs(dx) < spell.reach && foe.hp > 0) {
-      foe.x += Math.sign(dx) * Math.min(Math.abs(dx), spell.pull * dt);
-      if (Math.abs(dx) < spell.under) foe.hp = Math.max(0, foe.hp - spell.dps * dt);
+    if (Math.abs(dx) < spell.reach && foe.hp > 0) foe.x += Math.sign(dx) * Math.min(Math.abs(dx), spell.pull * dt);
+    // frostfire slows whoever stands in it
+    if (spell.chill && Math.abs(dx) < spell.under) foe.chilled = 0.1;
+    // it burns whoever stands under it, a tick every half second
+    s.tick += dt;
+    if (s.tick >= 0.5) {
+      s.tick -= 0.5;
+      if (Math.abs(dx) < spell.under && foe.hp > 0) {
+        const by = duel.fighters[s.owner];
+        const amount = damageOf(by, foe, spell.tick, spell.type, false, duel.rng());
+        const share = take(duel, foe, amount);
+        emit(duel, { type: "tick", by: by.index, damage: amount, share, x: foe.x, y: foe.air + CHEST });
+      }
     }
     if (s.t >= spell.life) {
       burst(duel, spell.endFx, s.x, g - spell.height);
-      if (Math.abs(dx) < spell.under) hurt(duel, foe, spell.damage, -Math.sign(dx) || 1, "void");
+      if (Math.abs(dx) < spell.under) hurt(duel, foe, spell.damage, -Math.sign(dx) || 1, s.name);
       endShot(duel, s);
     }
   }
@@ -725,7 +825,8 @@ function dangers(duel, me) {
       out.push({ spell: "move", move: me.vx !== 0 ? Math.sign(me.vx) * (atWall(duel, me) ? -1 : 1) : way, score: s.spell.damage * 1.4 });
       continue;
     }
-    if (s.t < REACTION) continue;
+    // a sealed spell is seen from the moment its seal shows
+    if (s.t + (s.lead ?? 0) < REACTION) continue;
     if (s.kind === "bolt") {
       const toward = Math.sign(me.x - s.x) === Math.sign(s.vx);
       const tti = Math.abs(me.x - s.x) / Math.abs(s.vx);
@@ -751,7 +852,7 @@ function dangers(duel, me) {
       if (ready(me, "bolt")) out.push({ spell: "bolt", target: null, score: urgency * 1.15 });
       const b = blink(bx);
       if (b) b.score = urgency * 0.9;
-    } else if (s.kind === "zone" && !s.fell && s.t >= s.spell.notice) {
+    } else if (s.kind === "zone" && !s.fell && s.t + (s.lead ?? 0) >= s.spell.notice) {
       const dx = me.x - s.x;
       if (Math.abs(dx) > (s.spell.reach ?? 0) + s.spell.radius + HALF_WIDTH + 4) continue;
       const left = s.spell.impact - s.t;
@@ -836,21 +937,29 @@ function attacks(duel, me, foe) {
     const pace = foe.act || foe.stun > 0 || foe.medit ? 0 : foe.intent.move * WALK;
     out.push({ spell: name, target: foe.x + pace * lead * 0.8, score: value(name, 0.8) * (SPELLS[name].strikes ?? 1) + 3 });
   }
-  for (const name of ["icicle", "collapse"]) {
-    if (!ready(me, name)) continue;
+  for (const name of me.spells) {
+    if (SPELLS[name].kind !== "zone" || SPELLS[name].ultimate || !ready(me, name)) continue;
     // aim where the foe will be when it lands
-    const lead = SPELLS[name].windup + SPELLS[name].impact;
+    const lead = SPELLS[name].windup + (SPELLS[name].sigil ?? 0) + SPELLS[name].impact;
     const pace = foe.act || foe.stun > 0 || foe.medit ? 0 : foe.intent.move * WALK;
     const target = foe.x + pace * lead * 0.8;
     // an icicle only finds a foe standing on the floor
     const grounded = SPELLS[name].grounded ? (foe.air < 10 && !foe.fly ? 1 : 0.1) : 1;
     out.push({ spell: name, target, score: value(name, (busy > lead * 0.6 ? 0.85 : SPELLS[name].pull ? 0.5 : 0.4) * grounded) });
   }
-  if (ready(me, "palm") && d < SPELLS.palm.range + 4) {
-    out.push({ spell: "palm", score: value("palm", busy > SPELLS.palm.windup ? 0.9 : foe.guard > 0 ? 0.2 : 0.55) });
-  }
-  if (ready(me, "void") && (foe.hp < 75 || busy > 0.4)) {
-    out.push({ spell: "void", score: value("void", 0.7) + 4 });
+  for (const name of me.spells) {
+    const s = SPELLS[name];
+    if (s.kind === "blast" && ready(me, name) && d < s.range + 4) {
+      out.push({ spell: name, score: value(name, busy > s.windup ? 0.9 : foe.guard > 0 ? 0.2 : 0.55) });
+    }
+    // a fire or a vortex under the foe: worth it on a foe that cannot leave it soon
+    if (s.kind === "void" && ready(me, name) && (busy > 0.4 || foe.frozen > 0 || foe.hp < 75)) {
+      out.push({ spell: name, score: value(name, 0.7) + 4 });
+    }
+    // a lightning step: the foe within a stride, on my level
+    if (s.kind === "dash" && ready(me, name) && d > 12 && d < s.distance - 10 && Math.abs(foe.air - me.air) < CHEST) {
+      out.push({ spell: name, score: value(name, busy > s.windup ? 0.9 : foe.guard > 0 ? 0.2 : 0.6) });
+    }
   }
   if (ready(me, "ward") && me.shield === 0 && me.hp < 90) {
     const safe = d > 50 && !foe.act ? 1 : 0.6;
@@ -871,9 +980,15 @@ function positions(duel, me, foe) {
   const has = (...kinds) => me.spells.some((name) => kinds.includes(SPELLS[name].kind));
   // and with too little qi to cast, it closes in to use the sword
   const casting = me.qi >= 25;
-  const range = casting && has("bolt", "orb", "zone", "void") ? SCHOOLS[me.school].range : casting && has("blast") ? SPELLS.palm.range - 6 : SPELLS.slash.range - 4;
+  const range = casting && has("bolt", "orb", "zone", "void") ? SCHOOLS[me.school].range : casting && has("blast", "dash") ? 26 : SPELLS.slash.range - 4;
   const off = Math.abs(d) - range;
   const out = [{ spell: "wait", score: 0.4 }];
+  // inside the foe's sword reach with no blade of my own ready: get out of it
+  if (Math.abs(d) < SPELLS.slash.range + 4 && me.air - foe.air < CHEST && !ready(me, "slash")) {
+    const back = -Math.sign(d) || 1;
+    const room = back < 0 ? me.x - duel.left : duel.right - me.x;
+    if (room > 14) out.push({ spell: "move", move: back, score: 2.2 });
+  }
   if (Math.abs(off) > 8) {
     let move = Math.sign(d) * Math.sign(off);
     // backed against a wall: step out sideways past the foe's reach instead
@@ -902,6 +1017,16 @@ function play(duel, fx, x, y, opts) {
   const key = ++duel.key;
   emit(duel, { type: "play", key, fx, x, y, opts });
   return key;
+}
+
+/** Play `fx` for fighter `me`'s spell, in its school's colours. */
+function cast(duel, me, fx, x, y, opts = {}) {
+  return play(duel, fx, x, y, { ...SCHOOLS[me.school].tint?.[fx], seed: Math.floor(duel.rng() * 1e6), ...opts });
+}
+
+/** A streak of `me`'s qi from where it casts to where the spell lands (heights up from the ground). */
+function streak(duel, me, x, y) {
+  emit(duel, { type: "streak", by: me.index, x0: me.x + me.face * 6, y0: me.air + CHEST, x1: x, y1: y });
 }
 
 function emit(duel, command) {

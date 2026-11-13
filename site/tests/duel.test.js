@@ -1,6 +1,6 @@
 // The duel's rules and minds, driven the way the hero drives them: step after step, playing what comes back.
 import { describe, expect, test } from "bun:test";
-import { SPELLS, STATS, createDuel, damageOf, step } from "../assets/duel.js";
+import { SCHOOLS, SPELLS, STATS, createDuel, damageOf, step } from "../assets/duel.js";
 
 const PLAN2 = new Set([
   "fire/candle", "fire/campfire", "fire/brazier", "impacts/parry", "explosions/plasma-explosion", "explosions/implosion",
@@ -232,5 +232,72 @@ describe("duel", () => {
       if (caster.act) cast.add(caster.act.spell);
     }
     expect(cast.has("bolt")).toBe(false);
+  });
+  test("whose spell it is shows in its colours: every tinted effect a fighter plays uses its school's palette", () => {
+    const owner = new Map();
+    let checked = 0;
+    for (const seed of [1, 2, 3]) {
+      const duel = arena(seed);
+      for (let i = 0; i < 40 * 60; i++) {
+        for (const c of step(duel, 1 / 60)) {
+          if (c.type !== "play" || !c.opts?.palette) continue;
+          const schools = Object.entries(SCHOOLS).filter(([, sc]) =>
+            [sc.tint?.[c.fx]?.palette, sc.circle, sc.bolt].some((p) => JSON.stringify(p) === JSON.stringify(c.opts.palette)),
+          );
+          // the palette belongs to exactly one school
+          expect(schools.length).toBe(1);
+          owner.set(c.key, schools[0][0]);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+    expect(new Set(owner.values()).size).toBe(2);
+  });
+
+  test("the same blast is gold from thunder and ice blue from frost", () => {
+    for (const [index, spell] of [[0, "seal"], [1, "shatter"]]) {
+      const duel = arena(4);
+      const me = duel.fighters[index];
+      const foe = duel.fighters[1 - index];
+      me.think = 1e9;
+      foe.think = 1e9;
+      me.act = { spell, phase: "windup", t: SPELLS[spell].windup - 1 / 60, target: foe.x };
+      let strike;
+      for (let i = 0; i < 60 && !strike; i++) strike = step(duel, 1 / 60).find((c) => c.type === "play" && c.fx === "explosions/plasma-explosion");
+      expect(strike.opts.palette).toEqual(SCHOOLS[me.school].tint["explosions/plasma-explosion"].palette);
+    }
+  });
+
+  test("a seal marks the spot before its strike lands there", () => {
+    const duel = arena(4);
+    const [caster, foe] = duel.fighters;
+    caster.think = 1e9;
+    foe.think = 1e9;
+    caster.x = 60;
+    foe.x = 140;
+    caster.act = { spell: "seal", phase: "windup", t: SPELLS.seal.windup - 1 / 60, target: 140 };
+    const plays = [];
+    for (let i = 0; i < 60; i++) for (const c of step(duel, 1 / 60)) if (c.type === "play") plays.push({ ...c, i });
+    const mark = plays.find((c) => c.fx === "arcane/rune-circle" && c.x === 140);
+    const strike = plays.find((c) => c.fx === SPELLS.seal.fx);
+    expect(mark).toBeDefined();
+    expect(strike.x).toBe(140);
+    expect((strike.i - mark.i) / 60).toBeCloseTo(SPELLS.seal.sigil, 1);
+  });
+  test("two fighters on the ground never stand inside each other", () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const duel = arena(seed);
+      const [a, b] = duel.fighters;
+      // start them on one spot
+      a.x = 110;
+      b.x = 110;
+      let closest = Infinity;
+      for (let i = 0; i < 60 * 60; i++) {
+        step(duel, 1 / 60);
+        if (duel.winner === null && Math.abs(a.air - b.air) < 20) closest = Math.min(closest, Math.abs(a.x - b.x));
+      }
+      expect(closest).toBeGreaterThanOrEqual(12);
+    }
   });
 });
