@@ -51,23 +51,33 @@ The engine draws every frame, the painter's fade included (pixelfx `p.fade`, 0.3
 defined once, in the painter. Running effects have fade 1, so their frames are shared; a stopped effect's fade
 frames are its own and it draws them with its own engine instance, exactly as pixelfx does.
 
-### 3. Phaser shares frames (frame cache)
+### 3. Every host shares frames by one key (Rust), stored in its own form
 
-Each effect keeps its engine instance as its clock: it advances with scene time, fires cues, says when it ends,
-and sits on the frame its clock is on (`Fx.frameIndex()`). Effects with one key `(id, engine options, margin)` live
-in one worker lane. When an effect reaches frame k of its key and the cache lacks it, its own instance draws it
-(it is already on frame k) and the frame, cropped to its lit box, goes to the main thread once; every effect with
-that key on frame k shows the same four textures. A stopped effect draws its fade frames itself and shows them on
-its own textures. The cache keeps the bytes (layers composite from them) and the textures (effects show them);
-past a byte budget (default 64 MB) least-recently-shown frames are dropped, and the next effect to reach a dropped
-frame draws it again.
+Today the canvas `Stage` draws and blits every effect on every display frame (`stage.rs` `draw_layer`), 2 to 4
+times the effect's 30 fps, and nothing is shared; Phaser uploads four textures per effect per new frame.
 
-### 4. Baked sheets (pixfx-cli + Phaser)
+- **The key, once, in Rust (pixfx-core).** `ClipKey` is a canonical byte encoding of `(effect id, options, margin,
+  placement)`; a shown frame is `(ClipKey, k)`. The encoder destructures `Options` and `Placement`, so a new field
+  does not compile until it is encoded. The key travels to JS and into bake files as a string.
+- **Player in pixfx-core.** `Player` (one effect on its own canvas) moves from pixfx-wasm to pixfx-core so every
+  host plays through it (architecture review #3). `Player::shown(place)` gives the frame's identity, or none while
+  the effect fades after `stop()` (a fade frame is its own).
+- **One rule for every host:** redraw only when the shown frame changes; if another effect already holds that
+  frame, show the held one instead of drawing.
+- **Canvas (pixfx-canvas):** per frame, one `OffscreenCanvas` per layer, drawn once and `drawImage`d by every effect
+  showing it.
+- **Phaser:** effects with one key live in one worker lane; the first effect to reach a missing frame draws it and
+  sends it once, cropped to its lit box; per frame four textures, shown by every effect on it.
+- **gpui (pixfx-gpui):** per frame one image per layer, painted by every view showing it.
+- **Memory:** each host holds frames under a byte budget (default 64 MB) and drops the least recently shown first;
+  a dropped frame is drawn again by the next effect that reaches it.
 
-`pixfx bake <id>[:<options json>] … --out <dir>` writes, per clip, an atlas PNG of every frame cropped to its lit
-box (back colour, back light, front colour, front light) and a JSON of each frame's rect and offset.
-`scene.pixfx.loadBaked(key, url)` in the game's `preload` fills the clip cache from it; effects whose key is baked
-never touch wasm to draw. Clips that are not baked fill the cache at runtime.
+### 4. Baked sheets (pixfx-cli, canvas, Phaser)
+
+`pixfx bake <id>[:<options json>] … --out <dir>` writes, per key, an atlas PNG of every frame cropped to its lit
+box (back colour, back light, front colour, front light) and a JSON of the key and each frame's rect and offset.
+`scene.pixfx.loadBaked(url)` (Phaser) and `stage.loadBaked(url)` (canvas) fill the hosts' frame stores from it;
+effects whose frames are baked never touch wasm to draw. Frames that are not baked fill the stores at runtime.
 
 ### 5. SIMD
 
@@ -80,7 +90,9 @@ compiler does not vectorise, so the flag would only raise the browser floor (Saf
 - Property test: for random dt sequences, a live instance's drawn frame equals `render_frames` frame k (loops and
   one-shots, every effect).
 - Goldens and `pixfx parity` unchanged.
-- Phaser: fifty campfires share one clip (`stats().textures` stays at one clip's count); byte-equal frames inline
-  vs pool with a late worker.
+- Key: equal inputs give equal keys; every field of `Options` and `Placement` changes the key.
+- Each host (canvas, Phaser, gpui): fifty effects with one key draw each frame once; a host redraws only on a new
+  frame; a dropped frame comes back byte-equal; a stopped effect fades on its own frames. Phaser: byte-equal frames
+  inline vs pool with a late worker.
 - `bun run perf` before and after, on the owner's machine (this agent's session has no display); Chrome check of
   the demo at 60 fps with no console errors.

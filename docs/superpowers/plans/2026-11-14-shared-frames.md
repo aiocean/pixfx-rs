@@ -14,30 +14,46 @@ and wasm `Fx.frameIndex()` expose the frame.
 Test: `pixfx-effects/tests/live_frames.rs`: uneven steps, zero steps and stalls draw `render_frames` frame k for
 every effect. Goldens unchanged.
 
-## 2. Phaser: frame cache
+## 2. Frame key and Player in pixfx-core
 
-- Lanes by key: every effect with one key `(id, canonical engine options, margin)` lives in one worker lane (or
-  inline).
-- Worker: after `update(dt)`, an effect reports `frameIndex()`. If its key's frame k is not on the main thread,
-  that effect draws it (it is on frame k), crops it to its lit box and sends it once as `(key, k, rect, buffers)`.
-  A stopped effect draws and sends its own fade frames, as today.
-- Main thread `FrameCache`: per `(key, k)` the cropped bytes (layers composite from them) and four textures
-  (effects show them). Byte budget (default 64 MB), least recently shown dropped first; drops are sent to the
-  worker so the next effect on that frame draws it again.
-- `PixfxEffect` shows the cached frame's textures at the frame's offset; `runner.ts` redraws by `frameIndex()`.
+- `key.rs`: `ClipKey` = canonical bytes of `(effect id, Options, margin, Placement)` (destructured, so a new field
+  fails to compile until encoded), `Display` as a string for JS and bake files.
+- Move `Player` from pixfx-wasm to pixfx-core (re-exported by pixfx-wasm); `Player::shown(place)` →
+  `Option<(ClipKey, u64)>`, none while fading.
+- Tests: equal inputs equal keys; each field changes the key.
+
+## 3. Canvas Stage shares frames
+
+`pixfx-canvas`: a frame store keyed by `(ClipKey, k)` holding one `OffscreenCanvas` per layer, under a byte budget;
+`draw_layer` redraws an effect only when its shown frame changes and draws a frame only when the store lacks it.
+Tests: native `Scene` counts draws (fifty same-key effects, one draw per frame; no redraw without a new frame).
+
+## 4. Phaser shares frames
+
+- Lanes by key: every effect with one key lives in one worker lane (or inline).
+- Worker: after `update(dt)`, an effect reports its shown frame. If the main thread lacks it, that effect draws it
+  (it is on that frame), crops it to its lit box and sends it once as `(key, k, rect, buffers)`. A stopped effect
+  draws and sends its own fade frames.
+- Main thread `FrameCache`: per `(key, k)` the cropped bytes (layers composite from them) and four textures;
+  byte budget, least recently shown dropped first; drops are sent to the worker.
 - Tests: fifty effects with one key upload one set of textures per frame; inline and pool give the same bytes with
   a late worker; a dropped frame comes back with the same bytes; a stopped effect fades on its own textures.
 
-## 3. Bake
+## 5. gpui shares frames
 
-`pixfx bake <id>[:<options json>]… --out <dir>`: per clip an atlas PNG (each frame cropped to its lit box, four
-layers) and a JSON of rects and offsets. `scene.pixfx.loadBaked(key, url)` in `preload` fills the cache.
+`pixfx-gpui`: views showing one `(key, k)` paint the same images; redraw only on a new frame. Checked with
+`cargo test --manifest-path crates/pixfx-gpui/Cargo.toml`.
 
-## 4. SIMD (measured: no gain, not adopted)
+## 6. Bake
+
+`pixfx bake <id>[:<options json>]… --out <dir>`: per key an atlas PNG (each frame cropped to its lit box, four
+layers) and a JSON of rects and offsets. `scene.pixfx.loadBaked(url)` and `stage.loadBaked(url)` fill the hosts' stores.
+
+## 7. SIMD (measured: no gain, not adopted)
 
 The wasm golden test (25 effects × 3 seeds) takes the same CPU with and without `+simd128` (user 26.0 / 26.5 s vs
 26.1 / 26.5 s, bytes equal): the draw code is scalar f64 per pixel with branches. The wasm keeps the default target.
 
-## 5. Measure
+## 8. Measure
 
 `bun run perf` on the owner's machine before (main before task 1) and after; Chrome check of the demo.
