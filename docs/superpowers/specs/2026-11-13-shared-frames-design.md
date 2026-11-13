@@ -1,7 +1,7 @@
 # Shared frames: fixed ticks, a frame cache, baked sheets, wasm SIMD
 
 Date: 2026-11-13 · Asked by the owner: use what Rust gives us that pixelfx (JS) cannot, so the game spends less CPU on
-effects. Chosen: fixed-step simulations, a frame cache shared by identical effects, baked sprite sheets, SIMD.
+effects. Chosen: fixed-step simulations, a frame cache shared by identical effects, baked sprite sheets; SIMD measured.
 
 ## Facts this rests on
 
@@ -33,35 +33,34 @@ From the code:
 
 ## Design
 
-### 1. A clip is the one definition of an effect's frames (pixfx-core)
+### 1. Live play shows rendered frames (pixfx-core)
 
-`Clip` = the frames of one effect with one set of options and margin, computed lazily and kept:
-`Clip::frame(k) -> &Frame` steps its own instance forward tick by tick (never backwards) and stores each frame.
-`render_frames` becomes "every frame of a clip", so the parity reference and goldens do not change.
-
-Frame index k of a live instance at time t is `floor(t × fps)`; a loop shows clip frame `k mod n`, a one-shot clip
-frame `min(k, n − 1)`. Live play is then byte-equal to the render for **any** sequence of dt, which:
+An `Instance` keeps the host's clock `t` and shows frame `floor(t × fps)`, wrapped round a loop and held at a
+one-shot's last frame. Its state takes ticks of `1 / fps` (respawning when a loop comes round), the same ticks
+`render_frames` takes to frame k. Live play is then byte-equal to the render for **any** sequence of dt, which:
 
 - makes every effect cacheable and bakeable (simulations included);
 - removes the worker pool's inline-vs-late difference (review #6);
 - keeps pixelfx parity: the bare render is unchanged, and pixelfx's own live play was never the reference.
 
-Cues keep firing on continuous time; only drawing is quantised to the clip's frames.
+Cues keep firing on the continuous clock; only drawing is quantised to frames.
 
-### 2. Fade-out on stop is a pass over a frame
+### 2. A frame is a pure function of (effect, options, frame, fade)
 
-Today `stop()` fades by passing `fade` into the painter, so a stopped effect's frame is not a clip frame. The fade
-becomes a pure pass applied on top of a clip frame: a colour pixel stays where `fade > bayer(x, y)`, light is scaled
-by `fade`. Same 4×4 ordered dither and 0.3 s as the painter's fade; opaque pixels fade exactly as before, dithered
-pixels and saturated light differ slightly (owner's choice: one code path, stopped effects stay on shared frames).
+The engine draws every frame, the painter's fade included (pixelfx `p.fade`, 0.3 s after `stop()`). The fade is
+defined once, in the painter. Running effects have fade 1, so their frames are shared; a stopped effect's fade
+frames are its own and it draws them with its own engine instance, exactly as pixelfx does.
 
-### 3. Phaser shares clips (frame cache)
+### 3. Phaser shares frames (frame cache)
 
-A clip is keyed by `(id, engine options, margin)`. The plugin keeps one clip per key: each frame becomes four
-textures, uploaded once, shown by every effect with that key. Per effect the plugin keeps only its time, stop
-state and cues. Memory has a budget (default 64 MB of texture); past it, least-recently-shown clip frames are
-dropped and recomputed on demand. Clips are computed in one worker each (a clip's simulation must step in order),
-picked by least load as today.
+Each effect keeps its engine instance as its clock: it advances with scene time, fires cues, says when it ends,
+and sits on the frame its clock is on (`Fx.frameIndex()`). Effects with one key `(id, engine options, margin)` live
+in one worker lane. When an effect reaches frame k of its key and the cache lacks it, its own instance draws it
+(it is already on frame k) and the frame, cropped to its lit box, goes to the main thread once; every effect with
+that key on frame k shows the same four textures. A stopped effect draws its fade frames itself and shows them on
+its own textures. The cache keeps the bytes (layers composite from them) and the textures (effects show them);
+past a byte budget (default 64 MB) least-recently-shown frames are dropped, and the next effect to reach a dropped
+frame draws it again.
 
 ### 4. Baked sheets (pixfx-cli + Phaser)
 
@@ -72,8 +71,9 @@ never touch wasm to draw. Clips that are not baked fill the cache at runtime.
 
 ### 5. SIMD
 
-Build the wasm with `-C target-feature=+simd128` (a `.cargo/config.toml` for `wasm32-unknown-unknown`). Integer
-paths give the same bytes; the native-vs-wasm frame-hash test is the gate.
+Measured, not adopted: the wasm golden test takes the same CPU with and without `-C target-feature=+simd128` (user
+26.0 / 26.5 s vs 26.1 / 26.5 s, frames byte-equal). The draw code is scalar f64 per pixel with branches, which the
+compiler does not vectorise, so the flag would only raise the browser floor (Safari 16.4).
 
 ## Verification
 

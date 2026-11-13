@@ -14,39 +14,30 @@ and wasm `Fx.frameIndex()` expose the frame.
 Test: `pixfx-effects/tests/live_frames.rs`: uneven steps, zero steps and stalls draw `render_frames` frame k for
 every effect. Goldens unchanged.
 
-## 2. Clock and Clip (core)
+## 2. Phaser: frame cache
 
-- `Clock`: the host's time, stop, end and cues of one effect, with no state to step. `Instance` = `Clock` + state.
-- `Clip`: one effect with one set of options and margin, drawing any frame k on request (seek forward, respawn
-  when behind). `render_frames` = every frame of a clip. `fade_pass(frame, fade)`: the stop fade as a pass.
+- Lanes by key: every effect with one key `(id, canonical engine options, margin)` lives in one worker lane (or
+  inline).
+- Worker: after `update(dt)`, an effect reports `frameIndex()`. If its key's frame k is not on the main thread,
+  that effect draws it (it is on frame k), crops it to its lit box and sends it once as `(key, k, rect, buffers)`.
+  A stopped effect draws and sends its own fade frames, as today.
+- Main thread `FrameCache`: per `(key, k)` the cropped bytes (layers composite from them) and four textures
+  (effects show them). Byte budget (default 64 MB), least recently shown dropped first; drops are sent to the
+  worker so the next effect on that frame draws it again.
+- `PixfxEffect` shows the cached frame's textures at the frame's offset; `runner.ts` redraws by `frameIndex()`.
+- Tests: fifty effects with one key upload one set of textures per frame; inline and pool give the same bytes with
+  a late worker; a dropped frame comes back with the same bytes; a stopped effect fades on its own textures.
 
-## 3. wasm bindings
-
-`FxClock` (per effect: `update`, `stop`, `done`, `frameIndex`, `takeCues`, `fade`) and `FxClip` (per key:
-`draw(k)` into the four RGBA buffers, `drawFaded(k, fade)`), both read through the pointer views Phaser already
-uses.
-
-## 4. Phaser: clip cache
-
-- `ClipCache` (game-wide): key = id + canonical engine options + margin. Per frame: four textures, uploaded once.
-  LRU over a texture-byte budget (default 64 MB).
-- A clip's frames are drawn in one worker lane (or inline), requested in frame order.
-- `PixfxEffect` keeps an `FxClock` on the main thread; on a new frame index it shows the cached frame's textures
-  (requesting it when missing). After `stop()` it draws its own faded frames.
-- `runner.ts` decides redraws by `frameIndex()`, not `floor(t × fps)`.
-- Tests: fifty effects with one key hold one clip's textures; inline and pool give the same frame bytes with a
-  late worker; eviction recomputes the same bytes.
-
-## 5. Bake
+## 3. Bake
 
 `pixfx bake <id>[:<options json>]… --out <dir>`: per clip an atlas PNG (each frame cropped to its lit box, four
 layers) and a JSON of rects and offsets. `scene.pixfx.loadBaked(key, url)` in `preload` fills the cache.
 
-## 6. SIMD
+## 4. SIMD (measured: no gain, not adopted)
 
-`.cargo/config.toml`: `[target.wasm32-unknown-unknown] rustflags = ["-C", "target-feature=+simd128"]`. Gate: the
-wasm determinism test (frame hashes equal native) and a node timing of the RGBA conversion before and after.
+The wasm golden test (25 effects × 3 seeds) takes the same CPU with and without `+simd128` (user 26.0 / 26.5 s vs
+26.1 / 26.5 s, bytes equal): the draw code is scalar f64 per pixel with branches. The wasm keeps the default target.
 
-## 7. Measure
+## 5. Measure
 
 `bun run perf` on the owner's machine before (main before task 1) and after; Chrome check of the demo.
