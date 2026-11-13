@@ -1,5 +1,5 @@
 //! Helpers for the projectiles: a steady emitter for loops.
-//! Not an effect (the file name starts with _).
+//! Not an effect (pixelfx keeps these in `_lib.js`).
 //!
 //! Port of pixelfx `src/fx/projectiles/_lib.js`: the functions laser-bolt uses (`beat`).
 

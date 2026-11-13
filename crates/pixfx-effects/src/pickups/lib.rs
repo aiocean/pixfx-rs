@@ -1,5 +1,5 @@
 //! Helpers for the pickups: a scratch layer to build outlined sprites in, floor shadows and glints.
-//! Not an effect (the file name starts with _).
+//! Not an effect (pixelfx keeps these in `_lib.js`).
 //!
 //! Port of pixelfx `src/fx/pickups/_lib.js`: the functions coin-spin uses (`Layer`, `coin3d`, `glint`,
 //! `blobShadow`). The JS `Layer` is [`CoinLayer`] here so it does not shadow [`pixfx_core::Layer`].
