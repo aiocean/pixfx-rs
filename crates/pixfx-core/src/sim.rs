@@ -731,12 +731,14 @@ impl Blazes {
     pub fn draw_back(&self, p: &mut Painter) {
         for b in &self.list {
             let k = b.life / b.max;
-            let c = if k <= 0.4 {
-                HOT[3]
-            } else if libm::sin(b.life * 31.0 + b.x) > 0.0 {
-                HOT[1]
+            let c = if k > 0.4 {
+                if libm::sin(b.life * 31.0 + b.x) > 0.0 {
+                    HOT[1]
+                } else {
+                    HOT[2]
+                }
             } else {
-                HOT[2]
+                HOT[3]
             };
             p.px(b.x, b.y, c);
             p.glow(b.x, b.y, 6.0 + 5.0 * k * b.power, HOT[2], 0.3 * k * b.power);
@@ -1064,7 +1066,7 @@ pub fn flare(p: &mut Painter, x: f64, y: f64, len: f64, k: f64, ramp: &[Rgba]) {
 /// `th` inward, alpha `k`, coloured by depth through the band with `ramp` (dark to bright; `hot` makes the inner
 /// edge white). `keep(angle)` picks which part to draw, so the far half can go behind things and the near half in
 /// front: `|g| libm::sin(g) < 0.0` is the far half (pixelfx's defaults: keep all, not hot).
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
 pub fn band(
     p: &mut Painter,
     cx: f64,
@@ -1131,7 +1133,7 @@ impl Default for CrystalOpts {
 /// A faceted crystal spike standing on (x, base), height `h`, base width `w`, leaning `lean` px at the tip, shaded
 /// in `ramp` (dark to bright, 6+ steps): a lit ridge, a bright left face, a darker right face, a dark rim
 /// (pixelfx `crystal`).
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
 pub fn crystal(
     p: &mut Painter,
     x: f64,

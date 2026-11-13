@@ -21,10 +21,16 @@ const PIXELFX_SCENE: [(u32, usize, u64); 5] = [
     (300, 12, 0xd6ab0b5058d65dce),
 ];
 
+/// The most blazes burning at once in the particle scene (both BRANDs land), printed by `tests/golden/sim_scene.mjs`
+/// at pixelfx 044e12a ("most blazes").
+const PIXELFX_MOST_BLAZES: usize = 2;
+
 /// `(step, bit count, frame hash)`, printed by `tests/golden/sim_scene.mjs` at pixelfx 044e12a ("debris scene").
-const PIXELFX_DEBRIS: [(u32, usize, u64); 3] = [
+/// By step 120 the SHARD and the CHUNK rest on the floor.
+const PIXELFX_DEBRIS: [(u32, usize, u64); 4] = [
     (0, 3, 0xc5696d57ba06f965),
     (60, 2, 0x4ef7b7d88fd10ce0),
+    (120, 2, 0x0aa2499a39f58680),
     (240, 2, 0x1100fdb97cd50325),
 ];
 
@@ -134,7 +140,7 @@ fn particle_scene_matches_pixelfx() -> Result<(), pixfx_core::ColorError> {
         }
     }
     assert_eq!(got, PIXELFX_SCENE);
-    assert_eq!(most_blazes, 2, "both BRANDs landed and started a blaze");
+    assert_eq!(most_blazes, PIXELFX_MOST_BLAZES);
     Ok(())
 }
 

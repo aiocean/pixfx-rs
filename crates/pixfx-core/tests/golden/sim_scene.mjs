@@ -2,6 +2,7 @@
 // then light words, 4 little-endian bytes each):
 // - `particle_scene_matches_pixelfx`: `(step, count, hash)` rows for every particle kind (a FIRE that leaves SMOKE,
 //   BRANDs trailing flame whose landings start blazes), a still MOTE, a back-layer SPARK and a light, at 1/120 s;
+//   then the most blazes burning at once;
 // - `debris_scene_matches_pixelfx`: `(step, count, hash)` rows for a SHARD, a CHUNK and a DRIP, at 1/120 s;
 // - `sim_shapes_match_pixelfx`: one hash for sparkle, flare, band and crystal.
 // Usage: node sim_scene.mjs <path to a pixelfx checkout>   (goldens taken at pixelfx 044e12a)
@@ -43,12 +44,14 @@ ps.spawn(P.SPARK, 4, -30, 50, -50, 1, WHITE, 1, 0, PF.BACK);
 ps.spawn(P.BRAND, -10, -40, 30, -80, 2, WHITE, 1);
 lights.add(0, -20, 30, "#ffaa44", 0.8, 0.5);
 
+let mostBlazes = 0;
 const dt = 1 / 120, checkpoints = new Set([0, 12, 60, 150, 300]);
 for (let step = 0; step <= 300; step++) {
   if (step > 0) {
     ps.update(dt);
     blazes.update(dt);
     lights.update(dt);
+    mostBlazes = Math.max(mostBlazes, blazes.count);
   }
   if (!checkpoints.has(step)) continue;
   const [f, p] = frame();
@@ -59,12 +62,14 @@ for (let step = 0; step <= 300; step++) {
   console.log(`(${step}, ${ps.count}, 0x${hash(f).toString(16).padStart(16, "0")}),`);
 }
 
+console.log(`most blazes ${mostBlazes}`);
+
 console.log("debris scene");
 const bits = new Bits({ ground: () => 0 });
 bits.add({ kind: B.SHARD, x: -20, y: -30, vx: 60, vy: -120, va: 9, s: 5, c: "#d8f4ff", bounce: 0.4, life: 2 });
 bits.add({ kind: B.CHUNK, x: 0, y: -40, vx: -40, vy: -90, va: -5, s: 3, bounce: 0.3, drag: 0.5, life: 2 });
 bits.add({ kind: B.DRIP, x: 20, y: -50, c: "#58b4ec", g: 0.5, life: 2 });
-const debrisAt = new Set([0, 60, 240]);
+const debrisAt = new Set([0, 60, 120, 240]);
 for (let step = 0; step <= 240; step++) {
   if (step > 0) bits.update(dt);
   if (!debrisAt.has(step)) continue;
