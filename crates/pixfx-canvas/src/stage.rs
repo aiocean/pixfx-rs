@@ -244,8 +244,13 @@ pub fn color_rgba(frame: &Frame, out: &mut [u8]) -> bool {
 pub fn light_rgba(frame: &Frame, out: &mut [u8]) -> bool {
     let mut any = false;
     for (&l, o) in frame.light.iter().zip(out.as_chunks_mut::<4>().0) {
+        // most of a frame is unlit, and unlit is transparent: skip the blend for it
+        if l & 0x00ff_ffff == 0 {
+            *o = [0; 4];
+            continue;
+        }
         *o = composite_px(0, l, None);
-        any |= l & 0x00ff_ffff != 0;
+        any = true;
     }
     any
 }
