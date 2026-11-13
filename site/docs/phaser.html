@@ -104,6 +104,32 @@ this.time.delayedCall(5000, () =&gt; torch.stop());</code></pre>
 <h3>Scene time</h3>
 <p>Effects advance on scene time: the scene <code>update</code> delta × <code>scene.time.timeScale</code>. A paused or sleeping scene freezes them; <code>timeScale</code> 0.25 plays them at quarter speed. Scene shutdown (<code>restart</code>, <code>stop</code>) or destroy frees every effect. <code>scene.pixfx.stats()</code> returns <code>{engines, textures, images}</code> still alive.</p>
 
+<h2>Game feel</h2>
+<p>Some effects fire cues at the frame of their impact: a camera shake, a hit-stop, a screen ripple, a flash or a sound. <code>scene.pixfx.feel</code> answers them for the scene. A hit-stop freezes the scene's effects. The shake moves the main camera's view for the render only, leaving its scroll and follow as the game set them. The flash lifts the view toward white. Sounds are the game's to play.</p>
+<pre><code>const feel = this.pixfx.feel;
+feel.setShakeStrength(settings.shake);   // 1 as designed, 0 holds the camera still
+feel.setFlashStrength(settings.flash);   // 0 never flashes, for photosensitive players
+feel.on("cue", (c) =&gt; {
+  if (c.cue.type === "sound") this.sound.play(c.cue.name, { pan: c.pan ?? 0 });
+});
+
+// in update(time, delta): freeze and slow the game's own world with the effects
+this.player.x += this.player.vx * feel.timeScale * delta / 1000;</code></pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>timeScale</code></td><td>How fast play ran in the last scene update: 0 in a hit-stop, a fraction in slow motion, 1 otherwise.</td></tr>
+    <tr><td><code>addTrauma(k)</code></td><td>The game's own impact shakes the camera: <code>k</code> (0 to 1) is added to the trauma.</td></tr>
+    <tr><td><code>freeze(secs)</code></td><td>The game's own hit-stop; freezes do not add up, the longest wins.</td></tr>
+    <tr><td><code>slow(secs, speed)</code></td><td>Play at <code>speed</code> (0 to 1) of real time for <code>secs</code> seconds, after any freeze.</td></tr>
+    <tr><td><code>setEnabled(on)</code></td><td>Off: effects play every second of scene time, nothing shakes or flashes, and <code>"cue"</code> events still fire for the game's own answer.</td></tr>
+    <tr><td><code>shake</code>, <code>flash</code>, <code>trauma</code>, <code>frozen</code></td><td>This frame's camera offset <code>[dx, dy]</code> in game pixels, white lift 0 to 1, shake 0 to 1, and whether a hit-stop holds play.</td></tr>
+  </tbody>
+</table>
+</div>
+<p><code>"cue"</code> fires as <code>(cue, effect)</code> on <code>feel</code> for every effect, and on each <code>PixfxEffect</code> for its own, whether or not the answer is on. A ripple's <code>x</code>/<code>y</code> and a sound's <code>x</code> are world positions; <code>pan</code> is -1 to 1 across the screen.</p>
+
 <h2>Layer mode</h2>
 <p>Every per-effect object holds four textures. For many effects in one region, a layer shares four textures among them:</p>
 <pre><code>const layer = this.pixfx.createLayer({

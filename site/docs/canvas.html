@@ -71,6 +71,21 @@ function frame(now) {
 requestAnimationFrame(frame);</code></pre>
 <p><code>tick(dt)</code> is <code>update(dt)</code> plus a full draw (clear or fill, back, front), for a host that owns the loop but draws nothing between layers.</p>
 
+<h2>Cues and feel</h2>
+<p>Some effects fire cues at the frame of their impact: a camera shake, a hit-stop, a screen ripple, a flash or a sound. By default the stage answers them itself with its Feel. A hit-stop freezes its effects, and its own loop (<code>start</code>, <code>tick</code>) shakes the view and lifts it toward white. Sounds are always the host's to play.</p>
+<p>A host-owned loop freezes with the effects by advancing its own world by what <code>update</code> returns, and moves its view by <code>shake</code>:</p>
+<pre><code>const played = stage.update(dt);   // 0 during a hit-stop, a fraction in slow motion
+world.step(played);
+const [dx, dy] = stage.shake(settings.shake);   // game pixels; 0 holds the view still
+ctx.save();
+ctx.translate(dx * SCALE, dy * SCALE);
+// ground, drawLayer("back"), sprites, drawLayer("front")
+ctx.restore();
+for (const e of stage.events()) {
+  if (e.type === "cue" &amp;&amp; e.cue.type === "sound") audio.play(e.cue.name, e.pan);
+}</code></pre>
+<p>A host with its own answer (a Phaser camera, say) calls <code>setFeel(false)</code> and reads the <code>cue</code> events. The stage then plays every second <code>update</code> gives it, and <code>shake</code>, <code>flash</code> and <code>ripples</code> stay empty.</p>
+
 <h2>API</h2>
 <h3><code>new Stage(canvas, scale)</code></h3>
 <p>Draw onto <code>canvas</code> (an <code>HTMLCanvasElement</code>), one game pixel as <code>scale</code>×<code>scale</code> canvas pixels. <code>scale</code> must be at least 1. Throws if the canvas has no 2D context, for example because it already has a WebGL one.</p>
@@ -85,6 +100,34 @@ requestAnimationFrame(frame);</code></pre>
 <p>Move the effect's origin to game pixel (<code>x</code>, <code>y</code>), rounded to a whole pixel, without restarting it: for an effect that follows the pointer or a sprite. Unknown handles are ignored; a non-finite position throws.</p>
 <pre><code>const wisp = stage.play("critters/wisp", 0, 0);
 addEventListener("pointermove", (e) =&gt; stage.move(wisp, e.offsetX / SCALE, e.offsetY / SCALE));</code></pre>
+
+<h3><code>set(handle, change)</code></h3>
+<p>Change where and how the effect draws without restarting it: <code>{x?, y?, flip?, angle?, light?}</code>. Each key left out keeps its value; <code>x</code>/<code>y</code> are game pixels, rounded as <code>move</code> does, and <code>angle</code> is radians. An unknown key, a wrong type or a non-finite number throws; unknown handles are ignored.</p>
+
+<h3><code>events()</code> → StageEvent[]</h3>
+<p>What happened since the last call, oldest first; the queue is emptied. <code>{type: "end", handle}</code> for each effect that finished, faded out after <code>stop</code>, or was removed. <code>{type: "cue", handle, t, pan, cue}</code> for each cue an effect fired, <code>t</code> seconds into its playback, with <code>pan</code> from -1 to 1 across the stage. <code>cue.type</code> is one of:</p>
+<ul>
+  <li><code>"shake"</code>: <code>{trauma}</code>, 0 to 1</li>
+  <li><code>"hitstop"</code>: <code>{dur}</code> seconds of freeze</li>
+  <li><code>"ripple"</code>: <code>{x, y, r0, r1, dur, amp}</code>, a ring growing from <code>r0</code> to <code>r1</code> game pixels</li>
+  <li><code>"flash"</code>: <code>{k, dur}</code></li>
+  <li><code>"sound"</code>: <code>{name, gain, pitch, len, x}</code>; <code>len</code> caps its length in seconds, or is <code>null</code></li>
+</ul>
+
+<h3><code>setFeel(on)</code></h3>
+<p><code>true</code> (the default): the stage answers cues, as described in <a href="#cues-and-feel">Cues and feel</a>. <code>false</code>: the host answers them from the <code>cue</code> events.</p>
+
+<h3><code>shake(strength)</code> → [dx, dy]</h3>
+<p>Where the view sits this frame, in whole game pixels, from the trauma the cues and <code>addTrauma</code> built up. <code>strength</code> is the player's setting: 1 as designed, 0 holds the view still.</p>
+
+<h3><code>setShakeStrength(strength)</code></h3>
+<p>How hard the stage's own loop shakes the view: 1 as designed (the default), 0 not at all.</p>
+
+<h3><code>trauma()</code>, <code>flash()</code>, <code>frozen()</code>, <code>ripples()</code></h3>
+<p>How shaken the view is (0 to 1), how white it is lifted (0 to 1), whether a hit-stop freezes play now, and the screen ripples alive now as <code>{x, y, r0, r1, dur, amp, age}</code> in game pixels and seconds. The stage's own loop applies shake and flash; ripples are for a host that bends its view.</p>
+
+<h3><code>addTrauma(k)</code>, <code>freeze(secs)</code>, <code>slow(secs, speed)</code></h3>
+<p>The game's own impacts, answered like cues. <code>addTrauma</code> adds <code>k</code> (0 to 1) to the shake. <code>freeze</code> is a hit-stop of <code>secs</code> seconds; freezes do not add up, the longest wins. <code>slow</code> plays at <code>speed</code> (0 to 1) of real time for the next <code>secs</code> seconds, after any freeze. They do nothing while <code>setFeel(false)</code>.</p>
 
 <h3><code>remove(handle)</code></h3>
 <p>Drop the effect now. Unknown handles are ignored.</p>
