@@ -129,7 +129,7 @@ export const SPELLS = {
   // Frost: a great collapse that drags the foe in from far off and freezes it where it pops.
   prison: {
     kind: "zone", type: "magic", silence: 2, fx: "explosions/implosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
-    impact: 1.02, radius: 26, damage: 26, notice: 0.1, height: CHEST, pull: 70, reach: 110, pullUntil: 0.9, seals: true, freeze: FREEZE * 1.4,
+    impact: 1.02, radius: 26, damage: 22, notice: 0.1, height: CHEST, pull: 70, reach: 110, pullUntil: 0.9, seals: true, freeze: FREEZE * 1.4,
   },
   // void-orb hangs 62 px over its origin (pixelfx shadow/void-orb.js Y) and loops every 3.2 s
   void: {
