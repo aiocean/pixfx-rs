@@ -1,9 +1,13 @@
-//! The palette a fighter is drawn in: each part's colours, darker tones after the first where a part is shaded.
+//! The palette a fighter is drawn in: each part's colours, darker tones after the first where a part is shaded. A
+//! look is plain data: build any palette, or start from a preset ([`Look::preset`]) and change what you like.
 
 use pixfx_core::Rgba;
 
 /// How a fighter wears its hair, which also decides its head's shape when lying down.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Hairdo {
     /// Swept up into a topknot under a crown, a ribbon streaming from it.
     Topknot,
@@ -11,8 +15,11 @@ pub enum Hairdo {
     Flowing,
 }
 
-/// A fighter's colours (site `duel-art.js` LOOKS).
+/// A fighter's colours (site `duel-art.js` LOOKS). Every field is public: a game builds its own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct Look {
     pub robe: [Rgba; 3],
     pub inner: [Rgba; 2],
@@ -34,6 +41,15 @@ const fn c(rgb: u32) -> Rgba {
 }
 
 impl Look {
+    /// The stock looks by name: `"thunder"` or `"frost"`.
+    pub fn preset(name: &str) -> Option<Look> {
+        match name {
+            "thunder" => Some(Look::thunder()),
+            "frost" => Some(Look::frost()),
+            _ => None,
+        }
+    }
+
     /// The Thunder school: a white robe over red, gold trim, black hair in a topknot.
     pub const fn thunder() -> Look {
         Look {

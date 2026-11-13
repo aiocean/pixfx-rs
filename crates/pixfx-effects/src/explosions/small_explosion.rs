@@ -13,7 +13,7 @@ use pixfx_core::math::{Rng, TAU, clamp, ease, js_max, js_min, js_round, rand, sm
 use pixfx_core::sim::{
     Bit, BitKind, Bits, Blazes, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn, band,
 };
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{ColorOpt, Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
 use super::lib::{OUTLINE, Stone};
 
@@ -33,6 +33,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 7,
     state: None,
+    options: &[SIZE.spec(), STONE.spec()],
 };
 
 // meta.options
@@ -46,10 +47,10 @@ const PALETTE: [Rgba; 8] = [
     Rgba::hex24(0xfff3a6),
     Rgba::hex24(0xffffff),
 ];
-const STONE: Rgba = Rgba::hex24(0x4a3f69);
-const SIZE: f64 = 1.0;
-/// The largest explosion drawn (beyond pixelfx, which draws any size; see the module doc).
-const MAX_SIZE: f64 = 16.0;
+const STONE: ColorOpt = ColorOpt::new("stone", Rgba::hex24(0x4a3f69));
+/// Held to 16 at most, the largest explosion drawn (beyond pixelfx, which draws any size; see the module doc).
+const SIZE: NumOpt = NumOpt::new("size", 1.0).within(0.0, 16.0);
+
 
 const D: f64 = META.duration;
 const SOOT: Rgba = Rgba::hex24(0x0d0a12);
@@ -164,11 +165,11 @@ impl Effect for SmallExplosion {
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let f: [Rgba; 8] = ramp(&opts.palette_or(&PALETTE));
-        let s = opts.num_in("size", SIZE, 0.0, MAX_SIZE);
+        let s = opts.num(&SIZE);
         let rad = 18.0 * s;
         let power = 0.9 * libm::pow(s, 0.8);
         let earth = 1.6;
-        let (st, dust) = stone(opts.color_or("stone", STONE));
+        let (st, dust) = stone(opts.color(&STONE));
         let mut r = Rng::new(to_uint32(seed as f64));
         let mut ps = Particles::new(ParticlesOpts {
             ground: 0.0,

@@ -5,7 +5,8 @@ use pixfx_core::color::{Rgba, WHITE, fit};
 use std::collections::BTreeMap;
 
 use pixfx_core::effect::{
-    Canvas, Effect, EffectState, Instance, Layer, Meta, OptValue, Options, find,
+    Canvas, ColorOpt, Effect, EffectState, Instance, Layer, Meta, NumOpt, OptValue, Options, RampOpt,
+    find,
 };
 use pixfx_core::frame::Frame;
 use pixfx_core::painter::Painter;
@@ -55,6 +56,7 @@ const fn dot_meta(id: &'static str, looping: bool) -> Meta {
         fps: 30,
         seed: 5,
         state: None,
+        options: &[],
     }
 }
 
@@ -72,7 +74,7 @@ fn lit(frame: &Frame, row: u32) -> Option<u32> {
 
 fn drawn(inst: &Instance) -> Frame {
     let mut frame = Frame::new(64, 4, 0, 0);
-    inst.draw(&mut frame, Layer::Both);
+    inst.draw(&mut frame, Layer::Both, inst.placement());
     frame
 }
 
@@ -167,10 +169,10 @@ fn layers_split_back_and_front() {
     let mut inst = Instance::new(&DOT, Options::default());
     inst.update(0.25);
     let mut back = Frame::new(64, 4, 0, 0);
-    inst.draw(&mut back, Layer::Back);
+    inst.draw(&mut back, Layer::Back, inst.placement());
     assert_eq!(lit(&back, 0), None, "the dot draws only in front");
     let mut front = Frame::new(64, 4, 0, 0);
-    inst.draw(&mut front, Layer::Front);
+    inst.draw(&mut front, Layer::Front, inst.placement());
     assert_eq!(front, drawn(&inst));
 }
 
@@ -213,7 +215,7 @@ impl Effect for Wide {
         &WIDE_META
     }
     fn canvas(&self, opts: &Options) -> Canvas {
-        let w = opts.num_or("width", 8.0) as u32;
+        let w = opts.num(&NumOpt::new("width", 8.0)) as u32;
         Canvas {
             size: (w, 4),
             origin: ((w / 2) as i32, 3),
@@ -292,6 +294,7 @@ const fn glow_meta(size: (u32, u32)) -> Meta {
         fps: 2,
         seed: 1,
         state: None,
+        options: &[],
     }
 }
 
@@ -393,12 +396,13 @@ fn seed_defaults_to_the_effects_own() {
 
 #[test]
 fn options_resolve_like_pixelfx() {
-    let def = [
+    const DEF: [Rgba; 4] = [
         Rgba(1, 0, 0, 255),
         Rgba(2, 0, 0, 255),
         Rgba(3, 0, 0, 255),
         Rgba(4, 0, 0, 255),
     ];
+    let def = DEF;
     let two = vec![Rgba(10, 0, 0, 255), Rgba(20, 0, 0, 255)];
     let four = vec![Rgba(9, 9, 9, 255); 4];
     let mut opts = Options {
@@ -410,14 +414,15 @@ fn options_resolve_like_pixelfx() {
     opts.extra
         .insert("short".into(), OptValue::Ramp(two.clone()));
     opts.extra.insert("height".into(), OptValue::Num(30.0));
+    let ramp = |name| opts.ramp(&RampOpt::new(name, &DEF));
     // a ramp of another length is resampled to the default's length
     assert_eq!(opts.palette_or(&def), fit(&two, 4));
-    assert_eq!(opts.ramp_or("short", &def), fit(&two, 4));
-    assert_eq!(opts.ramp_or("wood", &def), four);
-    assert_eq!(opts.ramp_or("iron", &def), def);
+    assert_eq!(ramp("short"), fit(&two, 4));
+    assert_eq!(ramp("wood"), four);
+    assert_eq!(ramp("iron"), def);
     assert_eq!(Options::default().palette_or(&def), def);
-    assert_eq!(opts.num_or("height", 22.0), 30.0);
-    assert_eq!(opts.num_or("depth", 22.0), 22.0);
+    assert_eq!(opts.num(&NumOpt::new("height", 22.0)), 30.0);
+    assert_eq!(opts.num(&NumOpt::new("depth", 22.0)), 22.0);
     assert_eq!(Options::default().light, 1.0);
 }
 
@@ -433,12 +438,13 @@ fn color_option_resolves_to_the_set_colour_or_the_default() {
     );
     opts.extra.insert("one".into(), OptValue::Ramp(vec![red]));
     opts.extra.insert("num".into(), OptValue::Num(3.0));
-    assert_eq!(opts.color_or("stone", def), red);
+    let color = |name| opts.color(&ColorOpt::new(name, def));
+    assert_eq!(color("stone"), red);
     // unset, or set to another kind of value (a ramp of any length is not a colour): the default
-    assert_eq!(opts.color_or("unset", def), def);
-    assert_eq!(opts.color_or("ramp", def), def);
-    assert_eq!(opts.color_or("one", def), def);
-    assert_eq!(opts.color_or("num", def), def);
+    assert_eq!(color("unset"), def);
+    assert_eq!(color("ramp"), def);
+    assert_eq!(color("one"), def);
+    assert_eq!(color("num"), def);
 }
 
 #[test]

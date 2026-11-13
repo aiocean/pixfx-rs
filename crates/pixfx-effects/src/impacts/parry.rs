@@ -6,7 +6,7 @@
 use pixfx_core::color::{Rgba, WHITE};
 use pixfx_core::math::{Rng, TAU, ease, js_max, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
 use super::lib::{Seg, Spike, broken_ring, star};
 
@@ -28,6 +28,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 11,
     state: None,
+    options: &[HEIGHT.spec()],
 };
 
 // meta.options
@@ -40,7 +41,7 @@ const PALETTE: [Rgba; 7] = [
     Rgba::hex24(0xfff6c4),
     Rgba::hex24(0xffffff),
 ];
-const HEIGHT: f64 = 30.0;
+const HEIGHT: NumOpt = NumOpt::new("height", 30.0);
 
 const X: f64 = 0.0;
 
@@ -51,7 +52,7 @@ impl Effect for Parry {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let pal = opts.palette_or(&PALETTE);
         let c = |i: usize| pal.get(i).copied().unwrap_or(WHITE);
-        let y = -opts.num_or("height", HEIGHT);
+        let y = -opts.num(&HEIGHT);
         let mut r = Rng::new(to_uint32(seed as f64));
         let mut ps = Particles::new(ParticlesOpts {
             ground: 0.0,

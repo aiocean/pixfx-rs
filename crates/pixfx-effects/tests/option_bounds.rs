@@ -1,5 +1,5 @@
 //! A number option set absurdly high must not hang an effect: each option that sizes a loop is held to a
-//! documented maximum (`Options::num_in`). Before the clamps these four never returned.
+//! documented maximum (`NumOpt::within`). Before the clamps these four never returned.
 
 use pixfx_core::{Frame, Instance, Layer, OptValue, Options};
 use pixfx_effects::effect;
@@ -25,7 +25,7 @@ fn huge_number_options_still_draw_quickly() -> Result<(), String> {
             let mut inst = Instance::new(fx, opts);
             inst.update(fx.meta().duration / 2.0);
             let mut frame = Frame::new(w, h, 0, 0);
-            inst.draw(&mut frame, Layer::Both);
+            inst.draw(&mut frame, Layer::Both, inst.placement());
             // debug builds are several times slower, so the bound only applies to release builds: a hang
             // fails there by never returning
             if !cfg!(debug_assertions) {

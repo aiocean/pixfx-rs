@@ -9,7 +9,7 @@
 use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::math::{TAU, js_max, js_min, smooth, tile_noise};
 use pixfx_core::particles::cycle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
 use super::lib::{WATER, bead};
 
@@ -37,11 +37,12 @@ const META: Meta = Meta {
     fps: 30,
     seed: 3,
     state: None,
+    options: &[LENGTH.spec()],
 };
 
-const LENGTH: f64 = 118.0;
-/// The longest stream drawn (beyond pixelfx, which draws any length; see the module doc).
-const MAX_LENGTH: f64 = 4096.0;
+/// Held to 4096 at most, the longest stream drawn (beyond pixelfx, which draws any length; see the module doc).
+const LENGTH: NumOpt = NumOpt::new("length", 118.0).within(0.0, 4096.0);
+
 const D: f64 = META.duration;
 const G: f64 = 520.0;
 const SPEED: f64 = 260.0;
@@ -53,7 +54,7 @@ impl Effect for WaterJet {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&WATER)),
-            length: opts.num_in("length", LENGTH, 0.0, MAX_LENGTH),
+            length: opts.num(&LENGTH),
             seed: seed as f64,
         })
     }

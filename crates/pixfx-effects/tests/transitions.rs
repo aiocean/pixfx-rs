@@ -98,7 +98,7 @@ fn burn_away_placed_matches_pixelfx() -> Result<(), String> {
                 i += 1;
             }
             let mut frame = Frame::new(640, 500, -160, -160);
-            inst.draw(&mut frame, Layer::Both);
+            inst.draw(&mut frame, Layer::Both, inst.placement());
             assert_eq!(frame_hash(&frame), want, "{name} frame {n}");
         }
     }

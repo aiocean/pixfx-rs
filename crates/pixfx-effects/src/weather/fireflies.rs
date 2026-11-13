@@ -11,13 +11,17 @@
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{TAU, js_max, js_min, js_round, loop_noise, rand};
-use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, NumOpt, Options, Painter, RampOpt};
 
-use super::lib::{clip, count, glow, rows, sized};
+use super::lib::{clip, count, glow, rows, size_options, sized};
 
 pub struct Fireflies;
 
 pub static FIREFLIES: Fireflies = Fireflies;
+
+/// The effect's own canvas, which its `width` and `height` options default to.
+const SIZE: (u32, u32) = (320, 180);
+const SIDES: (NumOpt, NumOpt) = size_options(SIZE);
 
 const META: Meta = Meta {
     id: "weather/fireflies",
@@ -33,13 +37,14 @@ const META: Meta = Meta {
         "ambient",
         "loop",
     ],
-    size: (320, 180),
+    size: SIZE,
     origin: (160, 170),
     duration: 12.0,
     looping: true,
     fps: 30,
     seed: 2,
     state: None,
+    options: &[GRASS.spec(), SIDES.0.spec(), SIDES.1.spec()],
 };
 
 // meta.options
@@ -51,14 +56,16 @@ const PALETTE: [Rgba; 6] = [
     Rgba::hex24(0xf4ffb8),
     Rgba::hex24(0xffffff),
 ];
-const GRASS: [Rgba; 6] = [
+const GRASS: RampOpt = RampOpt::new(
+    "grass",
+    &[
     Rgba::hex24(0x070f0b),
     Rgba::hex24(0x0c1a12),
     Rgba::hex24(0x13281a),
     Rgba::hex24(0x1d3a24),
     Rgba::hex24(0x2b5232),
     Rgba::hex24(0x3f6e40),
-];
+]);
 
 const D: f64 = META.duration;
 /// Flies over the effect's own width.
@@ -160,7 +167,7 @@ impl Effect for Fireflies {
         let cv = self.canvas(opts);
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
-            g: ramp(&opts.ramp_or("grass", &GRASS)),
+            g: ramp(&opts.ramp(&GRASS)),
             s: seed as f64,
             cv,
             flies: count(FLIES, f64::from(cv.size.0), f64::from(META.size.0)),

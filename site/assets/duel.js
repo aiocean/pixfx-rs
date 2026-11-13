@@ -10,20 +10,11 @@
 /** Effects the arena itself shows when they are in the registry. */
 export const DECOR = { lamp: "fire/brazier", night: "weather/fireflies" };
 
-// Where things are on a fighter, in pixels above its feet.
-const BODY = 34;
-const CHEST = 20;
-const HALF_WIDTH = 6;
+// A fighter's sizes and speeds (height, chest, half width, walk, jump, duck) are its body's: `f.spec`, as
+// pixfx-fighter's `Body` gives them. The rules and the minds reason with them.
 
-// The same numbers as pixfx-fighter's body, which owns them; the rules and the minds reason with them.
-const WALK = 52;
-const JUMP_SPEED = 220;
 /** Flying: the highest a fighter goes, and the qi it costs a second. */
 const FLY = { top: 96, cost: 3 };
-/** A jump crouches four frames before it leaves the ground. */
-const JUMP_SQUAT = 4 / 60;
-/** Ducking, a fighter is this tall: low enough that a bolt fired from the ground passes over it. */
-const DUCK = 16;
 /** Rage is a small whole-number pool: a point for each blow landed; when full, the school's ultimate. */
 export const RAGE = 4;
 /** Status effects: frozen (no moving, no acting) and shocked (a short paralysis), in seconds. */
@@ -99,7 +90,7 @@ export const SPELLS = {
   // Thunder: a gold seal opens on the ground under the foe, and a thunderclap bursts from it
   seal: {
     kind: "zone", type: "magic", fx: "explosions/plasma-explosion", cost: 30, windup: 0.3, recover: 0.3, cooldown: 2.4,
-    sigil: 0.4, impact: 0.08, radius: 16, damage: 22, notice: 0, height: CHEST, shock: true,
+    sigil: 0.4, impact: 0.08, radius: 16, damage: 22, notice: 0, shock: true,
   },
   // Frost: a lotus of ice shards blooms from the palm at close range, and cracks the foe's guard
   lotus: { kind: "blast", type: "magic", fx: "holy/feather-burst", cost: 24, windup: 0.3, recover: 0.3, cooldown: 2.2, range: 40, damage: 18, defDown: 3 },
@@ -111,7 +102,7 @@ export const SPELLS = {
   // Frost: a blue seal under the foe that shatters into a burst of cold, freezing it
   shatter: {
     kind: "zone", type: "magic", fx: "explosions/plasma-explosion", cost: 33, windup: 0.35, recover: 0.3, cooldown: 3,
-    sigil: 0.35, impact: 0.08, radius: 16, damage: 25, notice: 0, height: CHEST, freeze: 0.6,
+    sigil: 0.35, impact: 0.08, radius: 16, damage: 25, notice: 0, freeze: 0.6,
   },
   // from above: drop onto the foe sword first, and crack the ground if it lands there
   dive: { kind: "melee", type: "physical", dive: true, cost: 12, windup: 0.22, recover: 0.4, cooldown: 1.6, range: 26, damage: 11, speed: 260, slamFx: "explosions/dirt-explosion" },
@@ -122,23 +113,23 @@ export const SPELLS = {
   },
   // icicle-fall drops its icicle at FREE + fall time: 0.64 + sqrt(2 * (80 - 36) / 950) s, and only starts to tremble,
   // which is when a fighter notices it overhead, at 0.3 s (pixelfx ice/icicle-fall.js TREMBLE)
-  icicle: { kind: "zone", type: "magic", defDown: 4, fx: "ice/icicle-fall", cost: 33, windup: 0.42, recover: 0.28, cooldown: 2.2, impact: 0.944, radius: 16, damage: 28, notice: 0.3, height: 0, grounded: true, freeze: FREEZE },
+  icicle: { kind: "zone", type: "magic", defDown: 4, fx: "ice/icicle-fall", cost: 33, windup: 0.42, recover: 0.28, cooldown: 2.2, impact: 0.944, radius: 16, damage: 28, notice: 0.3, grounded: true, freeze: FREEZE },
   // implosion sucks in until 0.8 s and pops at 1.02 s (pixelfx explosions/implosion.js SUCK, STILL)
   collapse: {
     kind: "zone", type: "magic", silence: 1.5, fx: "explosions/implosion", cost: 39, windup: 0.5, recover: 0.3, cooldown: 2.4,
-    impact: 1.02, radius: 18, damage: 25, notice: 0.15, height: CHEST, pull: 60, reach: 52, pullUntil: 0.8,
+    impact: 1.02, radius: 18, damage: 25, notice: 0.15, pull: 60, reach: 52, pullUntil: 0.8,
   },
   // a thunderclap from the open palm, at arm's length
   palm: { kind: "blast", type: "physical", stealRage: 1, fx: "explosions/plasma-explosion", cost: 27, windup: 0.32, recover: 0.35, cooldown: 2.8, range: 38, damage: 20, shock: true },
   // ultimates, cast with full rage. Thunder: three thunderclaps fall one after another where the foe will be.
   tribulation: {
     kind: "zone", type: "magic", fx: "explosions/plasma-explosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
-    impact: 0.08, radius: 12, damage: 14, notice: 0, height: CHEST, strikes: 3, every: 0.7, aimAhead: 0.5,
+    impact: 0.08, radius: 12, damage: 14, notice: 0, strikes: 3, every: 0.7, aimAhead: 0.5,
   },
   // Frost: a great collapse that drags the foe in from far off and freezes it where it pops.
   prison: {
     kind: "zone", type: "magic", silence: 2, fx: "explosions/implosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
-    impact: 1.02, radius: 26, damage: 31, notice: 0.1, height: CHEST, pull: 70, reach: 110, pullUntil: 0.9, seals: true, freeze: FREEZE * 1.4,
+    impact: 1.02, radius: 26, damage: 31, notice: 0.1, pull: 70, reach: 110, pullUntil: 0.9, seals: true, freeze: FREEZE * 1.4,
   },
   // void-orb hangs 62 px over its origin (pixelfx shadow/void-orb.js Y) and loops every 3.2 s
   void: {
@@ -243,7 +234,7 @@ export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top, 
 const BODY_FIELDS = ["x", "air", "vx", "vy", "face", "stun", "wake", "land", "squat", "leap", "duck", "flash", "hitT", "hitPower", "frozen", "shocked", "poseT"];
 
 function fighter(index, school, spells, body) {
-  const f = { index, school, spells, stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, calm: 0, attune: 0, read: { tried: {}, landed: {} } , body };
+  const f = { index, school, spells, stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, calm: 0, attune: 0, read: { tried: {}, landed: {} } , body, spec: body.spec };
   for (const k of BODY_FIELDS) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
@@ -355,7 +346,7 @@ function begin(duel, me, name, target) {
   me.qi -= spell.cost;
   if (spell.ultimate) {
     me.rage = 0;
-    emit(duel, { type: "ultimate", by: me.index, x: me.x, y: me.air + CHEST });
+    emit(duel, { type: "ultimate", by: me.index, x: me.x, y: me.air + me.spec.chest });
   }
   me.cool[name] = spell.cooldown + spell.windup;
   me.act = { spell: name, phase: "windup", t: 0, target };
@@ -389,16 +380,16 @@ function release(duel, me, foe, spell) {
       }
     }
     const dx = Math.abs(foe.x - me.x);
-    if (dx <= spell.range + HALF_WIDTH && Math.abs(foe.air - me.air) < CHEST + 4 && foe.hp > 0) {
-      if (blocks(foe, me.x, spell.damage)) clash(duel, (me.x + foe.x) / 2, g - CHEST - me.air, [me, foe]);
+    if (dx <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < me.spec.chest + 4 && foe.hp > 0) {
+      if (blocks(foe, me.x, spell.damage)) clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
       else if (foe.act?.spell === "slash" && foe.act.phase === "windup" && foe.act.t > SPELLS.slash.windup * 0.6) {
         // both blades swing at once: they meet
-        clash(duel, (me.x + foe.x) / 2, g - CHEST - me.air, [me, foe]);
+        clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
         foe.act = null;
       } else hurt(duel, foe, spell.damage, me.face, me.act.spell);
     }
   } else if (spell.kind === "bolt") {
-    const y = me.air + CHEST;
+    const y = me.air + me.spec.chest;
     const key = play(duel, spell.fx, me.x + me.face * 8, g - y, { palette: SCHOOLS[me.school].bolt, flip: me.face < 0, seed: me.index + 7 });
     duel.shots.push({ kind: "bolt", owner: me.index, x: me.x + me.face * 8, y, vx: me.face * spell.speed, t: 0, key, spell });
   } else if (spell.kind === "orb") {
@@ -416,12 +407,12 @@ function release(duel, me, foe, spell) {
     for (let k = 0; k < (spell.strikes ?? 1); k++) {
       duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, air, t: -k * (spell.every ?? 0) - sigil, lead: sigil, key: k === 0 ? mark : null, spell, follow: k > 0 });
     }
-    streak(duel, me, x, air + (spell.height ?? 0));
+    streak(duel, me, x, air + zoneHeight(spell, foe));
   } else if (spell.kind === "blast") {
     const x = me.x + me.face * spell.range * 0.7;
-    cast(duel, me, spell.fx, x, g - CHEST - me.air);
-    if (Math.abs(foe.x - me.x) <= spell.range + HALF_WIDTH && Math.abs(foe.air - me.air) < BODY && foe.hp > 0) {
-      if (blocks(foe, me.x, spell.damage)) clash(duel, foe.x - me.face * 4, g - CHEST - foe.air, [foe]);
+    cast(duel, me, spell.fx, x, g - me.spec.chest - me.air);
+    if (Math.abs(foe.x - me.x) <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
+      if (blocks(foe, me.x, spell.damage)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
       else if (hurt(duel, foe, spell.damage, me.face, me.act.spell) && spell.shock) shock(duel, foe, SHOCK.chance);
     }
   } else if (spell.kind === "void") {
@@ -432,36 +423,36 @@ function release(duel, me, foe, spell) {
   } else if (spell.kind === "dash") {
     // gone in a flash and back a stride past the foe, cutting through it on the way
     const from = me.x;
-    const to = clamp(me.x + me.face * spell.distance, duel.left + HALF_WIDTH, duel.right - HALF_WIDTH);
+    const to = clamp(me.x + me.face * spell.distance, duel.left + me.spec.halfWidth, duel.right - me.spec.halfWidth);
     cast(duel, me, spell.fx, from, g - me.air);
     me.x = to;
     cast(duel, me, spell.fx, to, g - me.air);
-    emit(duel, { type: "streak", by: me.index, x0: from, y0: me.air + CHEST, x1: to, y1: me.air + CHEST });
-    const lo = Math.min(from, to) - HALF_WIDTH;
-    const hi = Math.max(from, to) + HALF_WIDTH;
-    if (foe.x > lo && foe.x < hi && Math.abs(foe.air - me.air) < BODY && foe.hp > 0) {
-      if (blocks(foe, from, spell.damage)) clash(duel, foe.x, g - CHEST - foe.air, [foe]);
+    emit(duel, { type: "streak", by: me.index, x0: from, y0: me.air + me.spec.chest, x1: to, y1: me.air + me.spec.chest });
+    const lo = Math.min(from, to) - foe.spec.halfWidth;
+    const hi = Math.max(from, to) + foe.spec.halfWidth;
+    if (foe.x > lo && foe.x < hi && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
+      if (blocks(foe, from, spell.damage)) clash(duel, foe.x, g - foe.spec.chest - foe.air, [foe]);
       else hurt(duel, foe, spell.damage, me.face, me.act.spell);
     }
   } else if (spell.kind === "heal") {
     const gained = Math.min(100 - me.hp, spell.amount);
     me.hp += gained;
-    emit(duel, { type: "heal", by: me.index, amount: Math.round((gained / 100) * me.stats.hp), x: me.x, y: me.air + CHEST });
-    cast(duel, me, spell.fx, me.x, g - BODY - me.air);
+    emit(duel, { type: "heal", by: me.index, amount: Math.round((gained / 100) * me.stats.hp), x: me.x, y: me.air + me.spec.chest });
+    cast(duel, me, spell.fx, me.x, g - me.spec.body - me.air);
   } else if (spell.kind === "ward") {
     me.shield = Math.round(WARD.share * me.stats.hp);
     me.shieldT = WARD.time;
-    emit(duel, { type: "ward", by: me.index, amount: me.shield, x: me.x, y: me.air + CHEST });
-    cast(duel, me, spell.fx, me.x, g - BODY - me.air);
+    emit(duel, { type: "ward", by: me.index, amount: me.shield, x: me.x, y: me.air + me.spec.chest });
+    cast(duel, me, spell.fx, me.x, g - me.spec.body - me.air);
   } else if (spell.kind === "barrier") {
     dropBarrier(duel, me);
     me.barrier = spell.time;
     me.barrierSpell = me.act.spell;
     me.barrierKey = cast(duel, me, spell.fx, me.x, g - me.air, { seed: me.index + 21 });
-    emit(duel, { type: "barrier", by: me.index, x: me.x, y: me.air + CHEST });
+    emit(duel, { type: "barrier", by: me.index, x: me.x, y: me.air + me.spec.chest });
   } else if (spell.kind === "blink") {
     cast(duel, me, spell.fx, me.x, g - me.air);
-    me.x = clamp(me.act.target, duel.left + HALF_WIDTH, duel.right - HALF_WIDTH);
+    me.x = clamp(me.act.target, duel.left + me.spec.halfWidth, duel.right - me.spec.halfWidth);
     cast(duel, me, spell.fx, me.x, g - me.air);
   }
 }
@@ -488,12 +479,12 @@ function blocks(f, fromX, damage = 0) {
 function turnsAside(duel, f, dir, spell) {
   const s = SPELLS[spell];
   if (f.barrier === 0 || s?.ultimate) return false;
-  turnAside(duel, f, f.x - dir * 8, duel.ground - CHEST - f.air);
+  turnAside(duel, f, f.x - dir * 8, duel.ground - f.spec.chest - f.air);
   const counter = SPELLS[f.barrierSpell].counter;
   const by = duel.fighters[1 - f.index];
-  const close = Math.abs(by.x - f.x) < 60 && Math.abs(by.air - f.air) < BODY;
+  const close = Math.abs(by.x - f.x) < 60 && Math.abs(by.air - f.air) < f.spec.body;
   if (counter && close && (s?.kind === "melee" || s?.kind === "blast" || s?.kind === "dash")) {
-    emit(duel, { type: "streak", by: f.index, x0: f.x, y0: f.air + CHEST, x1: by.x, y1: by.air + CHEST });
+    emit(duel, { type: "streak", by: f.index, x0: f.x, y0: f.air + f.spec.chest, x1: by.x, y1: by.air + by.spec.chest });
     if (hurt(duel, by, counter.damage, Math.sign(by.x - f.x) || 1, f.barrierSpell)) {
       by.stun = Math.max(by.stun, counter.stun);
       by.shocked = Math.max(by.shocked, counter.stun);
@@ -505,7 +496,7 @@ function turnsAside(duel, f, dir, spell) {
 /** The barrier rings where a blow struck it. */
 function turnAside(duel, f, x, y) {
   f.rang = RING;
-  emit(duel, { type: "block", by: f.index, x: f.x, y: f.air + CHEST });
+  emit(duel, { type: "block", by: f.index, x: f.x, y: f.air + f.spec.chest });
   if (duel.has(CLASH)) cast(duel, f, CLASH, x, y + 30, { height: 30, seed: f.index + 31 });
 }
 
@@ -528,7 +519,7 @@ function hurt(duel, f, power, dir, spell) {
   if (!s?.ultimate && duel.rng() < f.stats.dodge) {
     f.dodged = 0.3;
     f.vx -= dir * 40;
-    emit(duel, { type: "dodge", x: f.x, y: f.air + CHEST });
+    emit(duel, { type: "dodge", x: f.x, y: f.air + f.spec.chest });
     return false;
   }
   const crit = duel.rng() < by.stats.crit;
@@ -537,7 +528,7 @@ function hurt(duel, f, power, dir, spell) {
   // a frost blow freezes where it strikes: it holds the target in place rather than throwing it
   const heavy = duel.Body.heavy(power, !!s?.freeze);
   const ranged = s?.kind === "bolt" || s?.kind === "orb";
-  emit(duel, { type: "hit", by: by.index, spell, power, launch: heavy, ranged, damage: amount, crit, share, x: f.x, y: f.air + CHEST });
+  emit(duel, { type: "hit", by: by.index, spell, power, launch: heavy, ranged, damage: amount, crit, share, x: f.x, y: f.air + f.spec.chest });
   // rage for the blow: an attuned fighter's spells were paid for when cast, so only its blade earns here
   if (!s?.ultimate && !(by.stats.attuned && s?.kind !== "melee")) gainRage(by, 1);
   by.read.landed[spell] = (by.read.landed[spell] ?? 0) + 1;
@@ -580,7 +571,7 @@ function take(duel, f, amount) {
   if (share >= f.hp && f.stats.unyielding && !f.rose) {
     f.rose = true;
     share = f.hp - 100 / f.stats.hp;
-    emit(duel, { type: "unyielding", by: f.index, x: f.x, y: f.air + CHEST });
+    emit(duel, { type: "unyielding", by: f.index, x: f.x, y: f.air + f.spec.chest });
   }
   f.hp = Math.max(0, f.hp - share);
   return share;
@@ -594,7 +585,7 @@ function burning(duel, f, dt) {
   if (f.burn.tick <= 0 && f.hp > 0) {
     f.burn.tick += BURN.every;
     const share = take(duel, f, f.burn.per);
-    emit(duel, { type: "tick", by: f.burn.by, damage: f.burn.per, share, x: f.x, y: f.air + CHEST });
+    emit(duel, { type: "tick", by: f.burn.by, damage: f.burn.per, share, x: f.x, y: f.air + f.spec.chest });
   }
   if (f.burn.t <= 0) f.burn = null;
 }
@@ -616,7 +607,7 @@ function clash(duel, x, y, fighters) {
 
 function knockOut(duel, f) {
   const other = duel.fighters[1 - f.index];
-  emit(duel, { type: "ko", x: f.x, y: f.air + CHEST });
+  emit(duel, { type: "ko", x: f.x, y: f.air + f.spec.chest });
   // the knockout throws the loser off its feet, if the blow has not already
   f.body.knockOut(other.x);
   f.fly = false;
@@ -714,7 +705,7 @@ function shot(duel, s, dt) {
       s.shown = true;
       if (s.key !== null) emit(duel, { type: "stop", key: s.key });
       s.key = null;
-      cast(duel, duel.fighters[s.owner], spell.fx, s.x, g - spell.height - s.air);
+      cast(duel, duel.fighters[s.owner], spell.fx, s.x, g - zoneHeight(spell, foe) - s.air);
     }
     if (s.t < 0) return;
     // a collapse drags the foe toward its heart while it sucks in
@@ -726,7 +717,7 @@ function shot(duel, s, dt) {
     if (spell.seals && !s.fell && Math.abs(s.x - foe.x) < spell.reach) foe.sealed = 2 * dt;
     if (!s.fell && s.t >= spell.impact) {
       s.fell = true;
-      const reaches = Math.abs(foe.x - s.x) < spell.radius + HALF_WIDTH && (spell.grounded ? foe.air < 10 : Math.abs(foe.air - s.air) < 22);
+      const reaches = Math.abs(foe.x - s.x) < spell.radius + foe.spec.halfWidth && (spell.grounded ? foe.air < 10 : Math.abs(foe.air - s.air) < 22);
       if (reaches && hurt(duel, foe, spell.damage, Math.sign(foe.x - s.x) || 1, s.name)) {
         if (spell.freeze) foe.frozen = spell.freeze;
         if (spell.shock) shock(duel, foe, spell.ultimate ? 1 : SHOCK.chance);
@@ -747,7 +738,7 @@ function shot(duel, s, dt) {
         const by = duel.fighters[s.owner];
         const amount = damageOf(by, foe, spell.tick, spell.type, false, duel.rng());
         const share = take(duel, foe, amount);
-        emit(duel, { type: "tick", by: by.index, damage: amount, share, x: foe.x, y: foe.air + CHEST });
+        emit(duel, { type: "tick", by: by.index, damage: amount, share, x: foe.x, y: foe.air + foe.spec.chest });
       }
     }
     if (s.t >= spell.life) {
@@ -760,7 +751,7 @@ function shot(duel, s, dt) {
 
 /** Pressed against either edge of the arena. */
 function atWall(duel, f) {
-  return f.x <= duel.left + HALF_WIDTH + 2 || f.x >= duel.right - HALF_WIDTH - 2;
+  return f.x <= duel.left + f.spec.halfWidth + 2 || f.x >= duel.right - f.spec.halfWidth - 2;
 }
 
 function orbAt(s) {
@@ -769,9 +760,14 @@ function orbAt(s) {
 }
 
 /** Does a point (x, height above ground) touch fighter f, give or take r? */
+/** How high a zone strikes: what hangs in the air (a collapse) at the foe's chest, what falls (an icicle) at the floor. */
+function zoneHeight(spell, foe) {
+  return spell.grounded ? 0 : foe.spec.chest;
+}
+
 function overlaps(f, x, y, r) {
   if (f.body.untouchable()) return false;
-  return Math.abs(x - f.x) < HALF_WIDTH + r && y > f.air - r && y < f.air + (f.duck > 0 ? DUCK : BODY) + r;
+  return Math.abs(x - f.x) < f.spec.halfWidth + r && y > f.air - r && y < f.air + (f.duck > 0 ? f.spec.duck : f.spec.body) + r;
 }
 
 function burst(duel, fx, x, y) {
@@ -815,15 +811,15 @@ function mind(duel, me, foe, dt) {
   else if (best.spell === "jump") {
     // crouch first, then spring
     if (me.air === 0) {
-      me.squat = JUMP_SQUAT;
-      me.leap = JUMP_SPEED;
+      me.squat = me.spec.jumpSquat;
+      me.leap = me.spec.jumpSpeed;
     }
   } else if (best.spell === "guard") me.guard = best.hold;
   else if (best.spell === "duck") me.duck = best.hold;
   else if (best.spell === "fly") {
     me.fly = best.hover > 0;
     me.hover = best.hover;
-    if (me.fly && me.air === 0) me.vy = JUMP_SPEED * 0.6;
+    if (me.fly && me.air === 0) me.vy = me.spec.jumpSpeed * 0.6;
   }
   else if (best.spell === "meditate") setMeditating(duel, me, true);
   else if (best.spell !== "wait") begin(duel, me, best.spell, best.target);
@@ -860,24 +856,24 @@ function dangers(duel, me) {
     if (s.kind === "bolt") {
       const toward = Math.sign(me.x - s.x) === Math.sign(s.vx);
       const tti = Math.abs(me.x - s.x) / Math.abs(s.vx);
-      if (!toward || tti > 0.6 || s.y < me.air - 3 || s.y > me.air + BODY + 3) continue;
+      if (!toward || tti > 0.6 || s.y < me.air - 3 || s.y > me.air + me.spec.body + 3) continue;
       const urgency = s.spell.damage * (1.2 - tti);
       if (Math.sign(s.x - me.x) === me.face) out.push({ spell: "guard", hold: tti + 0.15, score: urgency * 1.1 });
       if (me.air === 0 && !me.fly && tti < 0.24 && tti > 0.08) out.push({ spell: "jump", score: urgency * 1.25 });
       // a bolt over a ducking body's height: drop under it
-      if (me.air === 0 && !me.fly && s.y > DUCK + 3 && tti < 0.4) out.push({ spell: "duck", hold: tti + 0.12, score: urgency * 1.2 });
+      if (me.air === 0 && !me.fly && s.y > me.spec.duck + 3 && tti < 0.4) out.push({ spell: "duck", hold: tti + 0.12, score: urgency * 1.2 });
       // on the sword: rise over it, or sink under it
       if (me.qi > 12 && tti > 0.15) {
         const over = s.y + 4;
         if (over < duel.top) out.push({ spell: "fly", hover: over, score: urgency * 1.15 });
-        if (me.fly && s.y > BODY + 2) out.push({ spell: "fly", hover: 0, score: urgency * 1.1 });
+        if (me.fly && s.y > me.spec.body + 2) out.push({ spell: "fly", hover: 0, score: urgency * 1.1 });
       }
       if (ready(me, "bolt") && tti > 0.3) out.push({ spell: "bolt", target: null, score: urgency * 0.9 });
       const b = blink(s.x);
       if (b) b.score = urgency * 0.7;
     } else if (s.kind === "orb") {
       const [bx, by] = orbAt(s);
-      const d = Math.hypot(bx - me.x, -by - (me.air + CHEST));
+      const d = Math.hypot(bx - me.x, -by - (me.air + me.spec.chest));
       if (d > 48) continue;
       const urgency = s.spell.damage * (1.4 - d / 48);
       out.push({ spell: "move", move: Math.sign(me.x - bx) || 1, score: urgency * 1.0 });
@@ -886,7 +882,7 @@ function dangers(duel, me) {
       if (b) b.score = urgency * 0.9;
     } else if (s.kind === "zone" && !s.fell && s.t + (s.lead ?? 0) >= s.spell.notice) {
       const dx = me.x - s.x;
-      if (Math.abs(dx) > (s.spell.reach ?? 0) + s.spell.radius + HALF_WIDTH + 4) continue;
+      if (Math.abs(dx) > (s.spell.reach ?? 0) + s.spell.radius + me.spec.halfWidth + 4) continue;
       const left = s.spell.impact - s.t;
       const urgency = s.spell.damage * (1.5 - left);
       const way = Math.abs(dx) < 1 ? (s.x - duel.left > duel.right - s.x ? -1 : 1) : Math.sign(dx);
@@ -916,15 +912,15 @@ function blows(duel, me, foe) {
   const spell = SPELLS[act.spell];
   if (spell.kind !== "melee" && spell.kind !== "blast") return [];
   const d = Math.abs(foe.x - me.x);
-  if (d > spell.range + HALF_WIDTH + 6) return [];
+  if (d > spell.range + me.spec.halfWidth + 6) return [];
   const left = spell.windup - act.t;
   const urgency = spell.damage * 1.2;
   const out = [];
   // backing off works if I can walk out of reach before it lands
-  const out_ = spell.range + HALF_WIDTH + 2 - d;
-  if (out_ / WALK < left + 0.05) out.push({ spell: "move", move: Math.sign(me.x - foe.x) || 1, score: urgency * 1.2 });
+  const out_ = spell.range + me.spec.halfWidth + 2 - d;
+  if (out_ / me.spec.walk < left + 0.05) out.push({ spell: "move", move: Math.sign(me.x - foe.x) || 1, score: urgency * 1.2 });
   if (Math.sign(foe.x - me.x) === me.face) out.push({ spell: "guard", hold: left + 0.2, score: urgency * 0.9 });
-  if (ready(me, "slash") && SPELLS.slash.windup < left && d < SPELLS.slash.range + HALF_WIDTH) {
+  if (ready(me, "slash") && SPELLS.slash.windup < left && d < SPELLS.slash.range + foe.spec.halfWidth) {
     out.push({ spell: "slash", score: urgency * 1.1 });
   }
   if (ready(me, "blink")) {
@@ -970,11 +966,11 @@ function attacks(duel, me, foe) {
   if (ready(me, "dive") && me.air - foe.air > 14 && d < 44) {
     out.push({ spell: "dive", score: value("dive", busy > SPELLS.dive.windup ? 0.9 : foe.guard > 0 ? 0.25 : 0.6) });
   }
-  if (ready(me, "slash") && d < SPELLS.slash.range + 8 && Math.abs(foe.air - me.air) < CHEST) {
+  if (ready(me, "slash") && d < SPELLS.slash.range + 8 && Math.abs(foe.air - me.air) < me.spec.chest) {
     out.push({ spell: "slash", score: value("slash", busy > SPELLS.slash.windup ? 0.95 : foe.guard > 0 ? 0.15 : 0.55) });
   }
   // a bolt flies level from my chest: it must cross the foe's body
-  const level = me.air + CHEST > foe.air - 2 && me.air + CHEST < foe.air + BODY;
+  const level = me.air + me.spec.chest > foe.air - 2 && me.air + me.spec.chest < foe.air + foe.spec.body;
   if (ready(me, "bolt") && d > 24 && level) {
     const travel = d / SPELLS.bolt.speed + SPELLS.bolt.windup;
     // a bolt into a bolt the foe is gathering only cancels it
@@ -989,7 +985,7 @@ function attacks(duel, me, foe) {
   for (const name of ["tribulation", "prison"]) {
     if (!ready(me, name)) continue;
     const lead = SPELLS[name].windup + SPELLS[name].impact;
-    const pace = foe.act || foe.body.reeling() || foe.medit ? 0 : foe.intent.move * WALK;
+    const pace = foe.act || foe.body.reeling() || foe.medit ? 0 : foe.intent.move * foe.spec.walk;
     if (lead < open) continue;
     out.push({ spell: name, target: foe.x + pace * lead * 0.8, score: value(name, 0.8, lead) * (SPELLS[name].strikes ?? 1) + 3 });
   }
@@ -997,7 +993,7 @@ function attacks(duel, me, foe) {
     if (SPELLS[name].kind !== "zone" || SPELLS[name].ultimate || !ready(me, name)) continue;
     // aim where the foe will be when it lands
     const lead = SPELLS[name].windup + (SPELLS[name].sigil ?? 0) + SPELLS[name].impact;
-    const pace = foe.act || foe.body.reeling() || foe.medit ? 0 : foe.intent.move * WALK;
+    const pace = foe.act || foe.body.reeling() || foe.medit ? 0 : foe.intent.move * foe.spec.walk;
     const target = foe.x + pace * lead * 0.8;
     // an icicle only finds a foe standing on the floor
     const grounded = SPELLS[name].grounded ? (foe.air < 10 && !foe.fly ? 1 : 0.1) : 1;
@@ -1014,7 +1010,7 @@ function attacks(duel, me, foe) {
       out.push({ spell: name, score: value(name, 0.7, s.windup + s.life) + 4 });
     }
     // a lightning step: the foe within a stride, on my level
-    if (s.kind === "dash" && ready(me, name) && d > 12 && d < s.distance - 10 && Math.abs(foe.air - me.air) < CHEST) {
+    if (s.kind === "dash" && ready(me, name) && d > 12 && d < s.distance - 10 && Math.abs(foe.air - me.air) < me.spec.chest) {
       out.push({ spell: name, score: value(name, busy > s.windup ? 0.9 : foe.guard > 0 ? 0.2 : 0.6) });
     }
   }
@@ -1041,10 +1037,10 @@ function punisher(foe, me, time) {
     const s = SPELLS[name];
     if (!s.damage || s.ultimate || !ready(foe, name)) continue;
     let lands = Infinity;
-    if (s.kind === "melee" && !s.dive && d < s.range + HALF_WIDTH && level < CHEST) lands = s.windup;
-    else if (s.kind === "blast" && d < s.range + HALF_WIDTH && level < BODY) lands = s.windup;
-    else if (s.kind === "dash" && d < s.distance && level < CHEST) lands = s.windup;
-    else if (s.kind === "bolt" && level < BODY) lands = s.windup + d / s.speed;
+    if (s.kind === "melee" && !s.dive && d < s.range + me.spec.halfWidth && level < me.spec.chest) lands = s.windup;
+    else if (s.kind === "blast" && d < s.range + me.spec.halfWidth && level < me.spec.body) lands = s.windup;
+    else if (s.kind === "dash" && d < s.distance && level < me.spec.chest) lands = s.windup;
+    else if (s.kind === "bolt" && level < me.spec.body) lands = s.windup + d / s.speed;
     if (lands <= time + REACTION) most = Math.max(most, s.damage);
   }
   return most;
@@ -1064,14 +1060,14 @@ function positions(duel, me, foe) {
   const out = [{ spell: "wait", score: 0.4 }];
   // after an exchange, or with the foe behind a barrier, back off to spacing and let it come (footsies): out of its
   // sword's reach at least, and most of the way back to its own range
-  const reach = Math.max(SPELLS.slash.range + HALF_WIDTH + 6, range * 0.8);
-  if ((me.calm > 0 || foe.barrier > 0) && Math.abs(d) < reach && Math.abs(foe.air - me.air) < CHEST && !foe.body.reeling()) {
+  const reach = Math.max(SPELLS.slash.range + me.spec.halfWidth + 6, range * 0.8);
+  if ((me.calm > 0 || foe.barrier > 0) && Math.abs(d) < reach && Math.abs(foe.air - me.air) < me.spec.chest && !foe.body.reeling()) {
     const back = -Math.sign(d) || 1;
     const room = back < 0 ? me.x - duel.left : duel.right - me.x;
     if (room > 14) out.push({ spell: "move", move: back, score: 2.4 });
   }
   // inside the foe's sword reach with no blade of my own ready: get out of it
-  if (Math.abs(d) < SPELLS.slash.range + 4 && me.air - foe.air < CHEST && !ready(me, "slash")) {
+  if (Math.abs(d) < SPELLS.slash.range + 4 && me.air - foe.air < me.spec.chest && !ready(me, "slash")) {
     const back = -Math.sign(d) || 1;
     const room = back < 0 ? me.x - duel.left : duel.right - me.x;
     if (room > 14) out.push({ spell: "move", move: back, score: 2.2 });
@@ -1115,7 +1111,7 @@ function cast(duel, me, fx, x, y, opts = {}) {
 
 /** A streak of `me`'s qi from where it casts to where the spell lands (heights up from the ground). */
 function streak(duel, me, x, y) {
-  emit(duel, { type: "streak", by: me.index, x0: me.x + me.face * 6, y0: me.air + CHEST, x1: x, y1: y });
+  emit(duel, { type: "streak", by: me.index, x0: me.x + me.face * 6, y0: me.air + me.spec.chest, x1: x, y1: y });
 }
 
 function emit(duel, command) {

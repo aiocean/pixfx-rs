@@ -1,6 +1,4 @@
-use pixfx_fighter::body::{
-    separate, Arena, Blow, Body, Doing, Drive, Event, Motion, HALF_WIDTH, PERSONAL,
-};
+use pixfx_fighter::body::{Arena, Blow, Body, BodySpec, Doing, Drive, Event, Motion, separate};
 use pixfx_fighter::pose::Pose;
 
 const ARENA: Arena = Arena {
@@ -112,11 +110,55 @@ fn a_light_blow_staggers_in_place_and_bodies_against_a_wall_part_the_other_way()
     assert_eq!(pose, Pose::Hurt);
     assert!(body.x > 100.0, "pushed back");
 
-    let mut a = Body::new(HALF_WIDTH);
-    let mut b = Body::new(HALF_WIDTH + 4.0);
+    let s = BodySpec::default();
+    let mut a = Body::new(s.half_width);
+    let mut b = Body::new(s.half_width + 4.0);
     b.vx = -50.0;
     separate(&mut a, &mut b, &ARENA);
-    assert_eq!(a.x, HALF_WIDTH, "the wall holds the one against it");
-    assert_eq!(b.x - a.x, PERSONAL, "the other takes the whole push");
+    assert_eq!(a.x, s.half_width, "the wall holds the one against it");
+    assert_eq!(
+        b.x - a.x,
+        2.0 * (s.half_width + s.room),
+        "the other takes the whole push"
+    );
     assert_eq!(b.vx, 0.0, "and stops walking into it");
+}
+
+#[test]
+fn a_body_built_lighter_and_floatier_is_thrown_by_a_blow_that_only_staggers_the_stock_one_and_flies_longer()
+ {
+    let blow = Blow {
+        power: 8.0,
+        dir: 1.0,
+        freeze: false,
+        flying: false,
+    };
+    let stock = BodySpec::default();
+    let light = BodySpec {
+        launch_damage: 6.0,
+        gravity: stock.gravity / 2.0,
+        ..stock
+    };
+    let mut a = Body::new(100.0);
+    let mut b = Body::with_spec(100.0, light);
+    a.hit(blow);
+    b.hit(blow);
+    assert!(
+        a.down.is_none() && b.down.is_some(),
+        "only the lighter one is thrown"
+    );
+    assert!(blow.heavy(&light) && !blow.heavy(&stock));
+
+    // the same jump hangs longer under less gravity
+    let airtime = |spec: BodySpec| {
+        let mut body = Body::with_spec(100.0, spec);
+        body.vy = spec.jump_speed;
+        let mut steps = 0;
+        while steps == 0 || body.air > 0.0 {
+            body.step(DT, &standing(150.0), &ARENA, &mut || 0.0);
+            steps += 1;
+        }
+        steps
+    };
+    assert!(airtime(light) > airtime(stock) + 20);
 }

@@ -7,7 +7,7 @@ use core::f64::consts::PI;
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{js_max, js_min, js_round, rand};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
 
 use super::lib::{
     Burn, Hot, Life, LoopNoise, Tongue, burn, drift, ember, floor_light, hot_first, looped, spark,
@@ -31,6 +31,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 8,
     state: None,
+    options: &[IRON.spec()],
 };
 
 // meta.options
@@ -45,13 +46,15 @@ const PALETTE: [Rgba; 9] = [
     Rgba::hex24(0xfff3a6),
     Rgba::hex24(0xffffff),
 ];
-const IRON: [Rgba; 5] = [
+const IRON: RampOpt = RampOpt::new(
+    "iron",
+    &[
     Rgba::hex24(0x0b0910),
     Rgba::hex24(0x1c1924),
     Rgba::hex24(0x302c3a),
     Rgba::hex24(0x4c4658),
     Rgba::hex24(0x78708a),
-];
+]);
 
 const D: f64 = META.duration;
 const NL: LoopNoise = LoopNoise(D);
@@ -80,7 +83,7 @@ impl Effect for Brazier {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             f: ramp(&opts.palette_or(&PALETTE)),
-            i: ramp(&opts.ramp_or("iron", &IRON)),
+            i: ramp(&opts.ramp(&IRON)),
             s: seed as f64,
         })
     }

@@ -10,11 +10,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 js-sys = "=0.3.107"
-pixfx-core = { path = "../pixfx-core" }
+pixfx-core = { path = "../pixfx-core", features = ["ts"] }
 pixfx-effects = { path = "../pixfx-effects" }
-pixfx-fighter = { path = "../pixfx-fighter" }
+pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"] }
+pixfx-light = { path = "../pixfx-light", features = ["ts"] }
 pixfx-wasm = { path = "../pixfx-wasm" }
-wasm-bindgen = "=0.2.130"
+serde.workspace = true
+tsify.workspace = true
+wasm-bindgen.workspace = true
 web-sys = { version = "=0.3.107", features = [
   "CanvasRenderingContext2d",
   "HtmlCanvasElement",

@@ -1,9 +1,11 @@
-//! `pixfx-fighter` for JS: the screen's answer to a fight ([`Feel`]). A game passes the fight's events as plain
-//! objects (`{type: "hit", by, power, launch, crit, ranged, share, damage, x, y}`, …), the same shapes the site's
-//! duel emits; anything else in the list (effect commands) is ignored.
+//! `pixfx-fighter` for JS: the screen's answer to a fight ([`Feel`]), a fighter's body ([`Body`]) and the drawing
+//! of fighters ([`Sprites`]). Every object JS passes is read once, strictly, into the Rust types
+//! ([`pixfx_wasm::js::parse`]): a misspelt, missing or mistyped field throws, naming it.
 
-use js_sys::{Array, Function, Object, Reflect};
-use pixfx_fighter::feel::{self, Cue, NumberKind};
+use js_sys::{Array, Function, Object};
+use pixfx_fighter::feel::{self, Cue};
+use pixfx_wasm::js::{parse, to_js};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 /// What a fight looks and feels like on screen: hit-stop, shake, the struck one's shudder, damage numbers, dust,
@@ -28,12 +30,19 @@ impl Feel {
         }
     }
 
-    /// Take in what the fight just did: an array of event objects; unknown types are skipped.
-    pub fn react(&mut self, events: &Array) -> Result<(), JsError> {
+    /// Take in what the fight just did: an array of the fight's events. Each whose `type` is a cue's
+    /// ([`Cue::TYPES`]) is read as that cue, its fields strictly (fields the cue does not read, which other parts
+    /// of the game read off the same event, are let be); events of other types (effect commands) are skipped.
+    pub fn react(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "Array<Cue | { type: string }>")] events: &Array,
+    ) -> Result<(), JsError> {
         let mut cues = Vec::new();
-        for e in events.iter() {
-            if let Some(c) = cue(&e)? {
-                cues.push(c);
+        for (i, e) in events.iter().enumerate() {
+            let what = format!("events[{i}]");
+            let Typed { ty } = parse(&what, &e)?;
+            if Cue::TYPES.contains(&ty.as_str()) {
+                cues.push(parse(&what, &e)?);
             }
         }
         self.inner.react(&cues);
@@ -63,6 +72,7 @@ impl Feel {
     }
 
     /// How far each fighter is jolted off its place: `[[dx, dy], [dx, dy]]`.
+    #[wasm_bindgen(unchecked_return_type = "[number, number][]")]
     pub fn jolts(&self) -> Array {
         self.inner
             .jolts()
@@ -74,7 +84,7 @@ impl Feel {
     /// How dark an ultimate's dusk makes the sky at its darkest.
     #[wasm_bindgen(js_name = duskDepth)]
     pub fn dusk_depth() -> f64 {
-        feel::DUSK.depth
+        feel::FeelSpec::default().dusk.depth
     }
 
     /// How dark the sky is, 0 up to the dusk's depth.
@@ -83,48 +93,15 @@ impl Feel {
     }
 
     /// Each floating number: `{x, y, alpha, text, by, kind}`, `y` up from the ground, `by` null for a dodge.
-    pub fn numbers(&self) -> Result<Array, JsError> {
-        self.inner
-            .numbers()
-            .into_iter()
-            .map(|n| {
-                let kind = match n.kind {
-                    NumberKind::Hit => "hit",
-                    NumberKind::Crit => "crit",
-                    NumberKind::Tick => "tick",
-                    NumberKind::Heal => "heal",
-                    NumberKind::Ward => "ward",
-                    NumberKind::Dodge => "dodge",
-                };
-                let by = n.by.map_or(JsValue::NULL, |b| JsValue::from(b as u32));
-                object(&[
-                    ("x", n.x.into()),
-                    ("y", n.y.into()),
-                    ("alpha", n.alpha.into()),
-                    ("text", n.text.into()),
-                    ("by", by),
-                    ("kind", kind.into()),
-                ])
-            })
-            .collect()
+    #[wasm_bindgen(unchecked_return_type = "DamageNumber[]")]
+    pub fn numbers(&self) -> Result<JsValue, JsError> {
+        to_js(&self.inner.numbers())
     }
 
     /// Each qi streak: `{x0, y0, x1, y1, by, fade}`.
-    pub fn streaks(&self) -> Result<Array, JsError> {
-        self.inner
-            .streaks()
-            .into_iter()
-            .map(|k| {
-                object(&[
-                    ("x0", k.x0.into()),
-                    ("y0", k.y0.into()),
-                    ("x1", k.x1.into()),
-                    ("y1", k.y1.into()),
-                    ("by", (k.by as u32).into()),
-                    ("fade", k.fade.into()),
-                ])
-            })
-            .collect()
+    #[wasm_bindgen(unchecked_return_type = "Streak[]")]
+    pub fn streaks(&self) -> Result<JsValue, JsError> {
+        to_js(&self.inner.streaks())
     }
 
     /// How shaken the screen is, 0 to 1.
@@ -133,98 +110,16 @@ impl Feel {
     }
 }
 
-fn object(fields: &[(&str, JsValue)]) -> Result<JsValue, JsError> {
-    let o = Object::new();
-    for (k, v) in fields {
-        Reflect::set(&o, &JsValue::from_str(k), v)
-            .map_err(|_| JsError::new("could not build an object"))?;
-    }
-    Ok(o.into())
-}
-
-fn num(e: &JsValue, key: &str) -> f64 {
-    Reflect::get(e, &JsValue::from_str(key))
-        .ok()
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0)
-}
-
-fn flag(e: &JsValue, key: &str) -> bool {
-    Reflect::get(e, &JsValue::from_str(key))
-        .ok()
-        .is_some_and(|v| v.is_truthy())
-}
-
-fn index(e: &JsValue, key: &str) -> usize {
-    let v = num(e, key);
-    if v >= 0.0 { v as usize } else { usize::MAX }
-}
-
-/// One event object as a [`Cue`]; `None` for types the feel does not answer.
-fn cue(e: &JsValue) -> Result<Option<Cue>, JsError> {
-    let ty = Reflect::get(e, &JsValue::from_str("type"))
-        .map_err(|_| JsError::new("an event must be an object"))?
-        .as_string()
-        .unwrap_or_default();
-    let (x, y) = (num(e, "x"), num(e, "y"));
-    Ok(Some(match ty.as_str() {
-        "hit" => Cue::Hit {
-            by: index(e, "by"),
-            power: num(e, "power"),
-            launch: flag(e, "launch"),
-            crit: flag(e, "crit"),
-            ranged: flag(e, "ranged"),
-            share: num(e, "share"),
-            damage: num(e, "damage"),
-            x,
-            y,
-        },
-        "tick" => Cue::Tick {
-            by: index(e, "by"),
-            damage: num(e, "damage"),
-            x,
-            y,
-        },
-        "heal" => Cue::Heal {
-            by: index(e, "by"),
-            amount: num(e, "amount"),
-            x,
-            y,
-        },
-        "ward" => Cue::Ward {
-            by: index(e, "by"),
-            amount: num(e, "amount"),
-            x,
-            y,
-        },
-        "dodge" => Cue::Dodge { x, y },
-        "unyielding" => Cue::Unyielding,
-        "block" => Cue::Block,
-        "clash" => Cue::Clash,
-        "land" => Cue::Land {
-            x,
-            strength: num(e, "strength"),
-        },
-        "bump" => Cue::Bump {
-            strength: num(e, "strength"),
-        },
-        "ko" => Cue::Ko,
-        "streak" => Cue::Streak {
-            x0: num(e, "x0"),
-            y0: num(e, "y0"),
-            x1: num(e, "x1"),
-            y1: num(e, "y1"),
-            by: index(e, "by"),
-        },
-        "ultimate" => Cue::Ultimate,
-        _ => return Ok(None),
-    }))
+/// Just an event's `type`, to tell cues from the game's other events.
+#[derive(Deserialize)]
+struct Typed {
+    #[serde(rename = "type")]
+    ty: String,
 }
 
 // ---------- the body ----------
 
-use pixfx_fighter::body::{self as b, Arena, Blow, Doing, Drive, Motion, Phase};
-use pixfx_fighter::pose::Pose;
+use pixfx_fighter::body::{self as b, Arena, Blow, BodySpec, Doing, Drive};
 
 /// A fighter's body for JS: its fields as properties, the duel's body steps as methods. Poses are the strings the
 /// site's duel uses (`"idle"`, `"walk"`, … `"win"`).
@@ -267,43 +162,58 @@ fields! {
     pose_t / set_pose_t: "poseT" => pose_t,
 }
 
+/// The default spec with the fields `o` gives over it (`{gravity: 400}`), read strictly; `undefined`/`null` is the
+/// default itself.
+fn spec_of(o: &JsValue) -> Result<BodySpec, JsError> {
+    if o.is_undefined() || o.is_null() {
+        return Ok(BodySpec::default());
+    }
+    if !o.is_object() {
+        return Err(JsError::new("body spec: expected an object"));
+    }
+    let defaults: Object = to_js(&BodySpec::default())?.unchecked_into();
+    parse(
+        "body spec",
+        &Object::assign(&defaults, &Object::from(o.clone())).into(),
+    )
+}
+
 #[wasm_bindgen]
 impl Body {
-    /// A body standing at `x`, facing right.
+    /// A body standing at `x`, facing right, built as `spec` says: omitted, the site's duel's body
+    /// ([`Body::defaults`]); an object, those defaults with the numbers it gives over them (`{gravity: 400}`).
     #[wasm_bindgen(constructor)]
-    pub fn new(x: f64) -> Body {
-        Body {
-            inner: b::Body::new(x),
-        }
+    pub fn new(
+        x: f64,
+        #[wasm_bindgen(unchecked_optional_param_type = "Partial<BodySpec>")] spec: JsValue,
+    ) -> Result<Body, JsError> {
+        Ok(Body {
+            inner: b::Body::with_spec(x, spec_of(&spec)?),
+        })
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn pose(&self) -> String {
-        pose_name(self.inner.pose).to_owned()
+    /// The default body's numbers, `{body, chest, halfWidth, walk, jumpSpeed, gravity, …}`: the rules read them
+    /// instead of copying them, and pass back the ones they change to the constructor.
+    #[wasm_bindgen(unchecked_return_type = "BodySpec")]
+    pub fn defaults() -> Result<JsValue, JsError> {
+        to_js(&BodySpec::default())
+    }
+
+    /// This body's numbers, as [`Body::defaults`] gives them.
+    #[wasm_bindgen(getter, unchecked_return_type = "BodySpec")]
+    pub fn spec(&self) -> Result<JsValue, JsError> {
+        to_js(&self.inner.spec)
+    }
+
+    #[wasm_bindgen(getter, unchecked_return_type = "Pose")]
+    pub fn pose(&self) -> Result<JsValue, JsError> {
+        to_js(&self.inner.pose)
     }
 
     /// Off its feet: `{phase, t, juggle, light, spin, bounced, quick, dir}` (a copy), or null.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "Down | null")]
     pub fn down(&self) -> Result<JsValue, JsError> {
-        let Some(d) = self.inner.down else {
-            return Ok(JsValue::NULL);
-        };
-        let phase = match d.phase {
-            Phase::Air => "air",
-            Phase::Down => "down",
-            Phase::Roll => "roll",
-            Phase::Rise => "rise",
-        };
-        object(&[
-            ("phase", phase.into()),
-            ("t", d.t.into()),
-            ("juggle", d.juggle.into()),
-            ("light", d.light.into()),
-            ("spin", d.spin.into()),
-            ("bounced", d.bounced.into()),
-            ("quick", d.quick.into()),
-            ("dir", d.dir.into()),
-        ])
+        to_js(&self.inner.down)
     }
 
     /// A new round: back on its feet at `x`.
@@ -320,27 +230,19 @@ impl Body {
     /// Feet and flight for one step. `drive`: `{alive, acting, meditating, guarding, chilled, intent, foeX,
     /// motion: "gravity" | {fly: hover} | {dive: speed, floor}}`; `arena`: `{left, right, top}`; `rand()` in
     /// [0, 1). Returns the events: `{type: "land", x, strength}`, `{type: "bump", x, y, strength}`.
+    #[wasm_bindgen(unchecked_return_type = "BodyEvent[]")]
     pub fn step(
         &mut self,
         dt: f64,
-        drive: &JsValue,
-        arena: &JsValue,
+        #[wasm_bindgen(unchecked_param_type = "Drive")] drive: &JsValue,
+        #[wasm_bindgen(unchecked_param_type = "Arena")] arena: &JsValue,
         rand: &Function,
-    ) -> Result<Array, JsError> {
-        let drive = Drive {
-            alive: flag(drive, "alive"),
-            acting: flag(drive, "acting"),
-            meditating: flag(drive, "meditating"),
-            guarding: flag(drive, "guarding"),
-            chilled: flag(drive, "chilled"),
-            intent: num(drive, "intent"),
-            motion: motion(drive)?,
-            foe_x: num(drive, "foeX"),
-        };
-        let arena = arena_of(arena);
+    ) -> Result<JsValue, JsError> {
+        let drive: Drive = parse("drive", drive)?;
+        let arena: Arena = parse("arena", arena)?;
         let (events, failed) = with_roll(rand, |roll| self.inner.step(dt, &drive, &arena, roll));
         failed?;
-        events_js(&events)
+        to_js(&events)
     }
 
     /// A blow lands: launch or stagger, knockback, the white flash.
@@ -354,11 +256,16 @@ impl Body {
     }
 
     /// Two bodies cannot stand in one place: part them (the caller skips this when either is knocked out).
-    pub fn separate(a: &mut Body, b: &mut Body, arena: &JsValue) {
-        b::separate(&mut a.inner, &mut b.inner, &arena_of(arena));
+    pub fn separate(
+        a: &mut Body,
+        b: &mut Body,
+        #[wasm_bindgen(unchecked_param_type = "Arena")] arena: &JsValue,
+    ) -> Result<(), JsError> {
+        b::separate(&mut a.inner, &mut b.inner, &parse("arena", arena)?);
+        Ok(())
     }
 
-    /// Whether a blow of `power` throws (a freezing one never does).
+    /// Whether a blow of `power` throws a default body (a freezing one never does).
     pub fn heavy(power: f64, freeze: bool) -> bool {
         Blow {
             power,
@@ -366,7 +273,7 @@ impl Body {
             freeze,
             flying: false,
         }
-        .heavy()
+        .heavy(&BodySpec::default())
     }
 
     /// The knockout throws the loser off its feet, away from the foe at `foe_x`.
@@ -376,21 +283,22 @@ impl Body {
     }
 
     /// Between rounds: slide, fall and lie, or stand over the loser (`won`).
+    #[wasm_bindgen(unchecked_return_type = "BodyEvent[]")]
     pub fn settle(
         &mut self,
         dt: f64,
         won: bool,
         alive: bool,
         foe_x: f64,
-        arena: &JsValue,
+        #[wasm_bindgen(unchecked_param_type = "Arena")] arena: &JsValue,
         rand: &Function,
-    ) -> Result<Array, JsError> {
-        let arena = arena_of(arena);
+    ) -> Result<JsValue, JsError> {
+        let arena: Arena = parse("arena", arena)?;
         let (events, failed) = with_roll(rand, |roll| {
             self.inner.settle(dt, won, alive, foe_x, &arena, roll)
         });
         failed?;
-        events_js(&events)
+        to_js(&events)
     }
 
     pub fn reeling(&self) -> bool {
@@ -420,7 +328,15 @@ impl Body {
     /// Settle its pose from what the rules have it doing: `"windup"`, `"recover"` (with `melee`), `"guard"`,
     /// `"meditate"`, `"fly"`, `"walk"` or `"idle"`. A new pose restarts the pose clock.
     #[wasm_bindgen(js_name = updatePose)]
-    pub fn update_pose(&mut self, doing: &str, melee: bool, alive: bool) -> Result<(), JsError> {
+    pub fn update_pose(
+        &mut self,
+        #[wasm_bindgen(
+            unchecked_param_type = "\"windup\" | \"recover\" | \"guard\" | \"meditate\" | \"fly\" | \"walk\" | \"idle\""
+        )]
+        doing: &str,
+        melee: bool,
+        alive: bool,
+    ) -> Result<(), JsError> {
         let doing = match doing {
             "windup" => Doing::Windup { melee },
             "recover" => Doing::Recover { melee },
@@ -434,37 +350,6 @@ impl Body {
         let pose = self.inner.pose_of(doing, alive);
         self.inner.set_pose(pose);
         Ok(())
-    }
-}
-
-fn arena_of(v: &JsValue) -> Arena {
-    Arena {
-        left: num(v, "left"),
-        right: num(v, "right"),
-        top: num(v, "top"),
-    }
-}
-
-fn motion(drive: &JsValue) -> Result<Motion, JsError> {
-    let m = Reflect::get(drive, &JsValue::from_str("motion"))
-        .map_err(|_| JsError::new("drive must be an object"))?;
-    if m.as_string().is_some() || m.is_undefined() || m.is_null() {
-        return Ok(Motion::Gravity);
-    }
-    let has = |k: &str| Reflect::has(&m, &JsValue::from_str(k)).unwrap_or(false);
-    if has("fly") {
-        Ok(Motion::Fly {
-            hover: num(&m, "fly"),
-        })
-    } else if has("dive") {
-        Ok(Motion::Dive {
-            speed: num(&m, "dive"),
-            floor: num(&m, "floor"),
-        })
-    } else {
-        Err(JsError::new(
-            "motion: expected \"gravity\", {fly} or {dive, floor}",
-        ))
     }
 }
 
@@ -490,64 +375,14 @@ fn with_roll<T>(
     (out, status)
 }
 
-fn events_js(events: &[b::Event]) -> Result<Array, JsError> {
-    events
-        .iter()
-        .map(|e| match *e {
-            b::Event::Land { x, strength } => object(&[
-                ("type", "land".into()),
-                ("x", x.into()),
-                ("strength", strength.into()),
-            ]),
-            b::Event::Bump { x, y, strength } => object(&[
-                ("type", "bump".into()),
-                ("x", x.into()),
-                ("y", y.into()),
-                ("strength", strength.into()),
-            ]),
-        })
-        .collect()
-}
-
-pub(crate) fn pose_name(p: Pose) -> &'static str {
-    match p {
-        Pose::Idle => "idle",
-        Pose::Walk => "walk",
-        Pose::Jump => "jump",
-        Pose::Fly => "fly",
-        Pose::Land => "land",
-        Pose::Crouch => "crouch",
-        Pose::Duck => "duck",
-        Pose::Draw => "draw",
-        Pose::Slash => "slash",
-        Pose::Channel => "channel",
-        Pose::Cast => "cast",
-        Pose::Guard => "guard",
-        Pose::Meditate => "meditate",
-        Pose::Hurt => "hurt",
-        Pose::Frozen => "frozen",
-        Pose::Shocked => "shocked",
-        Pose::Launched => "launched",
-        Pose::Tumble => "tumble",
-        Pose::Fall => "fall",
-        Pose::Down => "down",
-        Pose::Roll => "roll",
-        Pose::Sit => "sit",
-        Pose::Kneel => "kneel",
-        Pose::Win => "win",
-    }
-}
-
 // ---------- drawing fighters ----------
 
 use crate::Surface;
 use crate::stage::{Pass, Rect};
-use pixfx_core::color::to_hex;
 use pixfx_core::{Frame, Layer, Rgba};
 use pixfx_fighter::look::Look;
-use pixfx_fighter::paint::{self, Appearance, Windup};
-use pixfx_fighter::pose::Gather;
-use pixfx_fighter::status::{self, DomeStyle, Marks};
+use pixfx_fighter::paint::{self, Appearance};
+use pixfx_fighter::status::{self, DomeStyle, Figure, Mark, Silhouette};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 /// Fighters, their marks and the dust they raise, drawn onto a canvas in game pixels upscaled by `scale`, colour
@@ -594,51 +429,71 @@ impl Sprites {
         self.frame.clear();
     }
 
-    /// Fighter `a` in look `"thunder"` or `"frost"`, its feet on the floor at row `ground` (game pixels). `a`:
+    /// Fighter `a` in `look` (a preset's name, `"thunder"` or `"frost"`, or a look object as `lookColors` reads
+    /// it), its feet on the floor at row `ground` (game pixels). `a`:
     /// `{x, air, pose, poseT, face, vx, out, flash, frozen, shocked, hitT, hitPower, dodged, jolt: [dx, dy],
     /// act: null | {how: "summon"|"palm"|"lunge"|"prayer"|"cross", dive, progress: number|null, long}}`. `marks`:
     /// null, or `{shield, barrier, rang, burning, defDown, silence, chilled, fury, poseT, dome: "banded"|"faceted",
-    /// burn, shock, ice, t, seed}`, the last six drawing fire, lightning and frost over the body at time `t`.
+    /// burn, shock, ice, t, seed}`, the last five drawing fire, lightning and frost over the body at time `t`,
+    /// following the shape of its pose.
     pub fn fighter(
         &mut self,
-        look: &str,
-        a: &JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string | Look")] look: &JsValue,
+        #[wasm_bindgen(unchecked_param_type = "Appearance")] a: &JsValue,
         ground: f64,
-        marks: &JsValue,
+        #[wasm_bindgen(unchecked_param_type = "Marks | null")] marks: &JsValue,
     ) -> Result<(), JsError> {
         let look = look_of(look)?;
-        let a = appearance(a)?;
+        let a: Appearance = parse("appearance", a)?;
+        let marks: Option<Marks> = parse("marks", marks)?;
         paint::draw(&mut self.frame, &look, &a, ground);
-        if marks.is_object() {
-            let m = Marks {
-                shield: flag(marks, "shield"),
-                barrier: flag(marks, "barrier"),
-                rang: flag(marks, "rang"),
-                burning: flag(marks, "burning"),
-                def_down: flag(marks, "defDown"),
-                silence: flag(marks, "silence"),
-                chilled: flag(marks, "chilled"),
-                fury: num(marks, "fury").max(0.0) as u32,
-                pose_t: num(marks, "poseT"),
-                dome: if text(marks, "dome") == "faceted" {
-                    DomeStyle::Faceted
-                } else {
-                    DomeStyle::Banded
-                },
-                glow: look.glow,
+        if let Some(marks) = marks {
+            // the marks in the order the duel has always drawn them
+            let mut m = Vec::new();
+            if marks.shield {
+                m.push(Mark::Shield);
+            }
+            if marks.barrier {
+                m.push(Mark::Barrier {
+                    style: marks.dome,
+                    glow: look.glow,
+                    rang: marks.rang,
+                });
+            }
+            for (on, mark) in [
+                (marks.burning, Mark::Burning),
+                (marks.def_down, Mark::DefDown),
+                (marks.silence, Mark::Silence),
+                (marks.chilled, Mark::Chilled),
+            ] {
+                if on {
+                    m.push(mark);
+                }
+            }
+            m.push(Mark::Fury(marks.fury));
+            let figure = Figure {
+                feet_x: a.x,
+                feet_y: ground - a.air,
+                face: a.face,
+                silhouette: Silhouette::of(a.pose),
             };
-            let (fx, fy) = (a.x, ground - a.air);
-            let (t, seed) = (num(marks, "t"), num(marks, "seed").max(0.0) as u32);
-            if flag(marks, "burn") {
-                status::draw_burning(&mut self.frame, t, seed, fx, fy, 1.0);
+            let (t, seed) = (marks.t, marks.seed);
+            if marks.burn {
+                status::draw_burning(&mut self.frame, t, seed, &figure, 1.0);
             }
-            if flag(marks, "ice") {
-                status::draw_frozen(&mut self.frame, t, seed, fx, fy, 1.0);
+            if marks.ice {
+                status::draw_frozen(&mut self.frame, t, seed, &figure, 1.0);
             }
-            if flag(marks, "shock") {
-                status::draw_shocked(&mut self.frame, t, seed, fx, fy, 1.0);
+            if marks.shock {
+                status::draw_shocked(&mut self.frame, t, seed, &figure, 1.0);
             }
-            status::draw_marks(&mut self.frame, &m, fx, fy);
+            status::draw_marks(
+                &mut self.frame,
+                &m,
+                marks.pose_t,
+                figure.feet_x,
+                figure.feet_y,
+            );
         }
         Ok(())
     }
@@ -652,15 +507,15 @@ impl Sprites {
     /// look `look`, twice the sprite's size, filling the `size`-pixel square at (`x`, `y`), at opacity `alpha`.
     pub fn portrait(
         &mut self,
-        look: &str,
-        a: &JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string | Look")] look: &JsValue,
+        #[wasm_bindgen(unchecked_param_type = "Appearance")] a: &JsValue,
         x: i32,
         y: i32,
         size: i32,
         alpha: f64,
     ) -> Result<(), JsError> {
         let look = look_of(look)?;
-        let idle = appearance(a)?;
+        let idle: Appearance = parse("appearance", a)?;
         let mut sprite = paint::paint(&look, &idle);
         paint::outline(&mut sprite, look.outline);
         // the face and the hair round it, a quarter of the square either side of the middle, 35 pixels up
@@ -713,119 +568,63 @@ impl Sprites {
     }
 }
 
+/// What hangs on a fighter, for [`Sprites::fighter`]: a ward's shell, a barrier (`dome` its pattern, `rang` when a
+/// blow has just rung on it), a sign for each effect on it, `fury` pips, and fire (`burn`), lightning (`shock`) and
+/// frost (`ice`) over the body at time `t`, drawn from `seed`, following the shape of its pose.
+#[derive(Deserialize, tsify::Tsify)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Marks {
+    pub shield: bool,
+    pub barrier: bool,
+    pub rang: bool,
+    pub burning: bool,
+    pub def_down: bool,
+    pub silence: bool,
+    pub chilled: bool,
+    pub fury: u32,
+    /// Seconds since the pose began.
+    pub pose_t: f64,
+    pub dome: DomeStyle,
+    pub burn: bool,
+    pub shock: bool,
+    pub ice: bool,
+    pub t: f64,
+    pub seed: u32,
+}
+
+/// A look's colours the host draws its own parts in, as `"#rrggbb"`.
+#[derive(Serialize, tsify::Tsify)]
+pub struct LookColors {
+    pub glow: Rgba,
+    pub outline: Rgba,
+    /// Light, dark.
+    pub ribbon: [Rgba; 2],
+}
+
 /// A look's colours the host draws its own parts in: `{glow, outline, ribbon: [light, dark]}` as `#rrggbb`.
-#[wasm_bindgen(js_name = lookColors)]
-pub fn look_colors(look: &str) -> Result<JsValue, JsError> {
+/// `look` is a preset's name (`"thunder"`, `"frost"`) or a whole look: `{robe: [3], inner: [2], trim: [2],
+/// hair: [2], skin: [2], boot, blade: [3], jade, ribbon: [2], glow, outline, hairdo: "topknot" | "flowing"}`, each
+/// colour `"#rrggbb"`, lists light to dark.
+#[wasm_bindgen(js_name = lookColors, unchecked_return_type = "LookColors")]
+pub fn look_colors(
+    #[wasm_bindgen(unchecked_param_type = "string | Look")] look: &JsValue,
+) -> Result<JsValue, JsError> {
     let l = look_of(look)?;
-    let ribbon: Array = l.ribbon.iter().map(|&c| JsValue::from(to_hex(c))).collect();
-    object(&[
-        ("glow", to_hex(l.glow).into()),
-        ("outline", to_hex(l.outline).into()),
-        ("ribbon", ribbon.into()),
-    ])
-}
-
-fn look_of(name: &str) -> Result<Look, JsError> {
-    match name {
-        "thunder" => Ok(Look::thunder()),
-        "frost" => Ok(Look::frost()),
-        other => Err(JsError::new(&format!(
-            "unknown look {other:?}: expected \"thunder\" or \"frost\""
-        ))),
-    }
-}
-
-fn text(e: &JsValue, key: &str) -> String {
-    Reflect::get(e, &JsValue::from_str(key))
-        .ok()
-        .and_then(|v| v.as_string())
-        .unwrap_or_default()
-}
-
-fn pose_of_name(name: &str) -> Result<Pose, JsError> {
-    const ALL: [Pose; 24] = [
-        Pose::Idle,
-        Pose::Walk,
-        Pose::Jump,
-        Pose::Fly,
-        Pose::Land,
-        Pose::Crouch,
-        Pose::Duck,
-        Pose::Draw,
-        Pose::Slash,
-        Pose::Channel,
-        Pose::Cast,
-        Pose::Guard,
-        Pose::Meditate,
-        Pose::Hurt,
-        Pose::Frozen,
-        Pose::Shocked,
-        Pose::Launched,
-        Pose::Tumble,
-        Pose::Fall,
-        Pose::Down,
-        Pose::Roll,
-        Pose::Sit,
-        Pose::Kneel,
-        Pose::Win,
-    ];
-    ALL.into_iter()
-        .find(|&p| pose_name(p) == name)
-        .ok_or_else(|| JsError::new(&format!("unknown pose {name:?}")))
-}
-
-fn appearance(a: &JsValue) -> Result<Appearance, JsError> {
-    let act = Reflect::get(a, &JsValue::from_str("act"))
-        .map_err(|_| JsError::new("appearance must be an object"))?;
-    let act = if act.is_object() {
-        let how = match text(&act, "how").as_str() {
-            "summon" => Gather::Summon,
-            "lunge" => Gather::Lunge,
-            "prayer" => Gather::Prayer,
-            "cross" => Gather::Cross,
-            _ => Gather::Palm,
-        };
-        let progress = Reflect::get(&act, &JsValue::from_str("progress"))
-            .ok()
-            .and_then(|v| v.as_f64());
-        Some(paint::Act {
-            how,
-            dive: flag(&act, "dive"),
-            windup: progress.map(|progress| Windup {
-                progress,
-                long: flag(&act, "long"),
-            }),
-        })
-    } else {
-        None
-    };
-    let jolt = Reflect::get(a, &JsValue::from_str("jolt")).unwrap_or(JsValue::UNDEFINED);
-    let at = |i: u32| {
-        Reflect::get_u32(&jolt, i)
-            .ok()
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0) as i32
-    };
-    let jolt = if jolt.is_object() {
-        [at(0), at(1)]
-    } else {
-        [0, 0]
-    };
-    Ok(Appearance {
-        pose: pose_of_name(&text(a, "pose"))?,
-        pose_t: num(a, "poseT"),
-        face: num(a, "face"),
-        x: num(a, "x"),
-        air: num(a, "air"),
-        vx: num(a, "vx"),
-        out: flag(a, "out"),
-        flash: flag(a, "flash"),
-        frozen: flag(a, "frozen"),
-        shocked: flag(a, "shocked"),
-        hit_t: num(a, "hitT"),
-        hit_power: num(a, "hitPower"),
-        dodged: num(a, "dodged"),
-        act,
-        jolt,
+    to_js(&LookColors {
+        glow: l.glow,
+        outline: l.outline,
+        ribbon: l.ribbon,
     })
+}
+
+/// A look: a preset by name, or read from an object (see [`look_colors`]).
+fn look_of(v: &JsValue) -> Result<Look, JsError> {
+    match v.as_string() {
+        Some(name) => Look::preset(&name).ok_or_else(|| {
+            JsError::new(&format!(
+                "unknown look {name:?}: expected \"thunder\", \"frost\" or a look object"
+            ))
+        }),
+        None => parse("look", v),
+    }
 }

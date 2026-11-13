@@ -144,7 +144,7 @@ impl FxView {
     /// Rasterise `layer` into fresh images, one pixel per effect pixel.
     fn rasterise(&mut self, layer: Layer) -> Painted {
         self.frame.clear();
-        self.instance.draw(&mut self.frame, layer);
+        self.instance.draw(&mut self.frame, layer, self.instance.placement());
         let (w, frame) = (self.frame.w, &self.frame);
         let sprite = |words: &[u32], mask: u32, bgra: fn(u32) -> [u8; 4]| {
             let rect = occupied(words, w, mask)?;

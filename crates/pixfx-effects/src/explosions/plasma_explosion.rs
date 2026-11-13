@@ -9,7 +9,7 @@ use pixfx_core::math::{
 };
 use pixfx_core::shapes::{bolt, forks};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, band, flare};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
 
 use super::lib::cull;
 
@@ -37,6 +37,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 7,
     state: None,
+    options: &[ACCENT.spec()],
 };
 
 // meta.options
@@ -49,13 +50,15 @@ const PALETTE: [Rgba; 7] = [
     Rgba::hex24(0xc8ecff),
     Rgba::hex24(0xffffff),
 ];
-const ACCENT: [Rgba; 5] = [
+const ACCENT: RampOpt = RampOpt::new(
+    "accent",
+    &[
     Rgba::hex24(0x1c0a30),
     Rgba::hex24(0x4a1a8c),
     Rgba::hex24(0x8a3ce0),
     Rgba::hex24(0xc48cff),
     Rgba::hex24(0xf0d8ff),
-];
+]);
 
 const BALL: f64 = 0.55;
 // the canvas box in local px, 3 px in from each edge
@@ -70,7 +73,7 @@ impl Effect for PlasmaExplosion {
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let c: [Rgba; 7] = ramp(&opts.palette_or(&PALETTE));
-        let v: [Rgba; 5] = ramp(&opts.ramp_or("accent", &ACCENT));
+        let v: [Rgba; 5] = ramp(&opts.ramp(&ACCENT));
         let mut r = Rng::new(to_uint32(seed as f64));
         let mut ps = Particles::new(ParticlesOpts {
             sparks: vec![c[6], c[5], c[4], v[3]],

@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod fighter;
+pub mod light;
 pub mod stage;
 
 use std::cell::{Cell, RefCell};
@@ -22,7 +23,8 @@ use std::rc::{Rc, Weak};
 use js_sys::Uint8ClampedArray;
 use pixfx_core::{Frame, Layer};
 use pixfx_effects::effect;
-use stage::{Pass, Scene, color_rgba, light_rgba, live_player, stage_options};
+use pixfx_wasm::js::{parse, to_js};
+use stage::{Pass, PlacementChange, Scene, color_rgba, light_rgba, live_player, stage_options};
 use wasm_bindgen::prelude::*;
 use web_sys::{
     CanvasRenderingContext2d, HtmlCanvasElement, ImageData, OffscreenCanvas,
@@ -64,9 +66,15 @@ impl Stage {
 
     /// Play effect `id` with its origin at game pixel (`x`, `y`), rounded to a whole pixel; returns its
     /// handle. `opts`: `undefined` or `{seed?, flip?, angle?, light?, palette?: string[], ...extra}`.
-    pub fn play(&mut self, id: &str, x: f64, y: f64, opts: JsValue) -> Result<u32, JsError> {
+    pub fn play(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
+        x: f64,
+        y: f64,
+        #[wasm_bindgen(unchecked_optional_param_type = "FxOptions")] opts: JsValue,
+    ) -> Result<u32, JsError> {
         let fx = effect(id).ok_or_else(|| JsError::new(&format!("unknown effect {id:?}")))?;
-        let player = live_player(fx, stage_options(&opts)?);
+        let player = live_player(fx, stage_options(fx.meta(), &opts)?);
         let surface = Surface::new(player.frame())?;
         let mut r = self.renderer.borrow_mut();
         Ok(r.scene.play(player, x, y, surface)?)
@@ -88,6 +96,33 @@ impl Stage {
             .move_to(handle, x, y)
             .map(|_| ())
             .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Change where and how the effect draws without restarting it: `{x?, y?, flip?, angle?, light?}`, each
+    /// key left out keeps its value (`x`/`y` in game pixels, rounded as `move` does). An unknown key, a wrong
+    /// type or a non-finite number throws; unknown handles are ignored.
+    pub fn set(
+        &mut self,
+        handle: u32,
+        #[wasm_bindgen(unchecked_param_type = "PlacementChange")] change: JsValue,
+    ) -> Result<(), JsError> {
+        let change: PlacementChange = parse("set", &change)?;
+        let mut r = self.renderer.borrow_mut();
+        let Some(base) = r.scene.placement(handle) else {
+            return Ok(());
+        };
+        let p = change.over(base);
+        r.scene
+            .set(handle, p)
+            .map(|_| ())
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// What happened since the last call, oldest first, and empties the queue: `{type: "end", handle}` for
+    /// each effect that finished, faded out after `stop`, or was removed.
+    #[wasm_bindgen(unchecked_return_type = "StageEvent[]")]
+    pub fn events(&mut self) -> Result<JsValue, JsError> {
+        to_js(&self.renderer.borrow_mut().scene.drain_events())
     }
 
     /// Drop the effect now. Unknown handles are ignored.

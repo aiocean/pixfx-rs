@@ -10,26 +10,31 @@
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{TAU, js_min, js_round, rand, smooth, wrap};
-use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
-use super::lib::{clip, count, glow, pass, sized, trips};
+use super::lib::{clip, count, glow, pass, size_options, sized, trips};
 
 pub struct Snow;
 
 pub static SNOW: Snow = Snow;
+
+/// The effect's own canvas, which its `width` and `height` options default to.
+const SIZE: (u32, u32) = (320, 180);
+const SIDES: (NumOpt, NumOpt) = size_options(SIZE);
 
 const META: Meta = Meta {
     id: "weather/snow",
     name: "Snow",
     desc: "Snow at three depths in a gusty breeze: far specks, drifting flakes, big near crystals that spin and glow; they settle on a sparkling drift and melt away.",
     tags: &["weather", "snow", "winter", "cold", "ambient", "loop"],
-    size: (320, 180),
+    size: SIZE,
     origin: (160, 170),
     duration: 12.0,
     looping: true,
     fps: 30,
     seed: 6,
     state: None,
+    options: &[SIDES.0.spec(), SIDES.1.spec()],
 };
 
 // meta.options

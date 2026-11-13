@@ -42,6 +42,7 @@ const fn meta(id: &'static str, looping: bool) -> Meta {
         fps: 30,
         seed: 1,
         state: None,
+        options: &[],
     }
 }
 

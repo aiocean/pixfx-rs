@@ -9,7 +9,7 @@ use core::f64::consts::PI;
 use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::math::{Rng, TAU, js_round, lerp, rand, tile_fbm, to_uint32};
 use pixfx_core::sim::{Flags, Kind};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter, RampOpt};
 
 use super::lib::{Birth, Ghosts};
 
@@ -31,6 +31,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 30,
     state: None,
+    options: &[METAL.spec(), LENGTH.spec()],
 };
 
 // meta.options
@@ -44,15 +45,17 @@ const PALETTE: [Rgba; 8] = [
     Rgba::hex24(0xfff3a6),
     Rgba::hex24(0xffffff),
 ];
-const METAL: [Rgba; 6] = [
+const METAL: RampOpt = RampOpt::new(
+    "metal",
+    &[
     Rgba::hex24(0x0e0d14),
     Rgba::hex24(0x1e1c27),
     Rgba::hex24(0x312e3e),
     Rgba::hex24(0x4b4759),
     Rgba::hex24(0x6f6a82),
     Rgba::hex24(0x9d98b0),
-];
-const LENGTH: f64 = 26.0;
+]);
+const LENGTH: NumOpt = NumOpt::new("length", 26.0);
 
 const D: f64 = META.duration;
 const GAP: f64 = 8.0;
@@ -64,11 +67,11 @@ impl Effect for Jetpack {
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let f: [Rgba; 8] = ramp(&opts.palette_or(&PALETTE));
-        let length = opts.num_or("length", LENGTH);
+        let length = opts.num(&LENGTH);
         let s = seed as f64;
         Box::new(State {
             f,
-            h: ramp(&opts.ramp_or("metal", &METAL)),
+            h: ramp(&opts.ramp(&METAL)),
             length,
             s,
             ghosts: ghosts(&f, length, s),

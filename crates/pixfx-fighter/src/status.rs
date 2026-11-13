@@ -1,24 +1,28 @@
 //! What hangs on a fighter besides its pose, drawn as layers over its sprite in world space at one pixel per game
 //! pixel, feet at the given point.
 //!
-//! - [`draw_marks`]: a ward's shell round the body, a barrier dome, a mark over the head for each effect on it
-//!   (a flame for a burn, a cracked shield for defence down, a seal for silence, a snowflake for a chill) and its
-//!   fury pips. Translucent fills blend source-over into the frame's colour layer, as the duel's canvas does.
+//! - [`draw_marks`]: a list of [`Mark`]s drawn in its order: a ward's shell round the body, a barrier dome, a sign
+//!   over the head for each effect on it (a flame for a burn, a cracked shield for defence down, a seal for silence,
+//!   a snowflake for a chill), lined up and centred over the head, and fury pips. Translucent fills blend
+//!   source-over into the frame's colour layer, as the duel's canvas does.
 //! - [`draw_burning`], [`draw_shocked`], [`draw_frozen`]: a state shown on the body itself instead of a recoloured
-//!   sprite: flames licking up it, sparks jumping round it, rime growing on it. Each is a function of time, a seed,
-//!   the feet and an intensity (0 to 1), so the same call draws the same pixels; draw them after the sprite.
-//!   They write opaque pixels to the colour layer and glow to the light layer.
+//!   sprite: flames licking up it, sparks jumping round it, rime growing on it. Each follows the body's
+//!   [`Silhouette`] (taken from its pose) and is a function of time, a seed, the [`Figure`] and an intensity (0 to
+//!   1), so the same call draws the same pixels; draw them after the sprite. They write opaque pixels to the colour
+//!   layer and glow to the light layer.
 
+use crate::pose::Pose;
+use pixfx_core::blend::fill;
 use pixfx_core::color::Rgba;
 use pixfx_core::frame::Frame;
 use pixfx_core::math::{clamp, js_round, rand};
 use pixfx_core::painter::Painter;
 
-/// The body the overlays sit on: 34 pixels tall from the feet to the top of the head (a topknot may rise above).
-const BODY_H: i32 = 34;
-
 /// How a barrier dome is patterned.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum DomeStyle {
     /// Fixed bands across it, every 8 rows, rim to rim (a bell).
     #[default]
@@ -27,43 +31,34 @@ pub enum DomeStyle {
     Faceted,
 }
 
-/// The marks on a fighter, as [`draw_marks`] draws them.
+/// One thing hanging on a fighter, as [`draw_marks`] draws it.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Marks {
+pub enum Mark {
     /// A ward's shell round the body.
-    pub shield: bool,
-    /// A barrier dome round the body.
-    pub barrier: bool,
-    /// A blow has just rung on the barrier: it flares white.
-    pub rang: bool,
-    pub burning: bool,
-    pub def_down: bool,
-    pub silence: bool,
-    pub chilled: bool,
+    Shield,
+    /// A barrier dome round the body in colour `glow` (the duel uses the fighter's look's glow), flaring white
+    /// when a blow has just `rang` on it.
+    Barrier {
+        style: DomeStyle,
+        glow: Rgba,
+        rang: bool,
+    },
+    /// Signs over the head, one each, lined up in the list's order.
+    Burning,
+    DefDown,
+    Silence,
+    Chilled,
     /// Fury stacks, a pip each.
-    pub fury: u32,
-    /// Seconds into the current pose: drives the shell's and dome's flicker and the facets' drift.
-    pub pose_t: f64,
-    pub dome: DomeStyle,
-    /// The dome's colour (the duel uses the fighter's look's glow).
-    pub glow: Rgba,
+    Fury(u32),
 }
 
-impl Default for Marks {
-    fn default() -> Self {
-        Self {
-            shield: false,
-            barrier: false,
-            rang: false,
-            burning: false,
-            def_down: false,
-            silence: false,
-            chilled: false,
-            fury: 0,
-            pose_t: 0.0,
-            dome: DomeStyle::Banded,
-            glow: WHITE,
-        }
+impl Mark {
+    /// A sign over the head (lined up with the others), rather than something round the body.
+    fn sign(&self) -> bool {
+        matches!(
+            self,
+            Mark::Burning | Mark::DefDown | Mark::Silence | Mark::Chilled
+        )
     }
 }
 
@@ -81,76 +76,25 @@ const SNOW: Rgba = Rgba::hex24(0xbff2ff);
 const SEAL: Rgba = Rgba::hex24(0xc9c3e6);
 const FURY: Rgba = Rgba::hex24(0xffc23d);
 
-/// Fill the whole-pixel box (x, y, w, h) with `c` at alpha `a`, source-over into the colour layer (see [`over`]):
-/// a canvas `fillRect` under `globalAlpha`, the way the duel drew its marks and dust.
-pub(crate) fn fill(frame: &mut Frame, x: i32, y: i32, w: i32, h: i32, c: Rgba, a: f64) {
-    let a = clamp(a, 0.0, 1.0);
-    if a <= 0.0 {
-        return;
-    }
-    for yy in y..y + h {
-        for xx in x..x + w {
-            let (lx, ly) = (
-                i64::from(xx) - i64::from(frame.ox),
-                i64::from(yy) - i64::from(frame.oy),
-            );
-            if lx < 0 || ly < 0 || lx >= i64::from(frame.w) || ly >= i64::from(frame.h) {
-                continue;
-            }
-            let i = (ly * i64::from(frame.w) + lx) as usize;
-            if let Some(px) = frame.color.get_mut(i) {
-                *px = over(*px, c, a);
-            }
-        }
-    }
-}
-
-/// Colour `c` at alpha `a` over the ABGR word `d`, as the duel's canvas (Chrome's Skia raster blitter) does it:
-/// the alpha taken to 8 bits, both colours premultiplied to 8 bits, the destination scaled by `256 - alpha`
-/// in 8.8 fixed point, the sum stored premultiplied and read back straight. The rounding through premultiplied
-/// bytes is part of the look: at alpha 20 a channel moves in steps of about 13.
-fn over(d: u32, c: Rgba, a: f64) -> u32 {
-    let sa = js_round(a * 255.0) as u32;
-    if sa == 0 {
-        return d;
-    }
-    let da = d >> 24;
-    let keep = 256 - sa;
-    let oa = sa + ((da * keep) >> 8);
-    let mix = |cv: u8, s: u32| {
-        let dp = mul_div255((d >> s) & 255, da);
-        unpremultiply(mul_div255(u32::from(cv), sa) + ((dp * keep) >> 8), oa)
-    };
-    (oa << 24) | (mix(c.2, 16) << 16) | (mix(c.1, 8) << 8) | mix(c.0, 0)
-}
-
-/// `a * b / 255` rounded, in integers (Skia `SkMulDiv255Round`).
-fn mul_div255(a: u32, b: u32) -> u32 {
-    let p = a * b + 128;
-    (p + (p >> 8)) >> 8
-}
-
-/// A premultiplied channel back to straight at alpha `a` (Skia `SkUnPremultiply`, as `getImageData` reads it).
-fn unpremultiply(p: u32, a: u32) -> u32 {
-    if a == 0 {
-        return 0;
-    }
-    let scale = ((255_u64 << 24) + u64::from(a / 2)) / u64::from(a);
-    ((u64::from(p) * scale + (1 << 23)) >> 24).min(255) as u32
-}
-
 /// A barrier: a dome round the body, faint while it waits and flaring white where a blow has just rung on it.
-fn dome(frame: &mut Frame, m: &Marks, fx: i32, fy: i32) {
-    let flare = m.rang;
-    let edge = if flare { WHITE } else { m.glow };
+fn dome(
+    frame: &mut Frame,
+    style: DomeStyle,
+    glow: Rgba,
+    flare: bool,
+    pose_t: f64,
+    fx: i32,
+    fy: i32,
+) {
+    let edge = if flare { WHITE } else { glow };
     let a = if flare {
         0.95
     } else {
-        0.55 + 0.2 * libm::sin(m.pose_t * 10.0)
+        0.55 + 0.2 * libm::sin(pose_t * 10.0)
     };
     let cy = fy - 20;
     let (rx, ry) = (15.0, 24_i32);
-    let drift = js_round(m.pose_t * 12.0) as i32;
+    let drift = js_round(pose_t * 12.0) as i32;
     for y in -ry..=ry {
         let yf = f64::from(y);
         let ryf = f64::from(ry);
@@ -160,10 +104,10 @@ fn dome(frame: &mut Frame, m: &Marks, fx: i32, fy: i32) {
         fill(frame, fx + half, cy + y, 1, 1, edge, a);
         if half > 1 {
             let inner = if flare { 0.22 } else { 0.07 };
-            fill(frame, fx - half + 1, cy + y, half * 2 - 1, 1, m.glow, inner);
+            fill(frame, fx - half + 1, cy + y, half * 2 - 1, 1, glow, inner);
         }
         let hf = f64::from(half);
-        match m.dome {
+        match style {
             DomeStyle::Banded if y % 8 == 0 => {
                 fill(frame, fx - half, cy + y, half * 2 + 1, 1, edge, a * 0.45);
             }
@@ -186,72 +130,195 @@ fn dome(frame: &mut Frame, m: &Marks, fx: i32, fy: i32) {
     fill(frame, fx - 3, cy + ry, 7, 1, edge, a);
 }
 
-/// Draw `m` round a fighter whose feet are at (feet_x, feet_y), each rounded to a whole pixel.
-pub fn draw_marks(frame: &mut Frame, m: &Marks, feet_x: f64, feet_y: f64) {
+/// Draw `marks` in their order round a fighter whose feet are at (feet_x, feet_y), each rounded to a whole pixel;
+/// `pose_t`, seconds into its pose, drives the shell's and dome's flicker, the facets' drift and the flame's lick.
+pub fn draw_marks(frame: &mut Frame, marks: &[Mark], pose_t: f64, feet_x: f64, feet_y: f64) {
     let fx = js_round(feet_x) as i32;
     let fy = js_round(feet_y) as i32;
-    if m.shield {
-        // a shell of frost qi, flickering at the edges
-        let a = 0.45 + 0.25 * libm::sin(m.pose_t * 9.0);
-        fill(frame, fx - 11, fy - 41, 23, 1, SHELL, a);
-        fill(frame, fx - 11, fy + 1, 23, 1, SHELL, a);
-        fill(frame, fx - 12, fy - 40, 1, 41, SHELL, a);
-        fill(frame, fx + 12, fy - 40, 1, 41, SHELL, a);
-        fill(frame, fx - 11, fy - 40, 23, 41, SHELL, 0.08);
-    }
-    if m.barrier {
-        dome(frame, m, fx, fy);
-    }
-    let shown = [m.burning, m.def_down, m.silence, m.chilled];
-    let count = shown.iter().filter(|&&on| on).count() as f64;
+    let count = marks.iter().filter(|m| m.sign()).count() as f64;
     let mut x = fx - js_round((count * 6.0 - 1.0) / 2.0) as i32;
     let y = fy - 48;
     let px = |frame: &mut Frame, x: i32, y: i32, w: i32, h: i32, c: Rgba| {
         fill(frame, x, y, w, h, c, 1.0)
     };
-    if m.burning {
-        let lick = i32::from(libm::sin(m.pose_t * 14.0) > 0.0);
-        px(frame, x + 1, y + 1, 3, 3, FLAME[2]);
-        px(frame, x + 2 - lick, y - 1, 1, 2, FLAME[1]);
-        px(frame, x + 2, y + 2, 1, 2, FLAME[0]);
-        x += 6;
-    }
-    if m.def_down {
-        // a shield with a crack through it
-        px(frame, x, y - 1, 5, 4, BROKEN);
-        px(frame, x + 1, y + 3, 3, 1, BROKEN);
-        px(frame, x + 2, y + 4, 1, 1, BROKEN);
-        px(frame, x + 2, y - 1, 1, 3, RED);
-        x += 6;
-    }
-    if m.silence {
-        // a seal over the lips: a ring with a bar through it
-        px(frame, x, y, 5, 1, SEAL);
-        px(frame, x, y + 4, 5, 1, SEAL);
-        px(frame, x, y, 1, 5, SEAL);
-        px(frame, x + 4, y, 1, 5, SEAL);
-        px(frame, x + 1, y + 2, 3, 1, RED);
-        x += 6;
-    }
-    if m.chilled {
-        // a snowflake
-        px(frame, x + 2, y - 1, 1, 5, SNOW);
-        px(frame, x, y + 1, 5, 1, SNOW);
-        px(frame, x + 1, y, 1, 1, SNOW);
-        px(frame, x + 3, y + 2, 1, 1, SNOW);
-    }
-    // fury: a gold pip per stack over the head
-    for i in 0..m.fury.min(64) as i32 {
-        fill(frame, fx - 7 + i * 3, fy - 43, 2, 1, FURY, 0.9);
+    for &m in marks {
+        match m {
+            Mark::Shield => {
+                // a shell of frost qi, flickering at the edges
+                let a = 0.45 + 0.25 * libm::sin(pose_t * 9.0);
+                fill(frame, fx - 11, fy - 41, 23, 1, SHELL, a);
+                fill(frame, fx - 11, fy + 1, 23, 1, SHELL, a);
+                fill(frame, fx - 12, fy - 40, 1, 41, SHELL, a);
+                fill(frame, fx + 12, fy - 40, 1, 41, SHELL, a);
+                fill(frame, fx - 11, fy - 40, 23, 41, SHELL, 0.08);
+            }
+            Mark::Barrier { style, glow, rang } => dome(frame, style, glow, rang, pose_t, fx, fy),
+            Mark::Burning => {
+                let lick = i32::from(libm::sin(pose_t * 14.0) > 0.0);
+                px(frame, x + 1, y + 1, 3, 3, FLAME[2]);
+                px(frame, x + 2 - lick, y - 1, 1, 2, FLAME[1]);
+                px(frame, x + 2, y + 2, 1, 2, FLAME[0]);
+            }
+            Mark::DefDown => {
+                // a shield with a crack through it
+                px(frame, x, y - 1, 5, 4, BROKEN);
+                px(frame, x + 1, y + 3, 3, 1, BROKEN);
+                px(frame, x + 2, y + 4, 1, 1, BROKEN);
+                px(frame, x + 2, y - 1, 1, 3, RED);
+            }
+            Mark::Silence => {
+                // a seal over the lips: a ring with a bar through it
+                px(frame, x, y, 5, 1, SEAL);
+                px(frame, x, y + 4, 5, 1, SEAL);
+                px(frame, x, y, 1, 5, SEAL);
+                px(frame, x + 4, y, 1, 5, SEAL);
+                px(frame, x + 1, y + 2, 3, 1, RED);
+            }
+            Mark::Chilled => {
+                // a snowflake
+                px(frame, x + 2, y - 1, 1, 5, SNOW);
+                px(frame, x, y + 1, 5, 1, SNOW);
+                px(frame, x + 1, y, 1, 1, SNOW);
+                px(frame, x + 3, y + 2, 1, 1, SNOW);
+            }
+            Mark::Fury(n) => {
+                // a gold pip per stack over the head
+                for i in 0..n.min(64) as i32 {
+                    fill(frame, fx - 7 + i * 3, fy - 43, 2, 1, FURY, 0.9);
+                }
+            }
+        }
+        if m.sign() {
+            x += 6;
+        }
     }
 }
 
 // ---------- states on the body
 
-/// Half the body's width at `h` pixels above the feet, as [`crate::paint`] draws a standing fighter: the robe
-/// and arms up to the neck, then the head.
-fn half_width(h: i32) -> i32 {
-    if h < 24 { 7 } else { 4 }
+/// The rough shape of a fighter's body, taken from its pose, that fire, sparks and ice follow.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Silhouette {
+    /// Upright on its feet or in the air, 34 pixels tall: the robe and arms up to the neck, then the head.
+    Standing,
+    /// Low: ducking, sitting up, sitting cross-legged or tucked in a roll, about 20 pixels tall, reaching forward.
+    Crouched,
+    /// Flat on its back on the floor, head behind it, feet in front.
+    Lying,
+    /// Thrown and flat in the air: lying, a few pixels above where its feet would be.
+    Airborne,
+    /// Spinning head over heels about its middle.
+    Tumbling,
+}
+
+impl Silhouette {
+    /// The shape of a fighter in `pose`, as [`crate::paint`] draws it.
+    pub fn of(pose: Pose) -> Silhouette {
+        match pose {
+            Pose::Duck | Pose::Sit | Pose::Meditate | Pose::Roll => Silhouette::Crouched,
+            Pose::Down => Silhouette::Lying,
+            Pose::Launched | Pose::Fall => Silhouette::Airborne,
+            Pose::Tumble => Silhouette::Tumbling,
+            Pose::Idle
+            | Pose::Walk
+            | Pose::Jump
+            | Pose::Fly
+            | Pose::Land
+            | Pose::Crouch
+            | Pose::Kneel
+            | Pose::Draw
+            | Pose::Slash
+            | Pose::Channel
+            | Pose::Cast
+            | Pose::Guard
+            | Pose::Hurt
+            | Pose::Frozen
+            | Pose::Shocked
+            | Pose::Win => Silhouette::Standing,
+        }
+    }
+
+    /// Its bands from the bottom up: from `h` pixels above the feet, the body spans `back` to `front` pixels
+    /// along the way it faces (back negative). The last band reaches the top.
+    fn bands(self) -> &'static [Band] {
+        match self {
+            Silhouette::Standing => &[Band(0, -7, 7), Band(24, -4, 4)],
+            Silhouette::Crouched => &[Band(0, -7, 10), Band(8, -6, 6)],
+            Silhouette::Lying => &[Band(0, -22, 14)],
+            Silhouette::Airborne => &[Band(6, -22, 14)],
+            Silhouette::Tumbling => &[Band(2, -6, 6), Band(8, -10, 10), Band(28, -6, 6)],
+        }
+    }
+
+    /// Height of the top of the body above the feet.
+    fn top(self) -> i32 {
+        match self {
+            Silhouette::Standing => 34,
+            Silhouette::Crouched => 20,
+            Silhouette::Lying => 6,
+            Silhouette::Airborne => 12,
+            Silhouette::Tumbling => 34,
+        }
+    }
+}
+
+/// A band of a [`Silhouette`]: from height, back, front.
+#[derive(Clone, Copy, Debug)]
+struct Band(i32, i32, i32);
+
+/// A fighter as the states on its body see it: its feet in world pixels, which way it faces (1 right, -1 left)
+/// and its silhouette.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Figure {
+    pub feet_x: f64,
+    pub feet_y: f64,
+    pub face: f64,
+    pub silhouette: Silhouette,
+}
+
+/// A figure placed in whole pixels: the feet (`fx`, `fy`) and its shape's numbers, everything relative to the
+/// feet, x to the right on screen.
+struct Shape {
+    fx: i32,
+    fy: i32,
+    sil: Silhouette,
+    flip: bool,
+    /// Lowest and highest row of the body above the feet.
+    bottom: i32,
+    top: i32,
+}
+
+impl Shape {
+    fn of(f: &Figure) -> Shape {
+        let sil = f.silhouette;
+        Shape {
+            fx: js_round(f.feet_x) as i32,
+            fy: js_round(f.feet_y) as i32,
+            sil,
+            flip: f.face < 0.0,
+            bottom: sil.bands().first().map_or(0, |b| b.0),
+            top: sil.top(),
+        }
+    }
+
+    /// The body's left and right edge at `h` above the feet, relative to the feet (below the lowest band, the
+    /// lowest band's).
+    fn span(&self, h: i32) -> (i32, i32) {
+        let bands = self.sil.bands();
+        let band = bands
+            .iter()
+            .rev()
+            .find(|b| b.0 <= h)
+            .or(bands.first())
+            .map_or((0, 0), |b| (b.1, b.2));
+        if self.flip { (-band.1, -band.0) } else { band }
+    }
+
+    /// The middle of the body, relative to the feet: x across, h up.
+    fn middle(&self) -> (i32, i32) {
+        let (l, r) = self.span(self.bottom);
+        ((l + r) / 2, (self.bottom + self.top) / 2)
+    }
 }
 
 /// A value in [0, 1) from a seed and integers.
@@ -268,28 +335,22 @@ fn spot(p: &mut Painter<'_>, x: i32, y: i32, c: Rgba, light: Rgba, k: f64) {
 
 const FIRE_LIGHT: Rgba = Rgba(255, 110, 30, 255);
 
-/// Burning: tongues of flame licking up the body from the feet to the head, each born somewhere on the body,
+/// Burning: tongues of flame licking up the body from its bottom to its top, each born somewhere on the body,
 /// rising and flickering out, with embers drifting off the top and the fire's glow in the light layer.
-pub fn draw_burning(
-    frame: &mut Frame,
-    t: f64,
-    seed: u32,
-    feet_x: f64,
-    feet_y: f64,
-    intensity: f64,
-) {
+pub fn draw_burning(frame: &mut Frame, t: f64, seed: u32, at: &Figure, intensity: f64) {
     let k = clamp(intensity, 0.0, 1.0);
     if k.is_nan() || k <= 0.0 {
         return;
     }
-    let fx = js_round(feet_x) as i32;
-    let fy = js_round(feet_y) as i32;
+    let shape = Shape::of(at);
+    let (fx, fy) = (shape.fx, shape.fy);
+    let (mx, mh) = shape.middle();
     let mut p = Painter::new(frame);
-    // the fire's warm light on and round the body, breathing
+    // the fire's warm light on and round the body, breathing; a little below its middle, as fire climbs
     let breath = 0.75 + 0.25 * libm::sin(t * 23.0) * libm::sin(t * 7.3);
     p.glow(
-        f64::from(fx) + 0.5,
-        f64::from(fy - 14),
+        f64::from(fx + mx) + 0.5,
+        f64::from(fy - (mh - 3)),
         22.0,
         FIRE_LIGHT,
         0.45 * k * breath,
@@ -303,13 +364,18 @@ pub fn draw_burning(
         let c = cycle as i64;
         let pick = |j: i64| r(seed, [i, c, j + 2]);
         // where it starts: mostly low on the body (fire climbs), mostly at its edges so it breaks the outline
-        let up = (pick(0) * pick(0) * 28.0) as i32;
-        let hw = half_width(up);
+        let up =
+            shape.bottom + (pick(0) * pick(0) * f64::from(shape.top - shape.bottom - 6)) as i32;
+        let (left, right) = shape.span(up);
         let bx = if pick(1) < 0.6 {
-            let side = if pick(4) < 0.5 { -1 } else { 1 };
-            fx + side * (hw - (pick(5) * 2.0) as i32)
+            let inset = (pick(5) * 2.0) as i32;
+            if pick(4) < 0.5 {
+                fx + left + inset
+            } else {
+                fx + right - inset
+            }
         } else {
-            fx - hw + 2 + (pick(5) * f64::from(2 * hw - 3)) as i32
+            fx + left + 2 + (pick(5) * f64::from(right - left - 3)) as i32
         };
         let base = fy - 1 - up - (u * 6.0) as i32;
         let tall = (5.0 + pick(2) * 7.0) * (0.6 + 0.4 * k);
@@ -349,9 +415,9 @@ pub fn draw_burning(
         let cycle = libm::floor(run);
         let u = run - cycle;
         let c = cycle as i64;
-        let x0 = f64::from(fx) - 5.0 + r(seed, [i, c, 10]) * 11.0;
+        let x0 = f64::from(fx + mx) - 5.0 + r(seed, [i, c, 10]) * 11.0;
         let x = js_round(x0 + libm::sin(t * 5.0 + f64::from(i as i32)) * 2.0 * u) as i32;
-        let y = fy - 24 - (u * 20.0) as i32;
+        let y = fy - (shape.top - 10).max(mh) - (u * 20.0) as i32;
         let col = if u < 0.5 { FLAME[1] } else { FLAME[3] };
         spot(&mut p, x, y, col, FIRE_LIGHT, 0.5 * k * (1.0 - u));
     }
@@ -364,43 +430,53 @@ const SPARK: [Rgba; 3] = [
 ];
 const SPARK_LIGHT: Rgba = Rgba(150, 200, 255, 255);
 
-/// A point `d` steps round the body's outline (one pixel outside it), clockwise from the left foot.
-fn round_body(fx: i32, fy: i32, d: i32) -> (i32, i32) {
-    let side = BODY_H + 2;
-    let top = 2 * half_width(BODY_H) + 3;
-    let lap = 2 * side + top;
-    let d = d.rem_euclid(lap);
-    if d < side {
-        let h = d;
-        (fx - half_width(h) - 1, fy - h)
-    } else if d < side + top {
-        (fx - half_width(BODY_H) - 1 + (d - side), fy - BODY_H - 1)
-    } else {
-        let h = BODY_H - (d - side - top);
-        (fx + half_width(h) + 1, fy - h)
+impl Shape {
+    /// The steps up one side of the outline, and across its top.
+    fn sides(&self) -> (i32, i32) {
+        let (l, r) = self.span(self.top);
+        (self.top - self.bottom + 2, r - l + 3)
+    }
+
+    /// The steps once round the outline.
+    fn lap(&self) -> i32 {
+        let (side, top) = self.sides();
+        2 * side + top
+    }
+
+    /// A point `d` steps round the body's outline (one pixel outside it), clockwise from the bottom left.
+    fn round(&self, d: i32) -> (i32, i32) {
+        let (fx, fy) = (self.fx, self.fy);
+        let (side, top) = self.sides();
+        let d = d.rem_euclid(self.lap());
+        if d < side {
+            let h = self.bottom + d;
+            (fx + self.span(h).0 - 1, fy - h)
+        } else if d < side + top {
+            (
+                fx + self.span(self.top).0 - 1 + (d - side),
+                fy - self.top - 1,
+            )
+        } else {
+            let h = self.top - (d - side - top);
+            (fx + self.span(h).1 + 1, fy - h)
+        }
     }
 }
 
 /// Shocked: arcs of electricity crackling between points round the body, a new set every jolt (1/20 s), now and
 /// then none, with sparks popping off them and a cold flash in the light layer.
-pub fn draw_shocked(
-    frame: &mut Frame,
-    t: f64,
-    seed: u32,
-    feet_x: f64,
-    feet_y: f64,
-    intensity: f64,
-) {
+pub fn draw_shocked(frame: &mut Frame, t: f64, seed: u32, at: &Figure, intensity: f64) {
     let k = clamp(intensity, 0.0, 1.0);
     if k.is_nan() || k <= 0.0 {
         return;
     }
-    let fx = js_round(feet_x) as i32;
-    let fy = js_round(feet_y) as i32;
+    let shape = Shape::of(at);
+    let (fx, fy) = (shape.fx, shape.fy);
+    let (mx, mh) = shape.middle();
     let jolt = libm::floor(t * 20.0) as i64;
     let mut p = Painter::new(frame);
     let arcs = js_round(1.0 + 2.0 * k) as i64;
-    let lap = 2 * (BODY_H + 2) + 2 * half_width(BODY_H) + 3;
+    let lap = shape.lap();
     let mut lit = false;
     for j in 0..arcs {
         let pick = |n: i64| r(seed, [jolt, j, n]);
@@ -411,8 +487,8 @@ pub fn draw_shocked(
         lit = true;
         let start = (pick(1) * f64::from(lap)) as i32;
         let reach = 7 + (pick(2) * 14.0) as i32;
-        let (ax, ay) = round_body(fx, fy, start);
-        let (bx, by) = round_body(fx, fy, start + reach);
+        let (ax, ay) = shape.round(start);
+        let (bx, by) = shape.round(start + reach);
         // a crooked path: a few kinks pushed off the straight line
         let kinks = 3;
         let mut prev = (ax, ay);
@@ -446,8 +522,8 @@ pub fn draw_shocked(
     if lit {
         let flash = 0.12 + 0.12 * r(seed, [jolt, 99, 0]);
         p.glow(
-            f64::from(fx) + 0.5,
-            f64::from(fy - 17),
+            f64::from(fx + mx) + 0.5,
+            f64::from(fy - mh),
             20.0,
             SPARK_LIGHT,
             flash * k,
@@ -492,25 +568,27 @@ const ICE_LIGHT: Rgba = Rgba(120, 200, 255, 255);
 /// Frozen: rime crystals bristling off the body's sides and head, frost speckled over it, a crust of ice round
 /// the feet, a faint cold light, and a glint that wakes on a crystal now and then. The ice stays where it grew
 /// (it depends on the seed, not the time); only the glint moves.
-pub fn draw_frozen(frame: &mut Frame, t: f64, seed: u32, feet_x: f64, feet_y: f64, intensity: f64) {
+pub fn draw_frozen(frame: &mut Frame, t: f64, seed: u32, at: &Figure, intensity: f64) {
     let k = clamp(intensity, 0.0, 1.0);
     if k.is_nan() || k <= 0.0 {
         return;
     }
-    let fx = js_round(feet_x) as i32;
-    let fy = js_round(feet_y) as i32;
+    let shape = Shape::of(at);
+    let (fx, fy) = (shape.fx, shape.fy);
+    let (bottom, top) = (shape.bottom, shape.top);
+    let (mx, mh) = shape.middle();
     let mut p = Painter::new(frame);
     p.glow(
-        f64::from(fx) + 0.5,
-        f64::from(fy - 17),
+        f64::from(fx + mx) + 0.5,
+        f64::from(fy - mh),
         20.0,
         ICE_LIGHT,
         0.12 * k,
     );
     // frost speckled over the body
-    for h in 1..BODY_H {
-        let hw = half_width(h);
-        for x in -hw..=hw {
+    for h in bottom + 1..top {
+        let (left, right) = shape.span(h);
+        for x in left..=right {
             if r(seed, [i64::from(x), i64::from(h), 1]) < 0.05 * k {
                 p.put(f64::from(fx + x), f64::from(fy - h), ICE[2], 1.0);
             }
@@ -518,13 +596,14 @@ pub fn draw_frozen(frame: &mut Frame, t: f64, seed: u32, feet_x: f64, feet_y: f6
     }
     // rime: crystals growing out of the sides, leaning up, and off the top of the head
     for side in [-1_i32, 1] {
-        for h in 2..BODY_H {
+        for h in bottom + 2..top {
             let roll = r(seed, [i64::from(side), i64::from(h), 2]);
             if roll >= 0.18 + 0.27 * k {
                 continue;
             }
             let len = 1 + (r(seed, [i64::from(side), i64::from(h), 3]) * (1.0 + 2.5 * k)) as i32;
-            let edge = fx + side * half_width(h);
+            let (left, right) = shape.span(h);
+            let edge = fx + if side < 0 { left } else { right };
             for d in 0..=len {
                 let tone = if d == len {
                     0
@@ -543,25 +622,22 @@ pub fn draw_frozen(frame: &mut Frame, t: f64, seed: u32, feet_x: f64, feet_y: f6
             }
         }
     }
-    let hw = half_width(BODY_H);
-    for x in -hw..=hw {
+    let (left, right) = shape.span(top);
+    for x in left..=right {
         if r(seed, [i64::from(x), 0, 4]) < 0.3 + 0.3 * k {
             let len = 1 + (r(seed, [i64::from(x), 1, 4]) * (1.0 + 2.0 * k)) as i32;
             for d in 0..len {
                 let tone = if d + 1 == len { 0 } else { 2 };
-                p.put(
-                    f64::from(fx + x),
-                    f64::from(fy - BODY_H - d),
-                    ICE[tone],
-                    1.0,
-                );
+                p.put(f64::from(fx + x), f64::from(fy - top - d), ICE[tone], 1.0);
             }
         }
     }
-    // a crust of ice round the feet
+    // a crust of ice round the bottom of the body
+    let (left, right) = shape.span(bottom);
+    let (cx, reach) = ((left + right) / 2, (right - left) / 2 + 1);
     let crust = 2 + js_round(2.0 * k) as i32;
     for row in 0..crust {
-        let half = 8 - row * 2 + (r(seed, [i64::from(row), 0, 5]) * 2.0) as i32;
+        let half = reach - row * 2 + (r(seed, [i64::from(row), 0, 5]) * 2.0) as i32;
         for x in -half..=half {
             let tone = if row + 1 == crust || x.abs() == half {
                 1
@@ -570,7 +646,12 @@ pub fn draw_frozen(frame: &mut Frame, t: f64, seed: u32, feet_x: f64, feet_y: f6
             } else {
                 3
             };
-            p.put(f64::from(fx + x), f64::from(fy - row), ICE[tone], 1.0);
+            p.put(
+                f64::from(fx + cx + x),
+                f64::from(fy - bottom - row),
+                ICE[tone],
+                1.0,
+            );
         }
     }
     // a glint: once a cycle a star lights on one crystal, swells and fades
@@ -580,8 +661,10 @@ pub fn draw_frozen(frame: &mut Frame, t: f64, seed: u32, feet_x: f64, feet_y: f6
     let u = run - libm::floor(run);
     if u < 0.3 {
         let side = if r(seed, [c, 1, 6]) < 0.5 { -1 } else { 1 };
-        let h = 4 + (r(seed, [c, 2, 6]) * 28.0) as i32;
-        let (gx, gy) = (fx + side * (half_width(h) + 1), fy - h);
+        let h = bottom + 4 + (r(seed, [c, 2, 6]) * f64::from(top - bottom - 6)) as i32;
+        let (left, right) = shape.span(h);
+        let gx = fx + if side < 0 { left - 1 } else { right + 1 };
+        let gy = fy - h;
         let s = libm::sin(core::f64::consts::PI * u / 0.3);
         let arm = js_round(s * 2.0) as i32;
         spot(&mut p, gx, gy, ICE[0], ICE_LIGHT, 0.9 * k * s);

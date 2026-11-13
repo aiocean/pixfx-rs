@@ -4,9 +4,26 @@
 use crate::math::{clamp, js_round, to_int32};
 use core::fmt;
 
-/// An RGBA8 colour.
+/// An RGBA8 colour. As data (the `serde` feature) it is a `"#rrggbb"` string, read by [`hex`] and written by
+/// [`to_hex`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify), tsify(type = "string"))]
 pub struct Rgba(pub u8, pub u8, pub u8, pub u8);
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Rgba {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&to_hex(*self))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Rgba {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        hex(&s).map_err(serde::de::Error::custom)
+    }
+}
 
 impl Rgba {
     /// Fully transparent black, which packs to 0: the painter draws nothing for it.

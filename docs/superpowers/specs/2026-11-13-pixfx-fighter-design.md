@@ -29,7 +29,7 @@ public API. Lints as the workspace; `#![forbid(unsafe_code)]`.
 | `pose` | `Pose` (idle, walk, jump, fly, land, crouch, duck, draw, slash, channel, cast, guard, meditate, hurt, frozen, shocked, launched, tumble, fall, down, roll, sit, kneel, win, …), `Gather` (summon, palm, lunge, prayer, cross) | `duel-art.js` |
 | `look` | `Look`: the palette a fighter is drawn in; two stock looks, `thunder` and `frost` | `duel-art.js` LOOKS |
 | `paint` | `draw(frame, look, &Appearance)`: the pose into a 64×64 sprite, outlined, turned in quarter turns, its gathering aura, a dodge's afterimage; into a `pixfx_core::Frame` | `duel-art.js` paint/blit/outline |
-| `status` | `Marks` on a fighter and how they are drawn: burning (flames up the body, colour + light), frozen (ice), shocked (sparks, light), chill, defence down, silence, fury pips, shield, barrier dome | `duel-art.js` drawStatus/dome, new flames and sparks |
+| `status` | An ordered list of `Mark` values on a fighter and how they are drawn; burning, frozen and shocked follow the pose's `Silhouette`. Marks: burning (flames up the body, colour + light), frozen (ice), shocked (sparks, light), chill, defence down, silence, fury pips, shield, barrier dome | `duel-art.js` drawStatus/dome, new flames and sparks |
 | `feel` | `Feel`: `react(&[Cue])`, `advance(dt) -> fight dt`, `shake(roll)`, `jolts()`, `dust()` + drawing dust into a frame, `numbers()`, `streaks()`, `dusk()` | `duel-feel.js` |
 
 Randomness comes in from the caller (`roll: &mut dyn FnMut() -> f64`) so the duel keeps one seeded stream.

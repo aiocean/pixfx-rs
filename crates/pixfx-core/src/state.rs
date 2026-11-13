@@ -7,7 +7,7 @@
 use std::fmt;
 
 use crate::cue::TimedCue;
-use crate::effect::{Effect, Instance, Layer, Options, find};
+use crate::effect::{Effect, Instance, Layer, Options, Placement, find};
 use crate::frame::Frame;
 
 /// What makes an effect one state of a creature (pixelfx `meta.state`).
@@ -92,8 +92,14 @@ impl Creature {
         let _ = self.enter(next.0, opts);
     }
 
-    pub fn draw(&self, frame: &mut Frame, layer: Layer) {
-        self.inst.draw(frame, layer);
+    /// Draw the current state into `frame`, placed as `place` says ([`Instance::draw`]).
+    pub fn draw(&self, frame: &mut Frame, layer: Layer, place: Placement) {
+        self.inst.draw(frame, layer, place);
+    }
+
+    /// Where and how the current state's options place it.
+    pub fn placement(&self) -> Placement {
+        self.inst.placement()
     }
 
     /// The id of the effect playing now.

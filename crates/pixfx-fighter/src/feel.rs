@@ -11,8 +11,10 @@ use pixfx_core::math::{js_max, js_min, js_round, to_int32};
 use pixfx_core::screen::Ripple;
 
 /// Hit-stop, in frames at 60 a second, the way fighting games and Sakurai's Smash count it: both fighters freeze
-/// together, longer the heavier the blow (Street Fighter 6 gives its mediums 11 frames, its heavies 13); a crit
-/// holds longer, a spell that struck from afar shorter, and no blow freezes the fight past a cap.
+/// together, longer the heavier the blow (Street Fighter 6 gives its mediums 11 frames, its heavies 13); a blow of
+/// `medium_power` or more is a medium; a crit holds longer, a spell that struck from afar shorter, and no blow
+/// freezes the fight past a cap.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stop {
     pub light: f64,
     pub medium: f64,
@@ -20,67 +22,130 @@ pub struct Stop {
     pub crit: f64,
     pub ranged: f64,
     pub cap: f64,
+    pub medium_power: f64,
 }
-pub const STOP: Stop = Stop {
-    light: 6.0,
-    medium: 8.0,
-    launch: 11.0,
-    crit: 3.0,
-    ranged: -2.0,
-    cap: 13.0,
-};
 
-/// The one struck shudders through the hit-stop: this many pixels at first, dying away by its end.
-pub const JOLT: f64 = 2.0;
+/// How hard a cue that is not a blow answers: a hit-stop (seconds) and trauma added (0 to 1).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Answer {
+    pub stop: f64,
+    pub trauma: f64,
+}
 
-/// Dust a body raises where it hits the floor: how long it hangs, and how far it spreads.
+/// Dust a body raises where it hits the floor: how long it hangs, and the least landing strength (0 to 1) that
+/// raises any.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DustSpec {
     pub life: f64,
-    pub spread: f64,
+    pub least: f64,
 }
-pub const DUST: DustSpec = DustSpec {
-    life: 0.4,
-    spread: 12.0,
-};
 
-/// Trauma, 0 to 1, drains this fast per second; the shake is trauma squared times [`SHAKE`] game pixels.
-pub const TRAUMA_DRAIN: f64 = 1.6;
-pub const SHAKE: f64 = 3.0;
-
-/// A knockout: a longer stop, then the fight runs at this speed for this long.
+/// A knockout: a longer stop, then the fight runs at `speed` for `slow` seconds; it adds `trauma`.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct KoSpec {
     pub stop: f64,
     pub speed: f64,
     pub slow: f64,
+    pub trauma: f64,
 }
-pub const KO: KoSpec = KoSpec {
-    stop: 0.25,
-    speed: 0.35,
-    slow: 1.2,
-};
 
 /// Damage numbers rise this many pixels over their life.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NumberSpec {
     pub rise: f64,
     pub life: f64,
 }
-pub const NUMBER: NumberSpec = NumberSpec {
-    rise: 14.0,
-    life: 0.8,
-};
 
-/// A streak of qi from a caster to where its spell lands shows this long.
-pub const STREAK: f64 = 0.28;
-
-/// An ultimate dims the sky this much, fading over this many seconds.
+/// An ultimate stops the fight `stop` seconds and dims the sky `depth`, fading over `time` seconds.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DuskSpec {
+    pub stop: f64,
     pub depth: f64,
     pub time: f64,
 }
-pub const DUSK: DuskSpec = DuskSpec {
-    depth: 0.55,
-    time: 0.9,
-};
+
+/// How the screen answers a fight. `Default` is the site's duel.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FeelSpec {
+    pub stop: Stop,
+    /// The one struck shudders through the hit-stop: this many pixels at first, dying away by its end.
+    pub jolt: f64,
+    /// Trauma, 0 to 1, a blow adds: its share of full life over `share_trauma`, plus `crit_trauma` for a crit.
+    pub share_trauma: f64,
+    pub crit_trauma: f64,
+    /// Trauma drains this fast per second; the shake is trauma squared times `shake` game pixels.
+    pub trauma_drain: f64,
+    pub shake: f64,
+    /// A fighter refusing to fall, a barrier ringing, two spells meeting.
+    pub unyielding: Answer,
+    pub block: Answer,
+    pub clash: Answer,
+    /// Trauma a body hitting the floor or a wall adds at full strength.
+    pub land_trauma: f64,
+    pub bump_trauma: f64,
+    pub dust: DustSpec,
+    pub ko: KoSpec,
+    pub number: NumberSpec,
+    /// A streak of qi from a caster to where its spell lands shows this long.
+    pub streak: f64,
+    pub dusk: DuskSpec,
+}
+
+impl Default for FeelSpec {
+    /// The site's duel.
+    fn default() -> Self {
+        Self {
+            stop: Stop {
+                light: 6.0,
+                medium: 8.0,
+                launch: 11.0,
+                crit: 3.0,
+                ranged: -2.0,
+                cap: 13.0,
+                medium_power: 9.0,
+            },
+            jolt: 2.0,
+            share_trauma: 25.0,
+            crit_trauma: 0.2,
+            trauma_drain: 1.6,
+            shake: 3.0,
+            unyielding: Answer {
+                stop: 0.18,
+                trauma: 0.4,
+            },
+            block: Answer {
+                stop: 0.05,
+                trauma: 0.15,
+            },
+            clash: Answer {
+                stop: 0.06,
+                trauma: 0.25,
+            },
+            land_trauma: 0.15,
+            bump_trauma: 0.15,
+            dust: DustSpec {
+                life: 0.4,
+                least: 0.3,
+            },
+            ko: KoSpec {
+                stop: 0.25,
+                speed: 0.35,
+                slow: 1.2,
+                trauma: 0.8,
+            },
+            number: NumberSpec {
+                rise: 14.0,
+                life: 0.8,
+            },
+            streak: 0.28,
+            dusk: DuskSpec {
+                stop: 0.1,
+                depth: 0.55,
+                time: 0.9,
+            },
+        }
+    }
+}
 
 /// Dust specks: the light and the dark one, alternating.
 const DUST_LIGHT: Rgba = Rgba::hex24(0xa89a88);
@@ -89,6 +154,9 @@ const DUST_DARK: Rgba = Rgba::hex24(0x6e6458);
 /// Something the fight just did that the screen answers. Heights (`y`) are up from the ground; `by` is the index
 /// of the fighter who caused it.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "lowercase"))]
 pub enum Cue {
     /// A blow landed. `power` weighs it (9 and up is a medium), `launch` threw the one struck, `ranged` struck from
     /// afar (a bolt or an orb), `share` is the share of full life it took (0 to 100), `damage` the real amount.
@@ -154,8 +222,30 @@ pub enum Cue {
     Ultimate,
 }
 
+impl Cue {
+    /// The `type` of each cue as data, so a host that mixes cues with its own events can tell which are cues.
+    pub const TYPES: [&str; 13] = [
+        "hit",
+        "tick",
+        "heal",
+        "ward",
+        "dodge",
+        "unyielding",
+        "block",
+        "clash",
+        "land",
+        "bump",
+        "ko",
+        "streak",
+        "ultimate",
+    ];
+}
+
 /// What a floating number says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum NumberKind {
     Hit,
     Crit,
@@ -168,6 +258,9 @@ pub enum NumberKind {
 /// A floating number as drawn this frame: where it is (height above the ground), how faded (`alpha`), its text,
 /// who caused it (none for a dodge) and its kind.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "ts", tsify(rename = "DamageNumber", missing_as_null))]
 pub struct Number {
     pub x: f64,
     pub y: f64,
@@ -187,6 +280,8 @@ pub struct Dust {
 
 /// A qi streak: from where, to where (heights up from the ground), whose, and how faded (1 new, 0 gone).
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Streak {
     pub x0: f64,
     pub y0: f64,
@@ -235,6 +330,7 @@ struct Jolt {
 /// and read where the screen sits and what floats over the fight.
 #[derive(Clone, Debug, Default)]
 pub struct Feel {
+    spec: FeelSpec,
     stop: f64,
     slow: f64,
     trauma: f64,
@@ -248,26 +344,40 @@ pub struct Feel {
     flash: f64,
 }
 
-fn hit_stop(power: f64, launch: bool, crit: bool, ranged: bool) -> f64 {
+fn hit_stop(stop: &Stop, power: f64, launch: bool, crit: bool, ranged: bool) -> f64 {
     let mut frames = if launch {
-        STOP.launch
-    } else if power >= 9.0 {
-        STOP.medium
+        stop.launch
+    } else if power >= stop.medium_power {
+        stop.medium
     } else {
-        STOP.light
+        stop.light
     };
     if crit {
-        frames += STOP.crit;
+        frames += stop.crit;
     }
     if ranged {
-        frames += STOP.ranged;
+        frames += stop.ranged;
     }
-    js_min(STOP.cap, frames) / 60.0
+    js_min(stop.cap, frames) / 60.0
 }
 
 impl Feel {
+    /// The site's duel's answer ([`FeelSpec::default`]).
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Answering as `spec` has it.
+    pub fn with_spec(spec: FeelSpec) -> Self {
+        Self {
+            spec,
+            ..Self::default()
+        }
+    }
+
+    /// How it answers.
+    pub fn spec(&self) -> &FeelSpec {
+        &self.spec
     }
 
     /// How shaken the screen is, 0 to 1.
@@ -292,7 +402,7 @@ impl Feel {
         for c in cues {
             match c.cue {
                 Fx::Shake { trauma } => self.trauma = js_min(1.0, self.trauma + trauma),
-                Fx::Hitstop { dur } => self.stop = js_max(self.stop, js_min(STOP.cap / 60.0, dur)),
+                Fx::Hitstop { dur } => self.stop = js_max(self.stop, js_min(self.spec.stop.cap / 60.0, dur)),
                 Fx::Ripple {
                     x,
                     y,
@@ -317,6 +427,7 @@ impl Feel {
 
     /// Take in what the fight just did.
     pub fn react(&mut self, cues: &[Cue]) {
+        let s = self.spec;
         for &c in cues {
             match c {
                 Cue::Hit {
@@ -330,7 +441,7 @@ impl Feel {
                     x,
                     y,
                 } => {
-                    let stop = hit_stop(power, launch, crit, ranged);
+                    let stop = hit_stop(&s.stop, power, launch, crit, ranged);
                     self.stop = js_max(self.stop, stop);
                     // grounded, it shudders side to side; in the air, up and down (Sakurai)
                     self.jolt = Some(Jolt {
@@ -341,7 +452,9 @@ impl Feel {
                     });
                     self.trauma = js_min(
                         1.0,
-                        self.trauma + share / 25.0 + if crit { 0.2 } else { 0.0 },
+                        self.trauma
+                            + share / s.share_trauma
+                            + if crit { s.crit_trauma } else { 0.0 },
                     );
                     let kind = if crit {
                         NumberKind::Crit
@@ -373,22 +486,13 @@ impl Feel {
                 }
                 // a dodge shows as a dash where the blow would have struck
                 Cue::Dodge { x, y } => self.number(x, y, None, NumberKind::Dodge, "-".to_string()),
-                Cue::Unyielding => {
-                    self.stop = js_max(self.stop, 0.18);
-                    self.trauma = js_min(1.0, self.trauma + 0.4);
-                }
+                Cue::Unyielding => self.answer(s.unyielding),
                 // a barrier rings: a short stop, a little shake
-                Cue::Block => {
-                    self.stop = js_max(self.stop, 0.05);
-                    self.trauma = js_min(1.0, self.trauma + 0.15);
-                }
-                Cue::Clash => {
-                    self.stop = js_max(self.stop, 0.06);
-                    self.trauma = js_min(1.0, self.trauma + 0.25);
-                }
+                Cue::Block => self.answer(s.block),
+                Cue::Clash => self.answer(s.clash),
                 Cue::Land { x, strength } => {
-                    self.trauma = js_min(1.0, self.trauma + 0.15 * strength);
-                    if strength > 0.3 {
+                    self.trauma = js_min(1.0, self.trauma + s.land_trauma * strength);
+                    if strength > s.dust.least {
                         self.dust.push(Puff {
                             x,
                             strength,
@@ -396,11 +500,13 @@ impl Feel {
                         });
                     }
                 }
-                Cue::Bump { strength } => self.trauma = js_min(1.0, self.trauma + 0.15 * strength),
+                Cue::Bump { strength } => {
+                    self.trauma = js_min(1.0, self.trauma + s.bump_trauma * strength)
+                }
                 Cue::Ko => {
-                    self.stop = js_max(self.stop, KO.stop);
-                    self.slow = KO.slow;
-                    self.trauma = js_min(1.0, self.trauma + 0.8);
+                    self.stop = js_max(self.stop, s.ko.stop);
+                    self.slow = s.ko.slow;
+                    self.trauma = js_min(1.0, self.trauma + s.ko.trauma);
                 }
                 Cue::Streak { x0, y0, x1, y1, by } => self.streaks.push(Qi {
                     x0,
@@ -411,11 +517,16 @@ impl Feel {
                     t: 0.0,
                 }),
                 Cue::Ultimate => {
-                    self.stop = js_max(self.stop, 0.1);
-                    self.dusk = DUSK.time;
+                    self.stop = js_max(self.stop, s.dusk.stop);
+                    self.dusk = s.dusk.time;
                 }
             }
         }
+    }
+
+    fn answer(&mut self, a: Answer) {
+        self.stop = js_max(self.stop, a.stop);
+        self.trauma = js_min(1.0, self.trauma + a.trauma);
     }
 
     fn number(&mut self, x: f64, y: f64, by: Option<usize>, kind: NumberKind, text: String) {
@@ -439,7 +550,7 @@ impl Feel {
     /// Let `dt` real seconds pass. Returns how many seconds the fight should run for it: none during a hit-stop, a
     /// fraction in a knockout's slow motion.
     pub fn advance(&mut self, dt: f64) -> f64 {
-        self.trauma = js_max(0.0, self.trauma - TRAUMA_DRAIN * dt);
+        self.trauma = js_max(0.0, self.trauma - self.spec.trauma_drain * dt);
         self.dusk = js_max(0.0, self.dusk - dt);
         // the screen's own clock: ripples and flash run on through a hit-stop
         self.flash = js_max(0.0, self.flash - dt * 4.0);
@@ -450,15 +561,16 @@ impl Feel {
         for n in &mut self.numbers {
             n.t += dt;
         }
-        self.numbers.retain(|n| n.t < NUMBER.life);
+        let s = self.spec;
+        self.numbers.retain(|n| n.t < s.number.life);
         for k in &mut self.streaks {
             k.t += dt;
         }
-        self.streaks.retain(|k| k.t < STREAK);
+        self.streaks.retain(|k| k.t < s.streak);
         for d in &mut self.dust {
             d.t += dt;
         }
-        self.dust.retain(|d| d.t < DUST.life);
+        self.dust.retain(|d| d.t < s.dust.life);
         self.tick = self.tick.wrapping_add(1);
         if let Some(j) = &mut self.jolt {
             j.left -= dt;
@@ -477,14 +589,14 @@ impl Feel {
         }
         if self.slow > 0.0 {
             self.slow = js_max(0.0, self.slow - dt);
-            return dt * KO.speed;
+            return dt * s.ko.speed;
         }
         dt
     }
 
     /// Where the screen sits this frame, in whole game pixels; `roll` gives numbers in [0, 1), x first.
     pub fn shake(&self, roll: &mut dyn FnMut() -> f64) -> (i32, i32) {
-        let a = self.trauma * self.trauma * SHAKE;
+        let a = self.trauma * self.trauma * self.spec.shake;
         let x = to_int32(js_round((roll() * 2.0 - 1.0) * a));
         let y = to_int32(js_round((roll() * 2.0 - 1.0) * a));
         (x, y)
@@ -497,7 +609,7 @@ impl Feel {
             return out;
         };
         // flips side every frame, smaller as the stop runs out
-        let a = js_round(JOLT * (j.left / j.full) + 0.4)
+        let a = js_round(self.spec.jolt * (j.left / j.full) + 0.4)
             * if self.tick.is_multiple_of(2) {
                 -1.0
             } else {
@@ -517,26 +629,28 @@ impl Feel {
             .map(|d| Dust {
                 x: d.x,
                 strength: d.strength,
-                k: d.t / DUST.life,
+                k: d.t / self.spec.dust.life,
             })
             .collect()
     }
 
-    /// How dark the sky is, 0 to `DUSK.depth`.
+    /// How dark the sky is, 0 to the spec's `dusk.depth`.
     pub fn dusk(&self) -> f64 {
-        let k = self.dusk / DUSK.time;
+        let d = self.spec.dusk;
+        let k = self.dusk / d.time;
         // in fast, out slow
-        DUSK.depth * js_min(1.0, k * 4.0) * js_min(1.0, k * 1.6)
+        d.depth * js_min(1.0, k * 4.0) * js_min(1.0, k * 1.6)
     }
 
     /// Each floating number.
     pub fn numbers(&self) -> Vec<Number> {
+        let spec = self.spec.number;
         self.numbers
             .iter()
             .map(|n| Number {
                 x: n.x,
-                y: n.y + 16.0 + NUMBER.rise * libm::sqrt(n.t / NUMBER.life),
-                alpha: js_min(1.0, 2.5 * (1.0 - n.t / NUMBER.life)),
+                y: n.y + 16.0 + spec.rise * libm::sqrt(n.t / spec.life),
+                alpha: js_min(1.0, 2.5 * (1.0 - n.t / spec.life)),
                 text: n.text.clone(),
                 by: n.by,
                 kind: n.kind,
@@ -554,7 +668,7 @@ impl Feel {
                 x1: k.x1,
                 y1: k.y1,
                 by: k.by,
-                fade: 1.0 - k.t / STREAK,
+                fade: 1.0 - k.t / self.spec.streak,
             })
             .collect()
     }
@@ -584,7 +698,7 @@ impl Feel {
                 for side in [-1.0, 1.0] {
                     let x = js_round(d.x + side * out);
                     let y = ground - 1.0 - rise;
-                    crate::status::fill(frame, x as i32, y as i32, w as i32, 1, c, alpha);
+                    pixfx_core::blend::fill(frame, x as i32, y as i32, w as i32, 1, c, alpha);
                 }
                 i += 1.0;
             }

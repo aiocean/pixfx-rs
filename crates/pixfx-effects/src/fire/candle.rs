@@ -5,7 +5,7 @@
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{clamp, js_max, js_min, js_round, smooth};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
 
 use super::lib::{
     Hot, Life, LoopNoise, drift, flame_tongue, floor_light, hot_first, looped, smoke_puff,
@@ -27,6 +27,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 2,
     state: None,
+    options: &[ROOT.spec(), WAX.spec(), BRASS.spec()],
 };
 
 // meta.options
@@ -41,26 +42,32 @@ const PALETTE: [Rgba; 9] = [
     Rgba::hex24(0xfff3a6),
     Rgba::hex24(0xffffff),
 ];
-const ROOT: [Rgba; 3] = [
+const ROOT: RampOpt = RampOpt::new(
+    "root",
+    &[
     Rgba::hex24(0x1b2a8a),
     Rgba::hex24(0x3a62e0),
     Rgba::hex24(0x7fb4ff),
-];
-const WAX: [Rgba; 6] = [
+]);
+const WAX: RampOpt = RampOpt::new(
+    "wax",
+    &[
     Rgba::hex24(0x2e201e),
     Rgba::hex24(0x5e4436),
     Rgba::hex24(0x8e6e58),
     Rgba::hex24(0xb8957a),
     Rgba::hex24(0xd8b896),
     Rgba::hex24(0xf0dcc0),
-];
-const BRASS: [Rgba; 5] = [
+]);
+const BRASS: RampOpt = RampOpt::new(
+    "brass",
+    &[
     Rgba::hex24(0x2a1a10),
     Rgba::hex24(0x6a4a1e),
     Rgba::hex24(0xb4862e),
     Rgba::hex24(0xe8c060),
     Rgba::hex24(0xfff0b0),
-];
+]);
 
 const D: f64 = META.duration;
 const NL: LoopNoise = LoopNoise(D);
@@ -86,9 +93,9 @@ impl Effect for Candle {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             f: ramp(&opts.palette_or(&PALETTE)),
-            rt: ramp(&opts.ramp_or("root", &ROOT)),
-            x: ramp(&opts.ramp_or("wax", &WAX)),
-            b: ramp(&opts.ramp_or("brass", &BRASS)),
+            rt: ramp(&opts.ramp(&ROOT)),
+            x: ramp(&opts.ramp(&WAX)),
+            b: ramp(&opts.ramp(&BRASS)),
             s: seed as f64,
         })
     }

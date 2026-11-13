@@ -5,25 +5,60 @@
 use std::fmt;
 use std::num::NonZeroU32;
 
-use js_sys::Reflect;
 use pixfx_core::math::js_round;
-use pixfx_core::{Effect, Frame, Layer, Options, composite_px, valid_dt};
+use pixfx_core::{Effect, Frame, Layer, Meta, Options, Placement, composite_px, valid_dt};
 use pixfx_wasm::{Player, parse_options};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsError, JsValue};
 
 /// [`parse_options`] for [`crate::Stage::play`]: the stage sizes each effect's margin itself, so a `margin`
 /// option is an error.
-pub fn stage_options(v: &JsValue) -> Result<Options, JsError> {
-    let has_margin = v.is_object()
-        && Reflect::get(v, &JsValue::from_str("margin"))
-            .map_err(|_| JsError::new("could not read the options"))?
-            != JsValue::UNDEFINED;
-    if has_margin {
+pub fn stage_options(meta: &Meta, v: &JsValue) -> Result<Options, JsError> {
+    let (opts, margin) = parse_options(meta, v)?;
+    if margin.is_some() {
         return Err(JsError::new(
-            "option margin is not supported: Stage sizes the margin itself",
+            "options.margin is not supported: Stage sizes the margin itself",
         ));
     }
-    Ok(parse_options(v)?.0)
+    Ok(opts)
+}
+
+/// A change to where and how an effect draws, for [`crate::Stage::set`]: each field left out keeps its value.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, tsify::Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct PlacementChange {
+    /// The effect's origin, in game pixels (rounded to a whole pixel).
+    #[serde(default)]
+    #[tsify(optional)]
+    pub x: Option<f64>,
+    #[serde(default)]
+    #[tsify(optional)]
+    pub y: Option<f64>,
+    /// Mirror left-right.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub flip: Option<bool>,
+    /// Rotation, radians.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub angle: Option<f64>,
+    /// Glow strength.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub light: Option<f64>,
+}
+
+impl PlacementChange {
+    /// `base` with this change put over it.
+    pub fn over(self, base: Placement) -> Placement {
+        Placement {
+            x: self.x.unwrap_or(base.x),
+            y: self.y.unwrap_or(base.y),
+            flip: self.flip.unwrap_or(base.flip),
+            angle: self.angle.unwrap_or(base.angle),
+            light: self.light.unwrap_or(base.light),
+        }
+    }
 }
 
 /// `effect` with `opts` as the stage plays it: on its canvas plus [`Meta::glow_margin`], so nothing at the
@@ -47,6 +82,14 @@ pub struct Pass {
     pub handle: u32,
     pub layer: Layer,
     pub rect: Rect,
+}
+
+/// Something that happened on the stage, queued in order until the host drains it ([`Scene::drain_events`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, tsify::Tsify)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum StageEvent {
+    /// The instance is gone: it finished, faded out after a stop, or was removed.
+    End { handle: u32 },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,6 +118,8 @@ struct Entry<T> {
     handle: u32,
     /// Where the effect's origin sits, in whole game pixels.
     at: (i64, i64),
+    /// How the player draws the effect on its own frame: `x`/`y` its origin there, the rest as the host sets.
+    place: Placement,
     player: Player,
     /// What the shell keeps per instance (its scratch canvas); `()` in tests.
     surface: T,
@@ -86,6 +131,8 @@ pub struct Scene<T> {
     /// The next handle to give out; handles start at 1 and are never reused.
     next: Option<u32>,
     entries: Vec<Entry<T>>,
+    /// Events not yet drained, oldest first.
+    events: Vec<StageEvent>,
 }
 
 impl<T> Scene<T> {
@@ -94,6 +141,7 @@ impl<T> Scene<T> {
             scale,
             next: Some(1),
             entries: Vec::new(),
+            events: Vec::new(),
         }
     }
 
@@ -108,16 +156,13 @@ impl<T> Scene<T> {
     /// Add `player` with its origin at game pixel (`x`, `y`), rounded as JS `Math.round` does; returns its
     /// handle.
     pub fn play(&mut self, player: Player, x: f64, y: f64, surface: T) -> Result<u32, StageError> {
-        if !x.is_finite() || !y.is_finite() {
-            return Err(StageError::NotFinite);
-        }
+        let at = game_pixel(x, y)?;
         let handle = self.next.ok_or(StageError::OutOfHandles)?;
         self.next = handle.checked_add(1);
-        // `as` saturates; a position past i64 is off any canvas anyway
-        let at = (js_round(x) as i64, js_round(y) as i64);
         self.entries.push(Entry {
             handle,
             at,
+            place: player.placement(),
             player,
             surface,
         });
@@ -127,16 +172,45 @@ impl<T> Scene<T> {
     /// Put the instance's origin at game pixel (`x`, `y`), rounded as [`Scene::play`] does, keeping its time:
     /// an effect that follows something moves without restarting. `Ok(false)` if no instance has this handle.
     pub fn move_to(&mut self, handle: u32, x: f64, y: f64) -> Result<bool, StageError> {
-        if !x.is_finite() || !y.is_finite() {
-            return Err(StageError::NotFinite);
-        }
-        let at = (js_round(x) as i64, js_round(y) as i64);
+        let at = game_pixel(x, y)?;
         Ok(self
             .entries
             .iter_mut()
             .find(|e| e.handle == handle)
             .map(|e| e.at = at)
             .is_some())
+    }
+
+    /// Where and how the instance is drawn: `x`/`y` its origin in whole game pixels, the rest as its effect
+    /// reads them.
+    pub fn placement(&self, handle: u32) -> Option<Placement> {
+        self.entries.iter().find(|e| e.handle == handle).map(|e| {
+            let p = e.place;
+            // a game pixel past 2^53 loses precision as f64; no canvas reaches it
+            Placement {
+                x: e.at.0 as f64,
+                y: e.at.1 as f64,
+                ..p
+            }
+        })
+    }
+
+    /// Draw the instance as `p` says from now on, keeping its time: `x`/`y` move its origin as
+    /// [`Scene::move_to`] does, `flip`/`angle`/`light` change how it draws. `Ok(false)` if no instance has this
+    /// handle.
+    pub fn set(&mut self, handle: u32, p: Placement) -> Result<bool, StageError> {
+        let at = game_pixel(p.x, p.y)?;
+        let Some(e) = self.entries.iter_mut().find(|e| e.handle == handle) else {
+            return Ok(false);
+        };
+        e.at = at;
+        // the player's own x/y keep the origin on its frame; the stage places the frame
+        e.place = Placement {
+            x: e.place.x,
+            y: e.place.y,
+            ..p
+        };
+        Ok(true)
     }
 
     /// Let the instance end (loops fade out); false if no instance has this handle.
@@ -148,11 +222,20 @@ impl<T> Scene<T> {
             .is_some()
     }
 
-    /// Drop the instance now; false if no instance has this handle.
+    /// Drop the instance now, queueing its end; false if no instance has this handle.
     pub fn remove(&mut self, handle: u32) -> bool {
         let before = self.entries.len();
         self.entries.retain(|e| e.handle != handle);
-        self.entries.len() != before
+        let removed = self.entries.len() != before;
+        if removed {
+            self.events.push(StageEvent::End { handle });
+        }
+        removed
+    }
+
+    /// The events since the last drain, oldest first; the queue is empty afterwards.
+    pub fn drain_events(&mut self) -> Vec<StageEvent> {
+        std::mem::take(&mut self.events)
     }
 
     /// The playing handles, oldest first.
@@ -195,7 +278,8 @@ impl<T> Scene<T> {
             .map(|e| e.player.t())
     }
 
-    /// Advance every instance by `dt` seconds, then drop the ones that are done. A `dt` that fails
+    /// Advance every instance by `dt` seconds, then drop the ones that are done, queueing their ends oldest
+    /// first. A `dt` that fails
     /// [`valid_dt`] (NaN, infinite or negative) is an error and changes nothing.
     pub fn update(&mut self, dt: f64) -> Result<(), StageError> {
         if !valid_dt(dt) {
@@ -204,7 +288,14 @@ impl<T> Scene<T> {
         for e in &mut self.entries {
             e.player.update(dt);
         }
-        self.entries.retain(|e| !e.player.done());
+        let events = &mut self.events;
+        self.entries.retain(|e| {
+            let done = e.player.done();
+            if done {
+                events.push(StageEvent::End { handle: e.handle });
+            }
+            !done
+        });
         Ok(())
     }
 
@@ -235,11 +326,20 @@ impl<T> Scene<T> {
             let Some(e) = self.entries.get_mut(i) else {
                 break;
             };
-            e.player.draw(layer);
+            e.player.draw(layer, e.place);
             blit(pass, e.player.frame(), &mut e.surface)?;
         }
         Ok(())
     }
+}
+
+/// (`x`, `y`) as a whole game pixel, rounded as JS `Math.round` does; NaN or infinite is an error.
+fn game_pixel(x: f64, y: f64) -> Result<(i64, i64), StageError> {
+    if !x.is_finite() || !y.is_finite() {
+        return Err(StageError::NotFinite);
+    }
+    // `as` saturates; a position past i64 is off any canvas anyway
+    Ok((js_round(x) as i64, js_round(y) as i64))
 }
 
 /// Colour words (ABGR) as straight-alpha RGBA bytes into `out` (`w * h * 4`); true if any pixel is visible.

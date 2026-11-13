@@ -249,7 +249,10 @@ dependencies = [
  "pixfx-core",
  "pixfx-effects",
  "pixfx-fighter",
+ "pixfx-light",
  "pixfx-wasm",
+ "serde",
+ "tsify",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
@@ -270,6 +273,9 @@ name = "pixfx-core"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "serde",
+ "tsify",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -299,6 +305,21 @@ version = "0.1.0"
 dependencies = [
  "libm",
  "pixfx-core",
+ "serde",
+ "serde_json",
+ "tsify",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "pixfx-light"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "pixfx-core",
+ "serde",
+ "tsify",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -308,6 +329,11 @@ dependencies = [
  "js-sys",
  "pixfx-core",
  "pixfx-effects",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "serde_path_to_error",
+ "tsify",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -369,6 +395,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -385,7 +422,18 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 3.0.10",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.29.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -401,6 +449,17 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "serde_path_to_error"
+version = "0.1.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10a9ff822e371bb5403e391ecd83e182e0e77ba7f6fe0160b795797109d1b457"
+dependencies = [
+ "itoa",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -423,6 +482,17 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "syn"
+version = "2.0.119"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
 version = "3.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
@@ -439,6 +509,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3"
 dependencies = [
  "pin-project-lite",
+]
+
+[[package]]
+name = "tsify"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea3af6b48c5c5624f7eb3c2f578d1335fadac433321980cae0063e8eb0acaa44"
+dependencies = [
+ "serde",
+ "serde-wasm-bindgen",
+ "tsify-macros",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "tsify-macros"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1e2e93369379d0a527c7d6632b58c55d52db7a106d8afbde3b354f3a57a9f1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -499,7 +593,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 3.0.10",
  "wasm-bindgen-shared",
 ]
 
@@ -541,7 +635,7 @@ checksum = "238071aa4c5b268e57d21018621a2e2403c29dd11c55dbdf790ed47fdb9241c0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 3.0.10",
 ]
 
 [[package]]

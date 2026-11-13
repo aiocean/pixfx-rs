@@ -131,7 +131,7 @@ mod effect_cues {
         feel.react(&[hit(0, (5.0, false, false), 10.0, 5.0, (50.0, 10.0))]);
         feel.take(&[at(Fx::Hitstop { dur: 0.2 })]);
         // one freeze of min(0.2, cap / 60), not the two added together
-        let want = 0.2_f64.min(pixfx_fighter::feel::STOP.cap / 60.0);
+        let want = 0.2_f64.min(feel.spec().stop.cap / 60.0);
         let mut frozen = 0.0;
         while feel.advance(FRAME) == 0.0 {
             frozen += FRAME;

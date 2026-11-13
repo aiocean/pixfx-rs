@@ -7,7 +7,7 @@ use pixfx_core::color::{Rgba, ramp};
 use pixfx_core::math::{TAU, clamp, js_min, js_round, wrap};
 use pixfx_core::particles::{cycle, fly};
 use pixfx_core::sim::{Flags, Kind};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
 use super::lib::{Swarm, fire_puff, lnoise, shadow, shift, tongue};
 
@@ -29,6 +29,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 1,
     state: None,
+    options: &[HOVER.spec()],
 };
 
 const PALETTE: [Rgba; 7] = [
@@ -40,7 +41,7 @@ const PALETTE: [Rgba; 7] = [
     Rgba(0xa8, 0xff, 0xf0, 255),
     Rgba(255, 255, 255, 255),
 ];
-const HOVER: f64 = 36.0;
+const HOVER: NumOpt = NumOpt::new("hover", 36.0);
 const D: f64 = 3.2;
 
 impl Effect for Wisp {
@@ -50,7 +51,7 @@ impl Effect for Wisp {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
-            hover: opts.num_or("hover", HOVER),
+            hover: opts.num(&HOVER),
             seed: seed as f64,
         })
     }

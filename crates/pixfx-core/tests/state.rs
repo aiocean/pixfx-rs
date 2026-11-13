@@ -53,6 +53,7 @@ const fn meta(
             next,
             carry,
         }),
+        options: &[],
     }
 }
 
@@ -116,7 +117,7 @@ fn carry_survives_follow() -> Result<(), StateError> {
     run(&mut c, 0.7);
     assert_eq!(c.state(), "critter/b");
     let o = c.opts();
-    assert_eq!(o.num_or("hits", 0.0), 2.0);
+    assert_eq!(o.extra.get("hits"), Some(&OptValue::Num(2.0)));
     assert!(!o.extra.contains_key("other"));
     assert_eq!((o.x, o.y, o.flip, o.seed), (7.0, 9.0, true, Some(5)));
     Ok(())

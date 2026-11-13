@@ -74,7 +74,7 @@ fn a_taller_canvas_is_hazed_to_its_top() {
             },
         );
         let mut f = Frame::new(cv.size.0, cv.size.1, 0, 0);
-        inst.draw(&mut f, Layer::Back);
+        inst.draw(&mut f, Layer::Back, inst.placement());
         assert!(
             f.color[..64].iter().all(|c| c >> 24 != 0),
             "{}: the top row has no haze",
@@ -92,7 +92,7 @@ const GROUND: f64 = 170.0;
 fn scene(insts: &[Instance]) -> Frame {
     let mut f = Frame::new(W, H, 0, 0);
     for i in insts {
-        i.draw(&mut f, Layer::Both);
+        i.draw(&mut f, Layer::Both, i.placement());
     }
     f
 }
@@ -211,7 +211,7 @@ fn bands(fx: &'static dyn Effect, w: u32, h: u32, layer: Layer) -> Vec<(f64, f64
                 inst.update(0.25);
             }
             let mut f = Frame::new(cv.size.0, cv.size.1, 0, 0);
-            inst.draw(&mut f, layer);
+            inst.draw(&mut f, layer, inst.placement());
             for (i, (l, c)) in levels(&f).iter().zip(&f.color).enumerate() {
                 if let Some(b) = sums.get_mut((i % w as usize) / BAND as usize) {
                     b.0 += f64::from(*l);

@@ -29,22 +29,22 @@ pub fn or_one(x: f64) -> f64 {
     if x == 0.0 || x.is_nan() { 1.0 } else { x }
 }
 
-/// JS `Math.min(a, b)`: NaN if either is NaN.
+/// JS `Math.min(a, b)`: NaN if either is NaN, and -0 is less than +0.
 pub fn js_min(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         f64::NAN
-    } else if a < b {
+    } else if a < b || (a == b && a.is_sign_negative()) {
         a
     } else {
         b
     }
 }
 
-/// JS `Math.max(a, b)`: NaN if either is NaN.
+/// JS `Math.max(a, b)`: NaN if either is NaN, and +0 is greater than -0.
 pub fn js_max(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         f64::NAN
-    } else if a > b {
+    } else if a > b || (a == b && a.is_sign_positive()) {
         a
     } else {
         b

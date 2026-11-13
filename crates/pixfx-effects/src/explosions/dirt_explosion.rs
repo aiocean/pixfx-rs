@@ -11,7 +11,7 @@ use pixfx_core::math::{Rng, TAU, ease, js_max, js_min, js_round, smooth, to_uint
 use pixfx_core::sim::{
     Bit, BitKind, Bits, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn, band,
 };
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
 
 use super::lib::{Stone, crater, cull, dome, draw_dirt, fade_edges, pool, rock};
 
@@ -39,6 +39,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 3,
     state: None,
+    options: &[FIRE.spec()],
 };
 
 // meta.options
@@ -51,7 +52,9 @@ const PALETTE: [Rgba; 7] = [
     Rgba::hex24(0xb89f78),
     Rgba::hex24(0xdcc8a2),
 ];
-const FIRE: [Rgba; 8] = [
+const FIRE: RampOpt = RampOpt::new(
+    "fire",
+    &[
     Rgba::hex24(0x4a1712),
     Rgba::hex24(0xc9281f),
     Rgba::hex24(0xf2561d),
@@ -60,7 +63,7 @@ const FIRE: [Rgba; 8] = [
     Rgba::hex24(0xffe26b),
     Rgba::hex24(0xfff3a6),
     Rgba::hex24(0xffffff),
-];
+]);
 
 const D: f64 = META.duration;
 // the canvas box in local px, 3 px in from each edge
@@ -82,7 +85,7 @@ impl Effect for DirtExplosion {
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let e: [Rgba; 7] = ramp(&opts.palette_or(&PALETTE));
-        let f: [Rgba; 8] = ramp(&opts.ramp_or("fire", &FIRE));
+        let f: [Rgba; 8] = ramp(&opts.ramp(&FIRE));
         let mut r = Rng::new(to_uint32(seed as f64));
         let clod = Stone {
             light: e[5],

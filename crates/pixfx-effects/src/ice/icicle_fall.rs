@@ -33,6 +33,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 4,
     state: None,
+    options: &[],
 };
 
 // meta.options
