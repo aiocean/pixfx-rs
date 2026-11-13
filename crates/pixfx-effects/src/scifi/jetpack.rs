@@ -233,7 +233,8 @@ fn draw(p: &mut Painter, t: f64, st: &State) {
     let fr = libm::floor(t * FR) % js_round(D * FR);
     let dy = js_round(libm::sin(TAU * 12.0 * ph) * 0.6);
     // smoke and spent flame behind, then the plumes
-    st.ghosts.draw(p, t, Layer::Back);
+    let g = st.ghosts.at(t);
+    g.draw(p, Layer::Back);
     for sd in [-1.0, 1.0] {
         let cx = sd * GAP
             + if rand(&[s, fr, sd]) < 0.15 {
@@ -319,7 +320,7 @@ fn draw(p: &mut Painter, t: f64, st: &State) {
         p.glow(cx, dy + l * 0.45, l * 0.8, f[4], 0.35);
     }
     pack(p, h, f, dy);
-    st.ghosts.draw(p, t, Layer::Front);
+    g.draw(p, Layer::Front);
     // the fire lights the smoke below it, and its own surroundings
     p.glow(0.0, st.length + 14.0, 34.0, f[4], 0.16);
     p.glow(0.0, st.length * 0.4, 30.0, f[5], 0.18);

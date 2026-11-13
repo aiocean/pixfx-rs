@@ -8,8 +8,6 @@
 //! over an unbounded floor; the other kinds, `ground`, stars and the flash and arc helpers arrive with the effects
 //! that need them). JS `Ghosts` also builds an `Rng` for its `Particles`; nothing draws from it, so it is not kept.
 
-use pixfx_core::Layer;
-use pixfx_core::Painter;
 use pixfx_core::color::{Rgba, WHITE};
 use pixfx_core::math::{js_min, rand};
 use pixfx_core::sim::{Flags, GRAVITY, Kind, Particle, Particles, ParticlesOpts};
@@ -214,10 +212,5 @@ impl Ghosts {
             }
         }
         ps
-    }
-
-    /// Draw the particles alive at t on `layer`.
-    pub fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
-        self.at(t).draw(p, layer);
     }
 }
