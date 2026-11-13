@@ -194,6 +194,17 @@ impl Stage {
         Ok(())
     }
 
+    /// Draw at most `layers` effect layers per frame, so many effects reaching a new frame at once cannot make one
+    /// frame slow; effects left over show their last frame and are drawn in a later frame, the longest waiting
+    /// first. 0 (the default) draws every layer whose frame changed.
+    #[wasm_bindgen(js_name = setDrawBudget)]
+    pub fn set_draw_budget(&mut self, layers: u32) {
+        self.renderer
+            .borrow_mut()
+            .scene
+            .set_draw_budget(NonZeroU32::new(layers));
+    }
+
     /// Fill the canvas with this CSS colour before drawing; `""` clears to transparent instead.
     pub fn background(&mut self, css_color: &str) {
         self.renderer.borrow_mut().background =

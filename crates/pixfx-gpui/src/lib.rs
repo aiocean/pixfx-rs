@@ -198,6 +198,13 @@ impl FxScene {
         self.scene.set_frame_budget(bytes);
     }
 
+    /// Draw at most `layers` layers per window frame, or every changed one with `None` (the default); effects
+    /// left over show their last frame and wait ([`Scene::set_draw_budget`]). Views take turns in the order they
+    /// paint.
+    pub fn set_draw_budget(&mut self, layers: Option<NonZeroU32>) {
+        self.scene.set_draw_budget(layers);
+    }
+
     /// Bytes the shared frames hold.
     pub fn bytes(&self) -> u64 {
         self.scene.frame_bytes()

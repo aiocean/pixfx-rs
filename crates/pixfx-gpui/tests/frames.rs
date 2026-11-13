@@ -109,3 +109,29 @@ fn frames_past_the_budget_leave_the_atlas_and_a_fading_view_holds_its_own(cx: &m
         "a fading view paints its own images, not shared ones"
     );
 }
+
+#[gpui::test]
+fn a_draw_budget_uploads_that_many_new_frames_per_window_frame(cx: &mut TestAppContext) {
+    let cx = cx.add_empty_window();
+    let mut scene = FxScene::default();
+    let effects = (0..3)
+        .filter_map(|seed| {
+            let fx = pixfx_effects::effect("fire/campfire")?;
+            let opts = Options {
+                seed: Some(100 + seed),
+                ..Options::default()
+            };
+            scene.play(fx, opts).ok()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(effects.len(), 3);
+    scene.set_draw_budget(std::num::NonZeroU32::new(1));
+    let site = Rc::new(RefCell::new(Site { effects, scene }));
+    // three campfires with their own seeds share nothing: one new frame per window frame until all three show
+    let bytes: Vec<u64> = (0..4).map(|_| paint(cx, &site)).collect();
+    assert!(
+        bytes[0] > 0 && bytes[1] > bytes[0] && bytes[2] > bytes[1],
+        "{bytes:?}"
+    );
+    assert_eq!(bytes[3], bytes[2], "nothing left to draw: {bytes:?}");
+}
