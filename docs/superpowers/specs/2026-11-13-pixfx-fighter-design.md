@@ -49,5 +49,5 @@ tells `Sprites` what each fighter is doing.
   probe gives the same wins (104 to 118) and per-step traces of x, air, vx, vy, pose match.
 - **Same pictures**: every pose of both looks, at several times, drawn by the old JS and by Rust in Chrome, match
   pixel for pixel on the sprite (blended aura and dome compared with a ±1 per channel tolerance).
-- **Same feel**: `site/tests/duel-feel.test.js`'s cases run against the wasm `Feel`.
+- **Same feel**: the site's former feel tests run against the Rust `Feel` (`crates/pixfx-fighter/tests/feel.rs`).
 - Chrome on the live site: 60 fps, no errors.
