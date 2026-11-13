@@ -14,7 +14,7 @@ function fightTime(feel, seconds) {
 describe("feel", () => {
   test("a blow stops the fight for a few frames, then it runs on at full speed", () => {
     const feel = createFeel();
-    react(feel, [{ type: "hit", by: 0, damage: 12, x: 50, y: 20 }]);
+    react(feel, [{ type: "hit", by: 0, damage: 12, share: 12, x: 50, y: 20 }]);
     expect(advance(feel, FRAME)).toBe(0);
     const stopped = 0.5 - fightTime(feel, 0.5);
     expect(stopped).toBeGreaterThan(0.04);
@@ -25,7 +25,7 @@ describe("feel", () => {
   test("a harder blow stops the fight longer and shakes the screen harder", () => {
     const lost = (damage) => {
       const feel = createFeel();
-      react(feel, [{ type: "hit", by: 0, damage, x: 0, y: 0 }]);
+      react(feel, [{ type: "hit", by: 0, damage, share: damage, x: 0, y: 0 }]);
       const trauma = feel.trauma;
       return [1 - fightTime(feel, 1), trauma];
     };
@@ -45,7 +45,7 @@ describe("feel", () => {
 
   test("the screen settles after a shake", () => {
     const feel = createFeel();
-    react(feel, [{ type: "hit", by: 0, damage: 25, x: 0, y: 0 }]);
+    react(feel, [{ type: "hit", by: 0, damage: 25, share: 25, x: 0, y: 0 }]);
     const most = () => shake(feel, () => 0.999).map(Math.abs);
     expect(Math.max(...most())).toBeGreaterThan(0);
     fightTime(feel, 1);
@@ -54,9 +54,9 @@ describe("feel", () => {
 
   test("damage floats up from the blow and fades away", () => {
     const feel = createFeel();
-    react(feel, [{ type: "hit", by: 1, damage: 9.4, x: 80, y: 20 }]);
+    react(feel, [{ type: "hit", by: 1, damage: 940, share: 9.4, x: 80, y: 20 }]);
     const [first] = numbers(feel);
-    expect(first).toMatchObject({ x: 80, text: "9", by: 1 });
+    expect(first).toMatchObject({ x: 80, text: "940", by: 1, kind: "hit" });
     fightTime(feel, 0.4);
     const [later] = numbers(feel);
     expect(later.y).toBeGreaterThan(first.y);

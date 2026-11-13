@@ -23,11 +23,39 @@ const APEX = { speed: 45, gravity: 0.45 };
 const FLY = { rate: 7, max: 140, top: 64, cost: 5 };
 /** A blow this strong or stronger throws the target up into the air. */
 const LAUNCH = { damage: 12, speed: 130, perDamage: 5 };
-/** Rage: a point for each blow landed or taken; when full, the school's ultimate. */
-export const RAGE = 8;
+/** Rage is a small whole-number pool: a point for each blow landed; when full, the school's ultimate. */
+export const RAGE = 4;
 /** Status effects: frozen (no moving, no acting) and shocked (a short paralysis), in seconds. */
 const FREEZE = 0.9;
 const SHOCK = { time: 0.4, chance: 0.3 };
+/**
+ * How a blow turns into damage, the way xianxia hero battlers count it: attack times the skill's percentage, cut by
+ * the defence that matches its type (physical or magic), then a crit roll, a little spread, and a dodge roll before
+ * it all. Spell `damage` is the skill's power: power 10 is 100% of attack. Life (`hp`) is kept as a share of the
+ * fighter's full life, 0 to 100; hits report the real amounts.
+ */
+const DEFENCE = 500;
+const SPREAD = 0.1;
+/** Fury: each blow a fury fighter lands raises its attack, up to a cap of stacks, for the rest of the round. */
+const FURY = { per: 0.04, max: 5 };
+/** Defence broken by a spell: this much defence lost, for the spell's `defDown` seconds. */
+const DEF_DOWN = 0.3;
+/** Burn: a share of the caster's attack every tick, ignoring defence. */
+const BURN = { time: 3, every: 0.5, share: 0.05 };
+/** A frost ward absorbs this share of full life, for this long. */
+const WARD = { share: 0.18, time: 6 };
+
+/**
+ * Each school's fighter: full life, attack, the two defences, crit chance and crit damage, dodge, and its passives.
+ * Thunder is a body and sword cultivator: tough, hits harder the longer it fights (fury), and once a round stands
+ * up from a killing blow with 1 life (unyielding). Frost is a spell cultivator: frailer, harder to pin down, crits
+ * harder, shields itself, and every spell it casts charges its rage (attuned).
+ */
+export const STATS = {
+  thunder: { hp: 2500, atk: 330, pdef: 130, mdef: 110, crit: 0.18, critDamage: 1.6, dodge: 0.05, fury: true, unyielding: true, attuned: false },
+  frost: { hp: 2450, atk: 370, pdef: 105, mdef: 165, crit: 0.15, critDamage: 1.7, dodge: 0.11, fury: false, unyielding: false, attuned: true },
+};
+
 /** Knocked into the arena's edge faster than this, a fighter bounces off it. */
 const BOUNCE = 80;
 /** Falling faster than this when it lands, a fighter's landing is felt. */
@@ -54,40 +82,42 @@ const CLASH = "impacts/parry";
  * is left out of the fight (slash and block need none).
  */
 export const SPELLS = {
-  slash: { kind: "melee", cost: 0, windup: 0.2, recover: 0.32, cooldown: 0.55, range: 20, damage: 8 },
+  slash: { kind: "melee", type: "physical", cost: 0, windup: 0.2, recover: 0.32, cooldown: 0.55, range: 20, damage: 8 },
   // from above: drop onto the foe sword first, and crack the ground if it lands there
-  dive: { kind: "melee", dive: true, cost: 8, windup: 0.22, recover: 0.4, cooldown: 1.6, range: 22, damage: 13, speed: 260, slamFx: "explosions/dirt-explosion" },
-  bolt: { kind: "bolt", fx: "projectiles/laser-bolt", cost: 12, windup: 0.28, recover: 0.22, cooldown: 1.3, speed: 230, damage: 9, shock: true },
+  dive: { kind: "melee", type: "physical", dive: true, cost: 8, windup: 0.22, recover: 0.4, cooldown: 1.6, range: 22, damage: 13, speed: 260, slamFx: "explosions/dirt-explosion" },
+  bolt: { kind: "bolt", type: "magic", fx: "projectiles/laser-bolt", cost: 12, windup: 0.28, recover: 0.22, cooldown: 1.3, speed: 230, damage: 9, shock: true },
   orb: {
-    kind: "orb", fx: "lightning/ball-lightning", hitFx: "explosions/plasma-explosion",
-    cost: 30, windup: 0.6, recover: 0.3, cooldown: 4.5, speed: 26, life: 5.5, damage: 12, radius: 10,
+    kind: "orb", type: "magic", fx: "lightning/ball-lightning", hitFx: "explosions/plasma-explosion", burn: true,
+    cost: 30, windup: 0.6, recover: 0.3, cooldown: 4.5, speed: 26, life: 5.5, damage: 10, radius: 10,
   },
   // icicle-fall drops its icicle at FREE + fall time: 0.64 + sqrt(2 * (80 - 36) / 950) s, and only starts to tremble,
   // which is when a fighter notices it overhead, at 0.3 s (pixelfx ice/icicle-fall.js TREMBLE)
-  icicle: { kind: "zone", fx: "ice/icicle-fall", cost: 22, windup: 0.42, recover: 0.28, cooldown: 2.2, impact: 0.944, radius: 16, damage: 20, notice: 0.3, height: 0, grounded: true, freeze: FREEZE },
+  icicle: { kind: "zone", type: "magic", defDown: 4, fx: "ice/icicle-fall", cost: 22, windup: 0.42, recover: 0.28, cooldown: 2.2, impact: 0.944, radius: 16, damage: 20, notice: 0.3, height: 0, grounded: true, freeze: FREEZE },
   // implosion sucks in until 0.8 s and pops at 1.02 s (pixelfx explosions/implosion.js SUCK, STILL)
   collapse: {
-    kind: "zone", fx: "explosions/implosion", cost: 26, windup: 0.5, recover: 0.3, cooldown: 2.4,
+    kind: "zone", type: "magic", silence: 1.5, fx: "explosions/implosion", cost: 26, windup: 0.5, recover: 0.3, cooldown: 2.4,
     impact: 1.02, radius: 18, damage: 18, notice: 0.15, height: CHEST, pull: 30, reach: 46, pullUntil: 0.8,
   },
   // a thunderclap from the open palm, at arm's length
-  palm: { kind: "blast", fx: "explosions/plasma-explosion", cost: 18, windup: 0.32, recover: 0.35, cooldown: 2.8, range: 30, damage: 14, shock: true },
+  palm: { kind: "blast", type: "physical", stealRage: 1, fx: "explosions/plasma-explosion", cost: 18, windup: 0.32, recover: 0.35, cooldown: 2.8, range: 30, damage: 14, shock: true },
   // ultimates, cast with full rage. Thunder: three thunderclaps fall one after another where the foe will be.
   tribulation: {
-    kind: "zone", fx: "explosions/plasma-explosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
-    impact: 0.08, radius: 12, damage: 11, notice: 0, height: CHEST, strikes: 3, every: 0.7, aimAhead: 0.5,
+    kind: "zone", type: "magic", fx: "explosions/plasma-explosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
+    impact: 0.08, radius: 12, damage: 10, notice: 0, height: CHEST, strikes: 3, every: 0.7, aimAhead: 0.5,
   },
   // Frost: a great collapse that drags the foe in from far off and freezes it where it pops.
   prison: {
-    kind: "zone", fx: "explosions/implosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
-    impact: 1.02, radius: 26, damage: 22, notice: 0.1, height: CHEST, pull: 70, reach: 110, pullUntil: 0.9, seals: true, freeze: FREEZE * 1.4,
+    kind: "zone", type: "magic", silence: 2, fx: "explosions/implosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
+    impact: 1.02, radius: 26, damage: 26, notice: 0.1, height: CHEST, pull: 70, reach: 110, pullUntil: 0.9, seals: true, freeze: FREEZE * 1.4,
   },
   // void-orb hangs 62 px over its origin (pixelfx shadow/void-orb.js Y) and loops every 3.2 s
   void: {
-    kind: "void", fx: "shadow/void-orb", endFx: "explosions/implosion",
+    kind: "void", type: "magic", fx: "shadow/void-orb", endFx: "explosions/implosion",
     cost: 60, windup: 0.9, recover: 0.45, cooldown: 11, life: 3.2, height: 62, pull: 34, reach: 90, under: 22, dps: 8, damage: 10,
   },
   heal: { kind: "heal", fx: "holy/feather-burst", cost: 40, windup: 0.85, recover: 0.3, cooldown: 9, amount: 20 },
+  // a shell of frost qi that takes blows for the caster until it breaks
+  ward: { kind: "ward", fx: "holy/feather-burst", cost: 30, windup: 0.5, recover: 0.25, cooldown: 8 },
   blink: { kind: "blink", fx: "spawn/poof", cost: 20, windup: 0.06, recover: 0.12, cooldown: 1.8, distance: 56 },
 };
 
@@ -102,7 +132,7 @@ export const SCHOOLS = {
     circle: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"],
   },
   frost: {
-    name: "Frost", spells: ["slash", "dive", "bolt", "icicle", "collapse", "void", "blink", "heal", "prison"], range: 84, aggression: 1.1, sky: 26,
+    name: "Frost", spells: ["slash", "dive", "bolt", "icicle", "collapse", "void", "blink", "ward", "prison"], range: 84, aggression: 1.1, sky: 26,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
   },
@@ -146,7 +176,7 @@ export function createDuel({ seed = 1, left, right, ground, has }) {
 }
 
 function fighter(index, school, spells) {
-  return { index, school, spells, x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0 };
+  return { index, school, spells, stats: STATS[school], x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0 };
 }
 
 function startRound(duel) {
@@ -157,7 +187,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0 });
+    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0 });
     f.x = duel.left + span * (f.index === 0 ? 0.22 : 0.78);
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
@@ -203,6 +233,12 @@ function body(duel, me, foe, dt) {
   me.frozen = Math.max(0, me.frozen - dt);
   me.shocked = Math.max(0, me.shocked - dt);
   me.sealed = Math.max(0, me.sealed - dt);
+  me.defDown = Math.max(0, me.defDown - dt);
+  me.silence = Math.max(0, me.silence - dt);
+  me.dodged = Math.max(0, me.dodged - dt);
+  me.shieldT = Math.max(0, me.shieldT - dt);
+  if (me.shieldT === 0) me.shield = 0;
+  burning(duel, me, dt);
   me.guard = Math.max(0, me.guard - dt);
   for (const k of Object.keys(me.cool)) me.cool[k] = Math.max(0, me.cool[k] - dt);
   me.qi = Math.min(100, me.qi + (me.medit ? MEDITATE_REGEN : me.fly ? -FLY.cost : QI_REGEN) * dt);
@@ -297,6 +333,7 @@ function begin(duel, me, name, target) {
 /** The moment a spell lands: it hits, flies, falls or heals. */
 function release(duel, me, foe, spell) {
   const g = duel.ground;
+  if (me.stats.attuned && spell.kind !== "melee" && !spell.ultimate && spell.cost > 0) gainRage(me, 1);
   if (spell.kind === "melee") {
     me.vx += me.face * 90;
     if (spell.dive) {
@@ -347,8 +384,15 @@ function release(duel, me, foe, spell) {
     const key = play(duel, spell.fx, x, g, { seed: me.index + 5 });
     duel.shots.push({ kind: "void", owner: me.index, x, t: 0, key, spell });
   } else if (spell.kind === "heal") {
-    me.hp = Math.min(100, me.hp + spell.amount);
+    const gained = Math.min(100 - me.hp, spell.amount);
+    me.hp += gained;
+    emit(duel, { type: "heal", by: me.index, amount: Math.round((gained / 100) * me.stats.hp), x: me.x, y: me.air + CHEST });
     play(duel, spell.fx, me.x, g - BODY - me.air, { seed: Math.floor(duel.rng() * 1e6) });
+  } else if (spell.kind === "ward") {
+    me.shield = Math.round(WARD.share * me.stats.hp);
+    me.shieldT = WARD.time;
+    emit(duel, { type: "ward", by: me.index, amount: me.shield, x: me.x, y: me.air + CHEST });
+    play(duel, spell.fx, me.x, g - BODY - me.air, { palette: SCHOOLS[me.school].circle, seed: Math.floor(duel.rng() * 1e6) });
   } else if (spell.kind === "blink") {
     play(duel, spell.fx, me.x, g - me.air, { seed: Math.floor(duel.rng() * 1e6) });
     me.x = clamp(me.act.target, duel.left + HALF_WIDTH, duel.right - HALF_WIDTH);
@@ -371,24 +415,86 @@ function blocks(f, fromX, damage = 0) {
   return true;
 }
 
-/** f takes `damage` from `spell`, pushed toward `dir`; the step reports it as a `hit` command. */
-function hurt(duel, f, damage, dir, spell) {
-  if (f.hp <= 0) return;
-  emit(duel, { type: "hit", by: 1 - f.index, spell, damage, x: f.x, y: f.air + CHEST });
-  gainRage(f, 1);
-  gainRage(duel.fighters[1 - f.index], 1);
-  f.hp = Math.max(0, f.hp - damage);
+/**
+ * f takes a blow of `power` from `spell`, pushed toward `dir`; the step reports it as a `hit` command (or a
+ * `dodge`). Returns whether it landed.
+ */
+function hurt(duel, f, power, dir, spell) {
+  if (f.hp <= 0) return false;
+  const by = duel.fighters[1 - f.index];
+  const s = SPELLS[spell];
+  // an ultimate cannot be dodged
+  if (!s?.ultimate && duel.rng() < f.stats.dodge) {
+    f.dodged = 0.3;
+    f.vx -= dir * 40;
+    emit(duel, { type: "dodge", x: f.x, y: f.air + CHEST });
+    return false;
+  }
+  const crit = duel.rng() < by.stats.crit;
+  const amount = damageOf(by, f, power, s?.type ?? "magic", crit, duel.rng());
+  const share = take(duel, f, amount);
+  emit(duel, { type: "hit", by: by.index, spell, damage: amount, crit, share, x: f.x, y: f.air + CHEST });
+  // rage for the blow: an attuned fighter's spells were paid for when cast, so only its blade earns here
+  if (!s?.ultimate && !(by.stats.attuned && s?.kind !== "melee")) gainRage(by, 1);
+  if (by.stats.fury) by.fury = Math.min(FURY.max, by.fury + 1);
   f.flash = 0.18;
   f.stun = STAGGER;
-  f.vx += dir * KNOCKBACK * (damage >= LAUNCH.damage ? 1.6 : 1);
+  f.vx += dir * KNOCKBACK * (power >= LAUNCH.damage ? 1.6 : 1);
   f.fly = false;
   // a heavy blow throws it up, where it can be hit again before it lands
-  if (damage >= LAUNCH.damage) f.vy = Math.max(f.vy, LAUNCH.speed + damage * LAUNCH.perDamage);
+  if (power >= LAUNCH.damage) f.vy = Math.max(f.vy, LAUNCH.speed + power * LAUNCH.perDamage);
   // a hit breaks a cast: what was gathering is lost
   if (f.act?.circle !== undefined && f.act.phase === "windup") emit(duel, { type: "stop", key: f.act.circle });
   f.act = null;
   f.guard = 0;
   setMeditating(duel, f, false);
+  // what the spell leaves behind
+  if (s?.burn) f.burn = { t: BURN.time, tick: BURN.every, per: Math.round(by.stats.atk * (1 + FURY.per * by.fury) * BURN.share), by: by.index };
+  if (s?.defDown) f.defDown = s.defDown;
+  if (s?.silence) f.silence = s.silence;
+  if (s?.stealRage && f.rage > 0) {
+    f.rage -= s.stealRage;
+    gainRage(by, s.stealRage);
+  }
+  return true;
+}
+
+/** The damage `by` does to `f` with a blow of `power` and `type`; `roll` in [0, 1) spreads it. */
+export function damageOf(by, f, power, type, crit, roll) {
+  const atk = by.stats.atk * (1 + FURY.per * by.fury);
+  const def = (type === "physical" ? f.stats.pdef : f.stats.mdef) * (f.defDown > 0 ? 1 - DEF_DOWN : 1);
+  const spread = 1 - SPREAD / 2 + SPREAD * roll;
+  return Math.max(1, Math.round(atk * (power / 10) * (DEFENCE / (DEFENCE + def)) * (crit ? by.stats.critDamage : 1) * spread));
+}
+
+/**
+ * f loses `amount` life: its ward takes what it can first, and an unyielding fighter stands up once a round from
+ * a killing blow with 1 life left. Returns the share of full life lost.
+ */
+function take(duel, f, amount) {
+  const absorbed = Math.min(f.shield, amount);
+  f.shield -= absorbed;
+  let share = ((amount - absorbed) / f.stats.hp) * 100;
+  if (share >= f.hp && f.stats.unyielding && !f.rose) {
+    f.rose = true;
+    share = f.hp - 100 / f.stats.hp;
+    emit(duel, { type: "unyielding", by: f.index, x: f.x, y: f.air + CHEST });
+  }
+  f.hp = Math.max(0, f.hp - share);
+  return share;
+}
+
+/** A burn ticks: a share of its caster's attack, past defence, until it runs out. */
+function burning(duel, f, dt) {
+  if (!f.burn) return;
+  f.burn.t -= dt;
+  f.burn.tick -= dt;
+  if (f.burn.tick <= 0 && f.hp > 0) {
+    f.burn.tick += BURN.every;
+    const share = take(duel, f, f.burn.per);
+    emit(duel, { type: "tick", by: f.burn.by, damage: f.burn.per, share, x: f.x, y: f.air + CHEST });
+  }
+  if (f.burn.t <= 0) f.burn = null;
 }
 
 function gainRage(f, n) {
@@ -595,7 +701,9 @@ function mind(duel, me, foe, dt) {
 
 const ready = (me, name) =>
   me.spells.includes(name) && !(me.cool[name] > 0) && me.qi >= SPELLS[name].cost && (!SPELLS[name].ultimate || me.rage >= RAGE) &&
-  !(name === "blink" && me.sealed > 0);
+  !(name === "blink" && me.sealed > 0) &&
+  // silenced, only the blade answers
+  !(me.silence > 0 && SPELLS[name].kind !== "melee");
 
 /** What is coming at me, and the ways out of each. */
 function dangers(duel, me) {
@@ -743,6 +851,10 @@ function attacks(duel, me, foe) {
   }
   if (ready(me, "void") && (foe.hp < 75 || busy > 0.4)) {
     out.push({ spell: "void", score: value("void", 0.7) + 4 });
+  }
+  if (ready(me, "ward") && me.shield === 0 && me.hp < 90) {
+    const safe = d > 50 && !foe.act ? 1 : 0.6;
+    out.push({ spell: "ward", score: (8 + 14 * (1 - me.hp / 100)) * safe });
   }
   if (ready(me, "heal") && me.hp < 50) {
     const safe = d > 60 && !foe.act ? 1 : busy > 1 ? 0.8 : 0.2;

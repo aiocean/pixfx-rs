@@ -1,10 +1,11 @@
 // What makes the duel's blows land: the screen's answer to what just happened in the fight. A blow freezes the
 // fight for a few frames (hit-stop) and shakes the screen; its damage floats up from where it struck; a knockout
 // lingers in slow motion; an ultimate darkens the sky as it is cast. All of it is state over the duel's events and
-// real time, so the hero asks it each frame how fast the fight runs and where the screen sits.
+// real time, so the hero asks it each frame how fast the fight runs and where the screen sits. Blows weigh by the
+// share of full life they took (`share`); the numbers show the real amounts.
 
-/** Hit-stop seconds for a blow of `damage`, up to a cap so a combo never stalls the fight. */
-const hitStop = (damage) => Math.min(0.12, 0.035 + damage * 0.004);
+/** Hit-stop seconds for a blow that takes `share` percent of full life, up to a cap so a combo never stalls the fight. */
+const hitStop = (share) => Math.min(0.12, 0.035 + share * 0.004);
 /** Trauma, 0 to 1, drains this fast per second; the shake is trauma squared times this many game pixels. */
 const TRAUMA_DRAIN = 1.6;
 const SHAKE = 3;
@@ -23,9 +24,21 @@ export function createFeel() {
 export function react(feel, commands) {
   for (const c of commands) {
     if (c.type === "hit") {
-      feel.stop = Math.max(feel.stop, hitStop(c.damage));
-      feel.trauma = Math.min(1, feel.trauma + c.damage / 25);
-      feel.numbers.push({ x: c.x, y: c.y, text: String(Math.round(c.damage)), by: c.by, t: 0 });
+      feel.stop = Math.max(feel.stop, hitStop(c.share) * (c.crit ? 1.5 : 1));
+      feel.trauma = Math.min(1, feel.trauma + c.share / 25 + (c.crit ? 0.2 : 0));
+      number(feel, c, c.crit ? "crit" : "hit", String(c.damage));
+    } else if (c.type === "tick") {
+      number(feel, c, "tick", String(c.damage));
+    } else if (c.type === "heal") {
+      number(feel, c, "heal", `+${c.amount}`);
+    } else if (c.type === "ward") {
+      number(feel, c, "ward", `+${c.amount}`);
+    } else if (c.type === "dodge") {
+      // a dodge shows as a dash where the blow would have struck
+      number(feel, { ...c, by: null }, "dodge", "-");
+    } else if (c.type === "unyielding") {
+      feel.stop = Math.max(feel.stop, 0.18);
+      feel.trauma = Math.min(1, feel.trauma + 0.4);
     } else if (c.type === "clash") {
       feel.stop = Math.max(feel.stop, 0.06);
       feel.trauma = Math.min(1, feel.trauma + 0.25);
@@ -40,6 +53,12 @@ export function react(feel, commands) {
       feel.dusk = DUSK.time;
     }
   }
+}
+
+function number(feel, c, kind, text) {
+  // numbers from one spot step aside so a barrage stays readable
+  const near = feel.numbers.filter((n) => Math.abs(n.x - c.x) < 12 && n.t < 0.3).length;
+  feel.numbers.push({ x: c.x + (near % 2 ? 7 : -7) * Math.min(near, 1), y: c.y + near * 6, text, by: c.by, kind, t: 0 });
 }
 
 /**
@@ -75,7 +94,8 @@ export function dusk(feel) {
   return DUSK.depth * Math.min(1, k * 4) * Math.min(1, k * 1.6);
 }
 
-/** Each damage number: where it is (height above the ground), how faded, and who struck. */
+/** Each number: where it is (height above the ground), how faded, who caused it, and its kind (hit, crit, tick, heal,
+ *  ward or dodge). */
 export function numbers(feel) {
   return feel.numbers.map((n) => ({
     x: n.x,
@@ -83,5 +103,6 @@ export function numbers(feel) {
     alpha: Math.min(1, 2.5 * (1 - n.t / NUMBER.life)),
     text: n.text,
     by: n.by,
+    kind: n.kind,
   }));
 }

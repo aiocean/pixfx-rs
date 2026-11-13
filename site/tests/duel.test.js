@@ -1,6 +1,6 @@
 // The duel's rules and minds, driven the way the hero drives them: step after step, playing what comes back.
 import { describe, expect, test } from "bun:test";
-import { SPELLS, createDuel, step } from "../assets/duel.js";
+import { SPELLS, STATS, createDuel, damageOf, step } from "../assets/duel.js";
 
 const PLAN2 = new Set([
   "fire/candle", "fire/campfire", "fire/brazier", "impacts/parry", "explosions/plasma-explosion", "explosions/implosion",
@@ -152,5 +152,85 @@ describe("duel", () => {
     const x = target.x;
     for (let i = 0; i < 30; i++) step(duel, 1 / 60);
     expect(target.x).toBe(x);
+  });
+  test("damage is attack times the skill's power, cut by the matching defence, raised by a crit", () => {
+    const thunder = { stats: STATS.thunder, fury: 0 };
+    const frost = { stats: STATS.frost, fury: 0, defDown: 0 };
+    const physical = damageOf(thunder, frost, 10, "physical", false, 0.5);
+    const magic = damageOf(thunder, frost, 10, "magic", false, 0.5);
+    // frost guards better against spells than blades
+    expect(magic).toBeLessThan(physical);
+    expect(damageOf(thunder, frost, 20, "physical", false, 0.5)).toBeCloseTo(physical * 2, -1);
+    expect(damageOf(thunder, frost, 10, "physical", true, 0.5)).toBeCloseTo(physical * STATS.thunder.critDamage, -1);
+    expect(damageOf(thunder, { ...frost, defDown: 2 }, 10, "physical", false, 0.5)).toBeGreaterThan(physical);
+    expect(damageOf({ ...thunder, fury: 5 }, frost, 10, "physical", false, 0.5)).toBeGreaterThan(physical);
+  });
+
+  /** Hold both fighters still, then land one bolt on fighter `at` from the other. */
+  function boltOn(duel, at, setup) {
+    const target = duel.fighters[at];
+    const shooter = duel.fighters[1 - at];
+    shooter.think = 1e9;
+    target.think = 1e9;
+    shooter.x = at === 1 ? 60 : 120;
+    target.x = at === 1 ? 120 : 60;
+    shooter.face = Math.sign(target.x - shooter.x);
+    target.stats = { ...target.stats, dodge: 0 };
+    setup?.(target);
+    shooter.act = { spell: "bolt", phase: "windup", t: SPELLS.bolt.windup - 1 / 60 };
+    const hits = [];
+    for (let i = 0; i < 40; i++) for (const c of step(duel, 1 / 60)) if (c.type === "hit" || c.type === "unyielding") hits.push(c);
+    return hits;
+  }
+
+  test("a frost ward takes a blow before life does", () => {
+    const duel = arena(2);
+    const [, frost] = duel.fighters;
+    const hits = boltOn(duel, 1, (t) => {
+      t.shield = 5000;
+      t.shieldT = 5;
+    });
+    expect(hits.filter((h) => h.type === "hit").length).toBe(1);
+    expect(frost.hp).toBe(100);
+    expect(frost.shield).toBeLessThan(5000);
+  });
+
+  test("thunder stands up from its first killing blow each round, with 1 life, but not its second", () => {
+    const duel = arena(2);
+    const [thunder] = duel.fighters;
+    expect(thunder.school).toBe("thunder");
+    let hits = boltOn(duel, 0, (t) => (t.hp = 0.5));
+    expect(hits.some((h) => h.type === "unyielding")).toBe(true);
+    expect(thunder.hp).toBeGreaterThan(0);
+    hits = boltOn(duel, 0);
+    expect(thunder.hp).toBe(0);
+    expect(hits.some((h) => h.type === "unyielding")).toBe(false);
+  });
+
+  test("a burn keeps hurting after the orb is gone", () => {
+    const duel = arena(3);
+    const [, target] = duel.fighters;
+    target.think = 1e9;
+    duel.fighters[0].think = 1e9;
+    target.burn = { t: 3, tick: 0.5, per: 50, by: 0 };
+    const ticks = [];
+    for (let i = 0; i < 4 * 60; i++) for (const c of step(duel, 1 / 60)) if (c.type === "tick") ticks.push(c);
+    expect(ticks.length).toBe(6);
+    expect(target.burn).toBeNull();
+  });
+
+  test("a silenced fighter answers only with its blade", () => {
+    const duel = arena(5);
+    const [caster, foe] = duel.fighters;
+    caster.spells = ["bolt", "slash"];
+    caster.qi = 100;
+    caster.silence = 3;
+    foe.think = 1e9;
+    const cast = new Set();
+    for (let i = 0; i < 2 * 60; i++) {
+      step(duel, 1 / 60);
+      if (caster.act) cast.add(caster.act.spell);
+    }
+    expect(cast.has("bolt")).toBe(false);
   });
 });

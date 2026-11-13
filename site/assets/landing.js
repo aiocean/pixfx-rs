@@ -5,11 +5,12 @@ import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 import { DECOR, createDuel, step } from "./duel.js";
 import { drawBars, drawFighter, drawNumbers } from "./duel-art.js";
 import { advance, createFeel, dusk, numbers, react, shake } from "./duel-feel.js";
+import { createScene, drawScene } from "./duel-scene.js";
 
-/** The two cultivators, by school, as the bars name them. */
-const NAMES = ["Thunder", "Frost"];
-
-const COLORS = { sky: "#13101b", ground: "#1e1a24", edge: "#2f2a38", star: "#f0dcc0" };
+/** Behind the hero's scene while the screen shakes. */
+const BACKDROP = "#0b0a1c";
+/** The effect tiles' sky and floor. */
+const COLORS = { sky: "#13101b", ground: "#1e1a24" };
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const PALETTES = {
@@ -74,7 +75,6 @@ export async function mount() {
   if (reduceMotion) {
     // one still frame a second into each effect
     for (const v of views) v.step(1);
-    document.getElementById("hint").textContent = "Animation is off because your system asks for reduced motion.";
   } else {
     requestAnimationFrame(frame);
   }
@@ -91,7 +91,6 @@ export async function mount() {
 
 function createHero(canvas, signal) {
   const view = { canvas, stage: null, duel: null, feel: createFeel(), layout: null, handles: new Map() };
-  const copy = document.querySelector(".hero-copy");
   const have = new Set(effects());
   let seed = 1 + Math.floor(Math.random() * 1e6);
 
@@ -105,11 +104,11 @@ function createHero(canvas, signal) {
     const h = Math.ceil(rect.height / scale);
     canvas.width = w * scale;
     canvas.height = h * scale;
-    const ground = h - (narrow ? 8 : 18);
-    // the arena is right of the headline; on a narrow screen, under it, the whole width
-    const textRight = narrow ? 0 : Math.ceil((copy.getBoundingClientRect().right - rect.left) / scale);
+    const ground = h - (narrow ? 14 : 22);
+    // the arena is the middle of the dais, at most 420 pixels wide, a brazier at each end
     const lampInset = 14;
-    const arena = w - textRight >= 170 ? { left: textRight + 12, right: w - 10 } : { left: 8, right: w - 8 };
+    const span = Math.min(w - 16, 420);
+    const arena = { left: Math.round((w - span) / 2), right: Math.round((w + span) / 2) };
 
     view.stage = new Stage(canvas, scale);
     if (have.has(DECOR.night)) {
@@ -119,7 +118,7 @@ function createHero(canvas, signal) {
     if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
     view.feel = createFeel();
     view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id) });
-    view.layout = { scale, w, h, ground, stars: stars(w, ground) };
+    view.layout = { scale, w, h, ground, scene: createScene(w, h, ground) };
     // a still frame shows the fight under way
     if (reduceMotion) {
       for (let i = 0; i < 6 * 30; i++) play(step(view.duel, 1 / 30));
@@ -140,7 +139,7 @@ function createHero(canvas, signal) {
   }
 
   view.step = (dt) => {
-    const { scale, w, h, ground, stars: dots } = view.layout;
+    const { scale, w, h, ground, scene } = view.layout;
     // a blow stops the fight and its effects together for a few frames; a knockout plays out slowed
     const run = advance(view.feel, dt);
     const commands = step(view.duel, run);
@@ -148,22 +147,12 @@ function createHero(canvas, signal) {
     react(view.feel, commands);
     view.stage.update(reduceMotion ? 0 : run);
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = COLORS.sky;
+    ctx.fillStyle = BACKDROP;
     ctx.fillRect(0, 0, w * scale, h * scale);
     ctx.save();
     const [sx, sy] = shake(view.feel, Math.random);
     ctx.translate(sx * scale, sy * scale);
-    ctx.fillStyle = COLORS.star;
-    for (const [x, y, a] of dots) {
-      ctx.globalAlpha = a;
-      ctx.fillRect(x * scale, y * scale, scale, scale);
-    }
-    ctx.globalAlpha = 1;
-    // wider and deeper than the canvas by the most the screen shakes
-    ctx.fillStyle = COLORS.ground;
-    ctx.fillRect(-4 * scale, ground * scale, (w + 8) * scale, (h - ground + 4) * scale);
-    ctx.fillStyle = COLORS.edge;
-    ctx.fillRect(-4 * scale, ground * scale, (w + 8) * scale, scale);
+    drawScene(ctx, scene, view.duel.time, scale);
     view.stage.drawLayer("back");
     // an ultimate darkens the world behind the fighters and the magic
     const dark = dusk(view.feel);
@@ -175,7 +164,7 @@ function createHero(canvas, signal) {
     view.stage.drawLayer("front");
     drawNumbers(ctx, numbers(view.feel), view.duel, scale);
     ctx.restore();
-    drawBars(ctx, view.duel, scale, NAMES);
+    drawBars(ctx, view.duel, scale);
   };
 
   let pending = null;
@@ -188,17 +177,6 @@ function createHero(canvas, signal) {
 
   build();
   return view;
-}
-
-/** Sky dots from a fixed hash, so the sky is the same on every load. */
-function stars(w, ground) {
-  const out = [];
-  let s = 7;
-  const next = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
-  for (let i = 0; i < Math.floor((w * ground) / 260); i++) {
-    out.push([Math.floor(next() * w), Math.floor(next() * (ground - 30)), 0.25 + next() * 0.5]);
-  }
-  return out;
 }
 
 // ---------- effect tiles ----------
