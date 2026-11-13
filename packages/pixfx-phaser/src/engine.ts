@@ -48,11 +48,16 @@ export interface Engine {
 /** The engine over an initialised wasm module (`memory` is what its default init resolved to). */
 export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engine {
   const ids = z.array(z.string()).parse(wasm.effects());
+  const isEffectId = (id: string): id is Wasm.EffectId => ids.includes(id);
+  const effectId = (id: string): Wasm.EffectId => {
+    if (!isEffectId(id)) throw new Error(`pixfx: unknown effect "${id}"`);
+    return id;
+  };
   return {
     effects: () => ids,
-    meta: (id) => effectMetaSchema.parse(wasm.meta(id)),
+    meta: (id) => effectMetaSchema.parse(wasm.meta(effectId(id))),
     create: (id, opts) => {
-      const fx = new wasm.Fx(id, opts);
+      const fx = new wasm.Fx(effectId(id), opts);
       const bytes = fx.width() * fx.height() * 4;
       // A view on wasm memory, made after the call: a call may grow the memory and detach older buffers.
       const view = (ptr: number): Uint8ClampedArray => new Uint8ClampedArray(memory.buffer, ptr, bytes);

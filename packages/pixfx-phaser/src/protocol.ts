@@ -1,5 +1,6 @@
 // Messages between the main thread and an effect worker. Both sides parse what they receive.
 import { z } from "zod";
+import { engineOptionsSchema } from "./options";
 
 const handle = z.number().int().nonnegative();
 const buffer = z.instanceof(ArrayBuffer);
@@ -11,7 +12,7 @@ export type FrameBuffers = z.infer<typeof frameBuffersSchema>;
 const spawnSchema = z.object({
   handle,
   id: z.string(),
-  opts: z.record(z.string(), z.unknown()),
+  opts: engineOptionsSchema,
   /** The effect's authored frame rate: the worker draws only on a new frame of it. */
   fps: z.number().positive(),
 });

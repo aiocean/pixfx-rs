@@ -1,6 +1,10 @@
 import { z } from "zod";
+import type { FxOptions } from "../wasm/pixfx_wasm.js";
 
-const playOptionsSchema = z.looseObject({
+// An effect's own option, as the engine takes it (`FxOptions`): a number, a colour, a list of colours or a flag.
+const ownOption = z.union([z.number(), z.string(), z.array(z.string()), z.boolean()]);
+
+const playOptionsSchema = z.object({
   seed: z.number().int().nonnegative().optional(),
   flip: z.boolean().optional(),
   angle: z.number().optional(),
@@ -9,10 +13,22 @@ const playOptionsSchema = z.looseObject({
   palette: z.array(z.string()).optional(),
   scrollFactor: z.number().default(1),
   depth: z.object({ back: z.number(), front: z.number() }).optional(),
-});
+}).catchall(ownOption);
 
 export type PlayOptions = z.infer<typeof playOptionsSchema>;
-export type EngineOptions = Record<string, unknown>;
+export type EngineOptions = FxOptions;
+
+/** Engine options as they cross to a worker: the ones every effect reads, `margin`, and the effect's own. */
+export const engineOptionsSchema = z
+  .object({
+    margin: z.number().optional(),
+    seed: z.number().optional(),
+    flip: z.boolean().optional(),
+    angle: z.number().optional(),
+    light: z.number().optional(),
+    palette: z.array(z.string()).optional(),
+  })
+  .catchall(ownOption.optional());
 
 /** Parse untrusted play options; throws an Error naming the offending field. */
 export function parsePlayOptions(input: unknown): PlayOptions {
