@@ -292,6 +292,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pixfx-fighter"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "pixfx-core",
+]
+
+[[package]]
 name = "pixfx-wasm"
 version = "0.1.0"
 dependencies = [

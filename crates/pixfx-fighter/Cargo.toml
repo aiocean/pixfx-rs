@@ -1,0 +1,13 @@
+[package]
+name = "pixfx-fighter"
+description = "Pixel fighters for pixfx: a drawn fighter with its poses, a body that takes hits like a fighting game's, the screen's answer to a blow, and the marks that hang on a fighter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm.workspace = true
+pixfx-core = { path = "../pixfx-core" }
+
+[lints]
+workspace = true
