@@ -188,6 +188,12 @@ impl Options {
             _ => default,
         }
     }
+
+    /// [`Options::num_or`] held to `lo..=hi`, for an option that sizes a loop: an effect names the largest value
+    /// it draws in reasonable time, so a huge number cannot hang it. NaN stays NaN, which draws nothing.
+    pub fn num_in(&self, key: &str, default: f64, lo: f64, hi: f64) -> f64 {
+        clamp(self.num_or(key, default), lo, hi)
+    }
 }
 
 /// A live effect: pixelfx `createFx`.

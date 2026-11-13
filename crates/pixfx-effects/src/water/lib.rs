@@ -8,7 +8,7 @@
 
 use pixfx_core::Painter;
 use pixfx_core::color::{Rgba, WHITE};
-use pixfx_core::math::js_min;
+use pixfx_core::math::{js_min, or_one};
 
 /// Water, deep to white: deep color only in shadow, tinted middles, white crests.
 pub const WATER: [Rgba; 8] = [
@@ -28,7 +28,7 @@ pub const WATER: [Rgba; 8] = [
 #[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
 pub fn bead(p: &mut Painter, x: f64, y: f64, vx: f64, vy: f64, s: f64, c: &[Rgba; 8], a: f64) {
     let h = libm::hypot(vx, vy);
-    let sp = if h == 0.0 || h.is_nan() { 1.0 } else { h };
+    let sp = or_one(h);
     let (ux, uy) = (vx / sp, vy / sp);
     let tail = js_min(5.0, sp * 0.011);
     if tail >= 1.0 {

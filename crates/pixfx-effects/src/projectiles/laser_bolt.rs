@@ -1,5 +1,7 @@
 //! Laser bolt: port of pixelfx `src/fx/projectiles/laser-bolt.js`.
 //!
+//! Beyond pixelfx: the `length` option is held to 0..=4096 px, so a huge number cannot hang the draw.
+//!
 //! The banded body, travelling pulses and spiralling sparks follow Sprite Fusion's open-source energy beam
 //! (https://www.spritefusion.com/pixel-art-vfx/energy), MIT License, Copyright (c) 2026 Hugo Duprez.
 
@@ -46,6 +48,8 @@ const PALETTE: [Rgba; 8] = [
     Rgba::hex24(0xffffff),
 ];
 const LENGTH: f64 = 40.0;
+/// The longest bolt drawn (beyond pixelfx, which draws any length; see the module doc).
+const MAX_LENGTH: f64 = 4096.0;
 
 impl Effect for LaserBolt {
     fn meta(&self) -> &Meta {
@@ -54,7 +58,7 @@ impl Effect for LaserBolt {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
-            length: opts.num_or("length", LENGTH),
+            length: opts.num_in("length", LENGTH, 0.0, MAX_LENGTH),
             seed: seed as f64,
         })
     }

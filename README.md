@@ -56,8 +56,9 @@ git -C /tmp/pixelfx checkout 044e12a
 cargo run -p pixfx-cli -- parity fire/candle --pixelfx /tmp/pixelfx --out target/parity
 ```
 
-The ports match pixelfx commit `044e12a` (0.3.1); a later pixelfx may have changed an effect. A few effects
-differ from pixelfx in a handful of pixels, because libm `pow` and V8 `Math.pow` can disagree in the last bit.
+The ports match pixelfx commit `044e12a` (0.3.1); a later pixelfx may have changed an effect. Only `water/water-jet`
+differs from pixelfx, in 0.01% of its colour pixels, because libm `pow` and V8 `Math.pow` can disagree in the last bit;
+the other 24 effects match pixel for pixel.
 
 It prints `colour x% differ, light y% differ` and `PASS` or `FAIL` (gate: both at most 0.5%), and writes a
 side-by-side `target/parity/<id>.side.gif`. Without `--pixelfx` it uses `$PIXELFX`, then `./pixelfx`. Exit

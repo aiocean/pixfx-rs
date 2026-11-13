@@ -8,7 +8,7 @@ use core::f64::consts::{FRAC_PI_2, PI};
 
 use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::math::{
-    Rng, TAU, clamp, ease, js_max, js_min, js_round, rand, seg, smooth, to_uint32,
+    Rng, TAU, clamp, ease, js_max, js_min, js_round, js_sign, rand, seg, smooth, to_uint32,
 };
 use pixfx_core::sim::{
     Bit, BitKind, Bits, GRAVITY, Kind, Lights, Particles, ParticlesOpts, Spawn, band, sparkle,
@@ -131,17 +131,6 @@ fn icicle(p: &mut Painter, c: &[Rgba; 8], x: f64, top: f64, len: f64, w: f64, o:
             None
         },
     );
-}
-
-/// JS `Math.sign` for the whole numbers used here.
-fn sign(x: f64) -> f64 {
-    if x > 0.0 {
-        1.0
-    } else if x < 0.0 {
-        -1.0
-    } else {
-        0.0
-    }
 }
 
 /// One bit of the rime it hangs from: a frosted crust with stubs of older icicles.
@@ -636,7 +625,7 @@ impl EffectState for State {
                         let n = js_round((1.0 + rand(&[x, 3.0]) * 2.5) * (1.0 - d));
                         let mut j = 1.0;
                         while j <= n {
-                            let dx = if j > 1.0 { sign(x) } else { 0.0 };
+                            let dx = if j > 1.0 { js_sign(x) } else { 0.0 };
                             p.dot(x + dx, -j, if j > 1.0 { WHITE } else { c[5] }, a);
                             j += 1.0;
                         }

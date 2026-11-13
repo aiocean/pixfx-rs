@@ -8,7 +8,7 @@
 
 use pixfx_core::Painter;
 use pixfx_core::color::{Rgba, scale};
-use pixfx_core::math::{js_max, js_min, js_round};
+use pixfx_core::math::{js_max, js_min, js_round, or_one};
 
 /// A drifting mote at (x, y) moving (vx, vy) px/s, drawn like the sim's MOTE: bright head, darker tail, light.
 /// JS defaults: `size = 1`, `k = 1`, `glow = 0.4`.
@@ -25,7 +25,7 @@ pub fn mote(
     glow: f64,
 ) {
     let h = libm::hypot(vx, vy);
-    let sp = if h == 0.0 || h.is_nan() { 1.0 } else { h };
+    let sp = or_one(h);
     let (ux, uy) = (vx / sp, vy / sp);
     let len = js_min(16.0, 0.5 + sp * 0.026) * size;
     let a = if k < 0.35 { k / 0.35 } else { 1.0 };

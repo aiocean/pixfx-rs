@@ -8,7 +8,7 @@
 
 use crate::color::{Rgba, WHITE, mix, scale, step_at};
 use crate::effect::Layer;
-use crate::math::{Rng, TAU, clamp, js_max, js_min, js_round};
+use crate::math::{Rng, TAU, clamp, js_max, js_min, js_round, or_one};
 use crate::painter::Painter;
 use core::ops::BitOr;
 
@@ -446,7 +446,7 @@ impl Particles {
     fn draw_one(&self, p: &mut Painter, q: &Particle) {
         let (k, x, y) = (q.life / q.max, q.x, q.y);
         let h = libm::hypot(q.vx, q.vy);
-        let sp = if h > 0.0 { h } else { 1.0 };
+        let sp = or_one(h);
         let (ux, uy) = (q.vx / sp, q.vy / sp);
         let spark = |i: usize| self.sparks.get(i).copied().unwrap_or(Rgba::NONE);
         let spark_tail = self.sparks.last().copied().unwrap_or(Rgba::NONE);

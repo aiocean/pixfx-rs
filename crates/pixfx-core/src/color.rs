@@ -100,7 +100,7 @@ pub fn luma(c: Rgba) -> f64 {
 
 /// Step `i` of a list (JS `list[i]` for an integral `i`): `Rgba::NONE` past its end or for a NaN or negative
 /// index, where JS gives `undefined`, which the painter also draws as nothing.
-pub(crate) fn step_at(list: &[Rgba], i: f64) -> Rgba {
+pub fn step_at(list: &[Rgba], i: f64) -> Rgba {
     if i >= 0.0 {
         list.get(i as usize).copied().unwrap_or(Rgba::NONE)
     } else {

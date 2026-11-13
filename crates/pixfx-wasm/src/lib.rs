@@ -76,7 +76,8 @@ pub struct Fx {
 
 #[wasm_bindgen]
 impl Fx {
-    /// Spawn effect `id`. `opts`: `undefined` or `{margin?, seed?, flip?, angle?, light?, palette?: string[], ...extra}`
+    /// Spawn effect `id`. `opts`: `undefined` or `{margin?, seed?, flip?, angle?, light?, palette?: string[], ...extra}`;
+    /// an extra option is a number, a hex colour string (`"#ff8800"`) or an array of hex colours
     /// (see [`parse_options`]).
     #[wasm_bindgen(constructor)]
     pub fn new(id: &str, opts: JsValue) -> Result<Fx, JsError> {

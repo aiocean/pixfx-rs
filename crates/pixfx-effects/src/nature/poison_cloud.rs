@@ -1,9 +1,14 @@
 //! Poison cloud: port of pixelfx `src/fx/nature/poison-cloud.js`.
+//!
+//! Beyond pixelfx: the `spread` option is held to 0..=16, so a huge number cannot hang the draw.
 
 use pixfx_core::color::{Rgba, ramp};
-use pixfx_core::math::{TAU, clamp, js_max, js_min, js_round, rng, smooth, tile_noise};
+use pixfx_core::math::{TAU, clamp, js_max, js_min, js_round, js_sign, rng, smooth, tile_noise};
 use pixfx_core::particles::cycle;
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+
+/// The widest cloud drawn (beyond pixelfx, which draws any spread; see the module doc).
+const MAX_SPREAD: f64 = 16.0;
 
 pub struct PoisonCloud;
 
@@ -85,7 +90,7 @@ impl Effect for PoisonCloud {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
-            spread: opts.num_or("spread", 1.0),
+            spread: opts.num_in("spread", 1.0, 0.0, MAX_SPREAD),
             seed: seed as f64,
         })
     }
@@ -165,17 +170,6 @@ fn height(sh: &Sheet, si: usize, e: f64, x: f64, ph: f64, tg: &[Tongue], seed: f
     h
 }
 
-/// JS `Math.sign` for a value that is never NaN.
-fn sign(x: f64) -> f64 {
-    if x > 0.0 {
-        1.0
-    } else if x < 0.0 {
-        -1.0
-    } else {
-        x
-    }
-}
-
 /// One sheet: brightest down at the floor where it's lit from within, darkening to violet toward its torn
 /// top, streaked in thin layers, a pale rim along its edge.
 fn sheet(p: &mut Painter, c: &[Rgba; 8], sh: &Sheet, si: usize, e: f64, t: f64, seed: f64) {
@@ -193,7 +187,7 @@ fn sheet(p: &mut Painter, c: &[Rgba; 8], sh: &Sheet, si: usize, e: f64, t: f64, 
         let mut y = top;
         while y <= 1.0 {
             let v = clamp(-y / hh, 0.0, 1.0);
-            let sx = if x == 0.0 { 1.0 } else { sign(x) };
+            let sx = if x == 0.0 { 1.0 } else { js_sign(x) };
             let streak = 0.7
                 + 0.3
                     * tile_noise(

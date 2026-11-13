@@ -13,6 +13,22 @@ pub fn js_round(x: f64) -> f64 {
     if up == 0.0 && x < 0.0 { -0.0 } else { up }
 }
 
+/// JS `Math.sign`: -1, 0 or 1; NaN and a signed zero come back as they are.
+pub fn js_sign(x: f64) -> f64 {
+    if x > 0.0 {
+        1.0
+    } else if x < 0.0 {
+        -1.0
+    } else {
+        x
+    }
+}
+
+/// JS `x || 1`: 0 and NaN are falsy, so they give 1.
+pub fn or_one(x: f64) -> f64 {
+    if x == 0.0 || x.is_nan() { 1.0 } else { x }
+}
+
 /// JS `Math.min(a, b)`: NaN if either is NaN.
 pub fn js_min(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
@@ -403,6 +419,17 @@ mod tests {
         assert_eq!(r.range(-0.4, 0.4), -0.03504624590277672);
         assert_eq!(r.int(3.0, 5.0), 3.0);
         assert_eq!(Rng::new(0).next(), 0.6270739405881613);
+    }
+
+    #[test]
+    fn js_sign_and_or_one_follow_js() {
+        assert_eq!(js_sign(-3.0), -1.0);
+        assert_eq!(js_sign(2.0), 1.0);
+        assert!(js_sign(-0.0).is_sign_negative() && js_sign(-0.0) == 0.0);
+        assert!(js_sign(f64::NAN).is_nan());
+        assert_eq!(or_one(0.0), 1.0);
+        assert_eq!(or_one(f64::NAN), 1.0);
+        assert_eq!(or_one(-2.5), -2.5);
     }
 
     #[test]
