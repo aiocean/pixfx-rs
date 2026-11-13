@@ -2,13 +2,15 @@
 // throttle (4× is Chrome's mid-range phone setting), with effects drawn on the main thread (`workers=0`) and on
 // the default worker pool, profile one load per throttle and pool, and print the tables. Chrome throttles the
 // page only, never a worker, so at 4× each worker batch is stretched 4× too (`slowdown=4`).
+// Vite serves `src/` live, so run it from a tree no other session is editing (a worktree): a file saved half-written
+// stops the page, and a wait that times out prints the page errors it saw.
 // Env: PIXFX_CHROME (Chrome binary), PIXFX_PERF_COUNTS (e.g. "10,50,100"), PIXFX_PERF_PROFILE_N (default 100).
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import type { Browser } from "./cdp";
-import { launchChrome } from "./cdp";
+import { launchChrome, timeoutMessage } from "./cdp";
 import type { Category } from "./profile";
 import { CATEGORIES, categoryTimes, cpuProfileSchema } from "./profile";
 import { ROOT, startServer } from "./server";
@@ -58,10 +60,11 @@ async function waitFor(b: Browser, expression: string, timeoutMs: number): Promi
     if ((await b.evaluate(expression)) === true) return;
     await Bun.sleep(250);
   }
-  throw new Error(`perf: timed out waiting for ${expression}`);
+  throw new Error(timeoutMessage(expression, b.takeErrors()));
 }
 
 async function open(b: Browser, query: string): Promise<void> {
+  b.takeErrors(); // errors of the page being left are not this page's
   await b.send("Page.navigate", { url: `${ROOT}/stress.html?${query}` });
   await Bun.sleep(300);
   await waitFor(b, "window.pixfxStress !== undefined", 20000);
@@ -109,6 +112,7 @@ async function main(): Promise<void> {
   const profiles: ProfileRow[] = [];
   try {
     await b.send("Page.enable");
+    await b.watchErrors();
     await b.send("Page.bringToFront");
     console.log(`browser: ${String(await b.evaluate("navigator.userAgent"))}`);
     console.log(`navigator.hardwareConcurrency: ${String(await b.evaluate("navigator.hardwareConcurrency"))}`);

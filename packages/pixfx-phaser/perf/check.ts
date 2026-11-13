@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import type { Browser } from "./cdp";
-import { launchChrome } from "./cdp";
+import { launchChrome, timeoutMessage } from "./cdp";
 import { ROOT, startServer } from "./server";
 
 const CDP_PORT = 9334;
@@ -17,7 +17,7 @@ async function waitFor(b: Browser, expression: string, timeoutMs: number): Promi
     if ((await b.evaluate(expression)) === true) return;
     await Bun.sleep(100);
   }
-  throw new Error(`check: timed out waiting for ${expression}`);
+  throw new Error(timeoutMessage(expression, b.takeErrors()));
 }
 
 async function screenshot(b: Browser): Promise<string> {
@@ -94,6 +94,7 @@ async function main(): Promise<void> {
   };
   try {
     await b.send("Page.enable");
+    await b.watchErrors();
     await b.send("Page.bringToFront");
     await b.send("Page.navigate", { url: `${ROOT}/index.html` });
     await waitFor(b, "window.pixfxDemo !== undefined && window.pixfxDemo.events.includes('create')", 20000);

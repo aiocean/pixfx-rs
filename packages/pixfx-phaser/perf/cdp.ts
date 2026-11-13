@@ -18,11 +18,50 @@ const evaluateSchema = z.object({
   exceptionDetails: z.unknown().optional(),
 });
 
+const eventSchema = z.object({ method: z.string(), params: z.unknown() });
+const exceptionSchema = z.object({
+  exceptionDetails: z.object({ text: z.string(), exception: z.object({ description: z.string().optional() }).optional() }),
+});
+const consoleSchema = z.object({
+  type: z.string(),
+  args: z.array(z.object({ value: z.unknown().optional(), description: z.string().optional() })),
+});
+const logSchema = z.object({ entry: z.object({ level: z.string(), text: z.string(), url: z.string().optional() }) });
+
+/** The error a CDP event reports from the page (an uncaught exception, `console.error`, a failed load), or null. */
+export function pageError(method: string, params: unknown): string | null {
+  if (method === "Runtime.exceptionThrown") {
+    const p = exceptionSchema.safeParse(params);
+    return p.success ? (p.data.exceptionDetails.exception?.description ?? p.data.exceptionDetails.text) : null;
+  }
+  if (method === "Runtime.consoleAPICalled") {
+    const p = consoleSchema.safeParse(params);
+    if (!p.success || p.data.type !== "error") return null;
+    return p.data.args.map((a) => a.description ?? String(a.value)).join(" ");
+  }
+  if (method === "Log.entryAdded") {
+    const p = logSchema.safeParse(params);
+    if (!p.success || p.data.entry.level !== "error") return null;
+    return p.data.entry.url === undefined ? p.data.entry.text : `${p.data.entry.text} (${p.data.entry.url})`;
+  }
+  return null;
+}
+
+/** What a wait that timed out says: the expression, and the page errors seen while waiting. */
+export function timeoutMessage(expression: string, errors: readonly string[]): string {
+  const head = `perf: timed out waiting for ${expression}`;
+  return errors.length === 0 ? `${head}; the page reported no errors` : `${head}; page errors:\n${errors.map((e) => `  ${e}`).join("\n")}`;
+}
+
 export interface Browser {
   /** Send one CDP command to the page; resolves with its `result`. */
   send(method: string, params?: Record<string, unknown>): Promise<unknown>;
   /** Evaluate `expression` in the page (promises awaited) and return its JSON value. */
   evaluate(expression: string): Promise<unknown>;
+  /** Page errors seen since the last call ([`pageError`]); the list is empty afterwards. Needs `watchErrors()`. */
+  takeErrors(): string[];
+  /** Start collecting page errors (enables the Runtime and Log domains). */
+  watchErrors(): Promise<void>;
   close(): void;
 }
 
@@ -66,8 +105,16 @@ export async function launchChrome(port: number): Promise<Browser> {
   });
   let nextId = 0;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; method: string }>();
+  let errors: string[] = [];
   ws.addEventListener("message", (e) => {
-    const reply = replySchema.safeParse(JSON.parse(String(e.data)));
+    const data: unknown = JSON.parse(String(e.data));
+    const event = eventSchema.safeParse(data);
+    if (event.success) {
+      const error = pageError(event.data.method, event.data.params);
+      if (error !== null) errors.push(error);
+      return;
+    }
+    const reply = replySchema.safeParse(data);
     if (!reply.success || reply.data.id === undefined) return;
     const p = pending.get(reply.data.id);
     if (!p) return;
@@ -87,6 +134,15 @@ export async function launchChrome(port: number): Promise<Browser> {
       const r = evaluateSchema.parse(await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }));
       if (r.exceptionDetails !== undefined) throw new Error(`perf: page threw: ${JSON.stringify(r.exceptionDetails)}`);
       return r.result.value;
+    },
+    takeErrors() {
+      const taken = errors;
+      errors = [];
+      return taken;
+    },
+    async watchErrors() {
+      await send("Runtime.enable");
+      await send("Log.enable");
     },
     close() {
       ws.close();
