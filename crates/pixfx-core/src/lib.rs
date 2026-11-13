@@ -7,7 +7,9 @@ pub mod effect;
 pub mod frame;
 pub mod math;
 pub mod painter;
+pub mod particles;
 pub mod render;
+pub mod shapes;
 pub mod sim;
 
 pub use color::{ColorError, Rgba, hex};
