@@ -4,13 +4,16 @@
 import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 import { DECOR, createDuel, step } from "./duel.js";
 import { BARS_TALL, drawBars, drawFighter, drawNumbers, drawStreaks } from "./duel-art.js";
-import { advance, createFeel, dusk, numbers, react, shake, streaks } from "./duel-feel.js";
+import { DUSK, advance, createFeel, dusk, numbers, react, shake, streaks } from "./duel-feel.js";
 import { createScene, drawScene } from "./duel-scene.js";
+import { createLights, drawLights, fade, kindle } from "./duel-light.js";
 
 /** Behind the hero's scene while the screen shakes. */
 const BACKDROP = "#0b0a1c";
 /** The effect tiles' sky and floor. */
 const COLORS = { sky: "#13101b", ground: "#1e1a24" };
+/** How tall the film bars an ultimate brings in are, in game pixels, at the sky's darkest. */
+const LETTERBOX = 12;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const PALETTES = {
@@ -58,23 +61,32 @@ export async function mount() {
   for (const id of effects()) views.push(createTile(gallery, id));
 
   let last = null;
-  let heroVisible = true;
   let running = true;
-  const seen = new IntersectionObserver(([e]) => { heroVisible = e.isIntersecting; });
-  seen.observe(hero.canvas);
+  // only what is on screen plays: a tile scrolled out of view, or the hero, waits where it was
+  const visible = new Set([hero.canvas]);
+  const seen = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) visible.add(e.target);
+      else visible.delete(e.target);
+    }
+  });
+  for (const v of views) seen.observe(v.canvas);
+  const proof = createProof(document.getElementById("proof"), () => views.filter((v) => visible.has(v.canvas)));
 
   // one animation-frame loop for every canvas on the page
   function frame(now) {
     if (!running) return;
     const dt = last === null ? 0 : Math.max(0, now - last) / 1000;
     last = now;
-    for (const v of views) if (v !== hero || heroVisible) v.step(dt);
+    for (const v of views) if (visible.has(v.canvas)) v.step(dt);
+    proof.frame(now);
     requestAnimationFrame(frame);
   }
 
   if (reduceMotion) {
     // one still frame a second into each effect
     for (const v of views) v.step(1);
+    proof.frame(performance.now(), true);
   } else {
     requestAnimationFrame(frame);
   }
@@ -90,7 +102,7 @@ export async function mount() {
 // ---------- hero ----------
 
 function createHero(canvas, signal) {
-  const view = { canvas, stage: null, duel: null, feel: createFeel(), layout: null, handles: new Map() };
+  const view = { canvas, stage: null, duel: null, feel: createFeel(), lights: createLights(), layout: null, handles: new Map() };
   const have = new Set(effects());
   let seed = 1 + Math.floor(Math.random() * 1e6);
 
@@ -117,6 +129,7 @@ function createHero(canvas, signal) {
     // a brazier at each end of the arena lights it
     if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
     view.feel = createFeel();
+    view.lights = createLights();
     // the bars go just under the page's top bar, which lies over the hero
     // (its links can wrap past its own box on a narrow screen, so measure what is in it)
     const topbar = Math.max(0, ...[...document.querySelectorAll(".topbar, .topbar *")].map((el) => el.getBoundingClientRect().bottom));
@@ -124,7 +137,7 @@ function createHero(canvas, signal) {
     // fighters fly no higher than keeps their heads (about 44 pixels tall) under the bars
     const sky = ground - (barTop + BARS_TALL + 13) - 46;
     view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky });
-    view.layout = { scale, w, h, ground, barTop, scene: createScene(w, h, ground, barTop + BARS_TALL) };
+    view.layout = { scale, w, h, ground, barTop, lamps: [arena.left, arena.right], scene: createScene(w, h, ground, barTop + BARS_TALL) };
     // a still frame shows the fight under way
     if (reduceMotion) {
       for (let i = 0; i < 6 * 30; i++) play(step(view.duel, 1 / 30));
@@ -151,6 +164,8 @@ function createHero(canvas, signal) {
     const commands = step(view.duel, run);
     play(commands);
     react(view.feel, commands);
+    kindle(view.lights, commands, ground, (fx) => meta(fx).loop);
+    fade(view.lights, run);
     view.stage.update(reduceMotion ? 0 : run);
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = BACKDROP;
@@ -167,10 +182,19 @@ function createHero(canvas, signal) {
       ctx.fillRect(-scale * 4, -scale * 4, (w + 8) * scale, (h + 8) * scale);
     }
     for (const f of view.duel.fighters) drawFighter(ctx, f, ground, scale);
+    // the magic lights the dais, the peaks and the fighters in its own colour
+    drawLights(ctx, view.lights, w, h, scale, view.layout.lamps, ground, view.duel.time);
     view.stage.drawLayer("front");
     drawStreaks(ctx, streaks(view.feel), view.duel, scale);
     drawNumbers(ctx, numbers(view.feel), view.duel, scale);
     ctx.restore();
+    // an ultimate frames the screen like a film for as long as the sky is dark
+    if (dark > 0) {
+      const band = Math.round((dark / DUSK.depth) * LETTERBOX);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, w * scale, band * scale);
+      ctx.fillRect(0, (h - band) * scale, w * scale, band * scale);
+    }
     drawBars(ctx, view.duel, scale, view.layout.barTop);
   };
 
@@ -181,6 +205,7 @@ function createHero(canvas, signal) {
   }, { signal });
   signal.addEventListener("abort", () => clearTimeout(pending));
   view.free = () => view.stage?.free();
+  view.playing = () => view.stage?.handles().length ?? 0;
 
   build();
   return view;
@@ -266,6 +291,8 @@ function createTile(parent, id) {
 
   let resting = 0;
   const view = {
+    canvas,
+    playing: () => stage.handles().length,
     step(dt) {
       stage.update(dt);
       // a one-shot is removed once it ends: rest a moment, then play it again
@@ -287,6 +314,58 @@ function createTile(parent, id) {
 
   replay();
   return view;
+}
+
+// ---------- proof ----------
+
+/** Seconds between updates of the proof line, so its numbers can be read. */
+const PROOF_EVERY = 0.5;
+/** A frame further apart than this from the last one came from a hidden or throttled page. */
+const SLOW_FRAME_MS = 50;
+
+/**
+ * The line under the hero that measures this page as it runs: how many effects are playing on screen, the frame
+ * rate the page holds while it plays them, and how big the engine's download was.
+ */
+function createProof(el, onScreen) {
+  let since = null;
+  let prev = null;
+  let frames = 0;
+  const download = engineDownload();
+  const write = (fps) => {
+    const playing = onScreen().reduce((n, v) => n + v.playing(), 0);
+    el.innerHTML =
+      `On your screen, <b>${playing} effects</b> are playing` +
+      (fps ? ` at <b>${fps} frames a second</b>` : "") +
+      (download ? `, all from a <b>${download} KB</b> engine.` : ".");
+  };
+  return {
+    frame(now, still = false) {
+      if (!el) return;
+      if (still) return write(null);
+      // a hidden or throttled page sends frames seconds apart: count only frames that come at a display's pace
+      const steady = prev !== null && now - prev < SLOW_FRAME_MS;
+      prev = now;
+      if (!steady) since = null;
+      if (since === null) {
+        since = now;
+        frames = 0;
+        return;
+      }
+      frames++;
+      if (now - since < PROOF_EVERY * 1000) return;
+      write(Math.round((frames * 1000) / (now - since)));
+      since = now;
+      frames = 0;
+    },
+  };
+}
+
+/** The engine's wasm as it came over the network, in KB, or null when the browser does not say. */
+function engineDownload() {
+  const entry = performance.getEntriesByType("resource").find((e) => e.name.endsWith(".wasm"));
+  const bytes = entry?.encodedBodySize || entry?.transferSize;
+  return bytes ? Math.round(bytes / 1024) : null;
 }
 
 function callText(id, o) {

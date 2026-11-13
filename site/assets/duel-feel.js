@@ -16,7 +16,7 @@ const NUMBER = { rise: 14, life: 0.8 };
 /** A streak of qi from a caster to where its spell lands shows this long. */
 const STREAK = 0.28;
 /** An ultimate dims the sky this much, fading over this many seconds. */
-const DUSK = { depth: 0.55, time: 0.9 };
+export const DUSK = { depth: 0.55, time: 0.9 };
 
 export function createFeel() {
   return { stop: 0, slow: 0, trauma: 0, dusk: 0, numbers: [], streaks: [] };
@@ -41,6 +41,10 @@ export function react(feel, commands) {
     } else if (c.type === "unyielding") {
       feel.stop = Math.max(feel.stop, 0.18);
       feel.trauma = Math.min(1, feel.trauma + 0.4);
+    } else if (c.type === "block") {
+      // a barrier rings: a short stop, a little shake
+      feel.stop = Math.max(feel.stop, 0.05);
+      feel.trauma = Math.min(1, feel.trauma + 0.15);
     } else if (c.type === "clash") {
       feel.stop = Math.max(feel.stop, 0.06);
       feel.trauma = Math.min(1, feel.trauma + 0.25);

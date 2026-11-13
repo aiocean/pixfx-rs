@@ -45,7 +45,7 @@ describe("duel", () => {
 
   test("both schools use their own magic, and only effects that exist", () => {
     const played = new Set();
-    for (const seed of [1, 2, 3]) for (const c of run(arena(seed), 60).commands) if (c.type === "play") played.add(c.fx);
+    for (const seed of [1, 2, 3, 4, 5]) for (const c of run(arena(seed), 90).commands) if (c.type === "play") played.add(c.fx);
     for (const fx of played) expect(PLAN2.has(fx)).toBe(true);
     for (const fx of ["projectiles/laser-bolt", "lightning/ball-lightning", "ice/icicle-fall", "arcane/rune-circle"]) {
       expect(played.has(fx)).toBe(true);
@@ -176,12 +176,58 @@ describe("duel", () => {
     target.x = at === 1 ? 120 : 60;
     shooter.face = Math.sign(target.x - shooter.x);
     target.stats = { ...target.stats, dodge: 0 };
+    // standing on the ground, steady, wherever an earlier bolt threw it
+    Object.assign(target, { air: 0, vy: 0, vx: 0, stun: 0, fly: false });
     setup?.(target);
     shooter.act = { spell: "bolt", phase: "windup", t: SPELLS.bolt.windup - 1 / 60 };
     const hits = [];
     for (let i = 0; i < 40; i++) for (const c of step(duel, 1 / 60)) if (c.type === "hit" || c.type === "unyielding") hits.push(c);
     return hits;
   }
+
+  test("a golden bell turns a bolt aside: no damage gets through", () => {
+    const duel = arena(2);
+    const [thunder] = duel.fighters;
+    const hits = boltOn(duel, 0, (t) => {
+      t.barrier = 2;
+      t.barrierSpell = "bell";
+    });
+    expect(hits).toEqual([]);
+    expect(thunder.hp).toBe(100);
+  });
+
+  test("an ice mirror sends a bolt back into the one who cast it", () => {
+    const duel = arena(2);
+    const [thunder, frost] = duel.fighters;
+    const hits = boltOn(duel, 1, (t) => {
+      t.barrier = 2;
+      t.barrierSpell = "mirror";
+    });
+    expect(frost.hp).toBe(100);
+    expect(hits.some((h) => h.type === "hit" && h.by === 1)).toBe(true);
+    expect(thunder.hp).toBeLessThan(100);
+  });
+
+  test("a golden bell rings back at a blade: the striker is hurt and stunned, the bell's keeper untouched", () => {
+    const duel = arena(2);
+    const [thunder, frost] = duel.fighters;
+    for (const f of duel.fighters) f.think = 1e9;
+    thunder.x = 100;
+    frost.x = 116;
+    frost.face = -1;
+    thunder.face = 1;
+    thunder.stats = { ...thunder.stats, dodge: 0 };
+    frost.stats = { ...frost.stats, dodge: 0 };
+    thunder.barrier = 2;
+    thunder.barrierSpell = "bell";
+    frost.act = { spell: "slash", phase: "windup", t: SPELLS.slash.windup - 1 / 60 };
+    const commands = [];
+    for (let i = 0; i < 3; i++) commands.push(...step(duel, 1 / 60));
+    expect(thunder.hp).toBe(100);
+    expect(frost.hp).toBeLessThan(100);
+    expect(frost.stun).toBeGreaterThan(0.3);
+    expect(commands.some((c) => c.type === "block" && c.by === 0)).toBe(true);
+  });
 
   test("a frost ward takes a blow before life does", () => {
     const duel = arena(2);

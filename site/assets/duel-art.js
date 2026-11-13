@@ -340,6 +340,34 @@ function lum(hex) {
  * it (a flame for a burn, a broken shield for defence down, a seal for silence, a snowflake for a chill) and its
  * fury stacks.
  */
+/**
+ * A barrier: a dome of the school's qi round the body, faint while it waits and flaring white where a blow has just
+ * rung on it. Thunder's golden bell is banded like a bell; Frost's ice mirror is faceted.
+ */
+function dome(box, f, fx, fy) {
+  const c = LOOKS[f.school];
+  const flare = f.rang > 0;
+  const edge = flare ? "#ffffff" : c.glow;
+  const a = flare ? 0.95 : 0.55 + 0.2 * Math.sin(f.poseT * 10);
+  const cy = fy - 20;
+  const rx = 15;
+  const ry = 24;
+  for (let y = -ry; y <= ry; y++) {
+    const half = Math.round(rx * Math.sqrt(1 - (y * y) / (ry * ry)));
+    // the shell's rim, and a faint fill inside
+    box(fx - half, cy + y, 1, 1, edge, a);
+    box(fx + half, cy + y, 1, 1, edge, a);
+    if (half > 1) box(fx - half + 1, cy + y, half * 2 - 1, 1, c.glow, flare ? 0.22 : 0.07);
+    if (f.school === "thunder" ? y % 8 === 0 : (y + Math.round(f.poseT * 12)) % 9 === 0) {
+      // bands across the bell; facets drifting up the mirror
+      const w = f.school === "thunder" ? half * 2 + 1 : Math.max(1, Math.round(half * 0.8));
+      box(fx - (f.school === "thunder" ? half : Math.round(half * 0.4)), cy + y, w, 1, edge, a * 0.45);
+    }
+  }
+  box(fx - 3, cy - ry, 7, 1, edge, a);
+  box(fx - 3, cy + ry, 7, 1, edge, a);
+}
+
 function drawStatus(ctx, f, ground, s) {
   const fx = Math.round(f.x);
   const fy = Math.round(ground - f.air);
@@ -357,6 +385,7 @@ function drawStatus(ctx, f, ground, s) {
     box(fx + 12, fy - 40, 1, 41, "#a6ecff", a);
     box(fx - 11, fy - 40, 23, 41, "#a6ecff", 0.08);
   }
+  if (f.barrier > 0) dome(box, f, fx, fy);
   const marks = [];
   if (f.burn) marks.push("burn");
   if (f.defDown > 0) marks.push("defDown");
