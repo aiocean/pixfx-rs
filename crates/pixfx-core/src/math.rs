@@ -218,6 +218,170 @@ pub fn noise2(x: f64, y: f64, seed: f64) -> f64 {
     lerp(lerp(a, b, ux), lerp(c, d, ux), uy) * 2.0 - 1.0
 }
 
+/// Fractal 2D noise in about [-1, 1] (pixelfx `fbm`; its defaults are `seed = 0`, `octaves = 3`).
+pub fn fbm(mut x: f64, mut y: f64, seed: f64, octaves: u32) -> f64 {
+    let (mut s, mut a, mut n) = (0.0, 0.5, 0.0);
+    for o in 0..octaves {
+        s += noise2(x, y, seed + f64::from(o) * 101.0) * a;
+        n += a;
+        x *= 2.03;
+        y *= 2.03;
+        a *= 0.5;
+    }
+    s / n
+}
+
+/// 2D value noise whose lattice repeats every `px` cells in x and `py` cells in y (0: no repeat; pixelfx
+/// `tileNoise`). Scroll it by exactly `py` cells over a loop and the loop has no seam.
+pub fn tile_noise(x: f64, y: f64, px: f64, py: f64, seed: f64) -> f64 {
+    let (ix, iy) = (libm::floor(x), libm::floor(y));
+    let (fx, fy) = (x - ix, y - iy);
+    let ux = fx * fx * (3.0 - 2.0 * fx);
+    let uy = fy * fy * (3.0 - 2.0 * fy);
+    let cell = |i: f64, period: f64| if period != 0.0 { wrap(i, period) } else { i };
+    let (x0, x1) = (cell(ix, px), cell(ix + 1.0, px));
+    let (y0, y1) = (cell(iy, py), cell(iy + 1.0, py));
+    let a = rand(&[x0, y0, seed]);
+    let b = rand(&[x1, y0, seed]);
+    let c = rand(&[x0, y1, seed]);
+    let d = rand(&[x1, y1, seed]);
+    lerp(lerp(a, b, ux), lerp(c, d, ux), uy) * 2.0 - 1.0
+}
+
+/// Fractal [`tile_noise`]: every octave keeps the repeat, so scrolled fields still loop (pixelfx `tileFbm`).
+pub fn tile_fbm(x: f64, y: f64, px: f64, py: f64, seed: f64, octaves: u32) -> f64 {
+    let (mut s, mut a, mut n, mut k) = (0.0, 0.5, 0.0, 1.0);
+    for o in 0..octaves {
+        s += tile_noise(x * k, y * k, px * k, py * k, seed + f64::from(o) * 101.0) * a;
+        n += a;
+        a *= 0.5;
+        k *= 2.0;
+    }
+    s / n
+}
+
+/// Noise that loops: the same value at phase 0 and phase 1 (pixelfx `loopNoise`).
+pub fn loop_noise(phase: f64, radius: f64, seed: f64) -> f64 {
+    let a = phase * TAU;
+    noise2(
+        libm::cos(a) * radius + 50.0,
+        libm::sin(a) * radius + 50.0,
+        seed,
+    )
+}
+
+/// Easing curves (pixelfx `ease`): input 0..1, output 0..1 (back and elastic overshoot).
+pub mod ease {
+    use super::TAU;
+    use core::f64::consts::PI;
+
+    /// Default overshoot of [`in_back`] and [`out_back`] (the JS default `s = 1.70158`).
+    pub const BACK_S: f64 = 1.70158;
+
+    pub fn linear(t: f64) -> f64 {
+        t
+    }
+    pub fn in_quad(t: f64) -> f64 {
+        t * t
+    }
+    pub fn out_quad(t: f64) -> f64 {
+        1.0 - (1.0 - t) * (1.0 - t)
+    }
+    pub fn in_out_quad(t: f64) -> f64 {
+        if t < 0.5 {
+            2.0 * t * t
+        } else {
+            1.0 - libm::pow(-2.0 * t + 2.0, 2.0) / 2.0
+        }
+    }
+    pub fn in_cubic(t: f64) -> f64 {
+        t * t * t
+    }
+    pub fn out_cubic(t: f64) -> f64 {
+        1.0 - libm::pow(1.0 - t, 3.0)
+    }
+    pub fn in_out_cubic(t: f64) -> f64 {
+        if t < 0.5 {
+            4.0 * t * t * t
+        } else {
+            1.0 - libm::pow(-2.0 * t + 2.0, 3.0) / 2.0
+        }
+    }
+    pub fn in_quart(t: f64) -> f64 {
+        t * t * t * t
+    }
+    pub fn out_quart(t: f64) -> f64 {
+        1.0 - libm::pow(1.0 - t, 4.0)
+    }
+    pub fn in_expo(t: f64) -> f64 {
+        if t <= 0.0 {
+            0.0
+        } else {
+            libm::pow(2.0, 10.0 * t - 10.0)
+        }
+    }
+    pub fn out_expo(t: f64) -> f64 {
+        if t >= 1.0 {
+            1.0
+        } else {
+            1.0 - libm::pow(2.0, -10.0 * t)
+        }
+    }
+    pub fn in_sine(t: f64) -> f64 {
+        1.0 - libm::cos((t * PI) / 2.0)
+    }
+    pub fn out_sine(t: f64) -> f64 {
+        libm::sin((t * PI) / 2.0)
+    }
+    pub fn in_out_sine(t: f64) -> f64 {
+        -(libm::cos(PI * t) - 1.0) / 2.0
+    }
+    /// `s` is the overshoot; pass [`BACK_S`] for pixelfx's default.
+    pub fn in_back(t: f64, s: f64) -> f64 {
+        if t <= 0.0 {
+            0.0
+        } else if t >= 1.0 {
+            1.0
+        } else {
+            (s + 1.0) * t * t * t - s * t * t
+        }
+    }
+    /// `s` is the overshoot; pass [`BACK_S`] for pixelfx's default.
+    pub fn out_back(t: f64, s: f64) -> f64 {
+        if t <= 0.0 {
+            0.0
+        } else if t >= 1.0 {
+            1.0
+        } else {
+            1.0 + (s + 1.0) * libm::pow(t - 1.0, 3.0) + s * libm::pow(t - 1.0, 2.0)
+        }
+    }
+    pub fn out_elastic(t: f64) -> f64 {
+        if t <= 0.0 {
+            0.0
+        } else if t >= 1.0 {
+            1.0
+        } else {
+            libm::pow(2.0, -10.0 * t) * libm::sin((t * 10.0 - 0.75) * (TAU / 3.0)) + 1.0
+        }
+    }
+    pub fn out_bounce(t: f64) -> f64 {
+        let (n, d) = (7.5625, 2.75);
+        if t < 1.0 / d {
+            n * t * t
+        } else if t < 2.0 / d {
+            let u = t - 1.5 / d;
+            n * u * u + 0.75
+        } else if t < 2.5 / d {
+            let u = t - 2.25 / d;
+            n * u * u + 0.9375
+        } else {
+            let u = t - 2.625 / d;
+            n * u * u + 0.984375
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
