@@ -14,8 +14,9 @@ const FX = {
 };
 /** Game pixel to CSS pixels for the cursor, click and press fx. */
 const SCALE = 2;
-/** Where the wisp floats relative to the pointer, in game pixels, so it never hides what is pointed at. */
-const WISP_OFFSET = { x: 10, y: 14 };
+/** Where the wisp's origin goes relative to the pointer, in game pixels. The wisp hovers 36 pixels over its origin
+ *  (its `hover` option), so this puts it just up and right of the pointer's tip, clear of the arrow. */
+const WISP_OFFSET = { x: 4, y: 28 };
 /** How far above its origin parry's blades clash, in game pixels (its `height` option). */
 const CLASH_HEIGHT = 30;
 /** burn-away's screen, and when its cover starts to smoulder and burn open from the hole (pixelfx

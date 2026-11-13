@@ -2,6 +2,11 @@
 // The page owns one animation-frame loop: for each canvas it fills the ground, draws the effects' back layers,
 // draws its own sprites, then the front layers.
 import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
+import { DECOR, createDuel, step } from "./duel.js";
+import { drawBars, drawFighter } from "./duel-art.js";
+
+/** The two cultivators, by school, as the bars name them. */
+const NAMES = ["Thunder", "Frost"];
 
 const COLORS = { sky: "#13101b", ground: "#1e1a24", edge: "#2f2a38", star: "#f0dcc0" };
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -66,7 +71,7 @@ export async function mount() {
   }
 
   if (reduceMotion) {
-    // one still frame a second into each effect; clicks still add candles
+    // one still frame a second into each effect
     for (const v of views) v.step(1);
     document.getElementById("hint").textContent = "Animation is off because your system asks for reduced motion.";
   } else {
@@ -84,11 +89,14 @@ export async function mount() {
 // ---------- hero ----------
 
 function createHero(canvas, signal) {
-  const view = { canvas, stage: null, extra: [], layout: null };
+  const view = { canvas, stage: null, duel: null, layout: null, handles: new Map() };
   const copy = document.querySelector(".hero-copy");
+  const have = new Set(effects());
+  let seed = 1 + Math.floor(Math.random() * 1e6);
 
   function build() {
     view.stage?.free();
+    view.handles.clear();
     const narrow = innerWidth < 760;
     const scale = narrow ? 2 : 3;
     const rect = canvas.getBoundingClientRect();
@@ -97,35 +105,42 @@ function createHero(canvas, signal) {
     canvas.width = w * scale;
     canvas.height = h * scale;
     const ground = h - (narrow ? 8 : 18);
-    const textRight = narrow ? 0 : (copy.getBoundingClientRect().right - rect.left) / scale;
-    const room = w - textRight;
-
-    // fires to the right of the headline; fewer when there is less room
-    let placed;
-    if (room >= 250) {
-      const at = (f) => Math.round(textRight + room * f);
-      placed = [["fire/candle", at(0.2)], ["fire/campfire", at(0.5)], ["fire/brazier", at(0.82)]];
-    } else if (narrow) {
-      placed = [["fire/candle", Math.round(w * 0.22)], ["fire/campfire", Math.round(w * 0.62)]];
-    } else {
-      placed = [["fire/campfire", Math.round(w - 80)]];
-    }
+    // the arena is right of the headline; on a narrow screen, under it, the whole width
+    const textRight = narrow ? 0 : Math.ceil((copy.getBoundingClientRect().right - rect.left) / scale);
+    const lampInset = 14;
+    const arena = w - textRight >= 170 ? { left: textRight + 12, right: w - 10 } : { left: 8, right: w - 8 };
 
     view.stage = new Stage(canvas, scale);
-    // fireflies drift over the whole scene once the effect is ported: one 320-wide field after another
-    if (effects().includes("weather/fireflies")) {
-      for (let x = 160; x - 160 < w; x += 320) view.stage.play("weather/fireflies", x, ground, { seed: x });
+    if (have.has(DECOR.night)) {
+      for (let x = 160; x - 160 < w; x += 320) view.stage.play(DECOR.night, x, ground, { seed: x });
     }
-    for (const [id, x] of placed) view.stage.play(id, x, ground, undefined);
-    const campfire = placed.find(([id]) => id === "fire/campfire");
-    view.layout = { scale, w, h, ground, traveller: campfire ? campfire[1] - 20 : null, stars: stars(w, ground) };
-    view.extra = [];
-    if (reduceMotion) view.step(1);
+    // a brazier at each end of the arena lights it
+    if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
+    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id) });
+    view.layout = { scale, w, h, ground, stars: stars(w, ground) };
+    // a still frame shows the fight under way
+    if (reduceMotion) {
+      for (let i = 0; i < 6 * 30; i++) play(step(view.duel, 1 / 30));
+      view.step(0);
+    }
+  }
+
+  /** The duel's effect commands, on the stage. */
+  function play(commands) {
+    for (const c of commands) {
+      if (c.type === "play") view.handles.set(c.key, view.stage.play(c.fx, c.x, c.y, c.opts));
+      else if (c.type === "move" && view.handles.has(c.key)) view.stage.move(view.handles.get(c.key), c.x, c.y);
+      else if (c.type === "stop" && view.handles.has(c.key)) {
+        view.stage.stop(view.handles.get(c.key));
+        view.handles.delete(c.key);
+      }
+    }
   }
 
   view.step = (dt) => {
-    const { scale, w, h, ground, traveller, stars: dots } = view.layout;
-    view.stage.update(dt);
+    const { scale, w, h, ground, stars: dots } = view.layout;
+    play(step(view.duel, dt));
+    view.stage.update(reduceMotion ? 0 : dt);
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = COLORS.sky;
     ctx.fillRect(0, 0, w * scale, h * scale);
@@ -140,18 +155,10 @@ function createHero(canvas, signal) {
     ctx.fillStyle = COLORS.edge;
     ctx.fillRect(0, ground * scale, w * scale, scale);
     view.stage.drawLayer("back");
-    if (traveller !== null) drawTraveller(ctx, traveller, ground, scale);
+    for (const f of view.duel.fighters) drawFighter(ctx, f, ground, scale);
     view.stage.drawLayer("front");
+    drawBars(ctx, view.duel, scale, NAMES);
   };
-
-  canvas.addEventListener("click", (e) => {
-    const { scale, ground } = view.layout;
-    const x = (e.offsetX * canvas.width) / canvas.clientWidth / scale;
-    view.extra.push(view.stage.play("fire/candle", x, ground, { seed: Math.floor(Math.random() * 1e6) }));
-    // keep six placed candles at most: the oldest fades out and removes itself
-    if (view.extra.length > 6) view.stage.stop(view.extra.shift());
-    if (reduceMotion) view.step(1);
-  });
 
   let pending = null;
   addEventListener("resize", () => {
@@ -174,22 +181,6 @@ function stars(w, ground) {
     out.push([Math.floor(next() * w), Math.floor(next() * (ground - 30)), 0.25 + next() * 0.5]);
   }
   return out;
-}
-
-/** A small traveller in a cloak, feet at (x, ground), drawn between the effects' back and front layers. */
-function drawTraveller(ctx, x, ground, s) {
-  const px = (dx, dy, w, h, c) => {
-    ctx.fillStyle = c;
-    ctx.fillRect((x + dx) * s, (ground + dy) * s, w * s, h * s);
-  };
-  px(-3, -10, 7, 9, "#3a3346"); // cloak
-  px(-2, -10, 2, 8, "#4c4658"); // lit fold
-  px(-2, -14, 5, 4, "#d8b896"); // face
-  px(-3, -15, 7, 2, "#3a3346"); // hood
-  px(1, -13, 1, 1, "#13101b"); // eye
-  px(-2, -1, 2, 1, "#24130f"); // boots
-  px(1, -1, 2, 1, "#24130f");
-  px(5, -16, 1, 16, "#5a3520"); // staff
 }
 
 // ---------- effect tiles ----------

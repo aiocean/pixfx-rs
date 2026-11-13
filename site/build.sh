@@ -13,7 +13,7 @@ wasm-pack build "$root/crates/pixfx-canvas" --release --target web --out-dir "$p
 
 rm -rf "$out"
 mkdir -p "$out/pkg"
-rsync -a --exclude dist --exclude build.sh "$site/" "$out/"
+rsync -a --exclude dist --exclude build.sh --exclude tests "$site/" "$out/"
 cp "$pkg/pixfx_canvas.js" "$pkg/pixfx_canvas_bg.wasm" "$out/pkg/"
 echo "site: $out"
 
