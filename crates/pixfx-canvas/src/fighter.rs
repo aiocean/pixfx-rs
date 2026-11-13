@@ -191,3 +191,279 @@ fn cue(e: &JsValue) -> Result<Option<Cue>, JsError> {
         _ => return Ok(None),
     }))
 }
+
+// ---------- the body ----------
+
+use pixfx_fighter::body::{self as b, Arena, Blow, Doing, Drive, Motion, Phase};
+use pixfx_fighter::pose::Pose;
+
+/// A fighter's body for JS: its fields as properties, the duel's body steps as methods. Poses are the strings the
+/// site's duel uses (`"idle"`, `"walk"`, … `"win"`).
+#[wasm_bindgen]
+pub struct Body {
+    pub(crate) inner: b::Body,
+}
+
+macro_rules! fields {
+    ($($get:ident / $set:ident : $js:literal => $f:ident),* $(,)?) => {
+        #[wasm_bindgen]
+        impl Body {
+            $(
+                #[wasm_bindgen(getter = $js)]
+                pub fn $get(&self) -> f64 { self.inner.$f }
+                #[wasm_bindgen(setter = $js)]
+                pub fn $set(&mut self, v: f64) { self.inner.$f = v; }
+            )*
+        }
+    };
+}
+
+fields! {
+    x / set_x: "x" => x,
+    air / set_air: "air" => air,
+    vx / set_vx: "vx" => vx,
+    vy / set_vy: "vy" => vy,
+    face / set_face: "face" => face,
+    stun / set_stun: "stun" => stun,
+    wake / set_wake: "wake" => wake,
+    land / set_land: "land" => land,
+    squat / set_squat: "squat" => squat,
+    leap / set_leap: "leap" => leap,
+    duck / set_duck: "duck" => duck,
+    flash / set_flash: "flash" => flash,
+    hit_t / set_hit_t: "hitT" => hit_t,
+    hit_power / set_hit_power: "hitPower" => hit_power,
+    frozen / set_frozen: "frozen" => frozen,
+    shocked / set_shocked: "shocked" => shocked,
+    pose_t / set_pose_t: "poseT" => pose_t,
+}
+
+#[wasm_bindgen]
+impl Body {
+    /// A body standing at `x`, facing right.
+    #[wasm_bindgen(constructor)]
+    pub fn new(x: f64) -> Body {
+        Body { inner: b::Body::new(x) }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn pose(&self) -> String {
+        pose_name(self.inner.pose).to_owned()
+    }
+
+    /// Off its feet: `{phase, t, juggle, light, spin, bounced, quick, dir}` (a copy), or null.
+    #[wasm_bindgen(getter)]
+    pub fn down(&self) -> Result<JsValue, JsError> {
+        let Some(d) = self.inner.down else { return Ok(JsValue::NULL) };
+        let phase = match d.phase {
+            Phase::Air => "air",
+            Phase::Down => "down",
+            Phase::Roll => "roll",
+            Phase::Rise => "rise",
+        };
+        object(&[
+            ("phase", phase.into()),
+            ("t", d.t.into()),
+            ("juggle", d.juggle.into()),
+            ("light", d.light.into()),
+            ("spin", d.spin.into()),
+            ("bounced", d.bounced.into()),
+            ("quick", d.quick.into()),
+            ("dir", d.dir.into()),
+        ])
+    }
+
+    /// A new round: back on its feet at `x`.
+    #[wasm_bindgen(js_name = startRound)]
+    pub fn start_round(&mut self, x: f64) {
+        self.inner.start_round(x);
+    }
+
+    /// The body's clocks run on; a fighter that is down lies, rolls or gets up.
+    pub fn tick(&mut self, dt: f64, alive: bool) {
+        self.inner.tick(dt, alive);
+    }
+
+    /// Feet and flight for one step. `drive`: `{alive, acting, meditating, guarding, chilled, intent, foeX,
+    /// motion: "gravity" | {fly: hover} | {dive: speed, floor}}`; `arena`: `{left, right, top}`; `rand()` in
+    /// [0, 1). Returns the events: `{type: "land", x, strength}`, `{type: "bump", x, y, strength}`.
+    pub fn step(&mut self, dt: f64, drive: &JsValue, arena: &JsValue, rand: &Function) -> Result<Array, JsError> {
+        let drive = Drive {
+            alive: flag(drive, "alive"),
+            acting: flag(drive, "acting"),
+            meditating: flag(drive, "meditating"),
+            guarding: flag(drive, "guarding"),
+            chilled: flag(drive, "chilled"),
+            intent: num(drive, "intent"),
+            motion: motion(drive)?,
+            foe_x: num(drive, "foeX"),
+        };
+        let arena = arena_of(arena);
+        let (events, failed) = with_roll(rand, |roll| self.inner.step(dt, &drive, &arena, roll));
+        failed?;
+        events_js(&events)
+    }
+
+    /// A blow lands: launch or stagger, knockback, the white flash.
+    pub fn hit(&mut self, power: f64, dir: f64, freeze: bool, flying: bool) {
+        self.inner.hit(Blow { power, dir, freeze, flying });
+    }
+
+    /// Whether a blow of `power` throws (a freezing one never does).
+    pub fn heavy(power: f64, freeze: bool) -> bool {
+        Blow { power, dir: 1.0, freeze, flying: false }.heavy()
+    }
+
+    /// The knockout throws the loser off its feet, away from the foe at `foe_x`.
+    #[wasm_bindgen(js_name = knockOut)]
+    pub fn knock_out(&mut self, foe_x: f64) {
+        self.inner.knock_out(foe_x);
+    }
+
+    /// Between rounds: slide, fall and lie, or stand over the loser (`won`).
+    pub fn settle(
+        &mut self,
+        dt: f64,
+        won: bool,
+        alive: bool,
+        foe_x: f64,
+        arena: &JsValue,
+        rand: &Function,
+    ) -> Result<Array, JsError> {
+        let arena = arena_of(arena);
+        let (events, failed) =
+            with_roll(rand, |roll| self.inner.settle(dt, won, alive, foe_x, &arena, roll));
+        failed?;
+        events_js(&events)
+    }
+
+    pub fn reeling(&self) -> bool {
+        self.inner.reeling()
+    }
+
+    pub fn floored(&self) -> bool {
+        self.inner.floored()
+    }
+
+    pub fn untouchable(&self) -> bool {
+        self.inner.untouchable()
+    }
+
+    /// Seconds until it can act again.
+    #[wasm_bindgen(js_name = outFor)]
+    pub fn out_for(&self) -> f64 {
+        self.inner.out_for()
+    }
+
+    /// Seconds until a blow can touch it.
+    #[wasm_bindgen(js_name = openIn)]
+    pub fn open_in(&self) -> f64 {
+        self.inner.open_in()
+    }
+
+    /// Settle its pose from what the rules have it doing: `"windup"`, `"recover"` (with `melee`), `"guard"`,
+    /// `"meditate"`, `"fly"`, `"walk"` or `"idle"`. A new pose restarts the pose clock.
+    #[wasm_bindgen(js_name = updatePose)]
+    pub fn update_pose(&mut self, doing: &str, melee: bool, alive: bool) -> Result<(), JsError> {
+        let doing = match doing {
+            "windup" => Doing::Windup { melee },
+            "recover" => Doing::Recover { melee },
+            "guard" => Doing::Guard,
+            "meditate" => Doing::Meditate,
+            "fly" => Doing::Fly,
+            "walk" => Doing::Walk,
+            "idle" => Doing::Idle,
+            other => return Err(JsError::new(&format!("unknown doing {other:?}"))),
+        };
+        let pose = self.inner.pose_of(doing, alive);
+        self.inner.set_pose(pose);
+        Ok(())
+    }
+}
+
+/// Two bodies cannot stand in one place: part them (the caller skips this when either is knocked out).
+#[wasm_bindgen]
+pub fn separate(a: &mut Body, b: &mut Body, arena: &JsValue) {
+    b::separate(&mut a.inner, &mut b.inner, &arena_of(arena));
+}
+
+fn arena_of(v: &JsValue) -> Arena {
+    Arena { left: num(v, "left"), right: num(v, "right"), top: num(v, "top") }
+}
+
+fn motion(drive: &JsValue) -> Result<Motion, JsError> {
+    let m = Reflect::get(drive, &JsValue::from_str("motion"))
+        .map_err(|_| JsError::new("drive must be an object"))?;
+    if m.as_string().is_some() || m.is_undefined() || m.is_null() {
+        return Ok(Motion::Gravity);
+    }
+    let has = |k: &str| Reflect::has(&m, &JsValue::from_str(k)).unwrap_or(false);
+    if has("fly") {
+        Ok(Motion::Fly { hover: num(&m, "fly") })
+    } else if has("dive") {
+        Ok(Motion::Dive { speed: num(&m, "dive"), floor: num(&m, "floor") })
+    } else {
+        Err(JsError::new("motion: expected \"gravity\", {fly} or {dive, floor}"))
+    }
+}
+
+/// Run `f` with a roll that calls JS `rand()`; the error says if `rand` failed or gave a non-number.
+fn with_roll<T>(rand: &Function, f: impl FnOnce(&mut dyn FnMut() -> f64) -> T) -> (T, Result<(), JsError>) {
+    let mut bad = false;
+    let mut roll = || match rand.call0(&JsValue::NULL).map(|v| v.as_f64()) {
+        Ok(Some(v)) => v,
+        _ => {
+            bad = true;
+            0.0
+        }
+    };
+    let out = f(&mut roll);
+    let status = if bad { Err(JsError::new("rand() must return a number")) } else { Ok(()) };
+    (out, status)
+}
+
+fn events_js(events: &[b::Event]) -> Result<Array, JsError> {
+    events
+        .iter()
+        .map(|e| match *e {
+            b::Event::Land { x, strength } => {
+                object(&[("type", "land".into()), ("x", x.into()), ("strength", strength.into())])
+            }
+            b::Event::Bump { x, y, strength } => object(&[
+                ("type", "bump".into()),
+                ("x", x.into()),
+                ("y", y.into()),
+                ("strength", strength.into()),
+            ]),
+        })
+        .collect()
+}
+
+pub(crate) fn pose_name(p: Pose) -> &'static str {
+    match p {
+        Pose::Idle => "idle",
+        Pose::Walk => "walk",
+        Pose::Jump => "jump",
+        Pose::Fly => "fly",
+        Pose::Land => "land",
+        Pose::Crouch => "crouch",
+        Pose::Duck => "duck",
+        Pose::Draw => "draw",
+        Pose::Slash => "slash",
+        Pose::Channel => "channel",
+        Pose::Cast => "cast",
+        Pose::Guard => "guard",
+        Pose::Meditate => "meditate",
+        Pose::Hurt => "hurt",
+        Pose::Frozen => "frozen",
+        Pose::Shocked => "shocked",
+        Pose::Launched => "launched",
+        Pose::Tumble => "tumble",
+        Pose::Fall => "fall",
+        Pose::Down => "down",
+        Pose::Roll => "roll",
+        Pose::Sit => "sit",
+        Pose::Kneel => "kneel",
+        Pose::Win => "win",
+    }
+}
