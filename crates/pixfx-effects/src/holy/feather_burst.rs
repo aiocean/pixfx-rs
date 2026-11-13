@@ -1,6 +1,10 @@
 //! Feather burst: port of pixelfx `src/fx/holy/feather-burst.js`.
+//!
+//! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
+//! scales them, 0 for none.
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
+use pixfx_core::cue::{FEEL, TimedCue, impact};
 use pixfx_core::math::{Rng, TAU, ease, js_max, js_min, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, sparkle};
 use pixfx_core::{ColorOpt, Effect, EffectState, Layer, Meta, Options, Painter};
@@ -25,7 +29,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 4,
     state: None,
-    options: &[GLOW.spec()],
+    options: &[GLOW.spec(), FEEL.spec()],
 };
 
 // meta.options
@@ -51,6 +55,10 @@ struct Lobe {
 impl Effect for FeatherBurst {
     fn meta(&self) -> &Meta {
         &META
+    }
+    /// Beyond pixelfx: the puff asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
+    fn cues(&self, opts: &Options) -> Vec<TimedCue> {
+        impact(0.0, 0.1, 0.0, 0.0, opts)
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let f: [Rgba; 6] = ramp(&opts.palette_or(&PALETTE));

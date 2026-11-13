@@ -1,9 +1,13 @@
 //! Poof: port of pixelfx `src/fx/spawn/poof.js`.
 //!
+//! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
+//! scales them, 0 for none.
+//!
 //! The soft, top-lit smoke puffs (a body, a denser core, a lit cap) follow Sprite Fusion's open-source explosion
 //! (https://www.spritefusion.com/pixel-art-vfx/explosion), MIT License, Copyright (c) 2026 Hugo Duprez.
 
 use pixfx_core::color::{Rgba, WHITE, ramp};
+use pixfx_core::cue::{FEEL, TimedCue, impact};
 use pixfx_core::math::{Rng, TAU, clamp, ease, js_min, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, flare};
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
@@ -26,7 +30,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 21,
     state: None,
-    options: &[STARS.spec()],
+    options: &[STARS.spec(), FEEL.spec()],
 };
 
 // meta.options
@@ -79,6 +83,10 @@ enum Part {
 impl Effect for Poof {
     fn meta(&self) -> &Meta {
         &META
+    }
+    /// Beyond pixelfx: the pop asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
+    fn cues(&self, opts: &Options) -> Vec<TimedCue> {
+        impact(0.0, 0.15, 0.0, -12.0, opts)
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let c: [Rgba; 6] = ramp(&opts.palette_or(&PALETTE));

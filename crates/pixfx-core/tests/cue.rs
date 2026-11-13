@@ -222,3 +222,69 @@ fn stopping_instance_fires_no_cues() {
     }
     assert!(inst.take_cues().is_empty());
 }
+
+mod impact_cues {
+    use pixfx_core::cue::{Cue, TimedCue, impact};
+    use pixfx_core::effect::{OptValue, Options};
+
+    fn with_feel(k: f64) -> Options {
+        let mut o = Options::default();
+        o.extra.insert("feel".into(), OptValue::Num(k));
+        o
+    }
+
+    fn kinds(cues: &[TimedCue]) -> Vec<&'static str> {
+        cues.iter()
+            .map(|c| match c.cue {
+                Cue::Shake { .. } => "shake",
+                Cue::Hitstop { .. } => "hitstop",
+                Cue::Ripple { .. } => "ripple",
+                Cue::Flash { .. } => "flash",
+                Cue::Sound { .. } => "sound",
+            })
+            .collect()
+    }
+
+    fn trauma(cues: &[TimedCue]) -> f64 {
+        cues.iter()
+            .find_map(|c| match c.cue {
+                Cue::Shake { trauma } => Some(trauma),
+                _ => None,
+            })
+            .unwrap_or(0.0)
+    }
+
+    fn hitstop(cues: &[TimedCue]) -> f64 {
+        cues.iter()
+            .find_map(|c| match c.cue {
+                Cue::Hitstop { dur } => Some(dur),
+                _ => None,
+            })
+            .unwrap_or(0.0)
+    }
+
+    #[test]
+    fn a_heavier_impact_answers_with_more() {
+        let o = Options::default();
+        let pop = impact(0.0, 0.1, 0.0, 0.0, &o);
+        let blow = impact(0.0, 0.5, 0.0, 0.0, &o);
+        let blast = impact(0.0, 1.0, 0.0, 0.0, &o);
+        assert_eq!(kinds(&pop), ["shake"], "a pop only nudges the screen");
+        assert_eq!(kinds(&blow), ["shake", "hitstop", "ripple"]);
+        assert_eq!(kinds(&blast), ["shake", "hitstop", "ripple", "flash"]);
+        assert!(trauma(&pop) < trauma(&blow) && trauma(&blow) < trauma(&blast));
+        assert!(hitstop(&blow) < hitstop(&blast));
+        // whole frames at 60 a second, at most 8
+        assert_eq!(hitstop(&blast), 8.0 / 60.0);
+    }
+
+    #[test]
+    fn the_feel_option_scales_the_answer_and_zero_turns_it_off() {
+        assert!(impact(0.3, 1.0, 0.0, 0.0, &with_feel(0.0)).is_empty());
+        let full = impact(0.3, 1.0, 0.0, 0.0, &Options::default());
+        let half = impact(0.3, 1.0, 0.0, 0.0, &with_feel(0.5));
+        assert!(trauma(&half) < trauma(&full));
+        assert!(hitstop(&half) < hitstop(&full));
+        assert!(full.iter().all(|c| c.t == 0.3), "every cue lands on the impact");
+    }
+}

@@ -1,5 +1,8 @@
 //! Explosion: port of pixelfx `src/fx/explosions/small-explosion.js`.
 //!
+//! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
+//! scales them, 0 for none.
+//!
 //! Beyond pixelfx: the `size` option is held to 0..=16, so a huge number cannot hang the particle loops.
 //!
 //! The particle recipe (fire puffs that cool into smoke, sparks, embers, burning brands, grit, rocks, scorch) is
@@ -9,6 +12,7 @@
 use core::f64::consts::FRAC_PI_2;
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp, rgb, scale};
+use pixfx_core::cue::{FEEL, TimedCue, impact};
 use pixfx_core::math::{Rng, TAU, clamp, ease, js_max, js_min, js_round, rand, smooth, to_uint32};
 use pixfx_core::sim::{
     Bit, BitKind, Bits, Blazes, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn, band,
@@ -33,7 +37,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 7,
     state: None,
-    options: &[SIZE.spec(), STONE.spec()],
+    options: &[SIZE.spec(), STONE.spec(), FEEL.spec()],
 };
 
 // meta.options
@@ -161,6 +165,10 @@ struct Rock {
 impl Effect for SmallExplosion {
     fn meta(&self) -> &Meta {
         &META
+    }
+    /// Beyond pixelfx: the blast asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
+    fn cues(&self, opts: &Options) -> Vec<TimedCue> {
+        impact(0.0, 1.0, 0.0, -16.0, opts)
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let f: [Rgba; 8] = ramp(&opts.palette_or(&PALETTE));

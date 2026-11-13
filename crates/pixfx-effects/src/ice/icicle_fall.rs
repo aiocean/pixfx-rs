@@ -1,5 +1,8 @@
 //! Icicle fall: port of pixelfx `src/fx/ice/icicle-fall.js`.
 //!
+//! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
+//! scales them, 0 for none.
+//!
 //! The break recipe (a white frame, the ice flung apart as shards with ice dust and glints) is adapted from
 //! Sprite Fusion's open-source ice (https://www.spritefusion.com/pixel-art-vfx/ice), MIT License,
 //! Copyright (c) 2026 Hugo Duprez.
@@ -7,6 +10,7 @@
 use core::f64::consts::{FRAC_PI_2, PI};
 
 use pixfx_core::color::{Rgba, WHITE, ramp};
+use pixfx_core::cue::{self, FEEL, TimedCue};
 use pixfx_core::math::{
     Rng, TAU, clamp, ease, js_max, js_min, js_round, js_sign, rand, seg, smooth, to_uint32,
 };
@@ -33,7 +37,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 4,
     state: None,
-    options: &[],
+    options: &[FEEL.spec()],
 };
 
 // meta.options
@@ -146,6 +150,10 @@ struct Rime {
 impl Effect for IcicleFall {
     fn meta(&self) -> &Meta {
         &META
+    }
+    /// Beyond pixelfx: the icicle stabbing the floor asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
+    fn cues(&self, opts: &Options) -> Vec<TimedCue> {
+        cue::impact(impact(), 0.45, 0.0, 0.0, opts)
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let c: [Rgba; 8] = ramp(&opts.palette_or(&PALETTE));

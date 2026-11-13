@@ -1,5 +1,8 @@
 //! Implosion: port of pixelfx `src/fx/explosions/implosion.js`.
 //!
+//! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
+//! scales them, 0 for none.
+//!
 //! The gathering streaks, the pulse rings and the release (cross flare, rings, light) are adapted from Sprite
 //! Fusion's open-source energy charge (https://www.spritefusion.com/pixel-art-vfx/energy), MIT License,
 //! Copyright (c) 2026 Hugo Duprez.
@@ -7,6 +10,7 @@
 use core::f64::consts::PI;
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
+use pixfx_core::cue::{FEEL, TimedCue, impact};
 use pixfx_core::math::{Rng, TAU, clamp, ease, js_max, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, sparkle};
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
@@ -36,7 +40,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 2,
     state: None,
-    options: &[],
+    options: &[FEEL.spec()],
 };
 
 // meta.options
@@ -72,6 +76,10 @@ struct Grit {
 impl Effect for Implosion {
     fn meta(&self) -> &Meta {
         &META
+    }
+    /// Beyond pixelfx: the pop asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
+    fn cues(&self, opts: &Options) -> Vec<TimedCue> {
+        impact(STILL, 0.7, 0.0, 0.0, opts)
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let c: [Rgba; 7] = ramp(&opts.palette_or(&PALETTE));

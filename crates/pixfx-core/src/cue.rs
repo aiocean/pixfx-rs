@@ -6,8 +6,8 @@
 //! An [`crate::effect::Instance`] reports them in world space as playback passes them
 //! ([`crate::effect::Instance::take_cues`]).
 
-use crate::effect::{Effect, Meta, Options};
-use crate::math::clamp;
+use crate::effect::{Effect, Meta, NumOpt, Options};
+use crate::math::{clamp, js_round};
 
 /// One thing an effect asks the game to do.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -111,6 +111,48 @@ pub fn cues_between(
             }
             out.push(w);
         }
+    }
+    out
+}
+
+/// The `feel` option of an effect that fires impact cues ([`impact`]): 1 as designed, 0 fires none, up to 2 hits
+/// twice as hard. Declare it in `meta.options` with `FEEL.spec()`.
+pub const FEEL: NumOpt = NumOpt::new("feel", 1.0).within(0.0, 2.0);
+
+/// The cues of an impact `t` seconds into an effect, centred on (`x`, `y`) in its own space. `weight` runs from 0
+/// (a pop) to 1 (a blast) and sets each answer the usual way: trauma grows with it (light hits stay subtle once the
+/// game squares it), a hit-stop of 2 to 8 frames at 60 a second freezes play from a medium blow up, a screen ring
+/// pushes out from a medium-heavy one and a flash lifts the screen for a heavy one. The effect's [`FEEL`] option
+/// scales all of it; at 0 there are none.
+pub fn impact(t: f64, weight: f64, x: f64, y: f64, opts: &Options) -> Vec<TimedCue> {
+    let k = opts.num(&FEEL);
+    let w = clamp(weight, 0.0, 1.0);
+    if k.is_nan() || k <= 0.0 {
+        return Vec::new();
+    }
+    let at = |cue| TimedCue { t, cue, pan: None };
+    let mut out = vec![at(Cue::Shake {
+        trauma: clamp((0.15 + 0.55 * w) * k, 0.0, 1.0),
+    })];
+    let frames = js_round((2.0 + 6.0 * w) * k.min(1.0));
+    if w >= 0.3 && frames >= 1.0 {
+        out.push(at(Cue::Hitstop { dur: frames / 60.0 }));
+    }
+    if w >= 0.5 {
+        out.push(at(Cue::Ripple {
+            x,
+            y,
+            r0: 4.0,
+            r1: 20.0 + 40.0 * w,
+            dur: 0.25 + 0.2 * w,
+            amp: (0.4 + 0.6 * w) * k,
+        }));
+    }
+    if w >= 0.7 {
+        out.push(at(Cue::Flash {
+            k: clamp(0.5 * w * k, 0.0, 1.0),
+            dur: 0.1,
+        }));
     }
     out
 }

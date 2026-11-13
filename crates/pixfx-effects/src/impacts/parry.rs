@@ -1,9 +1,13 @@
 //! Parry: port of pixelfx `src/fx/impacts/parry.js`.
 //!
+//! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
+//! scales them, 0 for none.
+//!
 //! The star's key frames and the spark spray are adapted from Sprite Fusion's open-source impact
 //! (https://www.spritefusion.com/pixel-art-vfx/impact), MIT License, Copyright (c) 2026 Hugo Duprez.
 
 use pixfx_core::color::{Rgba, WHITE};
+use pixfx_core::cue::{FEEL, TimedCue, impact};
 use pixfx_core::math::{Rng, TAU, ease, js_max, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn};
 use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
@@ -28,7 +32,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 11,
     state: None,
-    options: &[HEIGHT.spec()],
+    options: &[HEIGHT.spec(), FEEL.spec()],
 };
 
 // meta.options
@@ -48,6 +52,10 @@ const X: f64 = 0.0;
 impl Effect for Parry {
     fn meta(&self) -> &Meta {
         &META
+    }
+    /// Beyond pixelfx: the clash asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
+    fn cues(&self, opts: &Options) -> Vec<TimedCue> {
+        impact(0.0, 0.6, 0.0, -opts.num(&HEIGHT), opts)
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let pal = opts.palette_or(&PALETTE);

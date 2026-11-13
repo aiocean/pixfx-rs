@@ -1,9 +1,13 @@
 //! Plasma explosion: port of pixelfx `src/fx/explosions/plasma-explosion.js`.
 //!
+//! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
+//! scales them, 0 for none.
+//!
 //! The release (flash, rings, flare, light) and the arcs are adapted from Sprite Fusion's open-source energy
 //! (https://www.spritefusion.com/pixel-art-vfx/energy), MIT License, Copyright (c) 2026 Hugo Duprez.
 
 use pixfx_core::color::{Rgba, WHITE, ramp};
+use pixfx_core::cue::{FEEL, TimedCue, impact};
 use pixfx_core::math::{
     Rng, TAU, clamp, ease, js_max, js_min, js_round, noise, rng, smooth, to_uint32,
 };
@@ -37,7 +41,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 7,
     state: None,
-    options: &[ACCENT.spec()],
+    options: &[ACCENT.spec(), FEEL.spec()],
 };
 
 // meta.options
@@ -71,6 +75,10 @@ const Y1: f64 = META.size.1 as f64 - META.origin.1 as f64 - 3.0;
 impl Effect for PlasmaExplosion {
     fn meta(&self) -> &Meta {
         &META
+    }
+    /// Beyond pixelfx: the blast asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
+    fn cues(&self, opts: &Options) -> Vec<TimedCue> {
+        impact(0.0, 0.9, 0.0, 0.0, opts)
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let c: [Rgba; 7] = ramp(&opts.palette_or(&PALETTE));

@@ -1,5 +1,8 @@
 //! Dirt explosion: port of pixelfx `src/fx/explosions/dirt-explosion.js`.
 //!
+//! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
+//! scales them, 0 for none.
+//!
 //! The earth recipe (grit thrown in a fan, rocks that bounce and kick up dust, a dust column and dust rolling out
 //! along the floor) is adapted from Sprite Fusion's open-source explosion
 //! (https://www.spritefusion.com/pixel-art-vfx/explosion), MIT License, Copyright (c) 2026 Hugo Duprez.
@@ -7,6 +10,7 @@
 use core::f64::consts::FRAC_PI_2;
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp, rgb};
+use pixfx_core::cue::{FEEL, TimedCue, impact};
 use pixfx_core::math::{Rng, TAU, ease, js_max, js_min, js_round, smooth, to_uint32};
 use pixfx_core::sim::{
     Bit, BitKind, Bits, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn, band,
@@ -39,7 +43,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 3,
     state: None,
-    options: &[FIRE.spec()],
+    options: &[FIRE.spec(), FEEL.spec()],
 };
 
 // meta.options
@@ -83,6 +87,10 @@ struct Clod {
 impl Effect for DirtExplosion {
     fn meta(&self) -> &Meta {
         &META
+    }
+    /// Beyond pixelfx: the charge going off asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
+    fn cues(&self, opts: &Options) -> Vec<TimedCue> {
+        impact(0.0, 0.8, 0.0, -8.0, opts)
     }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let e: [Rgba; 7] = ramp(&opts.palette_or(&PALETTE));
