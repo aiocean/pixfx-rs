@@ -7,6 +7,7 @@ pub mod arcane;
 pub mod critters;
 pub mod explosions;
 pub mod fire;
+pub mod holy;
 pub mod impacts;
 pub mod spawn;
 
@@ -24,6 +25,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &arcane::RUNE_CIRCLE,
     &critters::WISP,
     &spawn::POOF,
+    &holy::FEATHER_BURST,
 ];
 
 /// The effect with this id (`fire/candle`).
