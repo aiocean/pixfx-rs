@@ -30,7 +30,7 @@ use js_sys::{Array, Uint8Array, Uint8ClampedArray};
 use pixfx_core::{Feel, Layer, Meta, Options, Player};
 use pixfx_draw::Frame;
 use pixfx_effects::effect;
-use pixfx_scene::{Pass, PlacementChange, Scene, Shell, color_rgba, light_rgba};
+use pixfx_scene::{Pass, PlacementChange, Scene, Shell, View, color_rgba, light_rgba};
 use pixfx_wasm::js::{pair, parse, to_js};
 use pixfx_wasm::parse_options;
 use wasm_bindgen::Clamped;
@@ -229,6 +229,28 @@ impl Stage {
             .map_err(|e| JsError::new(&e))
     }
 
+    /// Draw only the effects whose frame reaches into this rectangle of the world, in game pixels: for a host
+    /// that draws with `drawLayer` through its own camera. The stage's own drawing (`start`, `tick`) culls to its
+    /// canvas by itself. Throws if a value is not finite.
+    #[wasm_bindgen(js_name = setView)]
+    pub fn set_view(&mut self, x: f64, y: f64, w: f64, h: f64) -> Result<(), JsError> {
+        self.renderer
+            .borrow_mut()
+            .scene
+            .set_view(Some(View { x, y, w, h }))
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Draw every effect again, wherever it is (the default).
+    #[wasm_bindgen(js_name = clearView)]
+    pub fn clear_view(&mut self) -> Result<(), JsError> {
+        self.renderer
+            .borrow_mut()
+            .scene
+            .set_view(None)
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
     /// Let `dt` real seconds (finite, 0 or more) pass without drawing, for a host that draws its own sprites
     /// between the layers: `update(dt)`, draw the ground, `drawLayer("back")`, draw sprites,
     /// `drawLayer("front")`. Returns the seconds the effects played: none during a hit-stop, a fraction in slow
@@ -370,6 +392,18 @@ impl Stage {
     }
 }
 
+/// What the stage's own loop can show: its canvas (`canvas_w` x `canvas_h` canvas pixels, `scale` per game pixel)
+/// in game pixels, grown by `shake_px` game pixels on every side because the shake moves the view that far.
+pub fn own_view(canvas_w: u32, canvas_h: u32, scale: NonZeroU32, shake_px: f64) -> View {
+    let unit = f64::from(scale.get());
+    View {
+        x: -shake_px,
+        y: -shake_px,
+        w: f64::from(canvas_w) / unit + 2.0 * shake_px,
+        h: f64::from(canvas_h) / unit + 2.0 * shake_px,
+    }
+}
+
 fn nonzero_scale(scale: u32) -> Result<NonZeroU32, JsError> {
     NonZeroU32::new(scale).ok_or_else(|| JsError::new("scale must be at least 1"))
 }
@@ -399,6 +433,18 @@ impl Renderer {
         let ctx = &self.ctx;
         let canvas = ctx.canvas().ok_or("the 2d context has no canvas")?;
         let (w, h) = (f64::from(canvas.width()), f64::from(canvas.height()));
+        // draw only what the canvas can show, however far the shake moves it
+        let shake_px = self
+            .scene
+            .feel()
+            .map_or(0.0, |f| f.spec().shake * self.shake_strength);
+        let view = own_view(
+            canvas.width(),
+            canvas.height(),
+            self.scene.scale(),
+            shake_px,
+        );
+        self.scene.set_view(Some(view)).map_err(|e| e.to_string())?;
         ctx.set_global_composite_operation("source-over")
             .map_err(|e| js_message("could not reset compositing", &e))?;
         match &self.background {
