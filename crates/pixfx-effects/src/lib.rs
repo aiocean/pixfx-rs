@@ -10,6 +10,7 @@ pub mod fire;
 pub mod holy;
 pub mod ice;
 pub mod impacts;
+pub mod lightning;
 pub mod scifi;
 pub mod spawn;
 
@@ -30,6 +31,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &holy::FEATHER_BURST,
     &ice::ICICLE_FALL,
     &scifi::JETPACK,
+    &lightning::BALL_LIGHTNING,
 ];
 
 /// The effect with this id (`fire/candle`).
