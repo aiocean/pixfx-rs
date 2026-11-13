@@ -67,6 +67,28 @@ pub struct Rect {
     pub h: u64,
 }
 
+/// What the host can see, in game pixels (world units for a host with a camera). A scene with a view draws only the
+/// effects whose frame, canvas plus glow margin, overlaps it; the rest keep playing and firing cues unseen.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct View {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
+impl View {
+    /// Whether `rect` (canvas pixels, `scale` per game pixel) overlaps this view; rectangles that only touch do not.
+    fn overlaps(self, rect: Rect, scale: NonZeroU32) -> bool {
+        let s = f64::from(scale.get());
+        let (x0, y0) = (self.x * s, self.y * s);
+        let (x1, y1) = (x0 + self.w * s, y0 + self.h * s);
+        // canvas pixels past 2^53 lose precision as f64; no canvas reaches them
+        let (rx, ry) = (rect.x as f64, rect.y as f64);
+        rx < x1 && rx + rect.w as f64 > x0 && ry < y1 && ry + rect.h as f64 > y0
+    }
+}
+
 /// One blit: `layer` of the instance `handle`, drawn into `rect`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pass {
@@ -193,6 +215,8 @@ pub struct Scene<S> {
     draw_budget: Option<NonZeroU32>,
     /// Layers drawn in the current host frame.
     drawn: u32,
+    /// What the host can see; `None` draws every effect.
+    view: Option<View>,
 }
 
 impl<S> Scene<S> {
@@ -209,6 +233,7 @@ impl<S> Scene<S> {
             released: Vec::new(),
             draw_budget: None,
             drawn: 0,
+            view: None,
         }
     }
 
@@ -232,6 +257,19 @@ impl<S> Scene<S> {
     /// The stage's width in game pixels, so a cue's pan follows where it fires; 0 leaves cues without pan.
     pub fn set_screen_w(&mut self, w: f64) {
         self.screen_w = if w.is_finite() && w > 0.0 { w } else { 0.0 };
+    }
+
+    /// Draw only the effects whose frame overlaps `view` from the next draw on; `None` (the default) draws them all.
+    /// Effects outside it still play, fire their cues and end on time. A view with a NaN or infinite field is refused
+    /// and the view stays as it was.
+    pub fn set_view(&mut self, view: Option<View>) -> Result<(), StageError> {
+        if let Some(v) = view
+            && ![v.x, v.y, v.w, v.h].iter().all(|n| n.is_finite())
+        {
+            return Err(StageError::NotFinite);
+        }
+        self.view = view;
+        Ok(())
     }
 
     pub fn scale(&self) -> NonZeroU32 {
@@ -548,6 +586,11 @@ impl<S> Scene<S> {
             layer,
             rect: self.rect_of(e),
         };
+        if let Some(view) = self.view
+            && !view.overlaps(pass.rect, self.scale)
+        {
+            return Ok(());
+        }
         let Some(e) = self.entries.get_mut(i) else {
             return Ok(());
         };

@@ -7,7 +7,7 @@ anything here; this file only says what this crate holds.
 
 What a stage shows and where, decided once in Rust for every shell. `Scene` holds the effects playing, their
 placement and margins, the scale, the order their layers are drawn in, when finished ones go, which frames are drawn
-and shared (under `FRAME_BUDGET`), the game's answer to their cues (a `Feel`), and events (`StageEvent`).
+and shared (under `FRAME_BUDGET`), which effects the host can see (a `View`: the rest play on undrawn), the game's answer to their cues (a `Feel`), and events (`StageEvent`).
 
 It drives the `Shell` contract, which every shell implements:
 
