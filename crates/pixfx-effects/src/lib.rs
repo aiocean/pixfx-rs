@@ -8,6 +8,7 @@ pub mod critters;
 pub mod explosions;
 pub mod fire;
 pub mod holy;
+pub mod ice;
 pub mod impacts;
 pub mod spawn;
 
@@ -26,6 +27,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &critters::WISP,
     &spawn::POOF,
     &holy::FEATHER_BURST,
+    &ice::ICICLE_FALL,
 ];
 
 /// The effect with this id (`fire/candle`).
