@@ -44,3 +44,15 @@ fn huge_campfire_height_draws_in_bounded_time() -> Result<(), &'static str> {
     assert!(frame.color.iter().any(|&c| c != 0), "the fire still draws");
     Ok(())
 }
+
+#[test]
+fn spirit_flame_meta_matches_pixelfx() {
+    let m = effect("fire/spirit-flame").map(|e| *e.meta());
+    assert!(m.is_some(), "fire/spirit-flame is not registered");
+    assert_eq!(m.map(|m| m.size), Some((80, 124)));
+    assert_eq!(m.map(|m| m.origin), Some((40, 94)));
+    assert_eq!(m.map(|m| m.duration), Some(3.0));
+    assert_eq!(m.map(|m| m.looping), Some(true));
+    assert_eq!(m.map(|m| m.fps), Some(30));
+    assert_eq!(m.map(|m| m.seed), Some(7));
+}

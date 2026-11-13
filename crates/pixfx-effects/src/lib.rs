@@ -15,6 +15,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &fire::CANDLE,
     &fire::CAMPFIRE,
     &fire::BRAZIER,
+    &fire::SPIRIT_FLAME,
     &impacts::PARRY,
     &explosions::DIRT_EXPLOSION,
     &explosions::SMALL_EXPLOSION,

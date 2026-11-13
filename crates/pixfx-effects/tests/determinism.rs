@@ -9,10 +9,11 @@ use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 const GOLDENS: &str = include_str!("goldens/frame_hashes.json");
-const IDS: [&str; 11] = [
+const IDS: [&str; 12] = [
     "fire/candle",
     "fire/campfire",
     "fire/brazier",
+    "fire/spirit-flame",
     "impacts/parry",
     "explosions/dirt-explosion",
     "explosions/small-explosion",
