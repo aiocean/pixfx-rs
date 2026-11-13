@@ -4,6 +4,7 @@
 use pixfx_core::effect::{Effect, find};
 
 pub mod arcane;
+pub mod critters;
 pub mod explosions;
 pub mod fire;
 pub mod impacts;
@@ -19,6 +20,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &explosions::IMPLOSION,
     &explosions::PLASMA_EXPLOSION,
     &arcane::RUNE_CIRCLE,
+    &critters::WISP,
 ];
 
 /// The effect with this id (`fire/candle`).

@@ -370,6 +370,11 @@ impl Particles {
         self.list.len()
     }
 
+    /// Set the system's clock (pixelfx `ps.t`), which twinkling kinds read when drawn; `update` advances it.
+    pub fn set_time(&mut self, t: f64) {
+        self.t = t;
+    }
+
     /// The live particles in spawn order (pixelfx `ps.list`).
     pub fn list(&self) -> &[Particle] {
         &self.list
