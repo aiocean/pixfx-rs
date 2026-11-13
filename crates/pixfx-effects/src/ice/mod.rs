@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+#[cfg(feature = "ice-icicle-fall")]
 mod icicle_fall;
 
+#[cfg(feature = "ice-icicle-fall")]
 pub use icicle_fall::ICICLE_FALL;

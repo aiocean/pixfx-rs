@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+#[cfg(feature = "holy-feather-burst")]
 mod feather_burst;
 
+#[cfg(feature = "holy-feather-burst")]
 pub use feather_burst::FEATHER_BURST;

@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+#[cfg(feature = "arcane-rune-circle")]
 mod rune_circle;
 
+#[cfg(feature = "arcane-rune-circle")]
 pub use rune_circle::RUNE_CIRCLE;

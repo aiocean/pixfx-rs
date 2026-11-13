@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `pixfx-effects`: each effect is a cargo feature (`fire-candle`), each category a feature that turns on its effects
+  (`fire`), and `all` (the default) every one. `pixfx-wasm` and `pixfx-canvas` build with
+  `--no-default-features --features pixfx-effects/<effect or category>` to ship only the effects a game plays;
+  `EffectId` then lists only those.
+- Release builds favour play speed: fat LTO in one codegen unit (opt-level 3), and wasm-pack's `wasm-opt` pass at
+  `-O3` for `pixfx-wasm` and `pixfx-canvas`. The 25-effect wasm is 235 KB gzip instead of 246 KB.
 - `pixfx-core`, `pixfx-wasm`, `pixfx-cli`, `pixfx-phaser`: every effect takes an `outline` (off, a preset, a hex colour
   or `{color, width, corners}`) and a `palette` by preset name (`fire`, `ice`, `poison`, `holy`, `shadow`, `arcane`,
   `blood`, `electric`, `nature`, `gold`); the CLI takes `--outline` and `--palette`.

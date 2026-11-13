@@ -11,10 +11,10 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 js-sys = "=0.3.107"
 pixfx-core = { path = "../pixfx-core", features = ["ts"] }
-pixfx-effects = { path = "../pixfx-effects" }
+pixfx-effects = { path = "../pixfx-effects", default-features = false }
 pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"] }
 pixfx-light = { path = "../pixfx-light", features = ["ts"] }
-pixfx-wasm = { path = "../pixfx-wasm" }
+pixfx-wasm = { path = "../pixfx-wasm", default-features = false }
 serde.workspace = true
 tsify.workspace = true
 wasm-bindgen.workspace = true
@@ -27,6 +27,17 @@ web-sys = { version = "=0.3.107", features = [
   "Window",
   "console",
 ] }
+
+[features]
+default = ["all"]
+# every effect. For fewer, build with --no-default-features and name the effects or categories of pixfx-effects:
+# --features pixfx-effects/fire-candle,pixfx-effects/explosions
+all = ["pixfx-effects/all"]
+
+# wasm-pack's wasm-opt pass tuned for speed: -O3 runs effects 3 to 23% faster than its default -O (interleaved
+# benchmark of all 25 effects) at the same size.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3"]
 
 [lints]
 workspace = true

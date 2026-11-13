@@ -18,6 +18,15 @@ cd /path/to/your-game
 bun add ../pixfx-rs/packages/pixfx-phaser
 ```
 
+That builds every effect into the `.wasm`. A game that plays a few builds only those, and pays for no other:
+
+```sh
+bun run build:wasm --no-default-features --features pixfx-effects/fire-candle,pixfx-effects/explosions
+```
+
+Name an effect by its id with the `/` as `-` (`fire/candle` is `pixfx-effects/fire-candle`), or a whole category
+(`pixfx-effects/explosions`). `EffectId` then lists only those effects, so TypeScript flags a `play` of one left out.
+
 The package exports its TypeScript source (`src/index.ts`); Vite compiles it with the game. The `.wasm` file
 sits next to its JS glue and is loaded through `new URL(..., import.meta.url)`, so Vite bundles it with no
 plugin.

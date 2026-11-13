@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+#[cfg(feature = "projectiles-laser-bolt")]
 mod laser_bolt;
 
+#[cfg(feature = "projectiles-laser-bolt")]
 pub use laser_bolt::LASER_BOLT;

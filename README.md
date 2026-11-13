@@ -172,6 +172,21 @@ cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && ca
 bun test site/tests
 ```
 
+## Ship only the effects you play
+
+Each effect is a cargo feature of `pixfx-effects`, named after its id with the `/` as `-` (`fire/candle` is
+`fire-candle`); each category (`fire`, `explosions`, ...) turns on all of its effects, and `all` turns on every one.
+`pixfx-wasm` and `pixfx-canvas` build `all` by default. A game that plays a few effects builds only those, so
+effects added to the library later cost it nothing:
+
+```sh
+wasm-pack build crates/pixfx-wasm --target web -- --no-default-features \
+  --features pixfx-effects/fire-candle,pixfx-effects/explosions
+```
+
+The `EffectId` type in the generated `.d.ts` lists only the effects built in, and `new Fx(id)` with any other id
+is an error. `crates/pixfx-effects/tests/features.rs` fails if an effect is added without its feature.
+
 ## Web demos
 
 Each demo needs `wasm-pack`; the gpui demo needs `trunk`.

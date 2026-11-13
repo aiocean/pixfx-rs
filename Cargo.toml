@@ -18,6 +18,13 @@ serde_path_to_error = "=0.1.20"
 tsify = { version = "=0.5.8", default-features = false, features = ["js"] }
 wasm-bindgen = "=0.2.130"
 
+# Frame time comes first: a download happens once, every frame of play pays for slow code, so opt-level stays 3.
+# Fat LTO across crates in one codegen unit costs no speed and shrinks the 25-effect wasm (after wasm-pack's
+# wasm-opt) to about 235 KB gzip. Games cut size further by building only the effects they play.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 

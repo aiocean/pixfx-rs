@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+#[cfg(feature = "shadow-void-orb")]
 mod void_orb;
 
+#[cfg(feature = "shadow-void-orb")]
 pub use void_orb::VOID_ORB;

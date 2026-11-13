@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+#[cfg(feature = "impacts-parry")]
 mod parry;
 
+#[cfg(feature = "impacts-parry")]
 pub use parry::PARRY;

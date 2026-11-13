@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+#[cfg(feature = "scifi-jetpack")]
 mod jetpack;
 
+#[cfg(feature = "scifi-jetpack")]
 pub use jetpack::JETPACK;
