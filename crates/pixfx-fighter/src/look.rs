@@ -1,4 +1,5 @@
-//! The palette a fighter is drawn in: each part's colours, darker tones after the first where a part is shaded.
+//! The palette a fighter is drawn in: each part's colours, darker tones after the first where a part is shaded. A
+//! look is plain data: build any palette, or start from a preset ([`Look::preset`]) and change what you like.
 
 use pixfx_core::Rgba;
 
@@ -11,7 +12,7 @@ pub enum Hairdo {
     Flowing,
 }
 
-/// A fighter's colours (site `duel-art.js` LOOKS).
+/// A fighter's colours (site `duel-art.js` LOOKS). Every field is public: a game builds its own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Look {
     pub robe: [Rgba; 3],
@@ -34,6 +35,15 @@ const fn c(rgb: u32) -> Rgba {
 }
 
 impl Look {
+    /// The stock looks by name: `"thunder"` or `"frost"`.
+    pub fn preset(name: &str) -> Option<Look> {
+        match name {
+            "thunder" => Some(Look::thunder()),
+            "frost" => Some(Look::frost()),
+            _ => None,
+        }
+    }
+
     /// The Thunder school: a white robe over red, gold trim, black hair in a topknot.
     pub const fn thunder() -> Look {
         Look {

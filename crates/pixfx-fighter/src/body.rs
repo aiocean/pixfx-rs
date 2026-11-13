@@ -11,71 +11,142 @@
 
 use crate::pose::Pose;
 
-/// The body's height, in pixels above its feet.
-pub const BODY: f64 = 34.0;
-/// Where the chest is, in pixels above its feet: where blows and bumps are felt.
-pub const CHEST: f64 = 20.0;
-/// Half the body's width: how close to an arena's edge its middle can come.
-pub const HALF_WIDTH: f64 = 6.0;
-/// Walking speed, pixels a second.
-pub const WALK: f64 = 52.0;
-/// Walking away from the foe is slower than walking toward it, so no one can run away forever.
-pub const BACKWALK: f64 = 0.75;
-/// What a chill leaves of the walking speed.
-pub const CHILL: f64 = 0.45;
-pub const JUMP_SPEED: f64 = 220.0;
-pub const GRAVITY: f64 = 520.0;
-/// Near the top of an arc (rising or falling slower than this) gravity eases to `APEX_GRAVITY` of itself, so a
-/// jump hangs a moment before it falls.
-pub const APEX_SPEED: f64 = 45.0;
-pub const APEX_GRAVITY: f64 = 0.45;
-/// Flying: how fast a fighter climbs or sinks toward the height it wants, and the fastest it does.
-pub const FLY_RATE: f64 = 7.0;
-pub const FLY_MAX: f64 = 160.0;
-/// A blow this strong or stronger throws the target up into the air (`LAUNCH_SPEED` plus `LAUNCH_PER_DAMAGE` a
-/// point of power); one of `LAUNCH_SPIN` or more sends it head over heels. A lighter blow that catches a fighter in
-/// the air only pops it up (`LAUNCH_POP`), and it lands on its feet.
-pub const LAUNCH_DAMAGE: f64 = 12.0;
-pub const LAUNCH_SPEED: f64 = 130.0;
-pub const LAUNCH_PER_DAMAGE: f64 = 5.0;
-pub const LAUNCH_POP: f64 = 70.0;
-pub const LAUNCH_SPIN: f64 = 20.0;
-/// A blow that keeps the target on its feet holds it reeling `HITSTUN_BASE` plus `HITSTUN_PER` a point of power.
-pub const HITSTUN_BASE: f64 = 0.24;
-pub const HITSTUN_PER: f64 = 0.012;
-/// A thrown fighter can be hit `JUGGLE_LIMIT` more times before it lands, flying `JUGGLE_DECAY` as high each time.
-pub const JUGGLE_DECAY: f64 = 0.7;
-pub const JUGGLE_LIMIT: u32 = 1;
-/// Thrown and landing: falling faster than `KNOCKDOWN_BOUNCE` it bounces once, keeping `KNOCKDOWN_KEEP` of its
-/// speed; then it lies `KNOCKDOWN_LIE` and takes `KNOCKDOWN_RISE` to get up, or with chance `KNOCKDOWN_QUICK` flops
-/// `KNOCKDOWN_FLOP` and rolls back `KNOCKDOWN_ROLL_DISTANCE` pixels over `KNOCKDOWN_ROLL`. Nothing touches it from
-/// landing until `KNOCKDOWN_GRACE` after it stands.
-pub const KNOCKDOWN_BOUNCE: f64 = 150.0;
-pub const KNOCKDOWN_KEEP: f64 = 0.3;
-pub const KNOCKDOWN_LIE: f64 = 0.5;
-pub const KNOCKDOWN_RISE: f64 = 0.4;
-pub const KNOCKDOWN_QUICK: f64 = 0.4;
-pub const KNOCKDOWN_FLOP: f64 = 0.18;
-pub const KNOCKDOWN_ROLL: f64 = 0.36;
-pub const KNOCKDOWN_ROLL_DISTANCE: f64 = 26.0;
-pub const KNOCKDOWN_GRACE: f64 = 0.1;
-/// A jump crouches four frames before it leaves the ground.
-pub const JUMP_SQUAT: f64 = 4.0 / 60.0;
-/// A landing crouches a moment, longer from a fall.
-pub const LANDING_SOFT: f64 = 5.0 / 60.0;
-pub const LANDING_HARD: f64 = 0.14;
-/// Ducking, a fighter is this tall.
-pub const DUCK: f64 = 16.0;
-/// A hit lights the target white this long.
-pub const FLASH: f64 = 5.0 / 60.0;
-/// Knocked into the arena's edge faster than this, a fighter bounces off it.
-pub const BOUNCE: f64 = 80.0;
-/// Falling faster than this when it lands, a fighter's landing is felt.
-pub const HARD_LANDING: f64 = 140.0;
-/// How far a blow that keeps the target on its feet pushes it, as a speed.
-pub const KNOCKBACK: f64 = 130.0;
-/// How close two bodies can stand: the space each takes up, and a little room between.
-pub const PERSONAL: f64 = 2.0 * HALF_WIDTH + 6.0;
+/// A body's tuning: its size, how it moves, and how it takes a blow. `Default` is the site's duel. A body carries
+/// its spec ([`Body::with_spec`]), so two fighters can be built differently; every rule reads these numbers.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BodySpec {
+    /// The body's height, in pixels above its feet.
+    pub body: f64,
+    /// Where the chest is, in pixels above its feet: where blows and bumps are felt.
+    pub chest: f64,
+    /// Half the body's width: how close to an arena's edge its middle can come.
+    pub half_width: f64,
+    /// Room it keeps on each side beyond its half width: two bodies stand no closer than their half widths and
+    /// rooms together.
+    pub room: f64,
+    /// Walking speed, pixels a second.
+    pub walk: f64,
+    /// Walking away from the foe is slower than walking toward it, so no one can run away forever.
+    pub backwalk: f64,
+    /// What a chill leaves of the walking speed.
+    pub chill: f64,
+    /// The speed a jump leaves the ground at.
+    pub jump_speed: f64,
+    pub gravity: f64,
+    /// Near the top of an arc (rising or falling slower than `apex_speed`) gravity eases to `apex_gravity` of
+    /// itself, so a jump hangs a moment before it falls.
+    pub apex_speed: f64,
+    pub apex_gravity: f64,
+    /// Flying: how fast a fighter climbs or sinks toward the height it wants, and the fastest it does.
+    pub fly_rate: f64,
+    pub fly_max: f64,
+    /// A blow this strong or stronger throws the target up into the air (`launch_speed` plus `launch_per_damage` a
+    /// point of power); one of `launch_spin` or more sends it head over heels. A lighter blow that catches a fighter
+    /// in the air only pops it up (`launch_pop`), and it lands on its feet.
+    pub launch_damage: f64,
+    pub launch_speed: f64,
+    pub launch_per_damage: f64,
+    pub launch_pop: f64,
+    pub launch_spin: f64,
+    /// A blow that keeps the target on its feet holds it reeling `hitstun_base` plus `hitstun_per` a point of power.
+    pub hitstun_base: f64,
+    pub hitstun_per: f64,
+    /// A thrown fighter can be hit `juggle_limit` more times before it lands, flying `juggle_decay` as high each
+    /// time.
+    pub juggle_decay: f64,
+    pub juggle_limit: u32,
+    /// Thrown and landing: falling faster than `knockdown_bounce` it bounces once, keeping `knockdown_keep` of its
+    /// speed; then it lies `knockdown_lie` and takes `knockdown_rise` to get up, or with chance `knockdown_quick`
+    /// flops `knockdown_flop` and rolls back `knockdown_roll_distance` pixels over `knockdown_roll`. Nothing touches
+    /// it from landing until `knockdown_grace` after it stands.
+    pub knockdown_bounce: f64,
+    pub knockdown_keep: f64,
+    pub knockdown_lie: f64,
+    pub knockdown_rise: f64,
+    pub knockdown_quick: f64,
+    pub knockdown_flop: f64,
+    pub knockdown_roll: f64,
+    pub knockdown_roll_distance: f64,
+    pub knockdown_grace: f64,
+    /// How long a jump crouches before it leaves the ground.
+    pub jump_squat: f64,
+    /// A landing crouches a moment, longer from a fall.
+    pub landing_soft: f64,
+    pub landing_hard: f64,
+    /// Ducking, a fighter is this tall.
+    pub duck: f64,
+    /// A hit lights the target white this long.
+    pub flash: f64,
+    /// Knocked into the arena's edge faster than this, a fighter bounces off it.
+    pub bounce: f64,
+    /// Falling faster than this when it lands, a fighter's landing is felt.
+    pub hard_landing: f64,
+    /// How far a blow that keeps the target on its feet pushes it, as a speed; a freezing blow pushes
+    /// `freeze_knockback` of that, a throwing one `launch_knockback` of it.
+    pub knockback: f64,
+    pub freeze_knockback: f64,
+    pub launch_knockback: f64,
+    /// Bounced off the arena's edge, a body keeps this share of its speed.
+    pub wall_keep: f64,
+    /// Falling faster than this when it lands on its feet, a fighter crouches a moment (`landing_soft`).
+    pub soft_landing: f64,
+    /// How fast sliding along the floor dies away, a second (`exp(-slide * dt)`), and on its back.
+    pub slide: f64,
+    pub slide_down: f64,
+}
+
+impl Default for BodySpec {
+    /// The site's duel.
+    fn default() -> Self {
+        Self {
+            body: 34.0,
+            chest: 20.0,
+            half_width: 6.0,
+            room: 3.0,
+            walk: 52.0,
+            backwalk: 0.75,
+            chill: 0.45,
+            jump_speed: 220.0,
+            gravity: 520.0,
+            apex_speed: 45.0,
+            apex_gravity: 0.45,
+            fly_rate: 7.0,
+            fly_max: 160.0,
+            launch_damage: 12.0,
+            launch_speed: 130.0,
+            launch_per_damage: 5.0,
+            launch_pop: 70.0,
+            launch_spin: 20.0,
+            hitstun_base: 0.24,
+            hitstun_per: 0.012,
+            juggle_decay: 0.7,
+            juggle_limit: 1,
+            knockdown_bounce: 150.0,
+            knockdown_keep: 0.3,
+            knockdown_lie: 0.5,
+            knockdown_rise: 0.4,
+            knockdown_quick: 0.4,
+            knockdown_flop: 0.18,
+            knockdown_roll: 0.36,
+            knockdown_roll_distance: 26.0,
+            knockdown_grace: 0.1,
+            jump_squat: 4.0 / 60.0,
+            landing_soft: 5.0 / 60.0,
+            landing_hard: 0.14,
+            duck: 16.0,
+            flash: 5.0 / 60.0,
+            bounce: 80.0,
+            hard_landing: 140.0,
+            knockback: 130.0,
+            freeze_knockback: 0.5,
+            launch_knockback: 1.7,
+            wall_keep: 0.5,
+            soft_landing: 40.0,
+            slide: 6.0,
+            slide_down: 12.0,
+        }
+    }
+}
 
 /// The floor a fight happens on: its edges and the highest a fighter flies.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -185,9 +256,9 @@ pub struct Blow {
 }
 
 impl Blow {
-    /// Strong enough to throw a fighter off its feet (a freezing blow never does).
-    pub fn heavy(&self) -> bool {
-        self.power >= LAUNCH_DAMAGE && !self.freeze
+    /// Strong enough to throw a fighter built to `spec` off its feet (a freezing blow never does).
+    pub fn heavy(&self, spec: &BodySpec) -> bool {
+        self.power >= spec.launch_damage && !self.freeze
     }
 }
 
@@ -225,11 +296,19 @@ pub struct Body {
     pub pose: Pose,
     /// Time in this pose.
     pub pose_t: f64,
+    /// How it is built: every rule it moves and reels by reads these numbers.
+    pub spec: BodySpec,
 }
 
 impl Body {
-    /// A body standing at `x`, facing right, last hit long ago.
+    /// A body built as the site's duel builds one ([`BodySpec::default`]), standing at `x`, facing right, last hit
+    /// long ago.
     pub fn new(x: f64) -> Self {
+        Self::with_spec(x, BodySpec::default())
+    }
+
+    /// A body built to `spec`, standing at `x`, facing right, last hit long ago.
+    pub fn with_spec(x: f64, spec: BodySpec) -> Self {
         Self {
             x,
             air: 0.0,
@@ -250,17 +329,18 @@ impl Body {
             shocked: 0.0,
             pose: Pose::Idle,
             pose_t: 0.0,
+            spec,
         }
     }
 
-    /// A new round: back on its feet at `x`, every reaction over. Facing and pose carry over.
+    /// A new round: back on its feet at `x`, every reaction over. Facing, pose and build carry over.
     pub fn start_round(&mut self, x: f64) {
         *self = Self {
             x,
             face: self.face,
             pose: self.pose,
             pose_t: self.pose_t,
-            ..Self::new(x)
+            ..Self::with_spec(x, self.spec)
         };
     }
 
@@ -312,23 +392,23 @@ impl Body {
         let away = js_sign(drive.intent) == -js_sign(drive.foe_x - self.x);
         let walk = if free && !drive.guarding {
             drive.intent
-                * WALK
-                * (if drive.chilled { CHILL } else { 1.0 })
-                * (if away { BACKWALK } else { 1.0 })
+                * self.spec.walk
+                * (if drive.chilled { self.spec.chill } else { 1.0 })
+                * (if away { self.spec.backwalk } else { 1.0 })
         } else {
             0.0
         };
         // a body sliding along the floor on its back stops sooner
         self.vx *= libm::exp(self.slide() * dt);
         let x = self.x + (walk + self.vx) * dt;
-        let lo = arena.left + HALF_WIDTH;
-        let hi = arena.right - HALF_WIDTH;
-        if (x < lo || x > hi) && self.vx.abs() > BOUNCE {
+        let lo = arena.left + self.spec.half_width;
+        let hi = arena.right - self.spec.half_width;
+        if (x < lo || x > hi) && self.vx.abs() > self.spec.bounce {
             // thrown into the edge of the arena: bounce off it
-            self.vx = -self.vx * 0.5;
+            self.vx = -self.vx * self.spec.wall_keep;
             out.push(Event::Bump {
                 x: if x < lo { lo } else { hi },
-                y: self.air + CHEST,
+                y: self.air + self.spec.chest,
                 strength: min(1.0, self.vx.abs() / 120.0),
             });
         }
@@ -339,15 +419,19 @@ impl Body {
                 self.vy = -speed;
             }
             Motion::Fly { hover } => {
-                self.vy = clamp((hover - self.air) * FLY_RATE, -FLY_MAX, FLY_MAX);
+                self.vy = clamp(
+                    (hover - self.air) * self.spec.fly_rate,
+                    -self.spec.fly_max,
+                    self.spec.fly_max,
+                );
                 self.air = clamp(self.air + self.vy * dt, 0.0, arena.top);
             }
             Motion::Gravity => {
                 if self.air > 0.0 || self.vy > 0.0 {
-                    let g = if self.vy.abs() < APEX_SPEED {
-                        GRAVITY * APEX_GRAVITY
+                    let g = if self.vy.abs() < self.spec.apex_speed {
+                        self.spec.gravity * self.spec.apex_gravity
                     } else {
-                        GRAVITY
+                        self.spec.gravity
                     };
                     let falling = -self.vy;
                     self.vy -= g * dt;
@@ -363,14 +447,14 @@ impl Body {
                                 roll,
                                 &mut out,
                             );
-                        } else if falling > HARD_LANDING {
-                            self.land = LANDING_HARD;
+                        } else if falling > self.spec.hard_landing {
+                            self.land = self.spec.landing_hard;
                             out.push(Event::Land {
                                 x: self.x,
                                 strength: min(1.0, falling / 300.0),
                             });
-                        } else if falling > 40.0 {
-                            self.land = LANDING_SOFT;
+                        } else if falling > self.spec.soft_landing {
+                            self.land = self.spec.landing_soft;
                         }
                     }
                 }
@@ -382,9 +466,9 @@ impl Body {
     /// The body takes a blow that landed: it flashes, and a heavy blow (or any blow that catches it off the
     /// ground, unless it freezes) throws it; a lighter one staggers it where it stands and pushes it back.
     pub fn hit(&mut self, blow: Blow) {
-        let heavy = blow.heavy();
+        let heavy = blow.heavy(&self.spec);
         let thrown = heavy || (!blow.freeze && (self.air > 0.0 || blow.flying || self.thrown()));
-        self.flash = FLASH;
+        self.flash = self.spec.flash;
         self.hit_t = 0.0;
         self.hit_power = blow.power;
         self.squat = 0.0;
@@ -392,8 +476,14 @@ impl Body {
         if thrown {
             self.launch(blow.power, blow.dir, heavy);
         } else {
-            self.stun = HITSTUN_BASE + blow.power * HITSTUN_PER;
-            self.vx += blow.dir * KNOCKBACK * (if blow.freeze { 0.5 } else { 1.0 });
+            self.stun = self.spec.hitstun_base + blow.power * self.spec.hitstun_per;
+            self.vx += blow.dir
+                * self.spec.knockback
+                * (if blow.freeze {
+                    self.spec.freeze_knockback
+                } else {
+                    1.0
+                });
         }
     }
 
@@ -404,14 +494,21 @@ impl Body {
             Some(d) if d.phase == Phase::Air => d.juggle + 1,
             _ => 0,
         };
-        let k = libm::pow(JUGGLE_DECAY, f64::from(juggle));
-        self.vx += dir * KNOCKBACK * (if heavy { 1.7 } else { 1.0 }) * k;
+        let k = libm::pow(self.spec.juggle_decay, f64::from(juggle));
+        self.vx += dir
+            * self.spec.knockback
+            * (if heavy {
+                self.spec.launch_knockback
+            } else {
+                1.0
+            })
+            * k;
         self.vy = max(
             self.vy,
             (if heavy {
-                LAUNCH_SPEED + power * LAUNCH_PER_DAMAGE
+                self.spec.launch_speed + power * self.spec.launch_per_damage
             } else {
-                LAUNCH_POP
+                self.spec.launch_pop
             }) * k,
         );
         // a light pop lands on its feet; once thrown by a heavy blow it stays thrown
@@ -421,7 +518,7 @@ impl Body {
             t: 0.0,
             juggle,
             light,
-            spin: heavy && power >= LAUNCH_SPIN,
+            spin: heavy && power >= self.spec.launch_spin,
             bounced: false,
             quick: false,
             dir: 0.0,
@@ -432,7 +529,7 @@ impl Body {
     /// The knockout throws the loser off its feet, if the blow has not already; one on the floor stays there.
     pub fn knock_out(&mut self, foe_x: f64) {
         match &mut self.down {
-            None => self.launch(LAUNCH_SPIN, sign_or_one(self.x - foe_x), true),
+            None => self.launch(self.spec.launch_spin, sign_or_one(self.x - foe_x), true),
             Some(d) => {
                 if d.phase != Phase::Air {
                     d.phase = Phase::Down;
@@ -463,17 +560,24 @@ impl Body {
         self.vx *= libm::exp(self.slide() * dt);
         self.x = clamp(
             self.x + self.vx * dt,
-            arena.left + HALF_WIDTH,
-            arena.right - HALF_WIDTH,
+            arena.left + self.spec.half_width,
+            arena.right - self.spec.half_width,
         );
         if self.air > 0.0 || self.vy > 0.0 {
             let falling = -self.vy;
-            self.vy -= GRAVITY * dt;
+            self.vy -= self.spec.gravity * dt;
             self.air = max(0.0, self.air + self.vy * dt);
             if self.air == 0.0 {
                 self.vy = 0.0;
                 if self.thrown() {
-                    self.thrown_lands(falling + GRAVITY * dt, alive, foe_x, arena, roll, &mut out);
+                    self.thrown_lands(
+                        falling + self.spec.gravity * dt,
+                        alive,
+                        foe_x,
+                        arena,
+                        roll,
+                        &mut out,
+                    );
                 }
             }
         }
@@ -504,16 +608,16 @@ impl Body {
         self.floored()
             || self
                 .down
-                .is_some_and(|d| d.phase == Phase::Air && d.juggle >= JUGGLE_LIMIT)
+                .is_some_and(|d| d.phase == Phase::Air && d.juggle >= self.spec.juggle_limit)
     }
 
     /// How long until it can act again: its stagger, or the rest of its fall, lying and getting up.
     pub fn out_for(&self) -> f64 {
         let Some(d) = self.down else { return self.stun };
         let ground = if d.quick {
-            KNOCKDOWN_FLOP + KNOCKDOWN_ROLL
+            self.spec.knockdown_flop + self.spec.knockdown_roll
         } else {
-            KNOCKDOWN_LIE + KNOCKDOWN_RISE
+            self.spec.knockdown_lie + self.spec.knockdown_rise
         };
         match d.phase {
             Phase::Air => {
@@ -521,13 +625,16 @@ impl Body {
                     + max(
                         0.1,
                         (self.vy
-                            + libm::sqrt(max(0.0, self.vy * self.vy + 2.0 * GRAVITY * self.air)))
-                            / GRAVITY,
+                            + libm::sqrt(max(
+                                0.0,
+                                self.vy * self.vy + 2.0 * self.spec.gravity * self.air,
+                            )))
+                            / self.spec.gravity,
                     )
             }
             Phase::Down => ground - d.t,
-            Phase::Roll => KNOCKDOWN_ROLL - d.t,
-            Phase::Rise => KNOCKDOWN_RISE - d.t,
+            Phase::Roll => self.spec.knockdown_roll - d.t,
+            Phase::Rise => self.spec.knockdown_rise - d.t,
         }
     }
 
@@ -537,7 +644,7 @@ impl Body {
             return 0.0;
         }
         if self.down.is_some() {
-            self.out_for() + KNOCKDOWN_GRACE
+            self.out_for() + self.spec.knockdown_grace
         } else {
             self.wake
         }
@@ -555,7 +662,7 @@ impl Body {
                 Phase::Roll => Pose::Roll,
                 // getting up: sit up, kneel, then stand from a crouch
                 Phase::Rise => {
-                    let k = d.t / KNOCKDOWN_RISE;
+                    let k = d.t / self.spec.knockdown_rise;
                     if k < 0.4 {
                         Pose::Sit
                     } else if k < 0.75 {
@@ -627,9 +734,9 @@ impl Body {
     /// How fast sliding dies away: sooner on its back.
     fn slide(&self) -> f64 {
         if self.down.is_some_and(|d| d.phase == Phase::Down) {
-            -12.0
+            -self.spec.slide_down
         } else {
-            -6.0
+            -self.spec.slide
         }
     }
 
@@ -650,14 +757,14 @@ impl Body {
         });
         let x = self.x;
         let Some(d) = &mut self.down else { return };
-        if !d.bounced && falling > KNOCKDOWN_BOUNCE {
+        if !d.bounced && falling > self.spec.knockdown_bounce {
             d.bounced = true;
-            self.vy = falling * KNOCKDOWN_KEEP;
+            self.vy = falling * self.spec.knockdown_keep;
             return;
         }
         if d.light && alive {
             self.down = None;
-            self.land = LANDING_HARD;
+            self.land = self.spec.landing_hard;
             return;
         }
         let away = sign_or_one(x - foe_x);
@@ -668,7 +775,9 @@ impl Body {
         };
         d.phase = Phase::Down;
         d.t = 0.0;
-        d.quick = alive && room > KNOCKDOWN_ROLL_DISTANCE + 8.0 && roll() < KNOCKDOWN_QUICK;
+        d.quick = alive
+            && room > self.spec.knockdown_roll_distance + 8.0
+            && roll() < self.spec.knockdown_quick;
         d.dir = away;
     }
 
@@ -680,20 +789,20 @@ impl Body {
             && alive
             && d.t
                 >= (if d.quick {
-                    KNOCKDOWN_FLOP
+                    self.spec.knockdown_flop
                 } else {
-                    KNOCKDOWN_LIE
+                    self.spec.knockdown_lie
                 })
         {
             d.phase = if d.quick { Phase::Roll } else { Phase::Rise };
             d.t = 0.0;
         } else if d.phase == Phase::Roll {
-            let done = d.t >= KNOCKDOWN_ROLL;
-            self.vx = (d.dir * KNOCKDOWN_ROLL_DISTANCE) / KNOCKDOWN_ROLL;
+            let done = d.t >= self.spec.knockdown_roll;
+            self.vx = (d.dir * self.spec.knockdown_roll_distance) / self.spec.knockdown_roll;
             if done {
                 self.stand();
             }
-        } else if d.phase == Phase::Rise && d.t >= KNOCKDOWN_RISE {
+        } else if d.phase == Phase::Rise && d.t >= self.spec.knockdown_rise {
             self.stand();
         }
     }
@@ -701,36 +810,45 @@ impl Body {
     fn stand(&mut self) {
         self.down = None;
         self.vx = 0.0;
-        self.wake = KNOCKDOWN_GRACE;
-        self.land = LANDING_SOFT;
+        self.wake = self.spec.knockdown_grace;
+        self.land = self.spec.landing_soft;
     }
 }
 
 /// Two bodies cannot stand in one place: overlapping at the same height each is pushed half the overlap apart,
-/// and neither keeps walking into the other. One far enough above the other passes over it, and one on the floor
-/// is stepped over. The game calls it only while both fighters have life left.
+/// and neither keeps walking into the other. One far enough above the other (all but the last 6 pixels of the lower
+/// one's height) passes over it, and one on the floor is stepped over. Each keeps its own half width and room, and
+/// its own distance from the arena's edges. The game calls it only while both fighters have life left.
 pub fn separate(a: &mut Body, b: &mut Body, arena: &Arena) {
-    if a.floored() || b.floored() || (a.air - b.air).abs() >= BODY - 6.0 {
+    let lower = if a.air <= b.air { &a.spec } else { &b.spec };
+    if a.floored() || b.floored() || (a.air - b.air).abs() >= lower.body - 6.0 {
         return;
     }
+    let personal = a.spec.half_width + a.spec.room + b.spec.half_width + b.spec.room;
     let dx = b.x - a.x;
-    let overlap = PERSONAL - dx.abs();
+    let overlap = personal - dx.abs();
     if overlap <= 0.0 {
         return;
     }
     // exactly on top of each other: part them along the way they face
     let dir = if dx != 0.0 { js_sign(dx) } else { a.face };
-    let lo = arena.left + HALF_WIDTH;
-    let hi = arena.right - HALF_WIDTH;
-    a.x = clamp(a.x - (dir * overlap) / 2.0, lo, hi);
-    b.x = clamp(b.x + (dir * overlap) / 2.0, lo, hi);
+    let (a_lo, a_hi) = (
+        arena.left + a.spec.half_width,
+        arena.right - a.spec.half_width,
+    );
+    let (b_lo, b_hi) = (
+        arena.left + b.spec.half_width,
+        arena.right - b.spec.half_width,
+    );
+    a.x = clamp(a.x - (dir * overlap) / 2.0, a_lo, a_hi);
+    b.x = clamp(b.x + (dir * overlap) / 2.0, b_lo, b_hi);
     // against a wall one side cannot give: the other takes the rest
-    let left = PERSONAL - (b.x - a.x).abs();
+    let left = personal - (b.x - a.x).abs();
     if left > 0.0 {
-        if a.x == lo || a.x == hi {
-            b.x = clamp(b.x + dir * left, lo, hi);
+        if a.x == a_lo || a.x == a_hi {
+            b.x = clamp(b.x + dir * left, b_lo, b_hi);
         } else {
-            a.x = clamp(a.x - dir * left, lo, hi);
+            a.x = clamp(a.x - dir * left, a_lo, a_hi);
         }
     }
     if js_sign(a.vx) == dir {
@@ -755,11 +873,7 @@ fn js_sign(x: f64) -> f64 {
 /// JS `Math.sign(x) || 1`: the sign, or 1 for zero and NaN.
 fn sign_or_one(x: f64) -> f64 {
     let s = js_sign(x);
-    if s == 0.0 || s.is_nan() {
-        1.0
-    } else {
-        s
-    }
+    if s == 0.0 || s.is_nan() { 1.0 } else { s }
 }
 
 /// JS `Math.max(a, b)`, signed zeros included (+0 beats -0).
