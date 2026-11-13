@@ -1,5 +1,7 @@
 //! Water jet: port of pixelfx `src/fx/water/water-jet.js`.
 //!
+//! Beyond pixelfx: the `length` option is held to 0..=4096 px, so a huge number cannot stall the column loop.
+//!
 //! The stream's build (a white core banded out to darker edges, surges running along it, light down its length, a
 //! flare where it leaves the source) follows Sprite Fusion's open-source energy beam
 //! (https://www.spritefusion.com/pixel-art-vfx/energy), MIT License, Copyright (c) 2026 Hugo Duprez.
@@ -37,6 +39,8 @@ const META: Meta = Meta {
 };
 
 const LENGTH: f64 = 118.0;
+/// The longest stream drawn (beyond pixelfx, which draws any length; see the module doc).
+const MAX_LENGTH: f64 = 4096.0;
 const D: f64 = META.duration;
 const G: f64 = 520.0;
 const SPEED: f64 = 260.0;
@@ -48,7 +52,7 @@ impl Effect for WaterJet {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&WATER)),
-            length: opts.num_or("length", LENGTH),
+            length: opts.num_in("length", LENGTH, 0.0, MAX_LENGTH),
             seed: seed as f64,
         })
     }
@@ -68,8 +72,8 @@ impl EffectState for State {
     }
 }
 
-/// The stream's centre line drops as it goes.
-fn drop(x: f64, l: f64) -> f64 {
+/// The stream's centre line sags as it goes.
+fn sag(x: f64, l: f64) -> f64 {
     libm::pow(x / l, 2.0) * 9.0
 }
 
@@ -92,7 +96,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
         if u > 1.0 {
             break;
         }
-        let yc = drop(x, l);
+        let yc = sag(x, l);
         let rough = smooth(0.25, 1.0, u);
         let sd = (((x - ph * SPEED * 2.0) % 130.0) + 130.0) % 130.0 - 65.0;
         let w0 = thick(x, l) + libm::exp(-(sd * sd) / 90.0) * 1.4 * (1.0 - u * 0.5);
@@ -160,7 +164,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
     for k in 0..6 {
         let kf = f64::from(k);
         let x = l * 0.82 + ((kf * 13.0 + ph * SPEED) % 78.0);
-        let y = drop(js_min(x, l), l)
+        let y = sag(js_min(x, l), l)
             + if x > l {
                 libm::pow((x - l) / 60.0, 2.0) * 10.0
             } else {
@@ -190,7 +194,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
         |age, life, r, _| {
             let f = libm::sqrt(r.next());
             let x0 = l * (0.3 + 0.7 * f);
-            let y0 = drop(x0, l) + r.range(-1.0, 1.0) * thick(x0, l);
+            let y0 = sag(x0, l) + r.range(-1.0, 1.0) * thick(x0, l);
             let vx = r.range(150.0, 270.0) * (0.55 + 0.45 * f);
             let vy = r.range(-1.0, 1.0) * 110.0 * f + r.range(-10.0, 20.0);
             let x = x0 + vx * age;
@@ -217,7 +221,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
         |age, life, r, _| {
             let k = age / life;
             let x = l * r.range(0.7, 1.0) + age * r.range(20.0, 45.0);
-            let y = drop(js_min(x, l), l) + r.range(-5.0, 5.0) + age * r.range(4.0, 14.0);
+            let y = sag(js_min(x, l), l) + r.range(-5.0, 5.0) + age * r.range(4.0, 14.0);
             let rad = r.range(3.0, 5.0) + k * r.range(5.0, 9.0);
             let a = r.range(0.1, 0.18) * js_min(1.0, k / 0.15) * libm::pow(1.0 - k, 1.5);
             p.disc(x, y, rad, c[6], |d: f64, _: f64| a * (1.0 - d * d));
@@ -228,12 +232,12 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
     while x < l {
         p.glow(
             x,
-            drop(x, l),
+            sag(x, l),
             14.0 + x * 0.1,
             c[4],
             0.26 * (1.0 - (x / l) * 0.5),
         );
         x += 10.0;
     }
-    p.glow(l * 0.9, drop(l * 0.9, l), 26.0, c[5], 0.22);
+    p.glow(l * 0.9, sag(l * 0.9, l), 26.0, c[5], 0.22);
 }

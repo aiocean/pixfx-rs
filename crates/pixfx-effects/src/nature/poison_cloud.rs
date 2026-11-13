@@ -1,9 +1,14 @@
 //! Poison cloud: port of pixelfx `src/fx/nature/poison-cloud.js`.
+//!
+//! Beyond pixelfx: the `spread` option is held to 0..=16, so a huge number cannot hang the draw.
 
 use pixfx_core::color::{Rgba, ramp};
 use pixfx_core::math::{TAU, clamp, js_max, js_min, js_round, js_sign, rng, smooth, tile_noise};
 use pixfx_core::particles::cycle;
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+
+/// The widest cloud drawn (beyond pixelfx, which draws any spread; see the module doc).
+const MAX_SPREAD: f64 = 16.0;
 
 pub struct PoisonCloud;
 
@@ -85,7 +90,7 @@ impl Effect for PoisonCloud {
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
-            spread: opts.num_or("spread", 1.0),
+            spread: opts.num_in("spread", 1.0, 0.0, MAX_SPREAD),
             seed: seed as f64,
         })
     }
