@@ -10,6 +10,7 @@ pub mod fire;
 pub mod holy;
 pub mod ice;
 pub mod impacts;
+pub mod scifi;
 pub mod spawn;
 
 /// Every effect in this crate.
@@ -28,6 +29,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &spawn::POOF,
     &holy::FEATHER_BURST,
     &ice::ICICLE_FALL,
+    &scifi::JETPACK,
 ];
 
 /// The effect with this id (`fire/candle`).
