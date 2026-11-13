@@ -31,7 +31,8 @@ pub struct Puff {
     /// How many specks.
     pub n: u32,
     /// Which way they fly: -1 or 1.
-    pub dir: f64,
+    /// `None` leaves the side to the host (pixelfx picks one at random).
+    pub dir: Option<f64>,
 }
 
 /// An attack's timing.

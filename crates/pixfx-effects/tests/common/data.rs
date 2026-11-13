@@ -7,8 +7,9 @@
 //!
 //! Shape: `{cues: [{t, type, ...}], act: null | {windup, recovery, onBody, targets, hits: [{t, freeze, shake,
 //! amp, push, at?}], dust: [{t, x, n, dir}]}, state: null | {set, name, order, next, carry}}`. Only these
-//! fields are compared: the golden's cue `x` (used for pan, which the host sets), a hit's `skin` and the poses
-//! are not modelled by the port. Numbers match within 1e-9.
+//! fields are compared, and a field the golden leaves out is null (a sound's `x`, a hit's `at`, a puff's `dir`).
+//! A hit's `skin` and the pose track stay out on purpose: the rig and the training dummy are not ported, so
+//! the port has nothing to compare them with. Numbers match within 1e-9.
 
 use pixfx_core::act::Act;
 use pixfx_core::cue::{Cue, TimedCue, cues_of};
@@ -52,8 +53,9 @@ fn cue_json(c: &TimedCue) -> Value {
             gain,
             pitch,
             len,
+            x,
         } => {
-            json!({"type": "sound", "name": name, "gain": gain, "pitch": pitch, "len": len})
+            json!({"type": "sound", "name": name, "gain": gain, "pitch": pitch, "len": len, "x": x})
         }
     };
     m["t"] = json!(c.t);
@@ -103,7 +105,7 @@ fn project(golden: &Value) -> Value {
             "hitstop" => &["t", "type", "dur"],
             "ripple" => &["t", "type", "x", "y", "r0", "r1", "dur", "amp"],
             "flash" => &["t", "type", "k", "dur"],
-            _ => &["t", "type", "name", "gain", "pitch", "len"],
+            _ => &["t", "type", "name", "gain", "pitch", "len", "x"],
         }
     };
     let list = |v: &Value, f: &dyn Fn(&Value) -> Value| -> Value {

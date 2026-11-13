@@ -78,7 +78,7 @@ fn dust_events_in_order() {
         t,
         x: 0.0,
         n: 6,
-        dir: 1.0,
+        dir: Some(1.0),
     };
     let mut p = Performance::new(
         act(

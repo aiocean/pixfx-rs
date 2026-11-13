@@ -76,6 +76,31 @@ static RIPPLED: Cued = Cued {
     cues: &[at(0.5, RIPPLE)],
 };
 
+const SOUND: Cue = Cue::Sound {
+    name: "hit",
+    gain: 1.0,
+    pitch: 1.0,
+    len: None,
+    x: Some(10.0),
+};
+static SOUNDED: Cued = Cued {
+    meta: meta("test/sound", false),
+    cues: &[at(0.5, SOUND)],
+};
+static UNPLACED: Cued = Cued {
+    meta: meta("test/sound-unplaced", false),
+    cues: &[at(
+        0.5,
+        Cue::Sound {
+            name: "hit",
+            gain: 1.0,
+            pitch: 1.0,
+            len: None,
+            x: None,
+        },
+    )],
+};
+
 fn play(effect: &'static Cued, opts: Options, screen_w: f64, steps: u32) -> Vec<TimedCue> {
     let mut inst = Instance::new(effect, opts);
     inst.set_screen_w(screen_w);
@@ -159,6 +184,31 @@ fn pan_follows_a_cues_own_world_x() {
     // ripple x 10 offset by opts.x 100 = 110 of 220 -> 0
     let got = play(&RIPPLED, opts, 220.0, 10);
     assert_eq!(got[0].pan, Some(0.0));
+}
+
+#[test]
+fn a_sound_with_x_is_placed_and_panned_like_a_ripple() {
+    let opts = Options {
+        x: 100.0,
+        flip: true,
+        ..Options::default()
+    };
+    let got = play(&SOUNDED, opts, 180.0, 10);
+    assert_eq!(got.len(), 1);
+    // x 10 mirrored and offset by opts.x 100 = 90 of 180 -> 0
+    assert!(matches!(got[0].cue, Cue::Sound { x: Some(90.0), .. }));
+    assert_eq!(got[0].pan, Some(0.0));
+}
+
+#[test]
+fn a_sound_without_x_pans_from_the_effect() {
+    let opts = Options {
+        x: 50.0,
+        ..Options::default()
+    };
+    let got = play(&UNPLACED, opts, 200.0, 10);
+    assert!(matches!(got[0].cue, Cue::Sound { x: None, .. }));
+    assert_eq!(got[0].pan, Some(-0.5));
 }
 
 #[test]

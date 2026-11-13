@@ -183,6 +183,7 @@ mod effect_cues {
             gain: 1.0,
             pitch: 1.0,
             len: None,
+            x: None,
         })]);
         assert_eq!(feel.trauma(), 0.0);
         assert_eq!(feel.advance(FRAME), FRAME);

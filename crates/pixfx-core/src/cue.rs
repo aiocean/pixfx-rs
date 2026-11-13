@@ -27,12 +27,14 @@ pub enum Cue {
     },
     /// A full-screen flash of strength `k` lasting `dur`.
     Flash { k: f64, dur: f64 },
-    /// A sound by name (1.0 `pitch` = as designed); `len` caps its length in seconds.
+    /// A sound by name (1.0 `pitch` = as designed); `len` caps its length in seconds; `x` is where it comes
+    /// from in the effect's space, for pan (the effect's own position when `None`).
     Sound {
         name: &'static str,
         gain: f64,
         pitch: f64,
         len: Option<f64>,
+        x: Option<f64>,
     },
 }
 
@@ -84,10 +86,17 @@ pub fn cues_between(
             let mut w = *c;
             w.t = at;
             let mut world_x = None;
-            if let Cue::Ripple { x, y, .. } = &mut w.cue {
-                *x = opts.x + sx * *x;
-                *y += opts.y;
-                world_x = Some(*x);
+            match &mut w.cue {
+                Cue::Ripple { x, y, .. } => {
+                    *x = opts.x + sx * *x;
+                    *y += opts.y;
+                    world_x = Some(*x);
+                }
+                Cue::Sound { x: Some(x), .. } => {
+                    *x = opts.x + sx * *x;
+                    world_x = Some(*x);
+                }
+                _ => {}
             }
             if screen_w > 0.0 {
                 let wx = world_x.unwrap_or(opts.x);
