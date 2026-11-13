@@ -12,6 +12,7 @@ pub mod particles;
 pub mod render;
 pub mod shapes;
 pub mod sim;
+pub mod state;
 
 pub use color::{ColorError, Rgba, hex};
 pub use cue::{Cue, TimedCue, cues_between, cues_of};
@@ -24,3 +25,4 @@ pub use sim::{
     Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particle, Particles,
     ParticlesOpts, Piece, Spawn, band, crystal, flare, sparkle,
 };
+pub use state::{Creature, StateError, StateMeta};

@@ -27,6 +27,7 @@ const META: Meta = Meta {
     looping: false,
     fps: 30,
     seed: 11,
+    state: None,
 };
 
 // meta.options

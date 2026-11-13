@@ -40,6 +40,7 @@ pub const fn screen_meta(
         looping: false,
         fps: 30,
         seed,
+        state: None,
     }
 }
 

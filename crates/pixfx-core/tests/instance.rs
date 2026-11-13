@@ -50,6 +50,7 @@ const fn dot_meta(id: &'static str, looping: bool) -> Meta {
         looping,
         fps: 30,
         seed: 5,
+        state: None,
     }
 }
 
@@ -235,6 +236,7 @@ const fn glow_meta(size: (u32, u32)) -> Meta {
         looping: true,
         fps: 2,
         seed: 1,
+        state: None,
     }
 }
 

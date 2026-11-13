@@ -28,6 +28,7 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 1,
+    state: None,
 };
 
 const PALETTE: [Rgba; 7] = [

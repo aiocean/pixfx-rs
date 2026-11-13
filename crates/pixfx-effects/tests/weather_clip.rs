@@ -19,6 +19,7 @@ fn clip_glow_and_pass_match_pixelfx_at_any_placement() {
         looping: false,
         fps: 30,
         seed: 1,
+        state: None,
     };
     let col = |s: &str| hex(s).unwrap_or(Rgba::NONE);
     let (a, b, c) = (col("#93abd6"), col("#24304f"), col("#ffe26b"));

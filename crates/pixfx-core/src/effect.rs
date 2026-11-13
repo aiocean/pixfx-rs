@@ -12,6 +12,7 @@ use crate::cue::{TimedCue, cues_between, cues_of};
 use crate::frame::Frame;
 use crate::math::{clamp, js_max, js_min};
 use crate::painter::Painter;
+use crate::state::StateMeta;
 
 /// The longest step [`Instance::update`] takes: a live host that stalls (a background tab, a debugger)
 /// resumes where it left off instead of simulating the whole gap. pixelfx has no such clamp; renders never
@@ -43,6 +44,8 @@ pub struct Meta {
     pub fps: u32,
     /// The seed used when the caller gives none (pixelfx `meta.options.seed`; every pixelfx effect has one).
     pub seed: u64,
+    /// Set when the effect is one state of a creature.
+    pub state: Option<StateMeta>,
 }
 
 impl Meta {
