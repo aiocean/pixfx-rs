@@ -90,7 +90,7 @@ export const SPELLS = {
   // Thunder: a gold seal opens on the ground under the foe, and a thunderclap bursts from it
   seal: {
     kind: "zone", type: "magic", fx: "explosions/plasma-explosion", cost: 20, windup: 0.3, recover: 0.3, cooldown: 2.4,
-    sigil: 0.4, impact: 0.08, radius: 16, damage: 17, notice: 0, height: CHEST, shock: true,
+    sigil: 0.4, impact: 0.08, radius: 16, damage: 14, notice: 0, height: CHEST, shock: true,
   },
   // Frost: a lotus of ice shards blooms from the palm at close range, and cracks the foe's guard
   lotus: { kind: "blast", type: "magic", fx: "holy/feather-burst", cost: 16, windup: 0.3, recover: 0.3, cooldown: 2.2, range: 34, damage: 13, defDown: 3 },

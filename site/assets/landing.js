@@ -3,7 +3,7 @@
 // draws its own sprites, then the front layers.
 import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 import { DECOR, createDuel, step } from "./duel.js";
-import { drawBars, drawFighter, drawNumbers, drawStreaks } from "./duel-art.js";
+import { BARS_TALL, drawBars, drawFighter, drawNumbers, drawStreaks } from "./duel-art.js";
 import { advance, createFeel, dusk, numbers, react, shake, streaks } from "./duel-feel.js";
 import { createScene, drawScene } from "./duel-scene.js";
 
@@ -122,7 +122,7 @@ function createHero(canvas, signal) {
     // (its links can wrap past its own box on a narrow screen, so measure what is in it)
     const topbar = Math.max(0, ...[...document.querySelectorAll(".topbar, .topbar *")].map((el) => el.getBoundingClientRect().bottom));
     const barTop = Math.max(6, Math.ceil((topbar - rect.top) / scale) + 6);
-    view.layout = { scale, w, h, ground, barTop, scene: createScene(w, h, ground) };
+    view.layout = { scale, w, h, ground, barTop, scene: createScene(w, h, ground, barTop + BARS_TALL) };
     // a still frame shows the fight under way
     if (reduceMotion) {
       for (let i = 0; i < 6 * 30; i++) play(step(view.duel, 1 / 30));

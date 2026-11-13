@@ -15,8 +15,9 @@ const MIST = "#a9a4dc";
 const LAMP = "#ffb85a";
 const STONE = { lip: "#5d5670", top: "#3b3549", slab: "#2c2838", joint: "#211e2b", face: "#1b1824", shadow: "#120f1a" };
 
-/** The backdrop for a w x h scene whose floor is at `ground`, from a fixed seed so it is the same on every load. */
-export function createScene(w, h, ground) {
+/** The backdrop for a w x h scene whose floor is at `ground`, from a fixed seed so it is the same on every load. The
+ *  moon hangs below `clear`, the band at the top the fight's bars sit in. */
+export function createScene(w, h, ground, clear = 0) {
   const rand = seeded(11);
   const layer = () => {
     const c = Object.assign(document.createElement("canvas"), { width: w, height: h });
@@ -44,7 +45,8 @@ export function createScene(w, h, ground) {
     sky.ctx.fillRect(x, y, 1, 1);
   }
   sky.ctx.globalAlpha = 1;
-  drawMoon(sky.ctx, Math.round(w * 0.74), Math.round(Math.min(46, horizon * 0.3)), Math.round(Math.max(14, Math.min(24, h * 0.1))));
+  const moon = Math.round(Math.max(14, Math.min(24, h * 0.1)));
+  drawMoon(sky.ctx, Math.round(w * 0.74), Math.max(Math.round(Math.min(46, horizon * 0.3)), clear + moon + 4), moon);
 
   const ranges = RANGES.map((r, k) => {
     const l = layer();

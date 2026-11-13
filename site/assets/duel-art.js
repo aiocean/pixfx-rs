@@ -476,6 +476,9 @@ const BAR = { back: "#160f1c", lost: "#5a1a14", trail: "#fff0d0", qi: "#7fb4ff",
 /** Life each bar last showed, so a blow's loss drains away behind the bar instead of vanishing. */
 const shown = new WeakMap();
 
+/** How tall the fight's bars are, in game pixels: its medallions are this wide and tall. */
+export const BARS_TALL = 26;
+
 /**
  * The fight's bars, with no words: for each fighter a bronze medallion with its face, then its life (what a blow
  * just took drains away behind it), its qi under that, and its rage as beads that blaze once full (its ultimate
@@ -484,8 +487,10 @@ const shown = new WeakMap();
  */
 export function drawBars(ctx, duel, s, top) {
   const span = duel.right - duel.left;
-  const medal = 26;
-  const width = Math.max(30, Math.min(120, Math.floor(span / 2) - medal - 26));
+  const medal = BARS_TALL;
+  // a narrow arena hangs the plaque under the bars, between the rage beads, so the bars get its room
+  const narrow = span < 260;
+  const width = Math.max(30, Math.min(120, Math.floor(span / 2) - medal - (narrow ? 5 : 26)));
   const box = (x, y, w, h, col, a = 1) => {
     ctx.globalAlpha = a;
     ctx.fillStyle = col;
@@ -546,6 +551,7 @@ export function drawBars(ctx, duel, s, top) {
   }
   // the plaque in the middle: a diamond per round won, each side in its fighter's colour
   const mid = Math.round((duel.left + duel.right) / 2);
+  top += narrow ? 13 : 0;
   box(mid - 18, top + 2, 36, 9, BRONZE.deep);
   box(mid - 17, top + 3, 34, 7, BRONZE.dark);
   box(mid - 17, top + 3, 34, 1, BRONZE.mid);
