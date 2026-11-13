@@ -46,10 +46,12 @@ runtimes (pixelfx is JS-only live; beanfx is Python-only offline and needs a sep
    previews, write a Rust effect module, render takes, look, refine, export. Knob set follows beanfx's
    `knobs/` (size, view, loop, timing, role, density, placement, clarity, style, palette, glow, shape, caster,
    combo, aura, states, sound).
+10. **Phaser 4 plugin** (`packages/pixfx-phaser`): a scene plugin that plays effects in Phaser 4 games through
+    `pixfx-wasm` (`scene.pixfx.play(id, x, y, opts)`). Design: `2026-11-13-pixfx-phaser-design.md`.
 
 ## Non-goals
 
-- Adapters for Bevy, macroquad, Phaser, Pixi. The core stays engine-agnostic so they can be added later.
+- Adapters for Bevy, macroquad, Pixi. The core stays engine-agnostic so they can be added later.
 - Runtime-loaded effects (scripts/data). Effects are compiled Rust; the web plays what was built in.
 - beanfx's WIP `/char` and `/scene` (SDF/Blender) tools.
 - pixelfx's "publish on Patch" flow and the Patch Pixel font (not MIT).
@@ -116,6 +118,8 @@ pixfx-rs/
     pixfx-wasm     wasm-bindgen engine JS drives: list effects, spawn, step, read frames (demo/ page)
     pixfx-canvas   wasm Canvas 2D renderer with its own loop: a Stage that plays effects where JS puts them
                    (demo/ page); its decisions are plain Rust in `stage`, its blitting a thin shell
+  packages/
+    pixfx-phaser   TypeScript Phaser 4 scene plugin over pixfx-wasm (demo/ page)
   examples/gpui-web  a minimal gpui wasm app playing effects (the integration proof)
   skill/pixfx      the Claude Code skill (SKILL.md, knobs/, research notes)
   casters/         beanfx's four bundled casters
