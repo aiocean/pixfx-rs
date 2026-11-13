@@ -407,6 +407,37 @@ fn positions_snap_to_whole_game_pixels() -> Res {
 }
 
 #[test]
+fn moving_an_effect_places_its_origin_and_keeps_its_time() -> Res {
+    let mut scene = Scene::new(scale(2)?);
+    let h = scene.play(player("fire/candle")?, 100.0, 150.0, ())?;
+    scene.update(0.2)?;
+    let t = scene.t(h);
+    assert_eq!(scene.move_to(h, 40.6, 60.4), Ok(true));
+    assert_eq!(
+        scene.rect(h).map(|r| (r.x, r.y)),
+        Some(((41 - 28 - 38) * 2, (60 - 64 - 38) * 2))
+    );
+    assert_eq!(scene.t(h), t, "a move must not restart the effect");
+    assert_eq!(passes(&mut scene).first().map(|p| p.rect), scene.rect(h));
+    Ok(())
+}
+
+#[test]
+fn moving_refuses_non_finite_positions_and_reports_unknown_handles() -> Res {
+    let mut scene = Scene::new(scale(1)?);
+    let h = scene.play(player("fire/candle")?, 10.0, 20.0, ())?;
+    let before = scene.rect(h);
+    assert_eq!(scene.move_to(h, f64::NAN, 0.0), Err(StageError::NotFinite));
+    assert_eq!(
+        scene.move_to(h, 0.0, f64::INFINITY),
+        Err(StageError::NotFinite)
+    );
+    assert_eq!(scene.rect(h), before);
+    assert_eq!(scene.move_to(h + 1, 0.0, 0.0), Ok(false));
+    Ok(())
+}
+
+#[test]
 fn non_finite_positions_are_refused() -> Res {
     let mut scene = Scene::new(scale(1)?);
     for (x, y) in [

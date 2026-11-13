@@ -124,6 +124,21 @@ impl<T> Scene<T> {
         Ok(handle)
     }
 
+    /// Put the instance's origin at game pixel (`x`, `y`), rounded as [`Scene::play`] does, keeping its time:
+    /// an effect that follows something moves without restarting. `Ok(false)` if no instance has this handle.
+    pub fn move_to(&mut self, handle: u32, x: f64, y: f64) -> Result<bool, StageError> {
+        if !x.is_finite() || !y.is_finite() {
+            return Err(StageError::NotFinite);
+        }
+        let at = (js_round(x) as i64, js_round(y) as i64);
+        Ok(self
+            .entries
+            .iter_mut()
+            .find(|e| e.handle == handle)
+            .map(|e| e.at = at)
+            .is_some())
+    }
+
     /// Let the instance end (loops fade out); false if no instance has this handle.
     pub fn stop(&mut self, handle: u32) -> bool {
         self.entries
