@@ -1,7 +1,7 @@
 //! The screen transitions are registered under their pixelfx ids with pixelfx's meta
 //! (`src/fx/transitions/*.js`).
 
-use pixfx_core::{Meta, OptValue, Options, frame_hash, render_frames};
+use pixfx_core::{Frame, Instance, Layer, Meta, OptValue, Options, frame_hash, render_frames};
 use pixfx_effects::effect;
 
 fn meta(id: &str) -> Option<Meta> {
@@ -46,5 +46,61 @@ fn burn_away_hole_follows_hole_options() -> Result<(), String> {
     // pixelfx's own hole centre for seed 3 (outField: new Rng((3 * 13 + 1) * 31 + 5), node at 044e12a)
     let same = burn_away_hashes(&[("holeX", 172.76643117144704), ("holeY", 87.36016465723515)])?;
     assert_eq!(same, default);
+    Ok(())
+}
+
+/// Frame hashes from `tests/golden/burn_away_placed.mjs` (pixelfx 044e12a): burn-away played off the
+/// whole-pixel grid and rotated, on a frame with room round the screen. pixelfx clips only the flames, smoke,
+/// particles and light to the screen; the cover and the burning line are drawn whole.
+#[test]
+fn burn_away_placed_matches_pixelfx() -> Result<(), String> {
+    let fx = effect("transitions/burn-away").ok_or("transitions/burn-away is not registered")?;
+    // name, placement x, y and angle, and (frame, hash) after that many 1/30 s steps
+    type Case = (&'static str, f64, f64, f64, [(usize, u64); 3]);
+    let cases: [Case; 2] = [
+        (
+            "half_pixel",
+            0.5,
+            0.5,
+            0.0,
+            [
+                (30, 0xc1c5_a182_f4bf_c2bb),
+                (42, 0x1992_5c34_e000_19c7),
+                (60, 0xd7b8_4ef5_f119_582b),
+            ],
+        ),
+        (
+            "rotated",
+            160.0,
+            90.0,
+            0.3,
+            [
+                (30, 0x2e49_a44a_4b1e_3699),
+                (42, 0x3f2d_e2be_e2af_76aa),
+                (60, 0xc122_e03a_185f_c4e9),
+            ],
+        ),
+    ];
+    for (name, x, y, angle, frames) in cases {
+        let mut inst = Instance::new(
+            fx,
+            Options {
+                x,
+                y,
+                angle,
+                ..Options::default()
+            },
+        );
+        let mut i = 0;
+        for (n, want) in frames {
+            while i < n {
+                inst.update(1.0 / 30.0);
+                i += 1;
+            }
+            let mut frame = Frame::new(640, 500, -160, -160);
+            inst.draw(&mut frame, Layer::Both);
+            assert_eq!(frame_hash(&frame), want, "{name} frame {n}");
+        }
+    }
     Ok(())
 }

@@ -4,8 +4,8 @@
 //! open-source fire (https://www.spritefusion.com/pixel-art-vfx/fire), MIT License, Copyright (c) 2026 Hugo Duprez.
 //!
 //! Beyond pixelfx: the number options `holeX` and `holeY` (screen pixels) set where the hole starts burning
-//! open. Each replaces pixelfx's seeded centre on its own axis; the seeded centre is still drawn, so every
-//! other random draw is unchanged.
+//! open. Each replaces pixelfx's seeded centre on its own axis, and the two satellite spots that catch a beat
+//! later follow the overridden centre; the seeded centre is still drawn, so every other random draw is unchanged.
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{
@@ -464,7 +464,7 @@ impl State {
             if a < 0.04 {
                 continue;
             }
-            // pixelfx draws a puff wholly on screen without the clip, which keeps every pixel anyway
+            // pixelfx draws a puff wholly on screen without the clip; the clip keeps all of its pixels
             let c = mix(mix(dim, self.lit, lit), SMOKE_RAMP[2], age * 0.5);
             p.disc(q.x, q.y, r, c, a * 0.45);
             p.disc(q.x + r * 0.05, q.y + r * 0.06, r * 0.74, c, a * 0.62);
@@ -643,6 +643,7 @@ impl State {
         for &i in ord.get(a0..a1).unwrap_or_default() {
             shade_at(&mut px, i as usize, &mut line);
         }
+        clip_to(p);
         // flames stand on the white-hot line: tall and many where the char lies below it and they rise clear,
         // short and few where they'd only lick up over the char
         for i in line {
@@ -821,14 +822,13 @@ impl EffectState for State {
             return;
         }
         let t = self.t;
-        // pixelfx draws through clipTo(p) and writes the cover straight to p; the cover is all on screen, so
-        // one clipped painter draws the same pixels
-        clip_to(p);
+        // the cover and the burning line are drawn whole; everything after them is clipped to the screen
         if (COVER..SMOULDER).contains(&t) {
             rect(p, 0.0, 0.0, WF, HF, self.ink);
         } else if t < OPEN + 0.25 {
             self.draw_burn(p);
         }
+        clip_to(p);
         self.draw_smoke(p);
         self.ash.draw(p, Layer::Front);
         self.ps.draw(p, Layer::Front);

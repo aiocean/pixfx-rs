@@ -145,8 +145,8 @@ impl<'a> Painter<'a> {
 
     /// Drop every write whose local pixel cell lies outside `[0, w) x [0, h)`: a full-screen effect's sparks,
     /// smoke and light stop at its edge instead of spilling past it (pixelfx transitions `clipTo`, a painter
-    /// whose `put`, `add` and `blendPx` check `inside` first). Follows later placement; [`Painter::reset`]
-    /// removes it.
+    /// whose `put`, `add` and `blendPx` check `inside` first). Follows later placement, and lasts until
+    /// [`Painter::reset`] or the end of this painter's use.
     pub fn clip_local(&mut self, w: f64, h: f64) -> &mut Self {
         self.clip = Some((w, h));
         self
