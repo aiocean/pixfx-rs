@@ -118,7 +118,11 @@ function createHero(canvas, signal) {
     if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
     view.feel = createFeel();
     view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id) });
-    view.layout = { scale, w, h, ground, scene: createScene(w, h, ground) };
+    // the bars go just under the page's top bar, which lies over the hero
+    // (its links can wrap past its own box on a narrow screen, so measure what is in it)
+    const topbar = Math.max(0, ...[...document.querySelectorAll(".topbar, .topbar *")].map((el) => el.getBoundingClientRect().bottom));
+    const barTop = Math.max(6, Math.ceil((topbar - rect.top) / scale) + 6);
+    view.layout = { scale, w, h, ground, barTop, scene: createScene(w, h, ground) };
     // a still frame shows the fight under way
     if (reduceMotion) {
       for (let i = 0; i < 6 * 30; i++) play(step(view.duel, 1 / 30));
@@ -164,7 +168,7 @@ function createHero(canvas, signal) {
     view.stage.drawLayer("front");
     drawNumbers(ctx, numbers(view.feel), view.duel, scale);
     ctx.restore();
-    drawBars(ctx, view.duel, scale);
+    drawBars(ctx, view.duel, scale, view.layout.barTop);
   };
 
   let pending = null;

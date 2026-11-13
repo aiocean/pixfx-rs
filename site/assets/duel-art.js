@@ -279,12 +279,12 @@ function sword(px, c, x, y, how) {
 
 /**
  * The bars over the arena, with no words: each fighter's life (the part just lost fades out behind it), qi and its
- * rage pips, which flash once full (its ultimate is ready); between them, a diamond for each round won.
+ * rage pips, which flash once full (its ultimate is ready); between them, a diamond for each round won. `top` is
+ * the bars' top edge in game pixels.
  */
-export function drawBars(ctx, duel, s) {
-  const width = Math.max(40, Math.min(110, Math.floor((duel.right - duel.left) / 2) - 18));
-  // below the page's top bar
-  const top = 22;
+export function drawBars(ctx, duel, s, top) {
+  // room in the middle for the round diamonds
+  const width = Math.max(30, Math.min(110, Math.floor((duel.right - duel.left) / 2) - 36));
   const box = (x, y, w, h, col) => {
     ctx.fillStyle = col;
     ctx.fillRect(x * s, y * s, w * s, h * s);
