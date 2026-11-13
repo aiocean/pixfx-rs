@@ -12,6 +12,7 @@ pub mod frame;
 pub mod math;
 pub mod outline;
 pub mod painter;
+pub mod palette;
 pub mod particles;
 pub mod render;
 pub mod screen;

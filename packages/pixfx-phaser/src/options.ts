@@ -1,8 +1,25 @@
 import { z } from "zod";
-import type { FxOptions } from "../wasm/pixfx_wasm.js";
+import type { FxOptions, PaletteOption } from "../wasm/pixfx_wasm.js";
 
 // An effect's own option, as the engine takes it (`FxOptions`): a number, a colour, a list of colours or a flag.
 const ownOption = z.union([z.number(), z.string(), z.array(z.string()), z.boolean()]);
+
+/** The palette presets every effect takes by name (the engine's `palette::PRESETS`). */
+export const PALETTE_PRESETS = [
+  "fire",
+  "ice",
+  "poison",
+  "holy",
+  "shadow",
+  "arcane",
+  "blood",
+  "electric",
+  "nature",
+  "gold",
+] as const satisfies readonly Exclude<PaletteOption, string[]>[];
+
+// A palette: a preset's name or a list of colours, dark to light.
+const paletteOption = z.union([z.enum(PALETTE_PRESETS), z.array(z.string())]);
 
 // The outline every effect takes (`OutlineOption`): `false`, `true`, a word ("off", a preset, a hex colour) or a ring.
 const outlineOption = z.union([
@@ -21,7 +38,7 @@ const playOptionsSchema = z.object({
   angle: z.number().optional(),
   light: z.number().nonnegative().optional(),
   margin: z.never({ error: "the plugin sizes the margin itself" }).optional(),
-  palette: z.array(z.string()).optional(),
+  palette: paletteOption.optional(),
   outline: outlineOption.optional(),
   scrollFactor: z.number().default(1),
   depth: z.object({ back: z.number(), front: z.number() }).optional(),
@@ -38,7 +55,7 @@ export const engineOptionsSchema = z
     flip: z.boolean().optional(),
     angle: z.number().optional(),
     light: z.number().optional(),
-    palette: z.array(z.string()).optional(),
+    palette: paletteOption.optional(),
     outline: outlineOption.optional(),
   })
   // as `FxOptions` types any key (the engine checks each against the effect)

@@ -18,7 +18,7 @@ pub const MAX_MARGIN: u32 = 4096;
 #[derive(Default, tsify::Tsify)]
 #[tsify(
     rename = "FxOptions",
-    type = "{ margin?: number; seed?: number; flip?: boolean; angle?: number; light?: number; palette?: string[]; outline?: OutlineOption; [option: string]: number | string | string[] | boolean | OutlineOption | undefined }"
+    type = "{ margin?: number; seed?: number; flip?: boolean; angle?: number; light?: number; palette?: PaletteOption; outline?: OutlineOption; [option: string]: number | string | string[] | boolean | OutlineOption | undefined }"
 )]
 struct Wire {
     margin: Option<u32>,
@@ -26,7 +26,7 @@ struct Wire {
     flip: Option<bool>,
     angle: Option<f64>,
     light: Option<f64>,
-    palette: Option<Vec<Rgba>>,
+    palette: Option<PaletteIn>,
     outline: Option<OutlineIn>,
     extra: BTreeMap<String, Extra>,
 }
@@ -65,6 +65,45 @@ impl<'de> Visitor<'de> for WireVisitor {
             }
         }
         Ok(w)
+    }
+}
+
+/// The `palette` option as JS gives it: a preset's name ([`pixfx_core::palette::PRESETS`]) or a list of hex
+/// colours, dark to light.
+#[derive(tsify::Tsify)]
+#[tsify(
+    rename = "PaletteOption",
+    type = "\"fire\" | \"ice\" | \"poison\" | \"holy\" | \"shadow\" | \"arcane\" | \"blood\" | \"electric\" | \"nature\" | \"gold\" | string[]"
+)]
+struct PaletteIn(Vec<Rgba>);
+
+impl<'de> Deserialize<'de> for PaletteIn {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_any(PaletteVisitor)
+    }
+}
+
+struct PaletteVisitor;
+
+impl<'de> Visitor<'de> for PaletteVisitor {
+    type Value = PaletteIn;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a palette preset's name or an array of hex colours")
+    }
+
+    fn visit_str<E: de::Error>(self, word: &str) -> Result<PaletteIn, E> {
+        pixfx_core::palette::parse(word)
+            .map(PaletteIn)
+            .map_err(E::custom)
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<PaletteIn, A::Error> {
+        let mut ramp = Vec::new();
+        while let Some(c) = seq.next_element::<Rgba>()? {
+            ramp.push(c);
+        }
+        Ok(PaletteIn(ramp))
     }
 }
 
@@ -185,7 +224,7 @@ impl<'de> Visitor<'de> for ExtraVisitor {
 /// `undefined`/`null` (all defaults) or a plain object: `margin` (whole number up to [`MAX_MARGIN`]: empty pixels
 /// round the canvas, returned beside the options because it is the canvas's, not the effect's; `None` when not
 /// given), `seed` (non-negative integer), `flip` (boolean), `angle` (radians), `light` (glow strength), `palette`
-/// (array of `"#rgb"`/`"#rrggbb"` strings), `outline` ([`OutlineIn`]); any other key is one of the effect's own options ([`Meta::options`]):
+/// ([`PaletteIn`]: a preset's name or an array of `"#rgb"`/`"#rrggbb"` strings), `outline` ([`OutlineIn`]); any other key is one of the effect's own options ([`Meta::options`]):
 /// a number, a hex colour or an array of hex colours, as the effect declares it. `x`/`y` are refused: an instance
 /// draws on its own canvas at the effect's origin. A key the effect does not declare, or a field of the wrong
 /// type, is an error naming it.
@@ -210,7 +249,7 @@ pub fn parse_options(meta: &Meta, v: &JsValue) -> Result<(Options, Option<u32>),
         flip: w.flip.unwrap_or(base.flip),
         angle: w.angle.unwrap_or(base.angle),
         light: w.light.unwrap_or(base.light),
-        palette: w.palette,
+        palette: w.palette.map(|PaletteIn(p)| p),
         outline: w.outline.map(|OutlineIn(o)| o),
         extra: w.extra.into_iter().map(|(k, Extra(v))| (k, v)).collect(),
         ..base

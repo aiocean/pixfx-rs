@@ -2,13 +2,14 @@
 //!
 //!   pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
 //!
-//!   pixfx sheet <id> [--outline WORD] [--out DIR]
-//!   pixfx render <id> --gif [--scale N] [--outline WORD] [--out DIR]
+//!   pixfx sheet <id> [--palette WORD] [--outline WORD] [--out DIR]
+//!   pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
 //!
 //! `sheet` writes `<name>.png`, `<name>_color.png`, `<name>_light.png` and `<name>.json` (beanfx layout) for
 //! `<id>`; `render --gif` writes `<name>.gif`, each pixel blown up `N` times (default 4). `<name>` is `<id>`
 //! with `/` as `_`; `--out` defaults to `target/out`. `--outline` outlines the effect: `off`, a preset (`dark`,
-//! `black`, `white`, `thick`) or a hex colour (`#ffcc00`); left out, it looks as designed.
+//! `black`, `white`, `thick`) or a hex colour (`#ffcc00`); left out, it looks as designed. `--palette` recolours
+//! it with a preset (`fire`, `ice`, `poison`, `holy`, `shadow`, `arcane`, `blood`, `electric`, `nature`, `gold`).
 //!
 //! `parity` renders `<id>` with pixelfx (through `tools/pixelfx-ref.mjs`, under node) and with its pixfx port, prints
 //! how many pixels differ and whether that passes, and writes `<out>/<id>.side.gif` (pixelfx left, pixfx
@@ -26,8 +27,8 @@ use pixfx_core::{Options, Outline, render_frames};
 use pixfx_export::{write_gif, write_sheet};
 
 const USAGE: &str = "usage: pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
-       pixfx sheet <id> [--outline WORD] [--out DIR]
-       pixfx render <id> --gif [--scale N] [--outline WORD] [--out DIR]";
+       pixfx sheet <id> [--palette WORD] [--outline WORD] [--out DIR]
+       pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]";
 
 /// What `pixfx sheet` and `pixfx render` produce.
 enum Export {
@@ -40,6 +41,7 @@ struct ExportArgs {
     out: PathBuf,
     export: Export,
     outline: Option<Outline>,
+    palette: Option<Vec<pixfx_core::Rgba>>,
 }
 
 /// The reference script, found from this crate's source so `pixfx` runs from any directory of the repo.
@@ -100,6 +102,7 @@ fn parse_export(cmd: &str, args: &[String]) -> Result<ExportArgs, String> {
     let (mut id, mut out) = (None, PathBuf::from("target/out"));
     let (mut gif, mut scale) = (false, 4);
     let mut outline = None;
+    let mut palette = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -107,6 +110,10 @@ fn parse_export(cmd: &str, args: &[String]) -> Result<ExportArgs, String> {
             "--outline" => {
                 let word = it.next().ok_or(USAGE)?;
                 outline = Some(Outline::parse(word).map_err(|e| e.to_string())?);
+            }
+            "--palette" => {
+                let word = it.next().ok_or(USAGE)?;
+                palette = Some(pixfx_core::palette::parse(word).map_err(|e| e.to_string())?);
             }
             "--gif" if cmd == "render" => gif = true,
             "--scale" if cmd == "render" => {
@@ -131,6 +138,7 @@ fn parse_export(cmd: &str, args: &[String]) -> Result<ExportArgs, String> {
         out,
         export,
         outline,
+        palette,
     })
 }
 
@@ -141,6 +149,7 @@ fn export(a: &ExportArgs) -> Result<(), String> {
         .ok_or_else(|| format!("no pixfx effect {id} (not ported yet?)"))?;
     let opts = Options {
         outline: a.outline,
+        palette: a.palette.clone(),
         ..Options::default()
     };
     let rendered = render_frames(effect, &opts, 0);
