@@ -1,16 +1,18 @@
 //! One effect playing on its own canvas, in plain Rust: what [`crate::Fx`] wraps for JS and what other Rust
 //! crates (a canvas renderer) use directly.
 
-use pixfx_core::{Effect, Frame, Instance, Layer, Meta, Options, composite, edge_fade};
+use pixfx_core::{Canvas, Effect, Frame, Instance, Layer, Meta, Options, composite, edge_fade};
 
-/// An effect instance and the canvas it draws into: the effect's `meta.size` plus `margin` empty pixels on
-/// every side, with the effect's origin at `meta.origin + margin`. After the n-th `update(1 / fps)`,
+/// An effect instance and the canvas it draws into: the instance's canvas ([`Effect::canvas`]: `meta.size`
+/// unless its options size it) plus `margin` empty pixels on every side, with the effect's origin at the
+/// canvas origin plus `margin`. After the n-th `update(1 / fps)`,
 /// `draw(Layer::Both)` leaves the frame equal to [`pixfx_core::render_frames`] frame n at the same margin:
 /// margin 0 eases light out at the canvas edge (as the sprite sheet does), a margin leaves room for glow that
 /// spills past the canvas and fades nothing.
 pub struct Player {
     inst: Instance,
     meta: &'static Meta,
+    canvas: Canvas,
     margin: u32,
     frame: Frame,
     rgba: Vec<u8>,
@@ -21,10 +23,11 @@ impl Player {
     /// replaced by the effect's origin.
     pub fn new(effect: &'static dyn Effect, opts: Options, margin: u32) -> Self {
         let meta = effect.meta();
-        let (w, h) = (meta.size.0 + 2 * margin, meta.size.1 + 2 * margin);
+        let canvas = effect.canvas(&opts);
+        let (w, h) = (canvas.size.0 + 2 * margin, canvas.size.1 + 2 * margin);
         let at_origin = Options {
-            x: f64::from(meta.origin.0),
-            y: f64::from(meta.origin.1),
+            x: f64::from(canvas.origin.0),
+            y: f64::from(canvas.origin.1),
             ..opts
         };
         // the frame's top-left sits `margin` up and left of the effect canvas's, as in `render_frames`
@@ -32,6 +35,7 @@ impl Player {
         Self {
             inst: Instance::new(effect, at_origin),
             meta,
+            canvas,
             margin,
             frame: Frame::new(w, h, corner, corner),
             rgba: vec![0; w as usize * h as usize * 4],
@@ -40,6 +44,11 @@ impl Player {
 
     pub fn meta(&self) -> &'static Meta {
         self.meta
+    }
+
+    /// The canvas this instance draws on, margin not included.
+    pub fn canvas(&self) -> Canvas {
+        self.canvas
     }
 
     /// Empty pixels round the effect's canvas on every side.

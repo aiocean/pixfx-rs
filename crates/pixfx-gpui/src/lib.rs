@@ -114,13 +114,13 @@ pub struct FxView {
 }
 
 impl FxView {
-    /// The effect at its origin, in a frame with room round its canvas for glow that spills past it
-    /// (half the canvas's longer side on every side).
+    /// The effect at its origin, on the canvas `opts` give it ([`Effect::canvas`]), in a frame with room round
+    /// that canvas for glow that spills past it ([`pixfx_core::Meta::glow_margin`] on every side).
     pub fn new(effect: &'static dyn Effect, opts: Options) -> Self {
-        let meta = effect.meta();
-        let margin = meta.size.0.max(meta.size.1) / 2;
-        let (w, h) = (meta.size.0 + 2 * margin, meta.size.1 + 2 * margin);
-        let pivot = (meta.origin.0 + margin as i32, meta.origin.1 + margin as i32);
+        let margin = effect.meta().glow_margin();
+        let canvas = effect.canvas(&opts);
+        let (w, h) = (canvas.size.0 + 2 * margin, canvas.size.1 + 2 * margin);
+        let pivot = (canvas.origin.0 + margin as i32, canvas.origin.1 + margin as i32);
         let at_pivot = Options {
             x: f64::from(pivot.0),
             y: f64::from(pivot.1),

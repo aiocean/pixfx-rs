@@ -1,7 +1,7 @@
-//! Helpers shared by the weather loops. Weather fills its whole canvas edge to edge, so: `clip` keeps every
-//! pixel and every bit of light inside the canvas; `pass` and `rows` are per-pixel shaders over the canvas;
-//! `trips` rains particles that fall a whole number of times a loop, somewhere new each time. All of it is a
-//! pure function of t.
+//! Helpers shared by the weather loops. Weather fills its whole canvas edge to edge, so: `sized` gives an
+//! instance the canvas its `width` and `height` options ask for; `clip` keeps every pixel and every bit of
+//! light inside the canvas; `pass` and `rows` are per-pixel shaders over the canvas; `trips` rains particles
+//! that fall a whole number of times a loop, somewhere new each time. All of it is a pure function of t.
 //!
 //! Port of pixelfx `src/fx/weather/_lib.js`: the helpers snow and fireflies use (`clip`, `pass`, `trips`,
 //! `rows`). pixelfx writes `pass` and `rows` straight into the frame buffers for an unrotated painter; these go
@@ -9,11 +9,42 @@
 //! rotated painter).
 
 use pixfx_core::color::Rgba;
-use pixfx_core::math::{js_max, js_min, rand};
-use pixfx_core::{Meta, Painter};
+use pixfx_core::math::{clamp, js_max, js_min, js_round, rand};
+use pixfx_core::{Canvas, Meta, Options, Painter};
+
+/// The longest side a weather canvas takes from its options: room for any screen at 2 screen pixels per
+/// pixel, and a frame small enough to allocate.
+pub const MAX_SIDE: u32 = 2048;
+
+/// The canvas a weather instance draws on: the `width` and `height` options in whole pixels (1 to
+/// [`MAX_SIDE`]; one unset, not a number or not finite keeps the effect's own), with the origin mid-width and
+/// as far above the bottom as on the effect's own canvas, so the ground stays at the foot and a taller canvas
+/// adds sky. With neither option it is the effect's own canvas, so the default render is pixelfx's.
+pub fn sized(meta: &Meta, opts: &Options) -> Canvas {
+    let side = |key: &str, own: u32| {
+        let v = opts.num_or(key, f64::from(own));
+        if v.is_finite() {
+            clamp(js_round(v), 1.0, f64::from(MAX_SIDE)) as u32
+        } else {
+            own
+        }
+    };
+    let (w, h) = (side("width", meta.size.0), side("height", meta.size.1));
+    let below = meta.size.1 as i32 - meta.origin.1;
+    Canvas {
+        size: (w, h),
+        origin: ((w / 2) as i32, h as i32 - below),
+    }
+}
+
+/// `n` things spread over `span` pixels as the effect spreads them over its own `own` pixels: as dense on a
+/// wider canvas, and exactly `n` at the effect's own size.
+pub fn count(n: usize, span: f64, own: f64) -> usize {
+    js_round(n as f64 * span / own) as usize
+}
 
 /// The canvas in local coordinates: `x0 <= x < x1`, `y0 <= y < y1`, `w` pixels wide.
-struct Canvas {
+struct Bounds {
     x0: f64,
     y0: f64,
     x1: f64,
@@ -21,33 +52,34 @@ struct Canvas {
     w: usize,
 }
 
-fn canvas(meta: &Meta) -> Canvas {
-    let (w, h) = (f64::from(meta.size.0), f64::from(meta.size.1));
-    let (ox, oy) = (f64::from(meta.origin.0), f64::from(meta.origin.1));
-    Canvas {
+fn bounds(c: Canvas) -> Bounds {
+    let (w, h) = (f64::from(c.size.0), f64::from(c.size.1));
+    let (ox, oy) = (f64::from(c.origin.0), f64::from(c.origin.1));
+    Bounds {
         x0: -ox,
         y0: -oy,
         x1: w - ox,
         y1: h - oy,
-        w: meta.size.0 as usize,
+        w: c.size.0 as usize,
     }
 }
 
-/// Draw only inside the effect's canvas from here on: colour, blends and light outside it are dropped (pixelfx
-/// `clip`, the painter's canvas clip with the canvas around the origin as its box). Draw glows with [`glow`].
-pub fn clip(p: &mut Painter, meta: &Meta) {
-    let c = canvas(meta);
-    p.clip_box(c.x0, c.y0, c.x1, c.y1);
+/// Draw only inside the instance's canvas from here on: colour, blends and light outside it are dropped
+/// (pixelfx `clip`, the painter's canvas clip with the canvas around the origin as its box). Draw glows with
+/// [`glow`].
+pub fn clip(p: &mut Painter, c: Canvas) {
+    let b = bounds(c);
+    p.clip_box(b.x0, b.y0, b.x1, b.y1);
 }
 
 /// The painter's `glow` with its box cut to the canvas first, so big soft lights stay cheap (pixelfx `clip`'s
 /// `glow`): it walks local pixel cells and measures from their centres, which differs from `Painter::glow`
 /// (screen pixels) at a fractional or rotated placement.
-pub fn glow(p: &mut Painter, meta: &Meta, x: f64, y: f64, r: f64, c: Rgba, k: f64) {
+pub fn glow(p: &mut Painter, cv: Canvas, x: f64, y: f64, r: f64, c: Rgba, k: f64) {
     if r < 1.0 || k <= 0.004 {
         return;
     }
-    let cv = canvas(meta);
+    let cv = bounds(cv);
     let (x0, x1) = (
         js_max(cv.x0, libm::floor(x - r)),
         js_min(cv.x1 - 1.0, libm::ceil(x + r)),
@@ -95,7 +127,7 @@ impl Out {
 }
 
 /// The rows y0..y1 (local, cut to the canvas) as the loops below walk them: first and last row.
-fn row_span(cv: &Canvas, y0: f64, y1: f64) -> (f64, f64) {
+fn row_span(cv: &Bounds, y0: f64, y1: f64) -> (f64, f64) {
     (
         js_max(cv.y0, libm::floor(y0)),
         js_min(cv.y1 - 1.0, libm::ceil(y1)),
@@ -117,8 +149,8 @@ fn put(p: &mut Painter, x: f64, y: f64, o: &Out) {
 
 /// A per-pixel shader over the canvas rows y0..y1 (local, cut to the canvas): `f(x, y, out)` sets `out` for the
 /// pixel centred at (x, y); `out` starts each pixel as colour none, alpha 1, dithered, no light.
-pub fn pass(p: &mut Painter, meta: &Meta, y0: f64, y1: f64, mut f: impl FnMut(f64, f64, &mut Out)) {
-    let cv = canvas(meta);
+pub fn pass(p: &mut Painter, c: Canvas, y0: f64, y1: f64, mut f: impl FnMut(f64, f64, &mut Out)) {
+    let cv = bounds(c);
     let (first, last) = row_span(&cv, y0, y1);
     let mut y = first;
     while y <= last {
@@ -155,8 +187,8 @@ impl Cell {
 
 /// The fastest whole-sky shader: `f(y, row)` fills one canvas row at a time (`y` the row's pixel centre), one
 /// [`Cell`] per column (`x - box.x0`). Each row starts as colour none, alpha 1, dithered, no light.
-pub fn rows(p: &mut Painter, meta: &Meta, y0: f64, y1: f64, mut f: impl FnMut(f64, &mut [Cell])) {
-    let cv = canvas(meta);
+pub fn rows(p: &mut Painter, c: Canvas, y0: f64, y1: f64, mut f: impl FnMut(f64, &mut [Cell])) {
+    let cv = bounds(c);
     let (first, last) = row_span(&cv, y0, y1);
     // pixelfx's `R.l` is never reset between rows while this one is; equal today because nothing sets `k > 0`
     let mut row = vec![Cell::NONE; cv.w];

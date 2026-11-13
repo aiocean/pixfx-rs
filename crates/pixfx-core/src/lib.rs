@@ -13,7 +13,9 @@ pub mod shapes;
 pub mod sim;
 
 pub use color::{ColorError, Rgba, hex};
-pub use effect::{Effect, EffectState, Instance, Layer, Meta, OptValue, Options, find, valid_dt};
+pub use effect::{
+    Canvas, Effect, EffectState, Instance, Layer, Meta, OptValue, Options, find, valid_dt,
+};
 pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};
 pub use painter::Painter;

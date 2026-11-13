@@ -5,7 +5,8 @@ use crate::effect::{Effect, Instance, Layer, Options};
 use crate::frame::Frame;
 use crate::math::{js_max, js_round};
 
-/// An effect's frames, each `w` x `h` with its top-left at (-margin, -margin) in effect canvas space.
+/// An effect's frames, each `w` x `h` (its canvas, [`Effect::canvas`], plus the margin) with its top-left at
+/// (-margin, -margin) in effect canvas space.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rendered {
     pub w: u32,
@@ -21,17 +22,19 @@ const EDGE: u32 = 8;
 
 /// Render every frame of one loop or one-shot at the effect's fps: `max(1, round(duration * fps))` frames
 /// for a loop, one more for a one-shot (its last moment). Frame i is drawn after i steps of `1 / fps`.
-/// The effect sits at its origin whatever `opts.x` and `opts.y` say. Without a margin, light is eased out at
-/// the canvas edge (full-screen effects excepted) so a glow cut off by the edge does not show as a box.
+/// The effect sits at its origin on the canvas `opts` give it ([`Effect::canvas`]) whatever `opts.x` and
+/// `opts.y` say. Without a margin, light is eased out at the canvas edge (full-screen effects excepted) so a
+/// glow cut off by the edge does not show as a box.
 pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -> Rendered {
     let meta = effect.meta();
-    let (w, h) = (meta.size.0 + margin * 2, meta.size.1 + margin * 2);
+    let canvas = effect.canvas(opts);
+    let (w, h) = (canvas.size.0 + margin * 2, canvas.size.1 + margin * 2);
     let fps = meta.fps;
     let last = if meta.looping { 0.0 } else { 1.0 };
     let n = js_max(1.0, js_round(meta.duration * f64::from(fps)) + last) as usize;
     let at_origin = Options {
-        x: f64::from(meta.origin.0),
-        y: f64::from(meta.origin.1),
+        x: f64::from(canvas.origin.0),
+        y: f64::from(canvas.origin.1),
         ..opts.clone()
     };
     let mut inst = Instance::new(effect, at_origin);

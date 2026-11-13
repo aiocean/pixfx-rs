@@ -64,8 +64,9 @@ fn meta_object(m: &Meta) -> Result<JsValue, JsError> {
     Ok(o.into())
 }
 
-/// A live effect on its own canvas (`meta.size` plus `margin` empty pixels on every side, origin at
-/// `meta.origin + margin`; `meta(id).glowMargin` is the margin that fits an effect's glow). Each animation frame: `update(dt)`,
+/// A live effect on its own canvas (`meta.size`, or the size its options give it (weather's `width` and
+/// `height`), plus `margin` empty pixels on every side, origin at the canvas origin plus `margin`;
+/// `meta(id).glowMargin` is the margin that fits an effect's glow). Each animation frame: `update(dt)`,
 /// `draw(layer)`, then read `rgba()` (or `color()` and `light()`). Light is eased out at the canvas edge
 /// unless the effect is full-screen or has a margin, so frames match the effect's sprite sheet.
 #[wasm_bindgen]
@@ -123,12 +124,12 @@ impl Fx {
     /// Where the effect's origin sits on the canvas.
     #[wasm_bindgen(js_name = originX)]
     pub fn origin_x(&self) -> i32 {
-        self.player.meta().origin.0 + self.player.margin() as i32
+        self.player.canvas().origin.0 + self.player.margin() as i32
     }
 
     #[wasm_bindgen(js_name = originY)]
     pub fn origin_y(&self) -> i32 {
-        self.player.meta().origin.1 + self.player.margin() as i32
+        self.player.canvas().origin.1 + self.player.margin() as i32
     }
 
     /// Clear the canvas and draw `"back"`, `"front"` or `"both"` at the current time.

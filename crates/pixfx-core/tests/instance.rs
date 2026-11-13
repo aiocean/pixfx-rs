@@ -2,7 +2,11 @@
 //! `tools/lib/fxlib.mjs` (`renderFrames`, `edgeFade`).
 
 use pixfx_core::color::{Rgba, WHITE, fit};
-use pixfx_core::effect::{Effect, EffectState, Instance, Layer, Meta, OptValue, Options, find};
+use std::collections::BTreeMap;
+
+use pixfx_core::effect::{
+    Canvas, Effect, EffectState, Instance, Layer, Meta, OptValue, Options, find,
+};
 use pixfx_core::frame::Frame;
 use pixfx_core::painter::Painter;
 use pixfx_core::render::render_frames;
@@ -193,6 +197,59 @@ fn render_margin_grows_the_frame() {
     assert_eq!((f.ox, f.oy), (-3, -3));
     // origin (0, 0) sits 3 px in; after one frame the dot has moved 4 px
     assert_eq!(lit(f, 3), Some(7));
+}
+
+/// A test effect that sizes its canvas from its `width` option (8 when unset), 4 tall, origin mid-width on
+/// row 3; it lights its origin.
+struct Wide;
+
+struct WideState;
+
+static WIDE_META: Meta = dot_meta("test/wide", true);
+
+impl Effect for Wide {
+    fn meta(&self) -> &Meta {
+        &WIDE_META
+    }
+    fn canvas(&self, opts: &Options) -> Canvas {
+        let w = opts.num_or("width", 8.0) as u32;
+        Canvas {
+            size: (w, 4),
+            origin: ((w / 2) as i32, 3),
+        }
+    }
+    fn spawn(&self, _opts: &Options, _seed: u64) -> Box<dyn EffectState> {
+        Box::new(WideState)
+    }
+}
+
+impl EffectState for WideState {
+    fn draw(&self, p: &mut Painter, _t: f64, _layer: Layer) {
+        p.px(0.0, 0.0, WHITE);
+    }
+}
+
+#[test]
+fn render_sizes_frames_from_the_instances_canvas() {
+    let opts = Options {
+        extra: BTreeMap::from([("width".to_string(), OptValue::Num(20.0))]),
+        ..Options::default()
+    };
+    let r = render_frames(&Wide, &opts, 2);
+    assert_eq!(
+        (r.w, r.h),
+        (24, 8),
+        "the canvas its options give, plus the margin"
+    );
+    // its origin (10, 3) sits 2 px in from the frame's corner
+    assert_eq!(r.frames.first().and_then(|f| lit(f, 5)), Some(12));
+    assert_eq!(
+        Wide.canvas(&Options::default()),
+        Canvas {
+            size: (8, 4),
+            origin: (4, 3)
+        }
+    );
 }
 
 /// Light everywhere, to see the edge fade.
