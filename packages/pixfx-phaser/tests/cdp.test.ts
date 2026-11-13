@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { devToolsPort, pageError, timeoutMessage } from "../perf/cdp";
+import { devToolsPort, mainFrameNavigation, pageError, timeoutMessage } from "../perf/cdp";
 
 describe("pageError", () => {
   test("an uncaught exception gives its description", () => {
@@ -57,5 +57,22 @@ describe("devToolsPort", () => {
     expect(devToolsPort("531")).toBeNull();
     expect(devToolsPort("abc\n/devtools/browser/x\n")).toBeNull();
     expect(devToolsPort("0\n/devtools/browser/x\n")).toBeNull();
+  });
+});
+
+describe("mainFrameNavigation", () => {
+  test("the page itself navigating gives its url", () => {
+    const params = { frame: { id: "A", url: "http://127.0.0.1:5173/stress.html?n=10" } };
+    expect(mainFrameNavigation("Page.frameNavigated", params)).toBe("http://127.0.0.1:5173/stress.html?n=10");
+  });
+
+  test("a child frame navigating is not the page", () => {
+    const params = { frame: { id: "B", parentId: "A", url: "http://127.0.0.1:5173/inner.html" } };
+    expect(mainFrameNavigation("Page.frameNavigated", params)).toBeNull();
+  });
+
+  test("other events and malformed params are not navigations", () => {
+    expect(mainFrameNavigation("Page.loadEventFired", { timestamp: 1 })).toBeNull();
+    expect(mainFrameNavigation("Page.frameNavigated", { nope: true })).toBeNull();
   });
 });

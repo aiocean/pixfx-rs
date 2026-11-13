@@ -47,6 +47,15 @@ export function pageError(method: string, params: unknown): string | null {
   return null;
 }
 
+const navigatedSchema = z.object({ frame: z.object({ url: z.string(), parentId: z.string().optional() }) });
+
+/** The url the page itself (not a child frame) navigated to, from a CDP event, or null. */
+export function mainFrameNavigation(method: string, params: unknown): string | null {
+  if (method !== "Page.frameNavigated") return null;
+  const p = navigatedSchema.safeParse(params);
+  return p.success && p.data.frame.parentId === undefined ? p.data.frame.url : null;
+}
+
 /** What a wait that timed out says: the expression, and the page errors seen while waiting. */
 export function timeoutMessage(expression: string, errors: readonly string[]): string {
   const head = `perf: timed out waiting for ${expression}`;
@@ -79,6 +88,8 @@ export interface Browser {
   evaluate(expression: string): Promise<unknown>;
   /** Page errors seen since the last call ([`pageError`]); the list is empty afterwards. Needs `watchErrors()`. */
   takeErrors(): string[];
+  /** Urls the page navigated to since the last call ([`mainFrameNavigation`]); needs `Page.enable`. */
+  takeNavigations(): string[];
   /** Start collecting page errors (enables the Runtime and Log domains). */
   watchErrors(): Promise<void>;
   close(): void;
@@ -134,12 +145,15 @@ export async function launchChrome(): Promise<Browser> {
   let nextId = 0;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; method: string }>();
   let errors: string[] = [];
+  let navigations: string[] = [];
   ws.addEventListener("message", (e) => {
     const data: unknown = JSON.parse(String(e.data));
     const event = eventSchema.safeParse(data);
     if (event.success) {
       const error = pageError(event.data.method, event.data.params);
       if (error !== null) errors.push(error);
+      const url = mainFrameNavigation(event.data.method, event.data.params);
+      if (url !== null) navigations.push(url);
       return;
     }
     const reply = replySchema.safeParse(data);
@@ -166,6 +180,11 @@ export async function launchChrome(): Promise<Browser> {
     takeErrors() {
       const taken = errors;
       errors = [];
+      return taken;
+    },
+    takeNavigations() {
+      const taken = navigations;
+      navigations = [];
       return taken;
     },
     async watchErrors() {

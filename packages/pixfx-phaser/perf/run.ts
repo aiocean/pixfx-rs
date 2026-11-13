@@ -55,13 +55,30 @@ interface ProfileRow {
   msPerFrame: Record<Category, number>;
 }
 
-async function waitFor(b: Browser, expression: string, timeoutMs: number): Promise<void> {
+/** Poll `expression` until it is true; `guard` runs around each poll and throws to stop the wait early. */
+async function waitFor(b: Browser, expression: string, timeoutMs: number, guard: () => void = () => {}): Promise<void> {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
-    if ((await b.evaluate(expression)) === true) return;
+    guard();
+    let ok: unknown;
+    try {
+      ok = await b.evaluate(expression);
+    } catch (e) {
+      guard(); // a reload mid-evaluate surfaces as a page error; let the guard name the cause
+      throw e;
+    }
+    if (ok === true) return guard();
     await Bun.sleep(250);
   }
   throw new Error(timeoutMessage(expression, b.takeErrors()));
+}
+
+/** Throws if the page reloaded since it was opened: its numbers would mix two builds. */
+function failIfReloaded(b: Browser): void {
+  const reloads = b.takeNavigations();
+  if (reloads.length > 0) {
+    throw new Error(`perf: the page reloaded during measurement (${reloads.join(", ")}); did vite see a change in src/ or demo/? Run from a tree no one else edits.`);
+  }
 }
 
 async function open(b: Browser, query: string): Promise<void> {
@@ -70,11 +87,12 @@ async function open(b: Browser, query: string): Promise<void> {
   await Bun.sleep(300);
   // a loaded machine at 4x CPU throttle can take tens of seconds to load the page
   await waitFor(b, "window.pixfxStress !== undefined", 60000);
+  b.takeNavigations(); // the navigation that opened it
 }
 
 async function sweep(b: Browser, query: string): Promise<Result[]> {
   await open(b, `${query}&sweep=${COUNTS.join(",")}`);
-  await waitFor(b, "window.pixfxStress.done === true", COUNTS.length * 8000 + 20000);
+  await waitFor(b, "window.pixfxStress.done === true", COUNTS.length * 8000 + 20000, () => failIfReloaded(b));
   return z.array(resultSchema).parse(await b.evaluate("window.pixfxStress.results"));
 }
 
