@@ -8,8 +8,8 @@
 //! `flicker` and `simDraw` arrive with the effects that need them).
 
 use pixfx_core::Painter;
-use pixfx_core::color::{Rgba, WHITE, mix};
-use pixfx_core::math::{Rng, clamp, js_max, js_min, js_round, noise, rand, rng, wrap};
+use pixfx_core::color::{Rgba, WHITE, mix, step_at};
+use pixfx_core::math::{Rng, clamp, js_max, js_min, js_round, noise, or_one, rand, rng, wrap};
 use pixfx_core::sim::SMOKE_RAMP;
 
 /// A fire ramp hot-first: `H[0]` white .. `H[8]` smouldering.
@@ -226,13 +226,7 @@ pub fn fire_puff(
     let n = hh.len() as f64;
     let heat = js_min(0.999, libm::pow(age, 0.62) + frac * 0.1);
     let idx = js_min(n - 2.0, libm::floor(heat * (n - 1.0)));
-    let step = |i: f64| {
-        if i >= 0.0 {
-            hh.get(i as usize).copied().unwrap_or(Rgba::NONE)
-        } else {
-            Rgba::NONE
-        }
-    };
+    let step = |i: f64| step_at(hh, i);
     let r = size * (0.55 + 0.45 * js_min(1.0, age * 7.0)) * (1.0 - age * 0.55);
     let c = step(idx);
     if idx >= n - 2.0 {
@@ -357,8 +351,7 @@ pub fn ember(p: &mut Painter, x: f64, y: f64, k: f64, size: f64, cols: &[Rgba; 4
 /// A spark: a streak stretched along its velocity, a hot head and a cooler tail, and a point of light.
 pub fn spark(p: &mut Painter, x: f64, y: f64, vx: f64, vy: f64, k: f64, cols: &[Rgba; 4]) {
     let h = libm::hypot(vx, vy);
-    // `|| 1`: 0 and NaN are falsy
-    let sp = if h == 0.0 || h.is_nan() { 1.0 } else { h };
+    let sp = or_one(h);
     let (ux, uy, len) = (vx / sp, vy / sp, js_min(9.0, 1.0 + sp * 0.022));
     let head = if k > 0.6 {
         cols[0]

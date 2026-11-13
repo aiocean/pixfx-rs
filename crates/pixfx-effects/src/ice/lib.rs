@@ -9,7 +9,7 @@
 use core::f64::consts::FRAC_PI_2;
 
 use pixfx_core::Painter;
-use pixfx_core::color::{Rgba, WHITE};
+use pixfx_core::color::{Rgba, WHITE, step_at};
 use pixfx_core::math::{clamp, js_max, js_min, js_round};
 use pixfx_core::sim::{Bits, GRAVITY, Particles};
 
@@ -321,13 +321,7 @@ impl Panes {
     pub fn draw(&self, p: &mut Painter, c: &[Rgba]) {
         let n = c.len();
         let nf = n as f64;
-        let step = |i: f64| {
-            if i < 0.0 {
-                Rgba::NONE
-            } else {
-                c.get(i as usize).copied().unwrap_or(Rgba::NONE)
-            }
-        };
+        let step = |i: f64| step_at(c, i);
         for q in &self.list {
             let a = js_min(1.0, q.life / 0.35);
             let pts = q.corners();

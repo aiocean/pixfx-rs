@@ -1,7 +1,7 @@
 //! Void orb: port of pixelfx `src/fx/shadow/void-orb.js`.
 
 use pixfx_core::color::{Rgba, WHITE, ramp};
-use pixfx_core::math::{Rng, TAU, clamp, ease, fbm, js_max, js_min, smooth};
+use pixfx_core::math::{Rng, TAU, clamp, ease, fbm, js_max, js_min, js_sign, smooth};
 use pixfx_core::particles::cycle;
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
@@ -47,17 +47,6 @@ fn gulp(t: f64) -> f64 {
         let v = ((wrap(t / D - g + 0.5) - 0.5) * D) / 0.07;
         s + libm::exp(-(v * v))
     })
-}
-
-/// JS `Math.sign` for a value that is never NaN.
-fn sign(x: f64) -> f64 {
-    if x > 0.0 {
-        1.0
-    } else if x < 0.0 {
-        -1.0
-    } else {
-        0.0
-    }
 }
 
 /// A speck of light behind the orb on a looping path.
@@ -396,7 +385,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
         |age, l, r, _| {
             let x0 = r.range(-44.0, 44.0);
             let u = libm::pow(age / l, 1.7);
-            let side = if sign(x0) == 0.0 { 1.0 } else { sign(x0) };
+            let side = if js_sign(x0) == 0.0 { 1.0 } else { js_sign(x0) };
             let ea = core::f64::consts::FRAC_PI_2 + side * r.range(0.3, 1.0);
             let ex = libm::cos(ea) * R;
             let ey = Y + libm::sin(ea) * R;

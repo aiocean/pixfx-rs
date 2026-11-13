@@ -6,7 +6,7 @@
 
 use pixfx_core::Painter;
 use pixfx_core::color::{Rgba, WHITE, scale};
-use pixfx_core::math::{js_max, js_min, js_round};
+use pixfx_core::math::{js_max, js_min, js_round, js_sign};
 
 /// A scratch layer: draw a sprite into it, give it a dark outline, then stamp it onto the frame. Lets a
 /// procedural shape get a hand-made 1 px outline. Only what coin-spin needs of pixelfx's `Layer`: `begin`,
@@ -156,17 +156,6 @@ pub fn glint(p: &mut Painter, x: f64, y: f64, arm: f64, c: Rgba, k: f64) {
     p.glow(cx + 0.5, cy + 0.5, 3.0 + n * 2.5, c, k);
 }
 
-/// JS `Math.sign` for a number that is not NaN.
-fn sign(x: f64) -> f64 {
-    if x > 0.0 {
-        1.0
-    } else if x < 0.0 {
-        -1.0
-    } else {
-        0.0
-    }
-}
-
 /// A thick coin turning on its upright axis: radius r, thickness th, turned by theta (0 faces you). Each row
 /// shows the face (squashed by cos theta, a raised rim, a recessed field, an embossed star) and, beside it,
 /// the reeded edge band (th |sin theta| wide). Lit from the top left; the face flashes white as it squares
@@ -260,7 +249,7 @@ pub fn coin3d(
             let n = [cphi * ct, sy / r, -cphi * st];
             let lt = (n[0] * lx + n[1] * ly + n[2] * lz) / ln;
             let groove = libm::floor((libm::asin(sy / r) + core::f64::consts::PI) * 9.0) % 2.0;
-            let edge = libm::fabs(sx - xr) > rw - 0.6 && sign(sx - xr) == sign(xc - xr);
+            let edge = libm::fabs(sx - xr) > rw - 0.6 && js_sign(sx - xr) == js_sign(xc - xr);
             return ramp(js_max(
                 1.0,
                 js_min(
