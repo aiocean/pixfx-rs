@@ -51,7 +51,6 @@ const STONE: ColorOpt = ColorOpt::new("stone", Rgba::hex24(0x4a3f69));
 /// Held to 16 at most, the largest explosion drawn (beyond pixelfx, which draws any size; see the module doc).
 const SIZE: NumOpt = NumOpt::new("size", 1.0).within(0.0, 16.0);
 
-
 const D: f64 = META.duration;
 const SOOT: Rgba = Rgba::hex24(0x0d0a12);
 const SOOT2: Rgba = Rgba::hex24(0x17121d);

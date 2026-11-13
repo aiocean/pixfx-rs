@@ -45,29 +45,32 @@ const PALETTE: [Rgba; 9] = [
 const ROOT: RampOpt = RampOpt::new(
     "root",
     &[
-    Rgba::hex24(0x1b2a8a),
-    Rgba::hex24(0x3a62e0),
-    Rgba::hex24(0x7fb4ff),
-]);
+        Rgba::hex24(0x1b2a8a),
+        Rgba::hex24(0x3a62e0),
+        Rgba::hex24(0x7fb4ff),
+    ],
+);
 const WAX: RampOpt = RampOpt::new(
     "wax",
     &[
-    Rgba::hex24(0x2e201e),
-    Rgba::hex24(0x5e4436),
-    Rgba::hex24(0x8e6e58),
-    Rgba::hex24(0xb8957a),
-    Rgba::hex24(0xd8b896),
-    Rgba::hex24(0xf0dcc0),
-]);
+        Rgba::hex24(0x2e201e),
+        Rgba::hex24(0x5e4436),
+        Rgba::hex24(0x8e6e58),
+        Rgba::hex24(0xb8957a),
+        Rgba::hex24(0xd8b896),
+        Rgba::hex24(0xf0dcc0),
+    ],
+);
 const BRASS: RampOpt = RampOpt::new(
     "brass",
     &[
-    Rgba::hex24(0x2a1a10),
-    Rgba::hex24(0x6a4a1e),
-    Rgba::hex24(0xb4862e),
-    Rgba::hex24(0xe8c060),
-    Rgba::hex24(0xfff0b0),
-]);
+        Rgba::hex24(0x2a1a10),
+        Rgba::hex24(0x6a4a1e),
+        Rgba::hex24(0xb4862e),
+        Rgba::hex24(0xe8c060),
+        Rgba::hex24(0xfff0b0),
+    ],
+);
 
 const D: f64 = META.duration;
 const NL: LoopNoise = LoopNoise(D);

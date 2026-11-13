@@ -41,10 +41,11 @@ const PALETTE: [Rgba; 6] = [
 const STARS: RampOpt = RampOpt::new(
     "stars",
     &[
-    Rgba::hex24(0xffd84a),
-    Rgba::hex24(0xfff3a6),
-    Rgba::hex24(0xffffff),
-]);
+        Rgba::hex24(0xffd84a),
+        Rgba::hex24(0xfff3a6),
+        Rgba::hex24(0xffffff),
+    ],
+);
 
 const CY: f64 = -17.0;
 

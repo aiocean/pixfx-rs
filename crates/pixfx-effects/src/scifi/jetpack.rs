@@ -48,13 +48,14 @@ const PALETTE: [Rgba; 8] = [
 const METAL: RampOpt = RampOpt::new(
     "metal",
     &[
-    Rgba::hex24(0x0e0d14),
-    Rgba::hex24(0x1e1c27),
-    Rgba::hex24(0x312e3e),
-    Rgba::hex24(0x4b4759),
-    Rgba::hex24(0x6f6a82),
-    Rgba::hex24(0x9d98b0),
-]);
+        Rgba::hex24(0x0e0d14),
+        Rgba::hex24(0x1e1c27),
+        Rgba::hex24(0x312e3e),
+        Rgba::hex24(0x4b4759),
+        Rgba::hex24(0x6f6a82),
+        Rgba::hex24(0x9d98b0),
+    ],
+);
 const LENGTH: NumOpt = NumOpt::new("length", 26.0);
 
 const D: f64 = META.duration;

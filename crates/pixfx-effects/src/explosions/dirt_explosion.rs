@@ -55,15 +55,16 @@ const PALETTE: [Rgba; 7] = [
 const FIRE: RampOpt = RampOpt::new(
     "fire",
     &[
-    Rgba::hex24(0x4a1712),
-    Rgba::hex24(0xc9281f),
-    Rgba::hex24(0xf2561d),
-    Rgba::hex24(0xff8a2a),
-    Rgba::hex24(0xffc23d),
-    Rgba::hex24(0xffe26b),
-    Rgba::hex24(0xfff3a6),
-    Rgba::hex24(0xffffff),
-]);
+        Rgba::hex24(0x4a1712),
+        Rgba::hex24(0xc9281f),
+        Rgba::hex24(0xf2561d),
+        Rgba::hex24(0xff8a2a),
+        Rgba::hex24(0xffc23d),
+        Rgba::hex24(0xffe26b),
+        Rgba::hex24(0xfff3a6),
+        Rgba::hex24(0xffffff),
+    ],
+);
 
 const D: f64 = META.duration;
 // the canvas box in local px, 3 px in from each edge

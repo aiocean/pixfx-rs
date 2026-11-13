@@ -59,13 +59,14 @@ const PALETTE: [Rgba; 6] = [
 const GRASS: RampOpt = RampOpt::new(
     "grass",
     &[
-    Rgba::hex24(0x070f0b),
-    Rgba::hex24(0x0c1a12),
-    Rgba::hex24(0x13281a),
-    Rgba::hex24(0x1d3a24),
-    Rgba::hex24(0x2b5232),
-    Rgba::hex24(0x3f6e40),
-]);
+        Rgba::hex24(0x070f0b),
+        Rgba::hex24(0x0c1a12),
+        Rgba::hex24(0x13281a),
+        Rgba::hex24(0x1d3a24),
+        Rgba::hex24(0x2b5232),
+        Rgba::hex24(0x3f6e40),
+    ],
+);
 
 const D: f64 = META.duration;
 /// Flies over the effect's own width.

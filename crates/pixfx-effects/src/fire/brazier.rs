@@ -49,12 +49,13 @@ const PALETTE: [Rgba; 9] = [
 const IRON: RampOpt = RampOpt::new(
     "iron",
     &[
-    Rgba::hex24(0x0b0910),
-    Rgba::hex24(0x1c1924),
-    Rgba::hex24(0x302c3a),
-    Rgba::hex24(0x4c4658),
-    Rgba::hex24(0x78708a),
-]);
+        Rgba::hex24(0x0b0910),
+        Rgba::hex24(0x1c1924),
+        Rgba::hex24(0x302c3a),
+        Rgba::hex24(0x4c4658),
+        Rgba::hex24(0x78708a),
+    ],
+);
 
 const D: f64 = META.duration;
 const NL: LoopNoise = LoopNoise(D);

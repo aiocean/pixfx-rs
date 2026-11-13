@@ -21,8 +21,8 @@ pub use act::{Act, ActEvent, Contact, Performance, Phase, Puff};
 pub use color::{ColorError, Rgba, hex};
 pub use cue::{Cue, TimedCue, cues_between, cues_of};
 pub use effect::{
-    Canvas, ColorOpt, Effect, EffectState, Instance, Layer, Meta, NumOpt, OptKind, OptSpec, OptValue,
-    OptionError, Options, Placement, RampOpt, check_options, find, valid_dt,
+    Canvas, ColorOpt, Effect, EffectState, Instance, Layer, Meta, NumOpt, OptKind, OptSpec,
+    OptValue, OptionError, Options, Placement, RampOpt, check_options, find, valid_dt,
 };
 pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};

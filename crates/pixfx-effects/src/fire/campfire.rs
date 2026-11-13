@@ -50,13 +50,14 @@ const PALETTE: [Rgba; 9] = [
 const WOOD: RampOpt = RampOpt::new(
     "wood",
     &[
-    Rgba::hex24(0x0e080a),
-    Rgba::hex24(0x24130f),
-    Rgba::hex24(0x3b2216),
-    Rgba::hex24(0x5a3520),
-    Rgba::hex24(0x8a5a34),
-    Rgba::hex24(0xb9884f),
-]);
+        Rgba::hex24(0x0e080a),
+        Rgba::hex24(0x24130f),
+        Rgba::hex24(0x3b2216),
+        Rgba::hex24(0x5a3520),
+        Rgba::hex24(0x8a5a34),
+        Rgba::hex24(0xb9884f),
+    ],
+);
 const HEIGHT: NumOpt = NumOpt::new("height", 22.0);
 
 const D: f64 = META.duration;

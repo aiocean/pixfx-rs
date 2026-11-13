@@ -52,7 +52,6 @@ const PALETTE: [Rgba; 8] = [
 /// Held to 4096 at most, the longest bolt drawn (beyond pixelfx, which draws any length; see the module doc).
 const LENGTH: NumOpt = NumOpt::new("length", 40.0).within(0.0, 4096.0);
 
-
 impl Effect for LaserBolt {
     fn meta(&self) -> &Meta {
         &META

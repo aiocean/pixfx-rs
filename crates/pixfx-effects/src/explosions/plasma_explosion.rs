@@ -53,12 +53,13 @@ const PALETTE: [Rgba; 7] = [
 const ACCENT: RampOpt = RampOpt::new(
     "accent",
     &[
-    Rgba::hex24(0x1c0a30),
-    Rgba::hex24(0x4a1a8c),
-    Rgba::hex24(0x8a3ce0),
-    Rgba::hex24(0xc48cff),
-    Rgba::hex24(0xf0d8ff),
-]);
+        Rgba::hex24(0x1c0a30),
+        Rgba::hex24(0x4a1a8c),
+        Rgba::hex24(0x8a3ce0),
+        Rgba::hex24(0xc48cff),
+        Rgba::hex24(0xf0d8ff),
+    ],
+);
 
 const BALL: f64 = 0.55;
 // the canvas box in local px, 3 px in from each edge
