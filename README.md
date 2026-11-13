@@ -16,13 +16,13 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 
 | Crate | What it is |
 |---|---|
-| `crates/pixfx-core` | The engine: frame with colour and additive light, painter, `Effect`/`Instance`, `render_frames`, `composite`, `frame_hash`. |
+| `crates/pixfx-core` | The engine: frame with colour and additive light, painter, `Effect`/`Instance`, `render_frames`, `composite`, `frame_hash`; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`. |
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
 | `crates/pixfx-cli` | The `pixfx` binary: `parity`, `sheet`, `render`. |
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |
-| `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`. Demo in `crates/pixfx-wasm/demo/`. |
-| `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `move`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick`; for a host-owned loop `update(dt)` then `drawLayer("back")` / `drawLayer("front")` around its own sprites. Demo in `crates/pixfx-canvas/demo/`. |
-| `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, and scene-wide layers. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
+| `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
+| `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `move`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick`; for a host-owned loop `update(dt)` then `drawLayer("back")` / `drawLayer("front")` around its own sprites; game feel: `shake(strength)`, `flash()`, `frozen()`, `addTrauma`, `freeze`, `slow`, `setFeel(on)`, cue events. Demo in `crates/pixfx-canvas/demo/`. |
+| `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, scene-wide layers, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
 | `crates/pixfx-gpui` | Live playback inside gpui. Needs the gpui fork (see [gpui](#gpui)). |
 | `examples/gpui-web` | A gpui web app that plays the candle and campfire. Needs the gpui fork. |
 
@@ -35,6 +35,28 @@ Optional: cargo's intermediate build files can go in one shared directory with
 The root workspace holds every crate except `crates/pixfx-gpui`, so a fresh clone builds and tests without
 anything else. `crates/pixfx-gpui` and `examples/gpui-web` are separate workspaces that need a local gpui
 fork; see [gpui](#gpui).
+
+## Game feel
+
+Effects say what an impact should do to the screen, and every host answers the same way.
+
+- **Cues.** An effect fires timed cues on the frame it means them: `shake {trauma}`, `hitstop {dur}`,
+  `ripple {x, y, r0, r1, dur, amp}`, `flash {k, dur}`, `sound {name, gain, pitch}`. The impact effects
+  (explosions, dirt, plasma, implosion, parry, icicle fall, poof, feather burst) fire them by weight through
+  `cue::impact`: a light poof only shakes a little, an explosion shakes, stops, ripples and flashes. Their `feel`
+  option (0 to 2, default 1) scales the cues, and `feel: 0` silences them. pixelfx fires none of these, so parity
+  is unchanged.
+- **`Feel`** (core) turns cues and the game's own impacts (`add_trauma`, `freeze`, `slow`) into one answer:
+  `advance(dt)` returns the seconds that play (none in a hit-stop, a fraction in slow motion), `shake(strength)`
+  gives a smooth whole-pixel offset (strength is the player's setting, 0 holds still), and `flash()` gives 0 to 1.
+  Hit-stops do not add up: the longest wins, capped at 13/60 s.
+- **Hosts.** The Canvas `Stage` answers cues itself: its own loop shakes and flashes the view, and `update(dt)`
+  returns the played seconds for the host's own world. `setFeel(false)` leaves the answer to the game, and cues
+  still arrive in `events()`. In Phaser, `scene.pixfx.feel` shakes the main camera, flashes, and freezes the
+  scene's effects; the game reads `feel.timeScale`. Any other JS host uses `Fx.takeCues()` with a `Feel`.
+- **Sprites.** `Squash` stretches a body along a fast rise or fall, flattens it as it lands and eases back,
+  keeping its area. `Blink` blinks it while it cannot be hurt. In Phaser, use `scene.pixfx.squash(sprite)`. The
+  fighter paints with the same rules.
 
 ## Render a sheet
 

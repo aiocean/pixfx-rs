@@ -108,6 +108,55 @@ Effects advance on scene time: the scene `update` delta × `scene.time.timeScale
 freezes them; `timeScale` 0.25 plays them at quarter speed. Scene shutdown (`restart`, `stop`) or destroy
 frees every effect. `scene.pixfx.stats()` returns `{engines, textures, images}` that are still alive.
 
+## Game feel
+
+Effects fire cues on the frame they mean them: `shake`, `hitstop`, `ripple`, `flash` and `sound`. The impact
+effects (explosions, dirt, plasma, implosion, parry, icicle fall, poof, feather burst) fire them by how heavy the
+hit is. Their `feel` option scales the cues (0 to 2, default 1), and `feel: 0` silences them.
+
+`scene.pixfx.feel` (a `PixfxFeel`) answers the cues for the scene:
+
+- a hit-stop freezes every effect in the scene, and `feel.timeScale` (0 in a hit-stop, a fraction in slow
+  motion, else 1) lets the game freeze its own world with them;
+- the shake moves the main camera's view for the render only, so its scroll and follow are untouched;
+- the flash lifts the view toward white.
+
+```ts
+this.pixfx.feel.on("cue", (c: WorldCue) => {
+  if (c.cue.type === "sound") this.sound.play(c.cue.name);
+});
+player.setVelocityX(speed * this.pixfx.feel.timeScale);
+```
+
+| Call | Effect |
+|---|---|
+| `addTrauma(k)` | The game's own impact shakes the camera (`k` 0 to 1 added to the trauma). |
+| `freeze(secs)` | The game's own hit-stop. Freezes do not add up: the longest wins. |
+| `slow(secs, speed)` | Slow motion at `speed` (0 to 1) for `secs`, after any freeze. |
+| `setShakeStrength(k)` / `setFlashStrength(k)` | Player settings: 1 as designed, 0 off (still camera, no flash). |
+| `setEnabled(false)` | Leave the answer to the game. Effects play at scene time and `"cue"` events still fire. |
+| `shake`, `flash`, `trauma`, `frozen`, `timeScale` | This frame's answer, read-only. |
+
+`"cue"` fires on the feel and on the effect (`effect.on("cue", ...)`) with `{t, pan, cue}`. A ripple's `x`/`y`
+and a sound's `x` are world positions. Ripples are data only; the plugin does not draw them. With worker
+threads, cues arrive one frame later, the same as frames do.
+
+### Squash, stretch and blink for sprites
+
+```ts
+const hero = this.physics.add.sprite(100, 200, "hero").setOrigin(0.5, 1); // pivot at the feet
+const look = this.pixfx.squash(hero);
+// on landing: look.land(Math.min(1, fallSpeed / 400));
+// on taking a hit: look.blink(1.2);
+```
+
+Each scene update it stretches the sprite along a fast rise or fall, using the arcade body's velocity when there
+is one and otherwise how far the sprite moved. It flattens the sprite on `land(strength)` and eases back,
+keeping its area, and blinks it for `blink(secs)`. It scales over the sprite's scale and alpha at creation; call
+`setBase(scaleX, scaleY, alpha)` when the game changes them. In a hit-stop it holds its shape. The collision body
+keeps its size. It ends when the sprite is destroyed, on `destroy()` (the sprite returns to its base), or when the
+scene shuts down.
+
 ## Layer mode
 
 Every per-effect object holds four textures. For many effects in one region, a layer shares four textures
