@@ -77,6 +77,18 @@ impl Stage {
         self.renderer.borrow_mut().scene.stop(handle);
     }
 
+    /// Move the effect's origin to game pixel (`x`, `y`), rounded to a whole pixel, without restarting it: for an
+    /// effect that follows the pointer or a sprite. Unknown handles are ignored; a non-finite position throws.
+    #[wasm_bindgen(js_name = "move")]
+    pub fn move_to(&mut self, handle: u32, x: f64, y: f64) -> Result<(), JsError> {
+        self.renderer
+            .borrow_mut()
+            .scene
+            .move_to(handle, x, y)
+            .map(|_| ())
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
     /// Drop the effect now. Unknown handles are ignored.
     pub fn remove(&mut self, handle: u32) {
         self.renderer.borrow_mut().scene.remove(handle);

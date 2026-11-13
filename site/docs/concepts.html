@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concepts · pixfx docs</title>
+  <meta name="description" content="The ideas every pixfx package shares: effects and instances, the colour and light layers, back and front, origins and margins, time, and seeds.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Concepts</h1>
+<p class="lead">The ideas every pixfx package shares: effects and instances, the colour and light layers, back and front, origins and margins, time, and seeds.</p>
+
+<h2>Effects and instances</h2>
+<p>An <strong>effect</strong> is a static description: its metadata plus a way to spawn state. Effects are listed in one registry (<code>pixfx_effects::EFFECTS</code>) and looked up by id, a <code>category/name</code> string such as <code>fire/candle</code>.</p>
+<p>An <strong>instance</strong> is one playing copy of an effect, with its own options, seed and clock. You can spawn any number of instances of the same effect.</p>
+
+<h3>Metadata</h3>
+<p>Every effect has a <code>Meta</code>. In JavaScript, <code>meta(id)</code> returns it as an object.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field (JS name)</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>id</code></td><td><code>category/name</code>.</td></tr>
+    <tr><td><code>name</code>, <code>desc</code>, <code>tags</code></td><td>Display name, one-sentence description, search tags.</td></tr>
+    <tr><td><code>size</code></td><td><code>[w, h]</code>: the effect's canvas in pixels.</td></tr>
+    <tr><td><code>origin</code></td><td><code>[x, y]</code>: where the effect's local (0, 0) sits on its canvas. For a fire, the point on the ground under it.</td></tr>
+    <tr><td><code>duration</code></td><td>Seconds: one loop, or the whole one-shot.</td></tr>
+    <tr><td><code>loop</code> (Rust <code>looping</code>)</td><td>Whether it loops. A one-shot holds its last moment and is done at <code>duration</code>.</td></tr>
+    <tr><td><code>fps</code></td><td>Frame rate of exported sheets and GIFs. Live playback runs at any rate.</td></tr>
+    <tr><td><code>seed</code></td><td>The seed used when you give none.</td></tr>
+    <tr><td><code>glowMargin</code> (Rust <code>glow_margin()</code>)</td><td>Empty pixels worth adding round the canvas so glow that spills past it is not cut: half the canvas's longer side.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Colour and light</h2>
+<p>A <strong>frame</strong> holds two layers of the same size:</p>
+<ul>
+  <li><strong>Colour</strong>: ordinary pixels with alpha, drawn normally (source-over). Stored as one ABGR word per pixel, which is the byte order of <code>ImageData</code> in memory: R, G, B, A.</li>
+  <li><strong>Light</strong>: additive glow, one xBGR word per pixel with the top byte unused. Light is added to whatever is underneath, saturating at 255 per channel.</li>
+</ul>
+<p>Keeping light separate is what lets a fire light up the ground and the sprites standing next to it. Every live renderer draws colour first, then light with additive blending (Canvas 2D <code>"lighter"</code>, Phaser <code>BlendModes.ADD</code>, gpui <code>SpriteBlend::Additive</code>).</p>
+<div class="note"><p>Additive light only shows over an opaque, darker background. Over a transparent target there is nothing to add to: the canvas renderer and the exports then turn light into colour whose alpha is its brightest channel, which reads correctly once composited over a dark ground. Phaser's WebGL renderer adds nothing over a transparent render target; see <a href="phaser.html#limitation-transparent-render-targets">Phaser</a>.</p></div>
+
+<h3>Compositing</h3>
+<p>To flatten both layers into RGBA bytes, <code>composite</code> draws colour over an optional background, then adds light:</p>
+<ul>
+  <li>Opaque colour, or colour over a background: light is added channel by channel, clamped to 255.</li>
+  <li>Over transparency: the pixel's existing colour is premultiplied, the light added, and the result divided by the new alpha, which is at least the light's brightest channel. Light alone over nothing therefore becomes the straight-alpha pixel that adds that light when drawn additively.</li>
+</ul>
+<p>The composite sheet the CLI writes and <code>Fx.rgba()</code> in JS both use this.</p>
+
+<h2>Back and front layers</h2>
+<p>An effect draws in two passes:</p>
+<ul>
+  <li><strong>Back</strong>: what goes behind a character standing in the effect.</li>
+  <li><strong>Front</strong>: everything else, drawn over the character.</li>
+</ul>
+<p>When drawing <code>Both</code>, back is drawn first, then front, into the same frame. An effect with nothing behind a character draws nothing for back. The three effects shipped today (candle, campfire, brazier) draw everything in front; the split is part of the effect contract, so an effect can wrap around a character.</p>
+<p>To put your own sprite inside an effect, draw the back layer, your sprite, then the front layer:</p>
+<pre><code>stage.update(dt);
+drawGround();
+stage.drawLayer("back");
+drawPlayer();
+stage.drawLayer("front");</code></pre>
+<p>The Phaser plugin does the same with depths: its back images sit at one depth and front images at another, and you put your sprite between them.</p>
+
+<h2>Origin, placement and margin</h2>
+<p>When you play an effect "at" a point, that point is where the effect's <strong>origin</strong> lands. Its canvas extends from there by <code>-origin</code> to <code>size - origin</code>. The candle is 56×76 with origin (28, 64): its canvas reaches 28 pixels left, 28 right, 64 up and 12 down from the point you give.</p>
+<p>Positions are rounded to whole pixels as JavaScript's <code>Math.round</code> does.</p>
+<p>An instance can draw on a canvas bigger than <code>size</code> by a <strong>margin</strong> of empty pixels on every side. Light often spills past an effect's canvas, so:</p>
+<ul>
+  <li><strong>Margin 0</strong> eases light out over the last 8 pixels at the canvas edge (an edge fade), so a glow cut off by the edge does not show as a box. Exports use margin 0, matching pixelfx sheets. Full-screen effects (16:9, at least 320 wide) keep light to the edge.</li>
+  <li><strong>A margin</strong> leaves room for the glow and fades nothing. The canvas renderer, Phaser plugin and gpui crate all use <code>glowMargin</code>.</li>
+</ul>
+
+<h2>Time</h2>
+<p>Instances advance in seconds: <code>update(dt)</code>.</p>
+<ul>
+  <li>The simulation runs in equal sub-steps of at most 1/120 s, whatever your frame rate, so 30 fps and 144 fps hosts see the same motion.</li>
+  <li>One call advances at most 0.25 s (<code>MAX_DT</code>). A tab that was in the background resumes where it left off instead of simulating the whole gap.</li>
+  <li><code>dt</code> must be a finite number, 0 or more. In JS, any other value (NaN, a missing argument, a negative step) throws and leaves the instance unchanged. In Rust, <code>Instance::update</code> ignores it.</li>
+  <li>Loops wrap at <code>duration</code>; one-shots hold their last moment.</li>
+</ul>
+
+<h3>Stopping</h3>
+<p><code>stop()</code> lets an instance end: a loop fades out over 0.3 s (<code>FADE</code>), a one-shot is cut short the same way. An instance is <strong>done</strong> when that fade has finished, or when a one-shot reaches its duration. The canvas renderer and Phaser plugin remove done instances on their own. Later <code>stop()</code> calls keep the first stop time.</p>
+
+<h2>Options</h2>
+<p>Every instance takes the same common options, all optional:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>seed</code></td><td>non-negative integer</td><td><code>meta.seed</code></td><td>Picks the random variation. Same seed and same steps give the same pixels.</td></tr>
+    <tr><td><code>flip</code></td><td>boolean</td><td><code>false</code></td><td>Mirror left-right about the origin.</td></tr>
+    <tr><td><code>angle</code></td><td>number, radians</td><td><code>0</code></td><td>Rotate about the origin.</td></tr>
+    <tr><td><code>light</code></td><td>number</td><td><code>1</code></td><td>Glow strength. <code>0</code> draws no light; values above 1 brighten it.</td></tr>
+    <tr><td><code>palette</code></td><td>array of hex colours</td><td>the effect's ramp</td><td>The effect's main colour ramp, dark to bright.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Effects also take options of their own, each a number or an array of hex colours. The <a href="effects.html">Effect catalog</a> lists them. An option an effect does not know is ignored; a number given where a ramp is expected is ignored too.</p>
+
+<h3>Palettes and ramps</h3>
+<p>A ramp is a list of colours from dark to bright. Colours are <code>"#rgb"</code>, <code>"#rrggbb"</code> or <code>"#rrggbbaa"</code>, with or without the <code>#</code>; they are always opaque (alpha digits are ignored, as in pixelfx). A ramp of a different length from the default is resampled to the default's length, so a 3-colour ramp works on a 9-colour slot. An empty ramp falls back to the default.</p>
+<pre><code>stage.play("fire/campfire", 64, 112, {
+  palette: ["#0d1033", "#3a62e0", "#7fb4ff", "#ffffff"], // a blue fire
+  wood: ["#1a1a1a", "#4a4a4a"],                          // the campfire's own ramp
+  height: 30,                                            // the campfire's own number
+});</code></pre>
+
+<h2>Determinism</h2>
+<p>Everything an effect draws comes from its seed, its options and the steps it was given. pixfx reproduces JavaScript's number semantics (rounding, min/max with NaN, 32-bit integer conversions, clamped byte stores) and uses its own math functions instead of the platform's, so a native build and a wasm build of the same effect produce the same pixels, bit for bit. A frame-hash test checks this; see <a href="parity.html">Parity and tests</a>.</p>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

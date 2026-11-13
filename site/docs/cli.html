@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Command line · pixfx docs</title>
+  <meta name="description" content="The pixfx binary renders effects to sprite sheets and GIFs, and checks ports against pixelfx.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Command line</h1>
+<p class="lead">The <code>pixfx</code> binary renders effects to sprite sheets and GIFs, and checks ports against pixelfx.</p>
+
+<h2>Run it</h2>
+<p>From the repository, through cargo:</p>
+<pre><code>cargo run -p pixfx-cli -- &lt;command&gt; ...</code></pre>
+<p>Or install the binary once and call <code>pixfx</code> directly:</p>
+<pre><code>cargo install --path crates/pixfx-cli
+pixfx sheet fire/candle</code></pre>
+<p>Usage:</p>
+<pre><code>pixfx parity &lt;id&gt; [--pixelfx DIR] [--out DIR]
+pixfx sheet &lt;id&gt; [--out DIR]
+pixfx render &lt;id&gt; --gif [--scale N] [--out DIR]</code></pre>
+<p>Output files are named after the id with <code>/</code> replaced by <code>_</code>: <code>fire/candle</code> becomes <code>fire_candle</code>. Each command prints the id and the path it wrote.</p>
+
+<h2>sheet</h2>
+<p>Render one loop (or the whole one-shot) at the effect's fps and write a sprite sheet.</p>
+<pre><code>pixfx sheet fire/candle --out out</code></pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>File</th><th>Contents</th></tr></thead>
+  <tbody>
+    <tr><td><code>fire_candle.png</code></td><td>RGBA. Colour with light added, over transparency. Use it where you cannot blend additively.</td></tr>
+    <tr><td><code>fire_candle_color.png</code></td><td>RGBA. The colour layer alone.</td></tr>
+    <tr><td><code>fire_candle_light.png</code></td><td>RGB. The light layer alone, to draw additively over the colour sheet.</td></tr>
+    <tr><td><code>fire_candle.json</code></td><td>Aseprite-style "array" JSON with beanfx's fields. See <a href="sheets.html">Sprite sheet format</a>.</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>--out DIR</code></td><td><code>target/out</code></td><td>Directory to write into; created if missing.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>render --gif</h2>
+<p>Write a looping GIF, composited over a dark backdrop (<code>rgb(20, 18, 28)</code>), since GIF has no partial transparency.</p>
+<pre><code>pixfx render fire/campfire --gif --scale 4 --out out</code></pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>--gif</code></td><td></td><td>Required; GIF is the only render format.</td></tr>
+    <tr><td><code>--scale N</code></td><td><code>4</code></td><td>Each pixel becomes N×N. At least 1. The scaled size must fit GIF's 65535-pixel limit.</td></tr>
+    <tr><td><code>--out DIR</code></td><td><code>target/out</code></td><td>Directory to write into.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Frame delay is <code>1/fps</code> rounded to GIF's hundredths of a second.</p>
+
+<h2>parity</h2>
+<p>Render an effect with pixelfx and with its pixfx port and compare every pixel of every frame. See <a href="parity.html">Parity and tests</a> for setup.</p>
+<pre><code>pixfx parity fire/candle --pixelfx /tmp/pixelfx --out target/parity</code></pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>--pixelfx DIR</code></td><td><code>$PIXELFX</code>, else <code>./pixelfx</code></td><td>A pixelfx checkout. Needs Node on the path.</td></tr>
+    <tr><td><code>--out DIR</code></td><td><code>target/parity</code></td><td>Where the reference render and the side-by-side GIF go.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>It prints <code>&lt;id&gt;: colour x% differ, light y% differ → PASS</code> (or <code>FAIL</code>) and writes <code>&lt;out&gt;/&lt;id&gt;.side.gif</code>, pixelfx on the left and pixfx on the right.</p>
+
+<h2>Exit codes</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>0</code></td><td>Success; for <code>parity</code>, PASS.</td></tr>
+    <tr><td><code>1</code></td><td><code>parity</code> ran and FAILed the gate.</td></tr>
+    <tr><td><code>2</code></td><td>Could not run: bad arguments, an unknown effect id, a write error, or a pixelfx render that failed. The message starts with <code>pixfx:</code> on stderr.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Options</h2>
+<p>The CLI renders with default options (the effect's default seed, palette and own options) and margin 0, so its output matches pixelfx's own sheets. To export with other options or a glow margin, call <a href="rust.html#frames-and-output"><code>render_frames</code></a> and the <a href="rust.html#pixfx-export">export functions</a> from Rust.</p>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

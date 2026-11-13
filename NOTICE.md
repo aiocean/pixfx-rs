@@ -1,10 +1,12 @@
 # Notices
 
-pixfx-rs ports two MIT-licensed projects to Rust:
+pixfx-rs builds on two MIT-licensed projects:
 
 - **pixelfx**, Copyright (c) 2026 Patch, Copyright (c) 2026 Hugo Duprez, MIT License
-  (https://github.com/patch-gg/pixelfx — commit 044e12a). Its own notices follow verbatim.
-- **beanfx**, Copyright (c) 2026 bien, MIT
+  (https://github.com/patch-gg/pixelfx — commit 044e12a). pixfx-rs ports its engine and effects to Rust. Its own
+  notices follow verbatim.
+- **beanfx**, Copyright (c) 2026 bien, MIT License (https://github.com/baenv/beanfx). pixfx-rs sprite sheets use
+  the beanfx layout and its rule for compositing light over transparency.
 
 ## pixelfx notices (verbatim)
 

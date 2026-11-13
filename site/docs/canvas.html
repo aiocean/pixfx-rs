@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Canvas renderer · pixfx docs</title>
+  <meta name="description" content="pixfx-canvas draws effects onto an HTML canvas with Canvas 2D. Mount a Stage, say which effects play where, and either let it run its own loop or drive it from yours.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Canvas renderer</h1>
+<p class="lead"><code>pixfx-canvas</code> draws effects onto an HTML canvas with Canvas 2D. Mount a <code>Stage</code>, say which effects play where, and either let it run its own loop or drive it from yours.</p>
+
+<h2>Build</h2>
+<pre><code>wasm-pack build crates/pixfx-canvas --target web --out-dir pkg</code></pre>
+<p>Ship <code>pkg/pixfx_canvas.js</code> and <code>pkg/pixfx_canvas_bg.wasm</code> together and serve them over HTTP. The module also exports the <a href="js-engine.html">JS engine</a>'s <code>effects()</code>, <code>meta(id)</code> and <code>Fx</code>, so one wasm file covers both.</p>
+<pre><code>import init, { Stage, effects, meta } from "./pkg/pixfx_canvas.js";
+await init();</code></pre>
+
+<h2>Self-running stage</h2>
+<p>For a page that only shows effects:</p>
+<pre><code>const canvas = document.querySelector("canvas");
+canvas.width = 320 * 4;
+canvas.height = 180 * 4;
+
+const stage = new Stage(canvas, 4);
+stage.background("#13101b");
+const fire = stage.play("fire/campfire", 160, 160, { seed: 3 });
+stage.start();
+
+// later
+stage.stop(fire);   // fades out, then removes itself
+stage.pause();      // effects keep their state; start() resumes</code></pre>
+<p>Each frame the stage clears the canvas (or fills the background colour), then draws the back layer of every effect, then the front layer of every effect, oldest first. Time is the real time between animation frames.</p>
+<p>Set <code>image-rendering: pixelated</code> on the canvas if CSS resizes it, so the browser keeps the pixels sharp.</p>
+
+<h2>Host-owned loop</h2>
+<p>A game that draws its own sprites between an effect's layers owns the loop. Call <code>update(dt)</code>, draw your ground, <code>drawLayer("back")</code>, draw your sprites, then <code>drawLayer("front")</code>. <code>drawLayer</code> never clears and leaves the context's compositing and smoothing as you had them.</p>
+<pre><code>const SCALE = 4;
+const stage = new Stage(canvas, SCALE);
+const ctx = canvas.getContext("2d");
+stage.play("fire/campfire", 168, 160, { seed: 1 });
+
+let last = null;
+function frame(now) {
+  const dt = last === null ? 0 : Math.max(0, now - last) / 1000;
+  last = now;
+  stage.update(dt);
+  ctx.fillStyle = "#17131c";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  stage.drawLayer("back");
+  drawPlayer(ctx);            // your sprites, in canvas pixels (game pixels × SCALE)
+  stage.drawLayer("front");
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);</code></pre>
+<p><code>tick(dt)</code> is <code>update(dt)</code> plus a full draw (clear or fill, back, front), for a host that owns the loop but draws nothing between layers.</p>
+
+<h2>API</h2>
+<h3><code>new Stage(canvas, scale)</code></h3>
+<p>Draw onto <code>canvas</code> (an <code>HTMLCanvasElement</code>), one game pixel as <code>scale</code>×<code>scale</code> canvas pixels. <code>scale</code> must be at least 1. Throws if the canvas has no 2D context, for example because it already has a WebGL one.</p>
+
+<h3><code>play(id, x, y, opts?)</code> → handle</h3>
+<p>Play effect <code>id</code> with its origin at game pixel (<code>x</code>, <code>y</code>), rounded to a whole pixel. Returns a numeric handle; handles start at 1 and are never reused. <code>opts</code> takes the <a href="concepts.html#options">common options</a> and the effect's own. Throws on an unknown id, a bad option, a non-finite position, or a <code>margin</code> option (the stage sizes each effect's margin itself, as <code>meta.glowMargin</code>).</p>
+
+<h3><code>stop(handle)</code></h3>
+<p>Let the effect end: loops fade out over 0.3 s, one-shots are cut short. It is removed once done. Unknown handles are ignored.</p>
+
+<h3><code>move(handle, x, y)</code></h3>
+<p>Move the effect's origin to game pixel (<code>x</code>, <code>y</code>), rounded to a whole pixel, without restarting it: for an effect that follows the pointer or a sprite. Unknown handles are ignored; a non-finite position throws.</p>
+<pre><code>const wisp = stage.play("critters/wisp", 0, 0);
+addEventListener("pointermove", (e) =&gt; stage.move(wisp, e.offsetX / SCALE, e.offsetY / SCALE));</code></pre>
+
+<h3><code>remove(handle)</code></h3>
+<p>Drop the effect now. Unknown handles are ignored.</p>
+
+<h3><code>start()</code> and <code>pause()</code></h3>
+<p><code>start()</code> runs the stage's own <code>requestAnimationFrame</code> loop; calling it while running does nothing. The first frame after <code>start()</code> steps 0 s. <code>pause()</code> stops the loop; effects keep their state. If a frame fails, the loop logs <code>pixfx Stage stopped: ...</code> to the console and stops; <code>pause()</code> then <code>start()</code> retries.</p>
+
+<h3><code>update(dt)</code>, <code>drawLayer(layer)</code>, <code>tick(dt)</code></h3>
+<p>For host-owned loops, as above. <code>dt</code> is seconds, a finite number, 0 or more; anything else throws and changes nothing. <code>layer</code> is <code>"back"</code> or <code>"front"</code>. <code>update</code> removes effects that are done.</p>
+
+<h3><code>setScale(scale)</code></h3>
+<p>Change game pixel to canvas pixels (at least 1). Resize the canvas yourself to match.</p>
+
+<h3><code>background(css)</code></h3>
+<p>Fill the canvas with this CSS colour before each <code>tick</code> or self-run frame. <code>""</code> clears to transparent instead (the default). Has no effect on <code>drawLayer</code>.</p>
+
+<h3><code>handles()</code></h3>
+<p>The playing handles, oldest first. Finished effects are gone.</p>
+
+<h3><code>free()</code></h3>
+<p>Release the stage's wasm memory (generated by wasm-bindgen). Freeing a running stage stops its loop.</p>
+
+<h2>How it draws</h2>
+<p>Each effect has its own small <code>OffscreenCanvas</code> and pixel buffer, made once when it is played and reused every frame. For each layer, the colour half is drawn with <code>source-over</code>, then the light half with <code>"lighter"</code> (additive, saturating), each enlarged by <code>scale</code> with image smoothing off. Empty halves are skipped. Every effect gets <code>glowMargin</code> pixels of room round its canvas and no edge fade, so glow shows in full.</p>
+<p>Light is drawn as light over transparency: it adds exactly its light to an opaque canvas, and shows as that light's colour on a transparent one.</p>
+<p>The decisions (placement, ordering, removal, the pixels of each layer) are plain Rust in <code>crates/pixfx-canvas/src/stage.rs</code>, tested natively; <code>lib.rs</code> only blits.</p>
+
+<h2>Demo</h2>
+<pre><code>wasm-pack build crates/pixfx-canvas --target web --out-dir demo/pkg
+cd crates/pixfx-canvas/demo &amp;&amp; python3 -m http.server 8766 --bind 127.0.0.1</code></pre>
+<p>The demo owns the loop and draws a figure between the layers. <code>window.pixfxDemo</code> exposes its stage and frame rate for tests.</p>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

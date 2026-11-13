@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JS engine · pixfx docs</title>
+  <meta name="description" content="pixfx-wasm is the engine as plain JavaScript bindings: list effects, read their metadata, spawn instances, step them and read their pixels. You decide how to draw them.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>JS engine</h1>
+<p class="lead"><code>pixfx-wasm</code> is the engine as plain JavaScript bindings: list effects, read their metadata, spawn instances, step them and read their pixels. You decide how to draw them.</p>
+<p>Use it to draw with WebGL or WebGPU, in a worker, or to test pixels. To simply show effects on a canvas, the <a href="canvas.html">canvas renderer</a> does the drawing for you.</p>
+
+<h2>Build</h2>
+<pre><code>wasm-pack build crates/pixfx-wasm --target web --out-dir pkg</code></pre>
+<pre><code>import init, { Fx, effects, meta } from "./pkg/pixfx_wasm.js";
+await init();</code></pre>
+
+<h2>Example</h2>
+<pre><code>const fx = new Fx("fire/campfire", { seed: 1 });
+canvas.width = fx.width();
+canvas.height = fx.height();
+const ctx = canvas.getContext("2d");
+
+let last = performance.now();
+function frame(now) {
+  fx.update(Math.max(0, now - last) / 1000); // never step backwards
+  last = now;
+  fx.draw("both");
+  ctx.putImageData(new ImageData(fx.rgba(), fx.width(), fx.height()), 0, 0);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);</code></pre>
+
+<h2>Functions</h2>
+<h3><code>effects()</code> → string[]</h3>
+<p>Every effect id, in registry order.</p>
+<h3><code>meta(id)</code> → object</h3>
+<p><code>{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed}</code>. Throws <code>unknown effect "..."</code> for an id not in the registry. Fields are described in <a href="concepts.html#metadata">Concepts</a>.</p>
+
+<h2>Fx</h2>
+<p>A live effect on its own canvas: <code>meta.size</code> plus <code>margin</code> empty pixels on every side, with the effect's origin at <code>meta.origin + margin</code>.</p>
+
+<h3><code>new Fx(id, opts?)</code></h3>
+<p><code>opts</code> is <code>undefined</code>, <code>null</code> or a plain object with the <a href="concepts.html#options">common options</a>, the effect's own options, and:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Option</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>margin</code></td><td>Whole number from 0 to 4096: empty pixels round the canvas. 0 (the default) eases light out at the edge so frames match the sprite sheet; <code>meta(id).glowMargin</code> fits the effect's glow and fades nothing.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Options are checked once, here. A field of the wrong type throws an error naming it, for example <code>option flip must be a boolean</code> or <code>option palette[2]: not a #rgb, #rrggbb or #rrggbbaa colour</code>. <code>x</code> and <code>y</code> are refused: an <code>Fx</code> always draws at its own origin. Keys whose value is <code>undefined</code> are skipped.</p>
+
+<h3>Methods</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>update(dt)</code></td><td>Advance by <code>dt</code> seconds (at most 0.25, in 1/120 s sub-steps). Throws for NaN, a missing argument or a negative step, and leaves the instance unchanged.</td></tr>
+    <tr><td><code>draw(layer)</code></td><td>Clear the canvas and draw <code>"back"</code>, <code>"front"</code> or <code>"both"</code> at the current time.</td></tr>
+    <tr><td><code>stop()</code></td><td>Let it end: loops fade out, one-shots are cut short.</td></tr>
+    <tr><td><code>done()</code></td><td>True once a stopped instance has faded, or a one-shot has finished.</td></tr>
+    <tr><td><code>t()</code></td><td>Seconds since the instance started.</td></tr>
+    <tr><td><code>width()</code>, <code>height()</code></td><td>Canvas size in pixels, margin included.</td></tr>
+    <tr><td><code>originX()</code>, <code>originY()</code></td><td>Where the effect's origin sits on the canvas. Draw the canvas at <code>(x - originX(), y - originY())</code> to place the effect at <code>(x, y)</code>.</td></tr>
+    <tr><td><code>free()</code></td><td>Release the instance's wasm memory (wasm-bindgen).</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Reading pixels</h3>
+<p>After <code>draw()</code>, read the frame in the form that suits your renderer:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Returns</th></tr></thead>
+  <tbody>
+    <tr><td><code>rgba()</code></td><td>A <code>Uint8ClampedArray</code> copy, <code>width × height × 4</code>: both layers composited over transparency, ready for <code>new ImageData(px, w, h)</code>.</td></tr>
+    <tr><td><code>color()</code></td><td>A <code>Uint32Array</code> copy of the colour layer, one ABGR word per pixel, row-major.</td></tr>
+    <tr><td><code>light()</code></td><td>A <code>Uint32Array</code> copy of the light layer, one xBGR word per pixel (top byte unused).</td></tr>
+    <tr><td><code>colorRgbaPtr()</code></td><td>Address in wasm memory of the colour layer as straight-alpha RGBA8 bytes. No copy.</td></tr>
+    <tr><td><code>lightRgbaPtr()</code></td><td>Address of the light layer as RGBA8: lit pixels <code>r, g, b, 255</code>, unlit <code>0, 0, 0, 0</code>, to draw additively. No copy.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>The pointer methods avoid a copy per frame. View the bytes before the next call on the same instance; they share one buffer, so <code>lightRgbaPtr()</code> overwrites what <code>colorRgbaPtr()</code> wrote.</p>
+<pre><code>import init, { Fx } from "./pkg/pixfx_wasm.js";
+const wasm = await init();
+
+const ptr = fx.colorRgbaPtr();
+const bytes = new Uint8ClampedArray(wasm.memory.buffer, ptr, fx.width() * fx.height() * 4);
+gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, fx.width(), fx.height(), gl.RGBA, gl.UNSIGNED_BYTE, bytes);</code></pre>
+<p>Make a new view each frame: wasm memory can grow, which detaches old views.</p>
+
+<h2>Rust side</h2>
+<p>The bindings are a thin layer over plain Rust, which other crates use directly: <code>pixfx_wasm::Player</code> (an instance plus its canvas) and <code>pixfx_wasm::parse_options</code> (JS object to typed <code>Options</code> and margin). <code>pixfx-canvas</code> is built on both.</p>
+
+<h2>Demo</h2>
+<pre><code>wasm-pack build crates/pixfx-wasm --target web --out-dir demo/pkg
+cd crates/pixfx-wasm/demo &amp;&amp; python3 -m http.server 8765 --bind 127.0.0.1</code></pre>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

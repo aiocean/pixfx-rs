@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- `pixfx-canvas`: `Stage.move(handle, x, y)` moves a playing effect without restarting it, for effects that follow
+  the pointer or a sprite.
+- `site/`: landing page and docs, with an fx layer (`site/assets/fx.js`) that plays engine effects for the cursor,
+  clicks, button presses and page changes as soon as each effect is in the registry. With fx on, pages change in
+  place (`site/assets/nav.js`), so the old page burns open from the click point over the new one.
+
 ## 0.1.0
 
 - `pixfx-core`: frame with colour and additive light, painter, `Effect`/`Instance`, `render_frames`,

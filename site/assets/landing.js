@@ -1,0 +1,404 @@
+// The landing page: a live hero scene and one live tile per effect, all drawn by the pixfx-canvas Stage.
+// The page owns one animation-frame loop: for each canvas it fills the ground, draws the effects' back layers,
+// draws its own sprites, then the front layers.
+import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
+import { DECOR, createDuel, step } from "./duel.js";
+import { BARS_TALL, drawBars, drawFighter, drawNumbers, drawStreaks } from "./duel-art.js";
+import { DUSK, advance, createFeel, dusk, numbers, react, shake, streaks } from "./duel-feel.js";
+import { createScene, drawScene } from "./duel-scene.js";
+import { createLights, drawLights, fade, kindle } from "./duel-light.js";
+
+/** Behind the hero's scene while the screen shakes. */
+const BACKDROP = "#0b0a1c";
+/** The effect tiles' sky and floor. */
+const COLORS = { sky: "#13101b", ground: "#1e1a24" };
+/** How tall the film bars an ultimate brings in are, in game pixels, at the sky's darkest. */
+const LETTERBOX = 12;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const PALETTES = {
+  default: { label: "Default", ramp: null },
+  spirit: {
+    label: "Spirit (blue)",
+    ramp: ["#0d1033", "#1b2a8a", "#2a46c0", "#3a62e0", "#5a8cf0", "#7fb4ff", "#a8d0ff", "#d6ecff", "#ffffff"],
+  },
+  witch: {
+    label: "Witch fire (green)",
+    ramp: ["#0f1f12", "#1b3a1a", "#2a5e22", "#3f8a2a", "#62b236", "#8fd64a", "#bdf06e", "#e4ffa8", "#ffffff"],
+  },
+};
+
+/** Options each effect takes beyond the shared ones, for the tile controls. */
+const OWN = { "fire/campfire": [{ key: "height", label: "Height", min: 8, max: 40, step: 1, value: 22 }] };
+
+/** Canvas pixels per game pixel in a tile. */
+const TILE_SCALE = 3;
+/** Seconds a one-shot tile rests empty before it plays again. */
+const REST = 0.6;
+
+/** A tile's box in game pixels: at least 160x170 so most effects share one shape and one floor line, 24 pixels above
+ *  the box's bottom (lower when an effect reaches further below its origin); the effect's origin stands on the floor,
+ *  its canvas centred. */
+function boxFor(m) {
+  const pad = 8;
+  const below = Math.max(24, m.size[1] - m.origin[1] + pad);
+  const w = Math.max(160, m.size[0] + 2 * pad);
+  const h = Math.max(170, m.origin[1] + pad + below);
+  const at = { x: Math.round((w - m.size[0]) / 2) + m.origin[0], y: h - below };
+  return { w, h, at, ground: at.y };
+}
+
+/** Mount the landing page: the tabs, the hero and one tile per effect. Returns how to unmount it. */
+export async function mount() {
+  const off = new AbortController();
+  setupTabs(document.getElementById("targets"));
+
+  await init();
+
+  const hero = createHero(document.getElementById("scene"), off.signal);
+  const views = [hero];
+  const gallery = document.getElementById("gallery");
+  for (const id of effects()) views.push(createTile(gallery, id));
+
+  let last = null;
+  let running = true;
+  // only what is on screen plays: a tile scrolled out of view, or the hero, waits where it was
+  const visible = new Set([hero.canvas]);
+  const seen = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) visible.add(e.target);
+      else visible.delete(e.target);
+    }
+  });
+  for (const v of views) seen.observe(v.canvas);
+  const proof = createProof(document.getElementById("proof"), () => views.filter((v) => visible.has(v.canvas)));
+
+  // one animation-frame loop for every canvas on the page
+  function frame(now) {
+    if (!running) return;
+    const dt = last === null ? 0 : Math.max(0, now - last) / 1000;
+    last = now;
+    for (const v of views) if (visible.has(v.canvas)) v.step(dt);
+    proof.frame(now);
+    requestAnimationFrame(frame);
+  }
+
+  if (reduceMotion) {
+    // one still frame a second into each effect
+    for (const v of views) v.step(1);
+    proof.frame(performance.now(), true);
+  } else {
+    requestAnimationFrame(frame);
+  }
+
+  return () => {
+    running = false;
+    off.abort();
+    seen.disconnect();
+    for (const v of views) v.free();
+  };
+}
+
+// ---------- hero ----------
+
+function createHero(canvas, signal) {
+  const view = { canvas, stage: null, duel: null, feel: createFeel(), lights: createLights(), layout: null, handles: new Map() };
+  const have = new Set(effects());
+  let seed = 1 + Math.floor(Math.random() * 1e6);
+
+  function build() {
+    view.stage?.free();
+    view.handles.clear();
+    const narrow = innerWidth < 760;
+    const scale = narrow ? 2 : 3;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.ceil(rect.width / scale);
+    const h = Math.ceil(rect.height / scale);
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    const ground = h - (narrow ? 14 : 22);
+    // the arena is the middle of the dais, at most 420 pixels wide, a brazier at each end
+    const lampInset = 14;
+    const span = Math.min(w - 16, 420);
+    const arena = { left: Math.round((w - span) / 2), right: Math.round((w + span) / 2) };
+
+    view.stage = new Stage(canvas, scale);
+    if (have.has(DECOR.night)) {
+      for (let x = 160; x - 160 < w; x += 320) view.stage.play(DECOR.night, x, ground, { seed: x });
+    }
+    // a brazier at each end of the arena lights it
+    if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
+    view.feel = createFeel();
+    view.lights = createLights();
+    // the bars go just under the page's top bar, which lies over the hero
+    // (its links can wrap past its own box on a narrow screen, so measure what is in it)
+    const topbar = Math.max(0, ...[...document.querySelectorAll(".topbar, .topbar *")].map((el) => el.getBoundingClientRect().bottom));
+    const barTop = Math.max(6, Math.ceil((topbar - rect.top) / scale) + 6);
+    // fighters fly no higher than keeps their heads (about 44 pixels tall) under the bars
+    const sky = ground - (barTop + BARS_TALL + 13) - 46;
+    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky });
+    view.layout = { scale, w, h, ground, barTop, lamps: [arena.left, arena.right], scene: createScene(w, h, ground, barTop + BARS_TALL) };
+    // a still frame shows the fight under way
+    if (reduceMotion) {
+      for (let i = 0; i < 6 * 30; i++) play(step(view.duel, 1 / 30));
+      view.step(0);
+    }
+  }
+
+  /** The duel's effect commands, on the stage. */
+  function play(commands) {
+    for (const c of commands) {
+      if (c.type === "play") view.handles.set(c.key, view.stage.play(c.fx, c.x, c.y, c.opts));
+      else if (c.type === "move" && view.handles.has(c.key)) view.stage.move(view.handles.get(c.key), c.x, c.y);
+      else if (c.type === "stop" && view.handles.has(c.key)) {
+        view.stage.stop(view.handles.get(c.key));
+        view.handles.delete(c.key);
+      }
+    }
+  }
+
+  view.step = (dt) => {
+    const { scale, w, h, ground, scene } = view.layout;
+    // a blow stops the fight and its effects together for a few frames; a knockout plays out slowed
+    const run = advance(view.feel, dt);
+    const commands = step(view.duel, run);
+    play(commands);
+    react(view.feel, commands);
+    kindle(view.lights, commands, ground, (fx) => meta(fx).loop);
+    fade(view.lights, run);
+    view.stage.update(reduceMotion ? 0 : run);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = BACKDROP;
+    ctx.fillRect(0, 0, w * scale, h * scale);
+    ctx.save();
+    const [sx, sy] = shake(view.feel, Math.random);
+    ctx.translate(sx * scale, sy * scale);
+    drawScene(ctx, scene, view.duel.time, scale);
+    view.stage.drawLayer("back");
+    // an ultimate darkens the world behind the fighters and the magic
+    const dark = dusk(view.feel);
+    if (dark > 0) {
+      ctx.fillStyle = `rgba(4, 2, 10, ${dark})`;
+      ctx.fillRect(-scale * 4, -scale * 4, (w + 8) * scale, (h + 8) * scale);
+    }
+    for (const f of view.duel.fighters) drawFighter(ctx, f, ground, scale);
+    // the magic lights the dais, the peaks and the fighters in its own colour
+    drawLights(ctx, view.lights, w, h, scale, view.layout.lamps, ground, view.duel.time);
+    view.stage.drawLayer("front");
+    drawStreaks(ctx, streaks(view.feel), view.duel, scale);
+    drawNumbers(ctx, numbers(view.feel), view.duel, scale);
+    ctx.restore();
+    // an ultimate frames the screen like a film for as long as the sky is dark
+    if (dark > 0) {
+      const band = Math.round((dark / DUSK.depth) * LETTERBOX);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, w * scale, band * scale);
+      ctx.fillRect(0, (h - band) * scale, w * scale, band * scale);
+    }
+    drawBars(ctx, view.duel, scale, view.layout.barTop);
+  };
+
+  let pending = null;
+  addEventListener("resize", () => {
+    clearTimeout(pending);
+    pending = setTimeout(build, 150);
+  }, { signal });
+  signal.addEventListener("abort", () => clearTimeout(pending));
+  view.free = () => view.stage?.free();
+  view.playing = () => view.stage?.handles().length ?? 0;
+
+  build();
+  return view;
+}
+
+// ---------- effect tiles ----------
+
+function createTile(parent, id) {
+  const m = meta(id);
+  const BOX = { ...boxFor(m), scale: TILE_SCALE };
+  const tile = document.createElement("article");
+  tile.className = "tile";
+  tile.innerHTML = `
+    <canvas width="${BOX.w * BOX.scale}" height="${BOX.h * BOX.scale}" aria-label="${m.name}, playing live"></canvas>
+    <div class="tile-body">
+      <h3>${m.name}</h3>
+      <p class="facts">${m.size[0]}×${m.size[1]} px · ${m.duration} s ${m.loop ? "loop" : "one-shot"} · ${m.fps} fps</p>
+      <p class="desc">${m.desc}</p>
+      <div class="controls"></div>
+      <pre><code></code></pre>
+    </div>`;
+  parent.append(tile);
+
+  const canvas = tile.querySelector("canvas");
+  const controls = tile.querySelector(".controls");
+  const code = tile.querySelector("code");
+  const stage = new Stage(canvas, BOX.scale);
+  const opts = { seed: m.seed, light: 1, palette: "default" };
+  const own = OWN[id] ?? [];
+  for (const o of own) opts[o.key] = o.value;
+  let handle = null;
+
+  const range = (key, label, min, max, step) => {
+    const input = Object.assign(document.createElement("input"), { type: "range", min, max, step, value: opts[key] });
+    input.id = `${id.replace("/", "-")}-${key}`;
+    const lab = Object.assign(document.createElement("label"), { htmlFor: input.id, textContent: label });
+    const out = document.createElement("output");
+    out.value = opts[key];
+    input.addEventListener("input", () => {
+      opts[key] = Number(input.value);
+      out.value = input.value;
+      replay();
+    });
+    controls.append(lab, input, out);
+  };
+
+  range("light", "Light", 0, 2, 0.1);
+  for (const o of own) range(o.key, o.label, o.min, o.max, o.step);
+
+  const select = document.createElement("select");
+  select.id = `${id.replace("/", "-")}-palette`;
+  for (const [key, p] of Object.entries(PALETTES)) select.append(new Option(p.label, key));
+  select.addEventListener("change", () => {
+    opts.palette = select.value;
+    replay();
+  });
+  controls.append(Object.assign(document.createElement("label"), { htmlFor: select.id, textContent: "Palette" }), select);
+
+  const reseed = Object.assign(document.createElement("button"), { type: "button", textContent: "New seed" });
+  reseed.addEventListener("click", () => {
+    opts.seed = Math.floor(Math.random() * 10000);
+    replay();
+  });
+  controls.append(Object.assign(document.createElement("label"), { textContent: "Seed" }), reseed);
+
+  function engineOptions() {
+    const out = {};
+    if (opts.seed !== m.seed) out.seed = opts.seed;
+    if (opts.light !== 1) out.light = opts.light;
+    if (opts.palette !== "default") out.palette = PALETTES[opts.palette].ramp;
+    for (const o of own) if (opts[o.key] !== o.value) out[o.key] = opts[o.key];
+    return out;
+  }
+
+  function replay() {
+    if (handle !== null) stage.remove(handle);
+    const o = engineOptions();
+    handle = stage.play(id, BOX.at.x, BOX.at.y, o);
+    resting = 0;
+    code.textContent = callText(id, o);
+    if (reduceMotion) view.step(1);
+  }
+
+  let resting = 0;
+  const view = {
+    canvas,
+    playing: () => stage.handles().length,
+    step(dt) {
+      stage.update(dt);
+      // a one-shot is removed once it ends: rest a moment, then play it again
+      if (!m.loop && !stage.handles().includes(handle)) {
+        resting += dt;
+        if (resting >= REST) replay();
+      }
+      const ctx = canvas.getContext("2d");
+      const s = BOX.scale;
+      ctx.fillStyle = COLORS.ground;
+      ctx.fillRect(0, 0, BOX.w * s, BOX.h * s);
+      ctx.fillStyle = COLORS.sky;
+      ctx.fillRect(0, BOX.ground * s, BOX.w * s, (BOX.h - BOX.ground) * s);
+      stage.drawLayer("back");
+      stage.drawLayer("front");
+    },
+    free: () => stage.free(),
+  };
+
+  replay();
+  return view;
+}
+
+// ---------- proof ----------
+
+/** Seconds between updates of the proof line, so its numbers can be read. */
+const PROOF_EVERY = 0.5;
+/** A frame further apart than this from the last one came from a hidden or throttled page. */
+const SLOW_FRAME_MS = 50;
+
+/**
+ * The line under the hero that measures this page as it runs: how many effects are playing on screen, the frame
+ * rate the page holds while it plays them, and how big the engine's download was.
+ */
+function createProof(el, onScreen) {
+  let since = null;
+  let prev = null;
+  let frames = 0;
+  const download = engineDownload();
+  const write = (fps) => {
+    const playing = onScreen().reduce((n, v) => n + v.playing(), 0);
+    el.innerHTML =
+      `On your screen, <b>${playing} effects</b> are playing` +
+      (fps ? ` at <b>${fps} frames a second</b>` : "") +
+      (download ? `, all from a <b>${download} KB</b> engine.` : ".");
+  };
+  return {
+    frame(now, still = false) {
+      if (!el) return;
+      if (still) return write(null);
+      // a hidden or throttled page sends frames seconds apart: count only frames that come at a display's pace
+      const steady = prev !== null && now - prev < SLOW_FRAME_MS;
+      prev = now;
+      if (!steady) since = null;
+      if (since === null) {
+        since = now;
+        frames = 0;
+        return;
+      }
+      frames++;
+      if (now - since < PROOF_EVERY * 1000) return;
+      write(Math.round((frames * 1000) / (now - since)));
+      since = now;
+      frames = 0;
+    },
+  };
+}
+
+/** The engine's wasm as it came over the network, in KB, or null when the browser does not say. */
+function engineDownload() {
+  const entry = performance.getEntriesByType("resource").find((e) => e.name.endsWith(".wasm"));
+  const bytes = entry?.encodedBodySize || entry?.transferSize;
+  return bytes ? Math.round(bytes / 1024) : null;
+}
+
+function callText(id, o) {
+  const keys = Object.keys(o);
+  if (keys.length === 0) return `stage.play("${id}", x, y);`;
+  const parts = keys.map((k) => {
+    const v = o[k];
+    if (Array.isArray(v)) return `  ${k}: [${v.map((c) => `"${c}"`).join(", ")}],`;
+    return `  ${k}: ${v},`;
+  });
+  return `stage.play("${id}", x, y, {\n${parts.join("\n")}\n});`;
+}
+
+// ---------- tabs (WAI-ARIA tabs pattern) ----------
+
+function setupTabs(root) {
+  const tabs = [...root.querySelectorAll('[role="tab"]')];
+  const select = (tab) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    }
+    tab.focus();
+  };
+  for (const [i, tab] of tabs.entries()) {
+    tab.addEventListener("click", () => select(tab));
+    tab.addEventListener("keydown", (e) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (step) select(tabs[(i + step + tabs.length) % tabs.length]);
+      if (e.key === "Home") select(tabs[0]);
+      if (e.key === "End") select(tabs.at(-1));
+    });
+  }
+}

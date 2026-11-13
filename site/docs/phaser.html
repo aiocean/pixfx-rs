@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phaser plugin · pixfx docs</title>
+  <meta name="description" content="pixfx-phaser plays pixfx effects in Phaser 4 scenes. Effects show up as ordinary Phaser images: a back pair and a front pair, each a colour image and an additive light image, so your sprites can stand between them.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Phaser plugin</h1>
+<p class="lead"><code>pixfx-phaser</code> plays pixfx effects in Phaser 4 scenes. Effects show up as ordinary Phaser images: a back pair and a front pair, each a colour image and an additive light image, so your sprites can stand between them.</p>
+<p>Requires Phaser <code>^4.2.1</code>. The engine is the pixfx wasm module; drawing runs on worker threads by default.</p>
+
+<h2>Install</h2>
+<p>The package is not on npm yet. Build the engine once, then link the package into your game:</p>
+<pre><code>cd pixfx-rs/packages/pixfx-phaser
+bun install
+bun run build:wasm          # wasm-pack → wasm/ (git-ignored), shipped beside the JS
+cd /path/to/your-game
+bun add ../pixfx-rs/packages/pixfx-phaser</code></pre>
+<p>The package exports its TypeScript source (<code>src/index.ts</code>); Vite compiles it with the game. The <code>.wasm</code> file sits next to its JS glue and is loaded through <code>new URL(..., import.meta.url)</code>, so Vite bundles it with no plugin.</p>
+<p>A linked local package carries its own dev copy of Phaser in its <code>node_modules</code>. Tell Vite to use the game's copy, or the bundle holds two Phasers (2.8 MB instead of 1.5 MB, measured):</p>
+<pre><code>// vite.config.js of the game
+export default { resolve: { dedupe: ["phaser"] } };</code></pre>
+
+<h2>Load the engine and register the plugin</h2>
+<pre><code>import Phaser from "phaser";
+import { PixfxPlugin, loadPixfx } from "pixfx-phaser";
+
+await loadPixfx(); // once, before any scene calls play()
+
+new Phaser.Game({
+  pixelArt: true,
+  zoom: 4,
+  scene: [MyScene],
+  plugins: { scene: [{ key: "pixfx", plugin: PixfxPlugin, mapping: "pixfx" }] },
+});
+
+class MyScene extends Phaser.Scene {
+  declare pixfx: PixfxPlugin;
+  create() {
+    this.pixfx.play("fire/campfire", 150, 170);
+  }
+}</code></pre>
+<p><code>play()</code> before <code>loadPixfx()</code> has resolved throws <code>pixfx: call await loadPixfx() before play()</code>.</p>
+
+<h3>Worker threads</h3>
+<p><code>loadPixfx()</code> starts worker threads that draw the effects, one per core the main thread leaves free (1 to 4), each with its own copy of the engine. The pixels are exactly those the engine draws on the main thread. A new frame shows one display frame after the scene step that asked for it, and <code>"complete"</code> fires when the worker reports the effect finished. Each effect stays in one worker for its life. <code>play()</code> still checks the id and options on the main thread and throws at once.</p>
+<pre><code>await loadPixfx({ workers: 2 }); // a fixed number of workers
+await loadPixfx({ workers: 0 }); // draw on the main thread</code></pre>
+<p>Without <code>Worker</code> support, effects draw on the main thread. Options apply to the first call; later calls return the loaded engine. Vite bundles the worker from <code>new Worker(new URL(...), { type: "module" })</code>, with no plugin.</p>
+
+<h2>Play an effect</h2>
+<p><code>scene.pixfx.play(id, x, y, opts?)</code> places the effect's origin at world (<code>x</code>, <code>y</code>) and returns a <code>PixfxEffect</code>. One effect pixel is one world unit; camera zoom and <code>pixelArt</code> enlarge it, and positions snap to whole pixels. An unknown id or a bad option throws and creates nothing.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Option</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>seed</code></td><td>Non-negative integer; same seed and same steps give the same pixels.</td></tr>
+    <tr><td><code>flip</code>, <code>angle</code>, <code>palette</code></td><td>Passed to the effect; see <a href="concepts.html#options">Options</a>.</td></tr>
+    <tr><td><code>light</code></td><td>Glow strength, 0 or more: <code>0</code> is no glow, default <code>1</code>.</td></tr>
+    <tr><td><code>depth: {back, front}</code></td><td>Depths of the back and front images. Default <code>{back: 0, front: 1}</code>.</td></tr>
+    <tr><td><code>scrollFactor</code></td><td>Camera scroll factor of the images: <code>1</code> world space (default), <code>0</code> screen space (HUD effects).</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Other numeric or array options are passed to the effect (<code>height</code>, <code>wood</code>, ...). <code>margin</code> is refused: the plugin sizes it.</p>
+
+<h3>PixfxEffect</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Call</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>stop()</code></td><td>Let it end: loops fade out, one-shots are cut short. Does nothing once finished.</td></tr>
+    <tr><td><code>destroy()</code></td><td>Remove at once.</td></tr>
+    <tr><td><code>follow(obj, dx?, dy?)</code></td><td>Track a game object each frame. If <code>obj</code> is destroyed, the effect stops (fades) where <code>obj</code> last was.</td></tr>
+    <tr><td><code>setDepths(back, front)</code></td><td>Move the image pairs in the display list; put your sprite at a depth between them.</td></tr>
+    <tr><td><code>setPosition(x, y)</code></td><td>Move; stops following.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Events: <code>"complete"</code> when the effect finishes on its own (after <code>stop()</code>, or at the end of a one-shot), and <code>"destroy"</code> after <code>destroy()</code>, never both. When either fires, the effect's textures, images and engine instance are already freed.</p>
+<pre><code>const torch = this.pixfx.play("fire/candle", 0, 0, { depth: { back: 9, front: 11 } });
+torch.follow(this.player, 6, -2);   // the player sits at depth 10
+torch.once("complete", () =&gt; console.log("torch out"));
+this.time.delayedCall(5000, () =&gt; torch.stop());</code></pre>
+
+<h3>Scene time</h3>
+<p>Effects advance on scene time: the scene <code>update</code> delta × <code>scene.time.timeScale</code>. A paused or sleeping scene freezes them; <code>timeScale</code> 0.25 plays them at quarter speed. Scene shutdown (<code>restart</code>, <code>stop</code>) or destroy frees every effect. <code>scene.pixfx.stats()</code> returns <code>{engines, textures, images}</code> still alive.</p>
+
+<h2>Layer mode</h2>
+<p>Every per-effect object holds four textures. For many effects in one region, a layer shares four textures among them:</p>
+<pre><code>const layer = this.pixfx.createLayer({
+  bounds: { x: 290, y: 0, width: 110, height: 200 },
+  depths: { back: 0, front: 1 }, // optional
+  scrollFactor: 1,                // optional
+});
+layer.play("fire/brazier", 315, 180);
+layer.play("fire/brazier", 370, 160);</code></pre>
+<p><code>layer.play</code> returns a <code>PixfxEffect</code> with the same API and events. The layer owns the depths and scroll factor (<code>setDepths</code> on a member does nothing). Members are drawn clipped to <code>bounds</code>, glow included, so make the bounds cover the light you want to see. <code>layer.destroy()</code> destroys every member and the layer's textures.</p>
+
+<h2>Limitation: transparent render targets</h2>
+<p>Light images use Phaser's <code>BlendModes.ADD</code>. In Phaser 4.2.1's WebGL renderer that is <code>src·1 + dst·dstAlpha</code>: over an opaque scene it adds exactly the light, but over a transparent render target (a transparent canvas, or a transparent <code>RenderTexture</code>) it adds nothing. Draw effects over an opaque background.</p>
+
+<h2>Demo</h2>
+<pre><code>bun run build:wasm
+bunx vite demo                   # dev server; open the printed URL
+bunx vite build demo             # or build to demo/dist and serve that</code></pre>
+<p><code>?renderer=webgl</code> (default) or <code>?renderer=canvas</code>. Keys: <kbd>P</kbd> pause/resume, <kbd>S</kbd> time scale 1 ↔ 0.25, <kbd>X</kbd> stop the campfire, <kbd>D</kbd> destroy the walker the candle follows, <kbd>R</kbd> restart the scene. <code>window.pixfxDemo</code> exposes <code>scene</code>, <code>game</code>, <code>engine</code>, <code>stats()</code> and the <code>events</code> log for checks.</p>
+<p>A stress page (<code>demo/stress.html</code>) and a Chrome performance runner (<code>bun run perf</code>, <code>bun run perf:check</code>) measure frame times with many effects.</p>
+
+<h2>Develop</h2>
+<pre><code>bun run check   # tsc, eslint, bun test</code></pre>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

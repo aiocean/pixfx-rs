@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rust API · pixfx docs</title>
+  <meta name="description" content="Use the engine directly from Rust: look up effects, render their frames, step live instances, composite, hash and export.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Rust API</h1>
+<p class="lead">Use the engine directly from Rust: look up effects, render their frames, step live instances, composite, hash and export.</p>
+
+<h2>Crates</h2>
+<p>The crates are not on crates.io yet. Depend on them by path or git:</p>
+<pre><code>[dependencies]
+pixfx-core = { path = "../pixfx-rs/crates/pixfx-core" }
+pixfx-effects = { path = "../pixfx-rs/crates/pixfx-effects" }
+pixfx-export = { path = "../pixfx-rs/crates/pixfx-export" }</code></pre>
+<p>They need the nightly toolchain pinned in the repository's <code>rust-toolchain.toml</code>, edition 2024, and forbid <code>unsafe</code>.</p>
+
+<h2>Example</h2>
+<p>This program is checked to compile and run against the current source.</p>
+<pre><code>use std::path::Path;
+
+use pixfx_core::{Frame, Instance, Layer, OptValue, Options, composite, frame_hash, hex, render_frames};
+use pixfx_export::{write_gif, write_sheet};
+
+fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    let fx = pixfx_effects::effect("fire/campfire").ok_or("fire/campfire is not registered")?;
+
+    // render one loop with options, glow room and no edge fade
+    let mut opts = Options { seed: Some(7), light: 1.2, ..Options::default() };
+    opts.palette = Some(vec![hex("#0d1033")?, hex("#3a62e0")?, hex("#ffffff")?]);
+    opts.extra.insert("height".into(), OptValue::Num(30.0));
+    let rendered = render_frames(fx, &amp;opts, fx.meta().glow_margin());
+
+    let out = Path::new("out");
+    let files = write_sheet(&amp;rendered, fx.meta(), out, "blue_campfire")?;
+    write_gif(&amp;out.join("blue_campfire.gif"), &amp;rendered, 3)?;
+    println!("{}", files.json.display());
+
+    // live: step an instance and draw it into a frame you own
+    let meta = fx.meta();
+    let mut inst = Instance::new(fx, Options {
+        x: f64::from(meta.origin.0),
+        y: f64::from(meta.origin.1),
+        ..Options::default()
+    });
+    let mut frame = Frame::new(meta.size.0, meta.size.1, 0, 0);
+    inst.update(1.0 / 60.0);
+    frame.clear();
+    inst.draw(&amp;mut frame, Layer::Both);
+    let mut rgba = vec![0u8; frame.w as usize * frame.h as usize * 4];
+    composite(&amp;frame, &amp;mut rgba, None);
+    println!("hash {:016x}", frame_hash(&amp;frame));
+    Ok(())
+}</code></pre>
+
+<h2>pixfx-effects</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Item</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><code>EFFECTS: &amp;[&amp;'static dyn Effect]</code></td><td>Every effect, in registry order.</td></tr>
+    <tr><td><code>effect(id) -&gt; Option&lt;&amp;'static dyn Effect&gt;</code></td><td>Look one up by id.</td></tr>
+    <tr><td><code>fire::CANDLE</code>, <code>fire::CAMPFIRE</code>, <code>fire::BRAZIER</code></td><td>The effects as statics.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>pixfx-core</h2>
+<h3>Effect, Meta, Options</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Item</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><code>trait Effect</code></td><td><code>meta() -&gt; &amp;Meta</code> and <code>spawn(&amp;Options, seed) -&gt; Box&lt;dyn EffectState&gt;</code>. See <a href="writing-effects.html">Write an effect</a>.</td></tr>
+    <tr><td><code>trait EffectState</code></td><td><code>update(dt)</code> for one simulation sub-step (default: nothing) and <code>draw(&amp;mut Painter, t, Layer)</code>.</td></tr>
+    <tr><td><code>struct Meta</code></td><td><code>id, name, desc, tags, size, origin, duration, looping, fps, seed</code>; <code>is_screen()</code> and <code>glow_margin()</code>. See <a href="concepts.html#metadata">Concepts</a>.</td></tr>
+    <tr><td><code>struct Options</code></td><td><code>x, y, flip, angle, seed: Option&lt;u64&gt;, light, palette: Option&lt;Vec&lt;Rgba&gt;&gt;, extra: BTreeMap&lt;String, OptValue&gt;</code>. <code>Default</code> is origin (0, 0), no flip, angle 0, effect seed, light 1, effect palette.</td></tr>
+    <tr><td><code>enum OptValue</code></td><td><code>Num(f64)</code> or <code>Ramp(Vec&lt;Rgba&gt;)</code>: an effect's own option.</td></tr>
+    <tr><td><code>Options::palette_or</code>, <code>ramp_or</code>, <code>num_or</code></td><td>For effects: resolve an option against its default (ramps resampled to the default's length).</td></tr>
+    <tr><td><code>enum Layer</code></td><td><code>Back</code>, <code>Front</code>, <code>Both</code>.</td></tr>
+    <tr><td><code>find(list, id)</code></td><td>Find an effect by id in any list.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Instance</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td><code>Instance::new(effect, opts)</code></td><td>Spawn with <code>opts.seed</code> or the effect's seed. <code>opts.x</code>, <code>opts.y</code> place the origin in frame space.</td></tr>
+    <tr><td><code>update(dt)</code></td><td>Advance by at most <code>MAX_DT</code> (0.25 s) in sub-steps of at most 1/120 s. A step failing <code>valid_dt</code> (NaN, infinite, negative) is ignored.</td></tr>
+    <tr><td><code>draw(&amp;mut Frame, Layer)</code></td><td>Draw at the current time on top of what is in the frame. Clear the frame first for a fresh image.</td></tr>
+    <tr><td><code>stop()</code>, <code>done()</code>, <code>t()</code></td><td>As in <a href="concepts.html#stopping">Concepts</a>.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Frames and output</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Item</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><code>struct Frame { w, h, ox, oy, color, light }</code></td><td><code>w</code>×<code>h</code> pixels whose top-left is at (<code>ox</code>, <code>oy</code>) in world space. <code>color</code>: ABGR words. <code>light</code>: xBGR words. <code>Frame::new</code>, <code>clear()</code>.</td></tr>
+    <tr><td><code>render_frames(effect, &amp;opts, margin) -&gt; Rendered</code></td><td>Every frame of one loop or one-shot at the effect's fps, at its origin whatever <code>opts.x</code>/<code>y</code> say. Margin 0 eases light out at the edge.</td></tr>
+    <tr><td><code>struct Rendered { w, h, fps, margin, frames }</code></td><td>The result.</td></tr>
+    <tr><td><code>composite(&amp;frame, &amp;mut out, bg)</code></td><td>Colour over an optional RGBA background, plus light, into RGBA8 bytes (<code>w × h × 4</code>).</td></tr>
+    <tr><td><code>composite_px(c, l, ground)</code></td><td>One pixel of <code>composite</code>.</td></tr>
+    <tr><td><code>edge_fade(&amp;mut frame)</code></td><td>Ease light out over the last 8 pixels of the frame.</td></tr>
+    <tr><td><code>frame_hash(&amp;frame) -&gt; u64</code></td><td>FNV-1a 64 over colour then light words, little-endian: a stable fingerprint for golden tests.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Colour, math, painter</h3>
+<ul>
+  <li><code>color</code>: <code>Rgba(r, g, b, a)</code> with <code>pack</code>/<code>unpack</code> (ABGR words), <code>hex</code>, <code>to_hex</code>, <code>mix</code>, <code>scale</code>, <code>luma</code>, ramp helpers <code>fit</code>, <code>at</code>, <code>blend</code>.</li>
+  <li><code>math</code>: JavaScript-exact helpers (<code>js_round</code>, <code>js_min</code>, <code>js_max</code>, <code>to_int32</code>, <code>to_uint32</code>), easing and shaping (<code>clamp</code>, <code>lerp</code>, <code>smooth</code>, <code>bump</code>, <code>seg</code>, ...), hashing and noise (<code>hash</code>, <code>rand</code>, <code>noise</code>, <code>noise2</code>), and the seeded <code>Rng</code>.</li>
+  <li><code>painter</code>: <code>Painter</code>, the drawing API effects use. See <a href="writing-effects.html#the-painter">Write an effect</a>.</li>
+  <li><code>sim</code>: constants shared by simulated effects, such as <code>SMOKE_RAMP</code>.</li>
+</ul>
+
+<h2>pixfx-export</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Item</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><code>write_sheet(&amp;rendered, &amp;meta, out_dir, name) -&gt; Result&lt;SheetFiles, ExportError&gt;</code></td><td>Write <code>&lt;name&gt;.png</code>, <code>_color.png</code>, <code>_light.png</code> and <code>.json</code>, creating <code>out_dir</code>. See <a href="sheets.html">Sprite sheet format</a>.</td></tr>
+    <tr><td><code>write_gif(path, &amp;rendered, scale) -&gt; Result&lt;(), ExportError&gt;</code></td><td>A looping GIF over a dark backdrop, each pixel <code>scale</code>×<code>scale</code>.</td></tr>
+    <tr><td><code>Grid</code>, <code>beanfx_json</code>, <code>FileNames</code></td><td>The pure layout and JSON functions behind <code>write_sheet</code>.</td></tr>
+    <tr><td><code>enum ExportError</code></td><td><code>Io</code>, <code>Png</code>, <code>Gif</code>, <code>Json</code>, or <code>TooBig { w, h, scale }</code> when a scaled image exceeds the format's size field.</td></tr>
+  </tbody>
+</table>
+</div>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>
