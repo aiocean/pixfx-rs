@@ -255,3 +255,69 @@ fn shapes_match_pixelfx() {
         assert_eq!(frame_hash(&frame), want, "{name}");
     }
 }
+
+/// Frame hashes from `tests/golden/painter_shapes.mjs` (pixelfx 044e12a), drawn through pixelfx transitions
+/// `clipTo`: the painter keeps only writes whose local cell is inside the 320 x 180 screen.
+#[test]
+fn local_clip_matches_pixelfx() {
+    use pixfx_core::color::hex;
+    use pixfx_core::frame::frame_hash;
+
+    let orange = hex("#ff8a2a").unwrap_or(Rgba::NONE);
+    let yellow = hex("#ffe26b").unwrap_or(Rgba::NONE);
+    let straddle = |p: &mut Painter| {
+        p.glow(2.0, 3.0, 14.0, yellow, 0.8);
+        p.disc(1.0, 4.0, 9.0, orange, 0.6);
+        p.circle(-2.0, 6.0, 4.0, WHITE, 1.0);
+    };
+    let far = |p: &mut Painter| {
+        p.glow(318.0, 177.0, 14.0, yellow, 0.8);
+        p.disc(319.0, 176.0, 9.0, orange, 0.6);
+    };
+    type Case<'a> = (
+        &'static str,
+        (f64, f64, bool, f64),
+        u64,
+        &'a dyn Fn(&mut Painter),
+    );
+    let cases: [Case; 2] = [
+        (
+            "clip_origin_mirrored_rotated",
+            (32.0, 24.0, true, 0.6),
+            0x79a8_e5af_d0bd_b16f,
+            &straddle,
+        ),
+        (
+            "clip_far_corner",
+            (-288.0, -150.0, false, 0.0),
+            0x7e11_b54b_d5bf_93d1,
+            &far,
+        ),
+    ];
+    for (name, (x, y, flip, angle), want, draw) in cases {
+        let render = |clip: bool| {
+            let mut frame = Frame::new(64, 48, 0, 0);
+            let mut p = Painter::new(&mut frame);
+            p.place(x, y, flip, angle);
+            if clip {
+                p.clip_local(320.0, 180.0);
+            }
+            draw(&mut p);
+            frame_hash(&frame)
+        };
+        assert_eq!(render(true), want, "{name}");
+        // the shapes straddle the edge: without the clip they draw more
+        assert_ne!(render(false), want, "{name} unclipped");
+    }
+}
+
+#[test]
+fn reset_removes_the_clip() {
+    let mut f = Frame::new(8, 8, 0, 0);
+    let mut p = Painter::new(&mut f);
+    p.clip_local(2.0, 2.0);
+    p.put(5.0, 5.0, WHITE, 1.0);
+    p.reset();
+    p.put(6.0, 6.0, WHITE, 1.0);
+    assert_eq!(f.color.iter().filter(|&&c| c != 0).count(), 1);
+}
