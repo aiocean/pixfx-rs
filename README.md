@@ -86,6 +86,45 @@ darkest palette step does the work of an edge (the candle's wax, the icicle, the
 cargo run -p pixfx-cli -- render fire/candle --gif --outline white
 ```
 
+## Palettes
+
+Every effect takes a `palette`: a list of hex colours from dark to light, or one preset's name. A palette of
+another length is resampled to the effect's own, so any ramp fits any effect.
+
+| Preset | Ramp |
+|---|---|
+| `"fire"` | Soot red through orange to pale yellow. |
+| `"ice"` | Deep blue through cyan to white. |
+| `"poison"` | Dark moss through acid green to pale lime. |
+| `"holy"` | Dark bronze through gold to white. |
+| `"shadow"` | Near black through violet to pale lilac. |
+| `"arcane"` | Indigo through blue violet to near white. |
+| `"blood"` | Near black through crimson to pale pink. |
+| `"electric"` | Night blue through cyan to white. |
+| `"nature"` | Dark leaf through green to pale lime. |
+| `"gold"` | Dark brown through gold to white. |
+
+```js
+stage.play("explosions/small-explosion", x, y, { palette: "poison" });
+```
+
+```sh
+cargo run -p pixfx-cli -- render fire/campfire --gif --palette ice
+```
+
+In Phaser, `PALETTE_PRESETS` lists the names.
+
+## Ripples and hit flash
+
+- **Ripples.** A heavy impact's `ripple` cue pushes a ring out from where it lands, bending what is behind it. The
+  Canvas `Stage`'s own loop bends the view each frame. A host that owns the loop calls `stage.warp()` once it has
+  drawn everything the ring should bend. Any other host reads `ripples()` and bends RGBA pixels with
+  `screen::ripple_rgba` (core).
+- **Hit flash.** `HitFlash` (core, and `new HitFlash()` in JS) fills a struck sprite with one colour for a few
+  frames: `start(secs?)` (5 frames at 60 a second when left out), `advance(dt)` with play time, then draw the
+  sprite filled while `active()`, or blend the fill by `amount()` (1 down to 0). It runs on play time, so a
+  hit-stop holds the struck sprite lit through the freeze.
+
 ## Render a sheet
 
 ```sh

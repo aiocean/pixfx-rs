@@ -24,21 +24,22 @@ const PUSH: f64 = 22.0;
 const BAND: f64 = 10.0;
 
 /// Where `dst` pixel (`x`, `y`) reads from `src`, in source pixels before rounding: the shake moves the view by
-/// `shake`, each ripple pushes it along the ring's radius.
-fn source_of(x: f64, y: f64, shake: (i32, i32), ripples: &[Ripple]) -> (f64, f64) {
+/// `shake`, each ripple pushes it along the ring's radius. `unit` is how many pixels one of the ripples' game
+/// pixels covers (1 for a frame, the host's scale for a scaled-up canvas).
+fn source_of(x: f64, y: f64, shake: (i32, i32), ripples: &[Ripple], unit: f64) -> (f64, f64) {
     let mut sx = x - f64::from(shake.0);
     let mut sy = y - f64::from(shake.1);
     for r in ripples {
         let u = r.age / r.dur;
-        let radius = r.r0 + (r.r1 - r.r0) * u;
-        let (ex, ey) = (x - r.x, y - r.y);
+        let radius = (r.r0 + (r.r1 - r.r0) * u) * unit;
+        let (ex, ey) = (x - r.x * unit, y - r.y * unit);
         let d = match libm::hypot(ex, ey) {
             d if d == 0.0 || d.is_nan() => 1.0,
             d => d,
         };
-        let band = 1.0 - (d - radius).abs() / BAND;
+        let band = 1.0 - (d - radius).abs() / (BAND * unit);
         if band > 0.0 {
-            let push = r.amp * PUSH * (1.0 - u) * band;
+            let push = r.amp * PUSH * unit * (1.0 - u) * band;
             sx -= ex / d * push;
             sy -= ey / d * push;
         }
@@ -67,7 +68,7 @@ pub fn ripple(src: &Frame, dst: &mut Frame, ripples: &[Ripple], shake: (i32, i32
     let my = f64::from(src.h.saturating_sub(dst.h) / 2);
     for y in 0..dst.h {
         for x in 0..dst.w {
-            let (sx, sy) = source_of(f64::from(x), f64::from(y), shake, ripples);
+            let (sx, sy) = source_of(f64::from(x), f64::from(y), shake, ripples, 1.0);
             let si = clamp_index(sy + my, src.h) * src.w as usize + clamp_index(sx + mx, src.w);
             let di = y as usize * dst.w as usize + x as usize;
             if let (Some(&c), Some(&l)) = (src.color.get(si), src.light.get(si)) {
@@ -77,6 +78,28 @@ pub fn ripple(src: &Frame, dst: &mut Frame, ripples: &[Ripple], shake: (i32, i32
                 if let Some(d) = dst.light.get_mut(di) {
                     *d = l;
                 }
+            }
+        }
+    }
+}
+
+/// Bend a drawn screen through `ripples`: `src` and `dst` are RGBA8 bytes of a `w` x `h` image (a host's canvas,
+/// its own sprites and background included), `unit` canvas pixels per game pixel (the ripples are in game pixels).
+/// Each `dst` pixel copies the `src` pixel the ripples push it to, reads past the edge taking the nearest edge
+/// pixel. Short buffers are left alone past their end.
+pub fn ripple_rgba(src: &[u8], dst: &mut [u8], w: u32, h: u32, ripples: &[Ripple], unit: f64) {
+    let unit = if unit.is_finite() && unit > 0.0 {
+        unit
+    } else {
+        1.0
+    };
+    for y in 0..h {
+        for x in 0..w {
+            let (sx, sy) = source_of(f64::from(x), f64::from(y), (0, 0), ripples, unit);
+            let si = (clamp_index(sy, h) * w as usize + clamp_index(sx, w)) * 4;
+            let di = (y as usize * w as usize + x as usize) * 4;
+            if let (Some(from), Some(to)) = (src.get(si..si + 4), dst.get_mut(di..di + 4)) {
+                to.copy_from_slice(from);
             }
         }
     }

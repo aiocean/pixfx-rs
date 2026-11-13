@@ -4,11 +4,13 @@
 #![forbid(unsafe_code)]
 
 mod feel;
+mod hit_flash;
 pub mod js;
 mod options;
 mod squash;
 
 pub use feel::Feel;
+pub use hit_flash::HitFlash;
 use js::to_js;
 pub use options::{MAX_MARGIN, parse_options};
 pub use pixfx_core::Player;

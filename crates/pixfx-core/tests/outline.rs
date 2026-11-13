@@ -236,8 +236,14 @@ fn a_ring_is_one_to_three_pixels_wide() {
 #[test]
 fn scattered_pixels_such_as_smoke_get_no_ring_and_a_dithered_shape_still_does() {
     let faint = draw(&FAINT, on(WHITE, 1, false));
-    assert!(!of(&faint, RED).is_empty(), "the faint block is drawn, as scattered pixels");
+    assert!(
+        !of(&faint, RED).is_empty(),
+        "the faint block is drawn, as scattered pixels"
+    );
     assert!(of(&faint, WHITE).is_empty(), "but not ringed");
     let half = draw(&HALF, on(WHITE, 1, false));
-    assert!(!of(&half, WHITE).is_empty(), "a checkerboard still reads as a shape");
+    assert!(
+        !of(&half, WHITE).is_empty(),
+        "a checkerboard still reads as a shape"
+    );
 }

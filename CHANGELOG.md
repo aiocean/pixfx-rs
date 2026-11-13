@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `pixfx-core`, `pixfx-wasm`, `pixfx-cli`, `pixfx-phaser`: every effect takes an `outline` (off, a preset, a hex colour
+  or `{color, width, corners}`) and a `palette` by preset name (`fire`, `ice`, `poison`, `holy`, `shadow`, `arcane`,
+  `blood`, `electric`, `nature`, `gold`); the CLI takes `--outline` and `--palette`.
+- `pixfx-canvas`: the stage's own loop bends the view by the ripples alive; `Stage.warp()` does it for a host that
+  owns the loop. `pixfx-core`: `screen::ripple_rgba` bends RGBA pixels at any scale.
+- `pixfx-core`, `pixfx-wasm`: `HitFlash` fills a struck sprite for a few frames on play time, held through a hit-stop.
+- `site/`: the effect page picks a palette preset, an outline and (for impact effects) the feel, and copies the call.
 - `pixfx-core`: the trauma shake follows the usual model on every axis: `Feel::roll(strength)` tilts the screen
   (radians, `FeelSpec::roll`) next to `shake`'s x and y, each axis is the most it can move times trauma squared times
   smooth Perlin noise (`math::perlin`, gradient noise that never comes to rest), `cue::impact` adds 0.3 to 0.6 trauma

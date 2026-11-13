@@ -7,9 +7,9 @@
 //! Game feel: effects fire cues (shake, hit-stop, ripple, flash, sound) on the frame they mean them. The stage
 //! answers them with one [`pixfx_core::Feel`]: a hit-stop freezes every effect for its frames, and `update`
 //! returns the seconds that played so the host freezes its own world with them. Its own loop also moves the
-//! view by the shake and lifts it toward white by the flash; a host that owns the loop reads `shake(strength)`
-//! and `flash()` and applies them to everything it draws. Cues also come out of `events()` as
-//! `{type: "cue", ...}`, for sounds and anything else the host does on them.
+//! view by the shake, bends it by the ripples and lifts it toward white by the flash; a host that owns the loop
+//! reads `shake(strength)` and `flash()`, applies them to everything it draws and calls `warp()` after drawing.
+//! Cues also come out of `events()` as `{type: "cue", ...}`, for sounds and anything else the host does on them.
 //!
 //! Canvas 2D: each frame clears the canvas (or fills the background), then draws the back layer of every
 //! effect, then the front layer of every effect. Each layer is its colour drawn normally and its light drawn
@@ -32,6 +32,7 @@ use pixfx_core::{Feel, Frame, Layer};
 use pixfx_effects::effect;
 use pixfx_wasm::js::{pair, parse, to_js};
 use stage::{Pass, PlacementChange, Scene, color_rgba, light_rgba, live_player, stage_options};
+use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 use web_sys::{
     CanvasRenderingContext2d, HtmlCanvasElement, ImageData, OffscreenCanvas,
@@ -245,6 +246,12 @@ impl Stage {
         )
     }
 
+    /// Bend what the canvas shows now by the screen ripples alive (`ripples()`), for a host that owns the loop:
+    /// call it after drawing everything the ripples should move. The stage's own loop does it each frame.
+    pub fn warp(&self) -> Result<(), JsError> {
+        self.renderer.borrow().warp().map_err(|e| JsError::new(&e))
+    }
+
     /// Answer cues on the stage (`true`, the default: hit-stops freeze its effects, its own loop shakes and
     /// flashes), or leave them to the host (`false`: a host with its own answer, fed from the `cue` events; the
     /// stage plays every second `update` gives it and `shake`, `flash` and `ripples` stay empty).
@@ -362,6 +369,7 @@ impl Renderer {
             .and_then(|()| self.draw_layer(Layer::Front));
         self.ctx.restore();
         drawn?;
+        self.warp()?;
         if flash > 0.0 {
             let ctx = &self.ctx;
             ctx.save();
@@ -371,6 +379,30 @@ impl Renderer {
             ctx.restore();
         }
         Ok(())
+    }
+
+    /// Bend the canvas as it stands by the ripples alive now (nothing to do without any): each pixel takes the
+    /// colour [`pixfx_core::screen::ripple_rgba`] pulls toward it, one game pixel being `scale` canvas pixels.
+    fn warp(&self) -> Result<(), String> {
+        let ripples = self.scene.feel().map_or(&[][..], Feel::ripples);
+        if ripples.is_empty() {
+            return Ok(());
+        }
+        let canvas = self.ctx.canvas().ok_or("the 2d context has no canvas")?;
+        let (w, h) = (canvas.width(), canvas.height());
+        let drawn = self
+            .ctx
+            .get_image_data(0.0, 0.0, f64::from(w), f64::from(h))
+            .map_err(|e| js_message("getImageData failed", &e))?
+            .data();
+        let mut bent = vec![0; drawn.len()];
+        let unit = f64::from(self.scene.scale().get());
+        pixfx_core::screen::ripple_rgba(&drawn, &mut bent, w, h, ripples, unit);
+        let image = ImageData::new_with_u8_clamped_array_and_sh(Clamped(&bent), w, h)
+            .map_err(|e| js_message("could not create ImageData", &e))?;
+        self.ctx
+            .put_image_data(&image, 0.0, 0.0)
+            .map_err(|e| js_message("putImageData failed", &e))
     }
 
     /// One layer of every effect onto the canvas as it stands. Runs inside save/restore so the host's

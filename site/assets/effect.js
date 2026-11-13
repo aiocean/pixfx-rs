@@ -6,17 +6,11 @@ import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 const COLORS = { sky: "#13101b", ground: "#1e1a24" };
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const PALETTES = {
-  default: { label: "Default", ramp: null },
-  spirit: {
-    label: "Spirit (blue)",
-    ramp: ["#0d1033", "#1b2a8a", "#2a46c0", "#3a62e0", "#5a8cf0", "#7fb4ff", "#a8d0ff", "#d6ecff", "#ffffff"],
-  },
-  witch: {
-    label: "Witch fire (green)",
-    ramp: ["#0f1f12", "#1b3a1a", "#2a5e22", "#3f8a2a", "#62b236", "#8fd64a", "#bdf06e", "#e4ffa8", "#ffffff"],
-  },
-};
+/** The engine's palette presets (`palette: "ice"` recolours any effect), after the effect's own colours. */
+const PALETTES = ["default", "fire", "ice", "poison", "holy", "shadow", "arcane", "blood", "electric", "nature", "gold"];
+
+/** The outlines every effect takes: as designed, none, or a preset ring. */
+const OUTLINES = ["default", "off", "dark", "black", "white", "thick"];
 
 /** Options each effect takes beyond the shared ones, for the controls. */
 const OWN = { "fire/campfire": [{ key: "height", label: "Height", min: 8, max: 40, step: 1, value: 22 }] };
@@ -87,7 +81,15 @@ export async function mount() {
   const scale = scaleFor(box, root.querySelector(".effect-stage").clientWidth);
   canvas.width = box.w * scale;
   canvas.height = box.h * scale;
-  const view = createView(canvas, root.querySelector(".controls"), root.querySelector(".effect-side code"), id, m, box, scale);
+  const call = root.querySelector(".effect-side pre");
+  const copy = Object.assign(document.createElement("button"), { className: "copy", type: "button", textContent: "Copy" });
+  copy.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(call.querySelector("code").textContent);
+    copy.textContent = "Copied";
+    setTimeout(() => { copy.textContent = "Copy"; }, 1500);
+  });
+  call.append(copy);
+  const view = createView(canvas, root.querySelector(".controls"), call.querySelector("code"), id, m, box, scale);
 
   let running = true;
   let last = null;
@@ -109,8 +111,10 @@ export async function mount() {
 /** The live effect on `canvas`, driven by the controls it adds to `controls`, with its call shown in `code`. */
 function createView(canvas, controls, code, id, m, box, scale) {
   const stage = new Stage(canvas, scale);
-  const opts = { seed: m.seed, light: 1, palette: "default" };
-  const own = OWN[id] ?? [];
+  const opts = { seed: m.seed, light: 1, palette: "default", outline: "default" };
+  const own = [...(OWN[id] ?? [])];
+  // an effect that fires impact cues takes `feel`: how hard its hit shakes, freezes, rings and flashes the screen
+  if (m.options.some((o) => o.name === "feel")) own.push({ key: "feel", label: "Feel", min: 0, max: 2, step: 0.1, value: 1 });
   for (const o of own) opts[o.key] = o.value;
   let handle = null;
   let resting = 0;
@@ -132,14 +136,19 @@ function createView(canvas, controls, code, id, m, box, scale) {
   range("light", "Light", 0, 2, 0.1);
   for (const o of own) range(o.key, o.label, o.min, o.max, o.step);
 
-  const select = document.createElement("select");
-  select.id = "effect-palette";
-  for (const [key, p] of Object.entries(PALETTES)) select.append(new Option(p.label, key));
-  select.addEventListener("change", () => {
-    opts.palette = select.value;
-    replay();
-  });
-  controls.append(Object.assign(document.createElement("label"), { htmlFor: select.id, textContent: "Palette" }), select);
+  const choice = (key, label, values) => {
+    const select = document.createElement("select");
+    select.id = `effect-${key}`;
+    for (const v of values) select.append(new Option(v === "default" ? "As designed" : v, v));
+    select.addEventListener("change", () => {
+      opts[key] = select.value;
+      replay();
+    });
+    controls.append(Object.assign(document.createElement("label"), { htmlFor: select.id, textContent: label }), select);
+  };
+
+  choice("palette", "Palette", PALETTES);
+  choice("outline", "Outline", OUTLINES);
 
   const reseed = Object.assign(document.createElement("button"), { type: "button", textContent: "New seed" });
   reseed.addEventListener("click", () => {
@@ -152,7 +161,8 @@ function createView(canvas, controls, code, id, m, box, scale) {
     const out = {};
     if (opts.seed !== m.seed) out.seed = opts.seed;
     if (opts.light !== 1) out.light = opts.light;
-    if (opts.palette !== "default") out.palette = PALETTES[opts.palette].ramp;
+    if (opts.palette !== "default") out.palette = opts.palette;
+    if (opts.outline !== "default") out.outline = opts.outline;
     for (const o of own) if (opts[o.key] !== o.value) out[o.key] = opts[o.key];
     return out;
   }
@@ -186,6 +196,8 @@ function createView(canvas, controls, code, id, m, box, scale) {
       stage.drawLayer("back");
       stage.drawLayer("front");
       ctx.restore();
+      // a heavy hit's ring bends what is drawn
+      if (!reduceMotion) stage.warp();
       const flash = reduceMotion ? 0 : stage.flash();
       if (flash > 0) {
         ctx.fillStyle = `rgba(255, 255, 255, ${flash})`;
@@ -205,8 +217,7 @@ function callText(id, o) {
   if (keys.length === 0) return `stage.play("${id}", x, y);`;
   const parts = keys.map((k) => {
     const v = o[k];
-    if (Array.isArray(v)) return `  ${k}: [${v.map((c) => `"${c}"`).join(", ")}],`;
-    return `  ${k}: ${v},`;
+    return `  ${k}: ${JSON.stringify(v)},`;
   });
   return `stage.play("${id}", x, y, {\n${parts.join("\n")}\n});`;
 }

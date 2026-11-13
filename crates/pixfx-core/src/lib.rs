@@ -9,6 +9,7 @@ pub mod cue;
 pub mod effect;
 pub mod feel;
 pub mod frame;
+pub mod hit_flash;
 pub mod key;
 pub mod math;
 pub mod outline;

@@ -160,7 +160,10 @@ pub(crate) fn ring_round(frame: &mut Frame, before: &[u32], ring: Ring) {
             && y >= 0
             && (x as usize) < w
             && (y as usize) < h
-            && drawn.get(y as usize * w + x as usize).copied().unwrap_or(false)
+            && drawn
+                .get(y as usize * w + x as usize)
+                .copied()
+                .unwrap_or(false)
     };
     let mut alpha = vec![0u8; w * h];
     for (i, &now) in frame.color.iter().enumerate() {
@@ -168,10 +171,19 @@ pub(crate) fn ring_round(frame: &mut Frame, before: &[u32], ring: Ring) {
             continue;
         }
         let (x, y) = ((i % w) as isize, (i / w) as isize);
-        let around = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
-            .into_iter()
-            .filter(|&(dx, dy)| is_drawn(x + dx, y + dy))
-            .count() as u32;
+        let around = [
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+        ]
+        .into_iter()
+        .filter(|&(dx, dy)| is_drawn(x + dx, y + dy))
+        .count() as u32;
         if around < SHAPE_NEIGHBOURS {
             continue;
         }
