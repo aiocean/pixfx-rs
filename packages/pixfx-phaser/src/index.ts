@@ -1,5 +1,7 @@
 export { PixfxPlugin } from "./plugin";
 export { PixfxEffect } from "./effect";
+export { PixfxFeel } from "./feel";
+export type { WorldCue } from "./feel";
 export type { Counts } from "./effect";
 export { loadPixfx } from "./load";
 export type { LoadOptions } from "./load";

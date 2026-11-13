@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import type { FrameBuffers, FxInstance } from "./backend";
+import type { FrameBuffers, FxInstance, TimedCue } from "./backend";
 import type { GfxImage, GfxTexture } from "./gfx";
 import type { FollowTarget } from "./lifecycle";
 import { EffectCore } from "./lifecycle";
@@ -26,10 +26,14 @@ export interface Layers {
   frontLight: Layer;
 }
 
+/** Where an effect's cues go once placed in the world: the scene's feel. */
+export type CueSink = (cues: readonly TimedCue[], effect: PixfxEffect) => void;
+
 /**
  * One effect in a scene: four images (back colour, back light, front colour, front light).
  * Emits `"complete"` when it finishes on its own and `"destroy"` when destroyed; either way it is
- * already gone (textures, images and engine instance freed) when the event fires.
+ * already gone (textures, images and engine instance freed) when the event fires. Emits `"cue"` with each cue
+ * it fires (`{t, pan, cue}`, a ripple's and a sound's `x`/`y` in the world), on the step that passes it.
  */
 export class PixfxEffect extends Phaser.Events.EventEmitter {
   private readonly core: EffectCore;
@@ -43,12 +47,13 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     depths: { back: number; front: number },
     private readonly counts: Counts,
     private readonly onGone: (effect: PixfxEffect) => void,
+    private readonly sink: CueSink,
   ) {
     super();
     this.core = new EffectCore(instance.shape, x, y);
     this.setDepths(depths.back, depths.front);
     this.place();
-    instance.start({ frame: (f) => this.show(f), done: () => this.complete() });
+    instance.start({ frame: (f) => this.show(f), cues: (c) => this.fire(c), done: () => this.complete() });
   }
 
   /** Let it end: loops fade out, one-shots are cut short. Does nothing once finished. */
@@ -104,6 +109,20 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     if (this.gone()) return;
     const old = this.surface.show(frame);
     if (old) this.instance.recycle(old);
+  }
+
+  /** Place cues in the world (relative to the effect's origin until now), emit each, and hand them to the feel. */
+  private fire(cues: readonly TimedCue[]): void {
+    if (this.gone()) return;
+    const at = this.core.at();
+    const world = cues.map((c): TimedCue => {
+      const cue = c.cue;
+      if (cue.type === "ripple") return { ...c, cue: { ...cue, x: at.x + cue.x, y: at.y + cue.y } };
+      if (cue.type === "sound") return { ...c, cue: { ...cue, x: at.x + (cue.x ?? 0) } };
+      return c;
+    });
+    for (const c of world) this.emit("cue", c, this);
+    this.sink(world, this);
   }
 
   private place(): void {

@@ -1,4 +1,5 @@
-import type { EffectMeta, Engine, EngineOptions, FxLike } from "../src/engine";
+import type { EffectMeta, Engine, EngineOptions, FeelLike, FxLike } from "../src/engine";
+import type { TimedCue } from "../src/protocol";
 
 /** Stopping lets an effect fade for this long before it is done. */
 const FADE_SECONDS = 0.5;
@@ -9,6 +10,9 @@ export class FakeFx implements FxLike {
   freed = false;
   /** Number of `draw` calls; every RGBA byte of a frame is this count (mod 256), so a test can tell frames apart. */
   draws = 0;
+  /** Cues it fires once its time passes them (`t` in seconds of playback). */
+  schedule: TimedCue[] = [];
+  private fired: TimedCue[] = [];
   constructor(
     private readonly owner: FakeEngine,
     private duration: number,
@@ -16,7 +20,14 @@ export class FakeFx implements FxLike {
     private readonly origin: readonly [number, number],
   ) {}
   update(dt: number): void {
+    const from = this.elapsed;
     this.elapsed += dt;
+    this.fired.push(...this.schedule.filter((c) => c.t > from && c.t <= this.elapsed));
+  }
+  takeCues(): TimedCue[] {
+    const out = this.fired;
+    this.fired = [];
+    return out;
   }
   stop(): void {
     this.stopped = true;
@@ -56,10 +67,60 @@ export class FakeFx implements FxLike {
   }
 }
 
+/** A feel that keeps only what the glue needs: a hit-stop holds play, trauma shakes by one pixel, flash as given. */
+export class FakeFeel implements FeelLike {
+  taken: TimedCue[] = [];
+  freed = false;
+  private stop = 0;
+  private shaken = 0;
+  private lifted = 0;
+  take(cues: readonly TimedCue[]): void {
+    this.taken.push(...cues);
+    for (const c of cues) {
+      if (c.cue.type === "hitstop") this.freeze(c.cue.dur);
+      if (c.cue.type === "shake") this.addTrauma(c.cue.trauma);
+      if (c.cue.type === "flash") this.lifted = Math.max(this.lifted, c.cue.k);
+    }
+  }
+  addTrauma(k: number): void {
+    this.shaken = Math.min(1, this.shaken + k);
+  }
+  freeze(secs: number): void {
+    this.stop = Math.max(this.stop, secs);
+  }
+  slow(): void {}
+  advance(dt: number): number {
+    if (this.stop > 1e-9) {
+      this.stop = Math.max(0, this.stop - dt);
+      return 0;
+    }
+    return dt;
+  }
+  shake(strength: number): [number, number] {
+    const d = this.shaken > 0 && strength > 0 ? 1 : 0;
+    return [d, d === 0 ? 0 : -d];
+  }
+  trauma(): number {
+    return this.shaken;
+  }
+  frozen(): boolean {
+    return this.stop > 1e-9;
+  }
+  flash(): number {
+    return this.lifted;
+  }
+  free(): void {
+    this.freed = true;
+  }
+}
+
 /** Deterministic Engine: one known effect, "fake/spark", lasting 1 s. */
 export class FakeEngine implements Engine {
   live = 0;
   readonly created: FakeFx[] = [];
+  readonly feels: FakeFeel[] = [];
+  /** Cues every effect it creates from now on fires. */
+  schedule: TimedCue[] = [];
   readonly metas: Record<string, EffectMeta> = {
     "fake/spark": {
       id: "fake/spark",
@@ -84,9 +145,15 @@ export class FakeEngine implements Engine {
   create(id: string, _opts: EngineOptions): FxLike {
     const m = this.meta(id);
     const fx = new FakeFx(this, m.duration, m.size, m.origin);
+    fx.schedule = this.schedule;
     this.live += 1;
     this.created.push(fx);
     return fx;
+  }
+  feel(): FeelLike {
+    const f = new FakeFeel();
+    this.feels.push(f);
+    return f;
   }
 }
 

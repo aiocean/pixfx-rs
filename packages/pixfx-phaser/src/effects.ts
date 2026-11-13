@@ -1,6 +1,7 @@
 import { stepSeconds } from "./clock";
-import type { Counts, Layer, Layers } from "./effect";
+import type { CueSink, Counts, Layer, Layers } from "./effect";
 import { PixfxEffect } from "./effect";
+import type { PixfxFeel } from "./feel";
 import type { Backend } from "./backend";
 import type { Gfx, GfxBlend, GfxImage, GfxTexture } from "./gfx";
 import { OwnSurface } from "./surface";
@@ -20,12 +21,18 @@ export class EffectManager {
    * @param gfx creates textures and images.
    * @param backend returns where effects run (throws before `loadPixfx()` resolves).
    * @param keyPrefix makes texture keys unique in the game-wide texture manager.
+   * @param feel the scene's answer to the cues its effects fire; it also says how much time they play.
    */
   constructor(
     private readonly gfx: Gfx,
     private readonly backend: () => Backend,
     private readonly keyPrefix: string,
-  ) {}
+    private readonly feel: PixfxFeel,
+  ) {
+    this.sink = (cues, effect) => this.feel.take(cues, effect);
+  }
+
+  private readonly sink: CueSink;
 
   /** Play effect `id` with its origin at world (x, y). Throws on an unknown id or invalid options. */
   play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
@@ -51,8 +58,15 @@ export class EffectManager {
         frontColor: layer("front-color", "normal"),
         frontLight: layer("front-light", "add"),
       };
-      const effect = new PixfxEffect(instance, x, y, new OwnSurface(layers, this.counts), p.depth ?? DEFAULT_DEPTHS, this.counts, (e) =>
-        this.live.delete(e),
+      const effect = new PixfxEffect(
+        instance,
+        x,
+        y,
+        new OwnSurface(layers, this.counts),
+        p.depth ?? DEFAULT_DEPTHS,
+        this.counts,
+        (e) => this.live.delete(e),
+        this.sink,
       );
       this.live.add(effect);
       return effect;
@@ -69,16 +83,25 @@ export class EffectManager {
 
   /** A layer: effects played into it share four textures covering `cfg.bounds`. Throws on an invalid config. */
   createLayer(cfg: LayerConfig): PixfxLayer {
-    const layer = new PixfxLayer(cfg, this.gfx, this.backend, `${this.keyPrefix}L${this.nextId++}-`, this.counts, (l) =>
-      this.layers.delete(l),
+    const layer = new PixfxLayer(
+      cfg,
+      this.gfx,
+      this.backend,
+      `${this.keyPrefix}L${this.nextId++}-`,
+      this.counts,
+      (l) => this.layers.delete(l),
+      this.sink,
     );
     this.layers.add(layer);
     return layer;
   }
 
-  /** One scene update: advance every effect by `delta` ms × `timeScale`. */
+  /**
+   * One scene update: `deltaMs` real milliseconds pass through the feel (nothing plays in a hit-stop, a fraction in
+   * slow motion), then every effect advances by what played × `timeScale`.
+   */
   update(deltaMs: number, timeScale: number): void {
-    const dt = stepSeconds(deltaMs, timeScale);
+    const dt = stepSeconds(this.feel.advance(deltaMs), timeScale);
     if (dt === 0) return;
     for (const e of [...this.live]) e.step(dt);
     for (const l of [...this.layers]) l.update(dt);

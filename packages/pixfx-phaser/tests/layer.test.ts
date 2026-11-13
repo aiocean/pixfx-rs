@@ -7,6 +7,7 @@ import { FakeGfx } from "./fake-gfx";
 
 void mock.module("phaser", () => ({ default: { Events: { EventEmitter } } }));
 const { EffectManager } = await import("../src/effects");
+const { PixfxFeel } = await import("../src/feel");
 
 const BOUNDS = { bounds: { x: 100, y: 200, width: 20, height: 10 } };
 
@@ -15,7 +16,7 @@ function setup(paint = { color: 0, light: 0 }) {
   engine.paint = paint;
   const gfx = new FakeGfx();
   const backend = new InlineBackend(engine);
-  const fx = new EffectManager(gfx, (): Backend => backend, "pixfx:test:");
+  const fx = new EffectManager(gfx, (): Backend => backend, "pixfx:test:", new PixfxFeel(() => engine));
   return { engine, gfx, fx };
 }
 
@@ -23,7 +24,7 @@ test("colour composites source-over; light adds and saturates", () => {
   const engine = new PaintedEngine();
   const gfx = new FakeGfx();
   const backend = new InlineBackend(engine);
-  const fx = new EffectManager(gfx, (): Backend => backend, "pixfx:test:");
+  const fx = new EffectManager(gfx, (): Backend => backend, "pixfx:test:", new PixfxFeel(() => engine));
   const layer = fx.createLayer(BOUNDS);
   engine.paint = { color: 0xff0000ff, light: 0x00000090 }; // opaque red, light r=144
   layer.play("fake/spark", 104, 205);

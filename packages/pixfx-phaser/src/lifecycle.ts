@@ -61,6 +61,11 @@ export class EffectCore {
     return true;
   }
 
+  /** Where the effect's origin sits in the world, snapped to a whole pixel. */
+  at(): { x: number; y: number } {
+    return { x: snap(this.x), y: snap(this.y) };
+  }
+
   topLeft(): { x: number; y: number } {
     return { x: snap(this.x) - this.origin.originX, y: snap(this.y) - this.origin.originY };
   }

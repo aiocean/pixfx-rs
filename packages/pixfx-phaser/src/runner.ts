@@ -1,7 +1,8 @@
 import type { FxLike } from "./engine";
-import type { FrameBuffers } from "./protocol";
+import type { FrameBuffers, TimedCue } from "./protocol";
 
-export type Step = { kind: "done" } | { kind: "frame"; frame: FrameBuffers } | { kind: "same" };
+/** What one step did: finished, drew a new frame, or neither; and the cues the effect fired on the way. */
+export type Step = ({ kind: "done" } | { kind: "frame"; frame: FrameBuffers } | { kind: "same" }) & { cues: TimedCue[] };
 
 /**
  * Drives one engine instance: advances it, and draws back and front into RGBA buffers only when it reached a
@@ -27,14 +28,15 @@ export class FxRunner {
     this.fx.stop();
   }
 
-  /** Advance by `dt` seconds (0: none) and report what changed. The first step always draws. */
+  /** Advance by `dt` seconds (0: none) and report what changed and the cues fired. The first step always draws. */
   step(dt: number): Step {
     if (dt > 0) this.fx.update(dt);
-    if (this.fx.done()) return { kind: "done" };
+    const cues = this.fx.takeCues();
+    if (this.fx.done()) return { kind: "done", cues };
     const frame = Math.floor(this.fx.t() * this.fps);
-    if (frame === this.shown) return { kind: "same" };
+    if (frame === this.shown) return { kind: "same", cues };
     this.shown = frame;
-    return { kind: "frame", frame: this.draw() };
+    return { kind: "frame", frame: this.draw(), cues };
   }
 
   /** Take back a set for reuse; a set of the wrong size (or detached by a transfer) is dropped. */

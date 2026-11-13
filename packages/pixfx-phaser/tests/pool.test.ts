@@ -11,6 +11,7 @@ import { FakeGfx } from "./fake-gfx";
 
 void mock.module("phaser", () => ({ default: { Events: { EventEmitter } } }));
 const { EffectManager } = await import("../src/effects");
+const { PixfxFeel } = await import("../src/feel");
 
 /**
  * A worker without a thread: posts are structured-cloned with their transfer list (so a transferred buffer is
@@ -55,7 +56,7 @@ function setup(workers = 1, workerEngine: () => FakeEngine = () => new FakeEngin
   const ports = Array.from({ length: workers }, () => new LoopPort(workerEngine()));
   const pool = new WorkerPool(main, ports);
   const gfx = new FakeGfx();
-  const fx = new EffectManager(gfx, (): Backend => pool, "pixfx:test:");
+  const fx = new EffectManager(gfx, (): Backend => pool, "pixfx:test:", new PixfxFeel(() => main));
   return { main, ports, pool, gfx, fx };
 }
 
@@ -146,4 +147,21 @@ test("destroy before the spawn was sent sends nothing at all", () => {
   fx.play("fake/spark", 0, 0).destroy();
   pool.flush();
   expect(ports[0]?.posted).toEqual([]);
+});
+
+test("cues an effect fires in a worker reach the main thread in the reply", () => {
+  const hit = [{ t: 0.01, pan: null, cue: { type: "shake" as const, trauma: 0.5 } }];
+  const { ports, pool, fx } = setup(1, () => {
+    const e = new FakeEngine();
+    e.schedule = hit;
+    return e;
+  });
+  const effect = fx.play("fake/spark", 0, 0);
+  const got: unknown[] = [];
+  effect.on("cue", (c: unknown) => got.push(c));
+  frame(fx, pool);
+  ports[0]?.answer();
+  frame(fx, pool);
+  ports[0]?.answer();
+  expect(got).toEqual(hit);
 });

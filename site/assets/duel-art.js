@@ -46,7 +46,7 @@ export function drawFighters(sprites, duel, feel, ground, jolts) {
 }
 
 /**
- * Each qi streak (from the engine's `Feel.streaks()`): Thunder's a crooked line of lightning, Frost's a straight shimmer
+ * Each qi streak (from the engine's `FightFeel.streaks()`): Thunder's a crooked line of lightning, Frost's a straight shimmer
  * of ice, from the caster's hand to where the spell lands.
  */
 export function drawStreaks(ctx, list, duel, s) {
@@ -98,7 +98,7 @@ const NUMBER = {
   dodge: { size: 9, color: "#b8b4c8" },
 };
 
-/** The numbers over the fighters (from the engine's `Feel.numbers()`): damage, burns, heals, wards and dodges. */
+/** The numbers over the fighters (from the engine's `FightFeel.numbers()`): damage, burns, heals, wards and dodges. */
 export function drawNumbers(ctx, list, duel, s) {
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";

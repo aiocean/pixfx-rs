@@ -154,7 +154,8 @@ export class WorkerPool implements Backend {
       // A reply for an effect destroyed since is dropped with its buffers.
       const l = this.live.get(r.handle);
       if (!l) continue;
-      if (r.frame) l.events.frame(r.frame);
+      if (r.cues.length > 0) l.events.cues(r.cues);
+      if (r.frame && this.live.get(r.handle) === l) l.events.frame(r.frame);
       if (r.done && this.live.get(r.handle) === l) {
         // The worker freed it already.
         this.forget(r.handle, l);

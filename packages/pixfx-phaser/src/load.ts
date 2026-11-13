@@ -42,6 +42,11 @@ async function start(o: z.output<typeof loadOptionsSchema>): Promise<{ engine: E
   return { engine, backend: new WorkerPool(engine, workers.map(workerPort)) };
 }
 
+/** The loaded engine, or null before `loadPixfx()` resolves. */
+export function loadedEngine(): Engine | null {
+  return loaded?.engine ?? null;
+}
+
 export function getBackend(): Backend {
   if (!loaded) throw new Error("pixfx: call await loadPixfx() before play()");
   return loaded.backend;

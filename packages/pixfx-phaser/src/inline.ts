@@ -40,6 +40,7 @@ class InlineFx implements FxInstance {
   }
 
   private emit(step: Step): void {
+    if (step.cues.length > 0) this.events?.cues(step.cues);
     if (step.kind === "frame") this.events?.frame(step.frame);
     else if (step.kind === "done") {
       this.free();

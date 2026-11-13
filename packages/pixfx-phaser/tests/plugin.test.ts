@@ -10,6 +10,7 @@ import { FakeGfx } from "./fake-gfx";
 // the only Phaser value the Phaser-free effect code uses, so the test supplies exactly that.
 void mock.module("phaser", () => ({ default: { Events: { EventEmitter } } }));
 const { EffectManager } = await import("../src/effects");
+const { PixfxFeel } = await import("../src/feel");
 
 /** Records the options handed to the engine. */
 class SpyEngine extends FakeEngine {
@@ -25,7 +26,7 @@ function setup() {
   const engine = new SpyEngine();
   const gfx = new FakeGfx();
   const backend = new InlineBackend(engine);
-  const fx = new EffectManager(gfx, (): Backend => backend, "pixfx:test:");
+  const fx = new EffectManager(gfx, (): Backend => backend, "pixfx:test:", new PixfxFeel(() => engine));
   return { engine, gfx, fx };
 }
 

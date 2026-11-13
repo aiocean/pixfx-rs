@@ -9,8 +9,9 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 /// What a fight looks and feels like on screen: hit-stop, shake, the struck one's shudder, damage numbers, dust,
-/// a knockout's slow motion, an ultimate's dusk.
-#[wasm_bindgen]
+/// a knockout's slow motion, an ultimate's dusk. `FightFeel` in JS: `Feel` there is the engine's answer for any
+/// game.
+#[wasm_bindgen(js_name = FightFeel)]
 pub struct Feel {
     pub(crate) inner: feel::Feel,
 }
@@ -21,7 +22,7 @@ impl Default for Feel {
     }
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = FightFeel)]
 impl Feel {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Feel {

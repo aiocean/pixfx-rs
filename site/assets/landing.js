@@ -1,6 +1,6 @@
 // The landing page: a live duel in the hero, drawn by the pixfx-canvas Stage. The page owns the animation-frame
 // loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
-import init, { Body, Feel, Lights, Sprites, Stage, effects, meta } from "../pkg/pixfx_canvas.js";
+import init, { Body, FightFeel, Lights, Sprites, Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 import { DECOR, createDuel, step } from "./duel.js";
 import { BARS_TALL, drawBars, drawFighters, drawNumbers, drawStreaks } from "./duel-art.js";
 import { createScene, drawScene } from "./duel-scene.js";
@@ -82,14 +82,14 @@ function createHero(canvas, signal) {
     const arena = { left: Math.round((w - span) / 2), right: Math.round((w + span) / 2) };
 
     view.stage = new Stage(canvas, scale);
-    // the fight's own Feel answers every blow; the stage's effects just play the seconds it gives them
+    // the fight's own FightFeel answers every blow; the stage's effects just play the seconds it gives them
     view.stage.setFeel(false);
     // the night over the whole scene: one fireflies canvas its size, the meadow on the dais (the effect's ground
     // is mid-width, 10 pixels above its canvas's foot)
     if (have.has(DECOR.night)) view.stage.play(DECOR.night, Math.floor(w / 2), ground, { width: w, height: ground + 10 });
     // a brazier at each end of the arena lights it
     if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
-    view.feel = new Feel();
+    view.feel = new FightFeel();
     view.sprites = new Sprites(canvas, scale);
     view.lights = new Lights(w, h);
     // the bars go just under the page's top bar, which lies over the hero
@@ -153,7 +153,7 @@ function createHero(canvas, signal) {
     ctx.restore();
     // an ultimate frames the screen like a film for as long as the sky is dark
     if (dark > 0) {
-      const band = Math.round((dark / Feel.duskDepth()) * LETTERBOX);
+      const band = Math.round((dark / FightFeel.duskDepth()) * LETTERBOX);
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, w * scale, band * scale);
       ctx.fillRect(0, (h - band) * scale, w * scale, band * scale);

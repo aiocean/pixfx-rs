@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Backend, FrameBuffers, Shape } from "./backend";
-import type { Counts, Layer, Layers } from "./effect";
+import type { CueSink, Counts, Layer, Layers } from "./effect";
 import { PixfxEffect } from "./effect";
 import type { Gfx, GfxBlend, GfxImage, GfxTexture } from "./gfx";
 import { clipRect } from "./layout";
@@ -90,6 +90,7 @@ export class PixfxLayer {
     keyPrefix: string,
     private readonly counts: Counts,
     private readonly onGone: (layer: PixfxLayer) => void,
+    private readonly sink: CueSink,
   ) {
     const c = parseLayerConfig(cfg);
     this.bounds = { x: c.bounds.x, y: c.bounds.y, w: c.bounds.width, h: c.bounds.height };
@@ -126,9 +127,18 @@ export class PixfxLayer {
     const surface = new LayerSurface(this, instance.shape);
     this.surfaces.add(surface);
     try {
-      const effect = new PixfxEffect(instance, x, y, surface, { back: 0, front: 1 }, this.counts, (e) => {
-        this.members.delete(e);
-      });
+      const effect = new PixfxEffect(
+        instance,
+        x,
+        y,
+        surface,
+        { back: 0, front: 1 },
+        this.counts,
+        (e) => {
+          this.members.delete(e);
+        },
+        this.sink,
+      );
       this.members.add(effect);
       return effect;
     } catch (err) {

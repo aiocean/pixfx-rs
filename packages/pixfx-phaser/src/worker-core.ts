@@ -18,7 +18,7 @@ export class WorkerCore {
 
   /**
    * Free, spawn, then for each item: take back its buffers, stop, advance. Replies with every instance that drew
-   * a new frame (its buffers in the transfer list) or finished (freed here).
+   * a new frame (its buffers in the transfer list), fired cues, or finished (freed here).
    */
   run(batch: Batch): { reply: FromWorker; transfer: ArrayBuffer[] } {
     for (const h of batch.frees) this.free(h);
@@ -36,12 +36,15 @@ export class WorkerCore {
       if (item.stop) runner.stop();
       if (item.dt === 0 && !spawned.has(item.handle)) continue;
       const step = runner.step(item.dt);
+      const cues = step.cues;
       if (step.kind === "done") {
         this.free(item.handle);
-        results.push({ handle: item.handle, done: true });
+        results.push({ handle: item.handle, done: true, cues });
       } else if (step.kind === "frame") {
-        results.push({ handle: item.handle, done: false, frame: step.frame });
+        results.push({ handle: item.handle, done: false, frame: step.frame, cues });
         transfer.push(...step.frame);
+      } else if (cues.length > 0) {
+        results.push({ handle: item.handle, done: false, cues });
       }
     }
     return { reply: { type: "results", results }, transfer };

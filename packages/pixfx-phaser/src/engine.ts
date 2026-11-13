@@ -2,6 +2,8 @@ import { z } from "zod";
 import type * as Wasm from "../wasm/pixfx_wasm.js";
 import type { EngineOptions, PlayOptions } from "./options";
 import { engineOptions, parsePlayOptions } from "./options";
+import type { TimedCue } from "./protocol";
+import { timedCueSchema } from "./protocol";
 
 export type { EngineOptions };
 
@@ -20,6 +22,26 @@ export interface FxLike {
   colorRgba(): Uint8ClampedArray;
   /** The light layer as RGBA bytes (lit pixels opaque, unlit `0,0,0,0`); valid until the next call. */
   lightRgba(): Uint8ClampedArray;
+  /** The cues fired since the last call, oldest first; clears them. */
+  takeCues(): TimedCue[];
+  free(): void;
+}
+
+/** The engine's answer to impacts: trauma and shake, hit-stop, slow motion, flash. */
+export interface FeelLike {
+  /** Take in cues effects fired (sounds are skipped). */
+  take(cues: readonly TimedCue[]): void;
+  addTrauma(k: number): void;
+  freeze(secs: number): void;
+  slow(secs: number, speed: number): void;
+  /** Let `dt` real seconds pass; returns the seconds play runs for them. */
+  advance(dt: number): number;
+  /** Where the view sits, `[dx, dy]` in game pixels, at `strength` (1 as designed, 0 still). */
+  shake(strength: number): [number, number];
+  trauma(): number;
+  frozen(): boolean;
+  /** How white the view is lifted, 0 to 1. */
+  flash(): number;
   free(): void;
 }
 
@@ -43,6 +65,8 @@ export interface Engine {
   effects(): readonly string[];
   meta(id: string): EffectMeta;
   create(id: string, opts: EngineOptions): FxLike;
+  /** A fresh answer to impacts, with the default spec. */
+  feel(): FeelLike;
 }
 
 /** The engine over an initialised wasm module (`memory` is what its default init resolved to). */
@@ -73,7 +97,23 @@ export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engin
         draw: (layer) => fx.draw(layer),
         colorRgba: () => view(fx.colorRgbaPtr()),
         lightRgba: () => view(fx.lightRgbaPtr()),
+        takeCues: () => z.array(timedCueSchema).parse(fx.takeCues()),
         free: () => fx.free(),
+      };
+    },
+    feel: () => {
+      const f = new wasm.Feel(undefined);
+      return {
+        take: (cues) => f.take([...cues]),
+        addTrauma: (k) => f.addTrauma(k),
+        freeze: (secs) => f.freeze(secs),
+        slow: (secs, speed) => f.slow(secs, speed),
+        advance: (dt) => f.advance(dt),
+        shake: (strength) => pair.parse(f.shake(strength)),
+        trauma: () => f.trauma(),
+        frozen: () => f.frozen(),
+        flash: () => f.flash(),
+        free: () => f.free(),
       };
     },
   };

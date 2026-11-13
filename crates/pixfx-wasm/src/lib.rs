@@ -3,10 +3,13 @@
 //! which other Rust crates use directly.
 #![forbid(unsafe_code)]
 
+mod feel;
 pub mod js;
 mod options;
 mod player;
 
+pub use feel::Feel;
+use js::to_js;
 pub use options::{MAX_MARGIN, parse_options};
 pub use player::Player;
 
@@ -170,6 +173,27 @@ impl Fx {
 
     pub fn done(&self) -> bool {
         self.player.done()
+    }
+
+    /// The cues the effect fired since the last call, oldest first (`{t, pan, cue}`, `cue.type` `"shake"`,
+    /// `"hitstop"`, `"ripple"`, `"flash"` or `"sound"`), and clears them. A ripple's or a sound's `x`/`y` are
+    /// relative to the effect's origin: add where the host placed it. Hand them to a [`Feel`] with `take`.
+    #[wasm_bindgen(js_name = takeCues, unchecked_return_type = "TimedCue[]")]
+    pub fn take_cues(&mut self) -> Result<JsValue, JsError> {
+        let origin = self.player.canvas().origin;
+        let (ox, oy) = (f64::from(origin.0), f64::from(origin.1));
+        let mut cues = self.player.take_cues();
+        for c in &mut cues {
+            match &mut c.cue {
+                pixfx_core::Cue::Ripple { x, y, .. } => {
+                    *x -= ox;
+                    *y -= oy;
+                }
+                pixfx_core::Cue::Sound { x: Some(x), .. } => *x -= ox,
+                _ => {}
+            }
+        }
+        to_js(&cues)
     }
 
     /// Seconds since the instance started.

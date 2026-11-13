@@ -1,9 +1,9 @@
 // Where effects' engine instances live: on the main thread (`InlineBackend`) or in workers (`WorkerPool`).
 import type { FxLike } from "./engine";
 import type { PlayOptions } from "./options";
-import type { FrameBuffers } from "./protocol";
+import type { FrameBuffers, TimedCue } from "./protocol";
 
-export type { FrameBuffers };
+export type { FrameBuffers, TimedCue };
 
 /** Canvas size of an effect and where its origin sits on the canvas. */
 export interface Shape {
@@ -21,6 +21,8 @@ export function shapeOf(fx: FxLike): Shape {
 export interface FxEvents {
   /** A new frame of the effect; hand the buffers back with `recycle` once they are no longer read. */
   frame(frame: FrameBuffers): void;
+  /** The effect fired cues (before any frame or end of the same step), oldest first. */
+  cues(cues: TimedCue[]): void;
   /** The effect finished; the instance is already freed. */
   done(): void;
 }
