@@ -158,6 +158,16 @@ struct Entry<S> {
     player: Player,
     /// Its own frames while it fades out (back, front, both); shared frames live in the scene's store.
     own: [Option<Own<S>>; 3],
+    /// The shared frame each layer showed last: what it shows again while it waits for a draw.
+    last: [Option<FrameId>; 3],
+    /// The host frame each layer first waited for a draw in, past the draw budget; `None` while it is up to date.
+    waiting: [Option<u64>; 3],
+}
+
+/// Why a frame was not put in a surface: the shell failed, or the draw budget leaves it for a later host frame.
+enum Fill<E> {
+    Shell(E),
+    Wait,
 }
 
 /// The playing instances, in the order they were played, the frames they share and the game-to-canvas scale.
@@ -179,6 +189,10 @@ pub struct Scene<S> {
     /// Surfaces dropped since the last draw (past the frame budget, or their effect ended), handed to the shell's
     /// [`Shell::free`] at the start of the next draw.
     released: Vec<S>,
+    /// Layers drawn at most per host frame ([`Scene::set_draw_budget`]); `None` draws every one that changed.
+    draw_budget: Option<NonZeroU32>,
+    /// Layers drawn in the current host frame.
+    drawn: u32,
 }
 
 impl<S> Scene<S> {
@@ -193,6 +207,8 @@ impl<S> Scene<S> {
             feel: Some(Feel::new()),
             screen_w: 0.0,
             released: Vec::new(),
+            draw_budget: None,
+            drawn: 0,
         }
     }
 
@@ -238,6 +254,8 @@ impl<S> Scene<S> {
             place: player.placement(),
             player,
             own: [None, None, None],
+            last: [None, None, None],
+            waiting: [None, None, None],
         });
         Ok(handle)
     }
@@ -400,6 +418,16 @@ impl<S> Scene<S> {
         self.released.extend(dropped);
     }
 
+    /// Draw at most `layers` layers per host frame (each [`Scene::draw_layer`], or each [`Scene::end_frame`] after
+    /// [`Scene::draw_handle`]), or, with `None` (the default), every layer whose frame changed. An effect left over
+    /// shows the last frame it showed (nothing, if it has not been drawn yet or that frame was dropped) and is
+    /// drawn in a later host frame, the one waiting longest first, so none starves. It skips to the frame its clock
+    /// is on then: past the budget an effect plays at fewer frames a second, and the cost of a host frame stays
+    /// capped. [`Scene::draw_handle`] takes effects as the host shows them, first come first drawn.
+    pub fn set_draw_budget(&mut self, layers: Option<NonZeroU32>) {
+        self.draw_budget = layers;
+    }
+
     /// Bytes the shared frames hold now.
     pub fn frame_bytes(&self) -> u64 {
         self.store.bytes()
@@ -437,10 +465,37 @@ impl<S> Scene<S> {
         shell: &mut H,
     ) -> Result<(), H::Error> {
         let now = self.draws + 1;
+        let turns = self.turns(layer, now);
         for i in 0..self.entries.len() {
-            self.show_entry(i, layer, now, shell)?;
+            let may_draw = turns.as_ref().is_none_or(|t| t.contains(&i));
+            self.show_entry(i, layer, now, may_draw, shell)?;
         }
         self.end_frame(shell)
+    }
+
+    /// Under a draw budget, the entries that may draw `layer` in host frame `now`: of those whose frame is not
+    /// held, the ones waiting longest, as many as the budget has left. `None` without a budget: every one may.
+    fn turns(&mut self, layer: Layer, now: u64) -> Option<Vec<usize>> {
+        let left = self.draw_budget?.get().saturating_sub(self.drawn) as usize;
+        let slot = own_slot(layer);
+        let mut due: Vec<(u64, usize)> = Vec::new();
+        for (i, e) in self.entries.iter().enumerate() {
+            let needs = match e.player.shown(e.place) {
+                // a held frame is marked shown at `now`, which this host frame does anyway
+                Some(id) => self
+                    .store
+                    .show(&id, layer, now, || Err::<(S, u64), ()>(()))
+                    .is_err(),
+                None => e.own[slot]
+                    .as_ref()
+                    .is_none_or(|own| own.drawn != (e.player.clock_frame(), e.place)),
+            };
+            if needs {
+                due.push((e.waiting[slot].unwrap_or(now), i));
+            }
+        }
+        due.sort_unstable();
+        Some(due.into_iter().take(left).map(|(_, i)| i).collect())
     }
 
     /// Show `layer` of the instance `handle` within the host's current frame, for a host that paints each effect
@@ -455,7 +510,8 @@ impl<S> Scene<S> {
         let Some(i) = self.entries.iter().position(|e| e.handle == handle) else {
             return Ok(false);
         };
-        self.show_entry(i, layer, self.draws + 1, shell)?;
+        let may_draw = self.draw_budget.is_none_or(|b| self.drawn < b.get());
+        self.show_entry(i, layer, self.draws + 1, may_draw, shell)?;
         Ok(true)
     }
 
@@ -463,6 +519,7 @@ impl<S> Scene<S> {
     /// frame budget, the least recently shown shared frames, never one shown in this frame.
     pub fn end_frame<H: Shell<Surface = S>>(&mut self, shell: &mut H) -> Result<(), H::Error> {
         self.draws += 1;
+        self.drawn = 0;
         let dropped = self.store.trim(self.draws);
         for surface in std::mem::take(&mut self.released)
             .into_iter()
@@ -473,12 +530,14 @@ impl<S> Scene<S> {
         Ok(())
     }
 
-    /// Show `layer` of entry `i`, marking the frames it shows as shown at `now`.
+    /// Show `layer` of entry `i`, marking the frames it shows as shown at `now`. When it needs a new frame and
+    /// `may_draw` is false, it shows the last one it showed and waits.
     fn show_entry<H: Shell<Surface = S>>(
         &mut self,
         i: usize,
         layer: Layer,
         now: u64,
+        may_draw: bool,
         shell: &mut H,
     ) -> Result<(), H::Error> {
         let Some(e) = self.entries.get(i) else {
@@ -492,35 +551,65 @@ impl<S> Scene<S> {
         let Some(e) = self.entries.get_mut(i) else {
             return Ok(());
         };
+        let slot = own_slot(layer);
+        let mut drew = false;
         match e.player.shown(e.place) {
             Some(id) => {
-                let surface = self.store.show(&id, layer, now, || {
+                let got = self.store.show(&id, layer, now, || {
+                    if !may_draw {
+                        return Err(Fill::Wait);
+                    }
                     e.player.draw(layer, e.place);
                     let frame = e.player.frame();
-                    Ok((shell.make(frame)?, frame_bytes(frame)))
-                })?;
-                shell.show(pass, surface)?;
+                    drew = true;
+                    Ok((shell.make(frame).map_err(Fill::Shell)?, frame_bytes(frame)))
+                });
+                match got {
+                    Ok(surface) => {
+                        shell.show(pass, surface)?;
+                        e.last[slot] = Some(id);
+                        e.waiting[slot] = None;
+                    }
+                    Err(Fill::Shell(err)) => return Err(err),
+                    Err(Fill::Wait) => {
+                        e.waiting[slot].get_or_insert(now);
+                        let last = e.last[slot]
+                            .as_ref()
+                            .and_then(|last| self.store.show(last, layer, now, || Err(())).ok());
+                        if let Some(surface) = last {
+                            shell.show(pass, surface)?;
+                        }
+                    }
+                }
             }
             None => {
                 let drawn = (e.player.clock_frame(), e.place);
-                let slot = &mut e.own[own_slot(layer)];
-                match slot {
-                    Some(own) if own.drawn == drawn => {}
-                    Some(own) => {
-                        e.player.draw(layer, e.place);
-                        shell.refill(&mut own.surface, e.player.frame())?;
-                        own.drawn = drawn;
+                let own = &mut e.own[slot];
+                let stale = own.as_ref().is_none_or(|o| o.drawn != drawn);
+                if stale && may_draw {
+                    e.player.draw(layer, e.place);
+                    match own {
+                        Some(o) => {
+                            shell.refill(&mut o.surface, e.player.frame())?;
+                            o.drawn = drawn;
+                        }
+                        None => {
+                            let surface = shell.make(e.player.frame())?;
+                            *own = Some(Own { surface, drawn });
+                        }
                     }
-                    None => {
-                        e.player.draw(layer, e.place);
-                        let surface = shell.make(e.player.frame())?;
-                        *slot = Some(Own { surface, drawn });
-                    }
+                    drew = true;
+                    e.waiting[slot] = None;
+                } else if stale {
+                    e.waiting[slot].get_or_insert(now);
                 }
-                if let Some(own) = slot {
-                    shell.show(pass, &own.surface)?;
+                if let Some(o) = own {
+                    shell.show(pass, &o.surface)?;
                 }
             }
+        }
+        if drew {
+            self.drawn = self.drawn.saturating_add(1);
         }
         Ok(())
     }

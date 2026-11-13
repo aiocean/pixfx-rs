@@ -8,6 +8,7 @@ use std::num::NonZeroU32;
 use pixfx_core::{
     Canvas, Effect, EffectState, Layer, Meta, OptValue, Options, Placement, Player, render_frames,
 };
+use pixfx_draw::math::js_round;
 use pixfx_draw::{Frame, Painter, Rgba};
 use pixfx_effects::effect;
 use pixfx_scene::{Pass, Rect, Scene, Shell, StageEvent, color_rgba};
@@ -687,5 +688,174 @@ fn clearing_a_scene_frees_everything_it_holds() -> Res {
         .filter(|e| matches!(e, StageEvent::End { .. }))
         .count();
     assert_eq!(ends, 2, "both instances end");
+    Ok(())
+}
+
+/// A loop whose every frame differs: one pixel, one step further right each frame.
+struct Ticker;
+
+static TICKER: Ticker = Ticker;
+
+const TICKER_META: Meta = Meta {
+    id: "test/ticker",
+    name: "Ticker",
+    desc: "A pixel that moves one step a frame.",
+    tags: &[],
+    size: (32, 4),
+    origin: (0, 0),
+    duration: 1.0,
+    looping: true,
+    fps: 30,
+    seed: 1,
+    state: None,
+    options: &[],
+};
+
+struct TickerState;
+
+impl EffectState for TickerState {
+    fn draw(&self, p: &mut Painter, t: f64, _layer: Layer) {
+        p.px(js_round(t * 30.0) % 32.0, 1.0, Rgba(255, 255, 255, 255));
+    }
+}
+
+impl Effect for Ticker {
+    fn meta(&self) -> &Meta {
+        &TICKER_META
+    }
+    fn spawn(&self, _opts: &Options, _seed: u64) -> Box<dyn EffectState> {
+        Box::new(TickerState)
+    }
+}
+
+/// `n` tickers with their own seeds: distinct clips, so no frame is shared and each needs its own draw.
+fn distinct_tickers(scene: &mut Scene<Frame>, n: u64) -> Res {
+    for i in 0..n {
+        let opts = Options {
+            seed: Some(100 + i),
+            ..Options::default()
+        };
+        scene.play(Player::live(&TICKER, opts), 0.0, (i * 10) as f64)?;
+    }
+    Ok(())
+}
+
+fn budget(n: u32) -> Option<NonZeroU32> {
+    NonZeroU32::new(n)
+}
+
+#[test]
+fn a_draw_budget_draws_at_most_that_many_frames_per_host_frame() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    distinct_tickers(&mut scene, 6)?;
+    scene.set_draw_budget(budget(2));
+    scene.update(0.1)?;
+    // (drawn, shown) per host frame: an effect not drawn yet shows nothing, then shows once its turn comes
+    let mut seen = Vec::new();
+    for _ in 0..4 {
+        let mut r = Recorder::default();
+        scene
+            .draw_layer(Layer::Front, &mut r)
+            .map_err(|()| "draw")?;
+        seen.push((r.made, r.shown.len()));
+    }
+    assert_eq!(seen, vec![(2, 2), (2, 4), (2, 6), (0, 6)]);
+    Ok(())
+}
+
+#[test]
+fn under_a_draw_budget_every_effect_gets_its_turn_and_shows_its_last_frame_meanwhile() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    distinct_tickers(&mut scene, 6)?;
+    scene.set_draw_budget(budget(2));
+    scene.update(0.1)?;
+    let mut last: BTreeMap<u32, Frame> = BTreeMap::new();
+    for _ in 0..3 {
+        let mut r = Recorder::default();
+        scene
+            .draw_layer(Layer::Front, &mut r)
+            .map_err(|()| "draw")?;
+        last.extend(r.shown.into_iter().map(|(p, f)| (p.handle, f)));
+    }
+    // from here every effect reaches a new frame on every host frame: twice the work the budget allows
+    let mut changes: BTreeMap<u32, usize> = BTreeMap::new();
+    for _ in 0..12 {
+        scene.update(1.0 / 30.0)?;
+        let mut r = Recorder::default();
+        scene
+            .draw_layer(Layer::Front, &mut r)
+            .map_err(|()| "draw")?;
+        assert_eq!(r.made, 2, "never more than the budget");
+        assert_eq!(
+            r.shown.len(),
+            6,
+            "a waiting effect still shows its last frame"
+        );
+        for (pass, frame) in r.shown {
+            if last.get(&pass.handle) != Some(&frame) {
+                *changes.entry(pass.handle).or_default() += 1;
+            }
+            last.insert(pass.handle, frame);
+        }
+    }
+    // 12 host frames × 2 draws over 6 effects: the stalest goes first, so each gets 4, none starves
+    assert_eq!(changes.len(), 6);
+    assert!(changes.values().all(|&n| n == 4), "{changes:?}");
+    Ok(())
+}
+
+#[test]
+fn a_frame_drawn_late_is_the_one_its_effect_shows_now() -> Res {
+    let (mut capped, mut free): (Scene<Frame>, Scene<Frame>) =
+        (Scene::new(scale(1)?), Scene::new(scale(1)?));
+    distinct_tickers(&mut capped, 3)?;
+    distinct_tickers(&mut free, 3)?;
+    capped.set_draw_budget(budget(1));
+    for _ in 0..3 {
+        capped.update(1.0 / 30.0)?;
+        free.update(1.0 / 30.0)?;
+        shown(&mut capped, Layer::Front);
+    }
+    // the clock stops: the capped scene catches up one effect per host frame, to what the free one shows
+    for _ in 0..3 {
+        shown(&mut capped, Layer::Front);
+    }
+    assert_eq!(
+        shown(&mut capped, Layer::Front),
+        shown(&mut free, Layer::Front)
+    );
+    Ok(())
+}
+
+#[test]
+fn fading_effects_redraw_their_own_frames_within_the_budget() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    distinct_tickers(&mut scene, 3)?;
+    scene.update(0.1)?;
+    for h in scene.handles().collect::<Vec<_>>() {
+        scene.stop(h);
+    }
+    scene.set_draw_budget(budget(1));
+    let mut r = Recorder::default();
+    for _ in 0..3 {
+        scene
+            .draw_layer(Layer::Front, &mut r)
+            .map_err(|()| "draw")?;
+    }
+    assert_eq!(
+        (r.made, r.shown.len()),
+        (3, 1 + 2 + 3),
+        "one new fade surface per host frame"
+    );
+    scene.update(1.0 / 30.0)?;
+    let mut r = Recorder::default();
+    scene
+        .draw_layer(Layer::Front, &mut r)
+        .map_err(|()| "draw")?;
+    assert_eq!(
+        (r.refilled, r.shown.len()),
+        (1, 3),
+        "one refilled, the others show their last fade frame"
+    );
     Ok(())
 }

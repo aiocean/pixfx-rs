@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `pixfx-scene`: `Scene::set_draw_budget(Some(n))` draws at most `n` layers per host frame (time-slicing); effects
+  left over show their last frame and are drawn in a later host frame, the one waiting longest first, skipping to the
+  frame their clock is on. `None` (the default) draws every layer whose frame changed, as before.
 - `pixfx-scene` (new): `Scene` and the `Shell` contract move out of `pixfx-canvas` (`pixfx_canvas::stage`) so every
   shell shares them; `Shell` gains `free(surface)`, called for every surface the scene drops (past the frame budget,
   or when its effect ends), and `Scene::clear` frees all of them for a host shutting down.
