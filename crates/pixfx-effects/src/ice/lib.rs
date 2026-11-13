@@ -156,7 +156,6 @@ pub struct Pane {
     pub drag: f64,
     pub bounce: f64,
     pub life: f64,
-    pub max: f64,
     pub rest: bool,
     /// Breaks on that many hard landings (0: never).
     pub brittle: u32,
@@ -188,7 +187,6 @@ impl Pane {
             drag: 0.3,
             bounce: 0.35,
             life: 1.0,
-            max: 1.0,
             rest: false,
             brittle: 0,
             crumble: None,
@@ -237,17 +235,8 @@ impl Panes {
         }
     }
 
-    pub fn add(&mut self, mut q: Pane) {
-        q.max = q.life;
+    pub fn add(&mut self, q: Pane) {
         self.list.push(q);
-    }
-
-    pub fn count(&self) -> usize {
-        self.list.len()
-    }
-
-    pub fn list_mut(&mut self) -> &mut Vec<Pane> {
-        &mut self.list
     }
 
     /// Advance every pane by `dt` seconds; `on` hears landings, crumbles and skids as they happen.
