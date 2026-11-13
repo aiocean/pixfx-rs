@@ -139,13 +139,28 @@ impl EffectState for WalkState {
     }
 }
 
-/// A fresh, empty directory for one test.
-fn scratch(name: &str) -> PathBuf {
-    // per process, so concurrent test runs do not delete each other's directories
+/// A fresh, empty directory for one test, per process so concurrent runs do not delete each other's; removed when
+/// the test ends.
+struct Scratch(PathBuf);
+
+impl std::ops::Deref for Scratch {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn scratch(name: &str) -> Scratch {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("test")).ok();
-    dir
+    Scratch(dir)
 }
 
 /// Write `r` as `tools/pixelfx-ref.mjs` does: `<id>.json` and little-endian `<id>.{color,light}.bin`.

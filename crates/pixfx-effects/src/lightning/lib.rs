@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use pixfx_core::Painter;
 use pixfx_core::color::Rgba;
-use pixfx_core::math::{Rng, js_min, js_round};
+use pixfx_core::math::{Rng, js_max, js_min, js_round};
 use pixfx_core::sim::GRAVITY;
 
 /// Default palette, dark to bright: deep violet shadow, electric blue, icy white.
@@ -85,20 +85,17 @@ fn zig(
         off *= 0.52;
     }
     let n = pts.len();
-    let mut out = vec![Path {
-        pts: pts.clone(),
-        w,
-    }];
+    let mut forked = Vec::new();
     if depth < 2 {
         let d = f64::from(depth);
         let mut i = 2;
         while i + 3 < n {
-            if r.chance(forks / (1.0 + d) / (n as f64 / 6.0).max(4.0)) {
+            if r.chance(forks / (1.0 + d) / js_max(4.0, n as f64 / 6.0)) {
                 let (ax, ay) = pts[i];
                 let (bx, by) = pts[(n - 1).min(i + 3)];
                 let a = libm::atan2(by - ay, bx - ax) + r.sign() * r.range(0.35, 0.9);
                 let len = (l - (i as f64 / n as f64) * l) * r.range(0.25, 0.55);
-                out.extend(zig(
+                forked.extend(zig(
                     r,
                     ax,
                     ay,
@@ -113,6 +110,8 @@ fn zig(
             i += 1;
         }
     }
+    let mut out = vec![Path { pts, w }];
+    out.extend(forked);
     out
 }
 
@@ -184,7 +183,7 @@ impl Ink {
 fn walk(pts: &[(f64, f64)], mut f: impl FnMut(f64, f64)) {
     for pair in pts.windows(2) {
         let ((ax, ay), (bx, by)) = (pair[0], pair[1]);
-        let l = libm::hypot(bx - ax, by - ay).max(1.0);
+        let l = js_max(1.0, libm::hypot(bx - ax, by - ay));
         let mut d = 0.0;
         while d <= l {
             f(ax + ((bx - ax) * d) / l, ay + ((by - ay) * d) / l);
