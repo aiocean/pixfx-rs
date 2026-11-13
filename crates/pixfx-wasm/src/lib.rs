@@ -7,11 +7,13 @@ mod feel;
 pub mod js;
 mod options;
 mod player;
+mod squash;
 
 pub use feel::Feel;
 use js::to_js;
 pub use options::{MAX_MARGIN, parse_options};
 pub use player::Player;
+pub use squash::{Blink, Squash};
 
 use js_sys::{Array, Uint8ClampedArray, Uint32Array};
 use pixfx_core::{Effect, Layer, Meta, OptKind, Rgba, valid_dt};

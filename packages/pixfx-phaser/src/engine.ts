@@ -27,6 +27,24 @@ export interface FxLike {
   free(): void;
 }
 
+/** One body's squash and stretch: it lands, time passes, it is scaled for its speed. */
+export interface SquashLike {
+  land(strength: number): void;
+  advance(dt: number): void;
+  /** `[sx, sy]` for a body moving up or down at `vy` px/s; the area is kept. */
+  scale(vy: number): [number, number];
+  free(): void;
+}
+
+/** One body's blink while it cannot be hurt. */
+export interface BlinkLike {
+  start(secs: number): void;
+  advance(dt: number): void;
+  active(): boolean;
+  alpha(): number;
+  free(): void;
+}
+
 /** The engine's answer to impacts: trauma and shake, hit-stop, slow motion, flash. */
 export interface FeelLike {
   /** Take in cues effects fired (sounds are skipped). */
@@ -67,6 +85,9 @@ export interface Engine {
   create(id: string, opts: EngineOptions): FxLike;
   /** A fresh answer to impacts, with the default spec. */
   feel(): FeelLike;
+  /** A body's squash and stretch and its blink, with the default spec. */
+  squash(): SquashLike;
+  blink(): BlinkLike;
 }
 
 /** The engine over an initialised wasm module (`memory` is what its default init resolved to). */
@@ -114,6 +135,25 @@ export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engin
         frozen: () => f.frozen(),
         flash: () => f.flash(),
         free: () => f.free(),
+      };
+    },
+    squash: () => {
+      const s = new wasm.Squash(undefined);
+      return {
+        land: (strength) => s.land(strength),
+        advance: (dt) => s.advance(dt),
+        scale: (vy) => pair.parse(s.scale(vy)),
+        free: () => s.free(),
+      };
+    },
+    blink: () => {
+      const b = new wasm.Blink(undefined);
+      return {
+        start: (secs) => b.start(secs),
+        advance: (dt) => b.advance(dt),
+        active: () => b.active(),
+        alpha: () => b.alpha(),
+        free: () => b.free(),
       };
     },
   };

@@ -16,6 +16,7 @@ pub mod render;
 pub mod screen;
 pub mod shapes;
 pub mod sim;
+pub mod squash;
 pub mod state;
 
 pub use act::{Act, ActEvent, Contact, Performance, Phase, Puff};
@@ -35,4 +36,5 @@ pub use sim::{
     Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particle, Particles,
     ParticlesOpts, Piece, Spawn, band, crystal, flare, sparkle,
 };
+pub use squash::{Blink, Squash, SquashSpec};
 pub use state::{Creature, StateError, StateMeta};

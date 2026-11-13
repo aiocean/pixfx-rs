@@ -1,4 +1,4 @@
-import type { EffectMeta, Engine, EngineOptions, FeelLike, FxLike } from "../src/engine";
+import type { BlinkLike, EffectMeta, Engine, EngineOptions, FeelLike, FxLike, SquashLike } from "../src/engine";
 import type { TimedCue } from "../src/protocol";
 
 /** Stopping lets an effect fade for this long before it is done. */
@@ -114,6 +114,46 @@ export class FakeFeel implements FeelLike {
   }
 }
 
+/** Stretches 1.5 tall at any speed, squashes 0.5 tall until 0.1 s after a landing. */
+export class FakeSquash implements SquashLike {
+  freed = false;
+  private since: number | null = null;
+  land(): void {
+    this.since = 0;
+  }
+  advance(dt: number): void {
+    if (this.since !== null) this.since = this.since + dt >= 0.1 ? null : this.since + dt;
+  }
+  scale(vy: number): [number, number] {
+    const tall = this.since !== null ? 0.5 : vy !== 0 ? 1.5 : 1;
+    return [1 / tall, tall];
+  }
+  free(): void {
+    this.freed = true;
+  }
+}
+
+/** Faint (0.5) for as long as it blinks. */
+export class FakeBlink implements BlinkLike {
+  freed = false;
+  private left = 0;
+  start(secs: number): void {
+    this.left = secs;
+  }
+  advance(dt: number): void {
+    this.left = Math.max(0, this.left - dt);
+  }
+  active(): boolean {
+    return this.left > 0;
+  }
+  alpha(): number {
+    return this.left > 0 ? 0.5 : 1;
+  }
+  free(): void {
+    this.freed = true;
+  }
+}
+
 /** Deterministic Engine: one known effect, "fake/spark", lasting 1 s. */
 export class FakeEngine implements Engine {
   live = 0;
@@ -154,6 +194,12 @@ export class FakeEngine implements Engine {
     const f = new FakeFeel();
     this.feels.push(f);
     return f;
+  }
+  squash(): SquashLike {
+    return new FakeSquash();
+  }
+  blink(): BlinkLike {
+    return new FakeBlink();
   }
 }
 

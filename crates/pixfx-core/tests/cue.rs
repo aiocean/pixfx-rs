@@ -285,6 +285,9 @@ mod impact_cues {
         let half = impact(0.3, 1.0, 0.0, 0.0, &with_feel(0.5));
         assert!(trauma(&half) < trauma(&full));
         assert!(hitstop(&half) < hitstop(&full));
-        assert!(full.iter().all(|c| c.t == 0.3), "every cue lands on the impact");
+        assert!(
+            full.iter().all(|c| c.t == 0.3),
+            "every cue lands on the impact"
+        );
     }
 }

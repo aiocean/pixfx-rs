@@ -12,7 +12,8 @@ use crate::pose::{Gather, Pose};
 use core::f64::consts::PI;
 use libm::{cos, floor, sin, sqrt};
 use pixfx_core::blend::{cover_over, mul_div255, over_premul, straighten};
-use pixfx_core::math::{ease, js_max, js_min, js_round};
+use pixfx_core::math::{js_max, js_min, js_round};
+use pixfx_core::squash::{self, SquashSpec};
 use pixfx_core::{Frame, Rgba};
 
 /// Sprite width and height, in pixels.
@@ -1023,30 +1024,18 @@ fn pivot(pose: Pose) -> Option<i32> {
     }
 }
 
-/// A body moving this fast up or down (a jump's take-off) is stretched all the way.
-const FULL_STRETCH_SPEED: f64 = 220.0;
-/// How tall a body is drawn at most while it flies fast, and at least on the frame it lands.
-const MOST_STRETCH: f64 = 1.15;
-const MOST_SQUASH: f64 = 0.8;
-/// A landing's squash eases back to the body's own shape over this long.
-const SQUASH_TIME: f64 = 0.12;
-
-/// How tall the body is drawn against its own height (its width the inverse, so it keeps its size): stretched along
-/// its flight while it rises or falls fast, squashed as it lands and easing back, itself otherwise. Frozen bodies
-/// and tumbling ones (turned, so their height is not up) keep their shape.
+/// How tall the body is drawn against its own height (its width the inverse, so it keeps its size), by the
+/// engine's squash and stretch ([`pixfx_core::squash`]): stretched along its flight while it rises or falls fast,
+/// squashed as it lands and easing back, itself otherwise. Frozen bodies and tumbling ones (turned, so their height
+/// is not up) keep their shape.
 fn stretch(a: &Appearance) -> f64 {
     if a.frozen {
         return 1.0;
     }
+    let spec = SquashSpec::default();
     match a.pose {
-        Pose::Jump | Pose::Launched | Pose::Fall => {
-            let k = js_min(1.0, a.vy.abs() / FULL_STRETCH_SPEED);
-            1.0 + (MOST_STRETCH - 1.0) * k
-        }
-        Pose::Land => {
-            let k = js_min(1.0, js_max(0.0, a.pose_t / SQUASH_TIME));
-            MOST_SQUASH + (1.0 - MOST_SQUASH) * ease::out_quad(k)
-        }
+        Pose::Jump | Pose::Launched | Pose::Fall => squash::stretch(&spec, a.vy),
+        Pose::Land => squash::squash(&spec, a.pose_t, 1.0),
         _ => 1.0,
     }
 }
@@ -1100,11 +1089,11 @@ pub fn draw(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64) {
     blit(frame, look, a, ground_y, untouchable_alpha(a));
 }
 
-/// How strongly a fighter is drawn: whole, or fading in and out every other fifteenth of a second while nothing
-/// can touch it. Faint, not gone, so the pose still reads.
+/// How strongly a fighter is drawn: whole, or blinking faint ([`squash::blink`]) while nothing can touch it.
+/// Faint, not gone, so the pose still reads.
 fn untouchable_alpha(a: &Appearance) -> f64 {
-    if a.untouchable && !a.out && floor(a.pose_t * 15.0) % 2.0 != 0.0 {
-        0.35
+    if a.untouchable && !a.out {
+        squash::blink(&SquashSpec::default(), a.pose_t)
     } else {
         1.0
     }

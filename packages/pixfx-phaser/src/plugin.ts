@@ -3,6 +3,7 @@ import type { Counts, PixfxEffect } from "./effect";
 import { EffectManager } from "./effects";
 import { PixfxFeel } from "./feel";
 import { flushPixfx, getBackend, loadedEngine } from "./load";
+import { type FeelSprite, PixfxSpriteFeel, SpriteFeelCore } from "./sprite-feel";
 import type { LayerConfig, PixfxLayer } from "./layer";
 import type { Gfx } from "./gfx";
 
@@ -49,7 +50,8 @@ function phaserGfx(scene: Phaser.Scene): Gfx {
  *
  * Game feel: `this.pixfx.feel` answers the cues effects fire. A hit-stop freezes the scene's effects (the game
  * reads `feel.timeScale` to freeze its own world), the shake moves the main camera's view for the render only
- * (its scroll and follow are untouched), and the flash lifts the view toward white.
+ * (its scroll and follow are untouched), and the flash lifts the view toward white. `this.pixfx.squash(sprite)`
+ * gives a sprite squash, stretch and a blink on the same clock.
  */
 export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   private readonly host: Phaser.Scene;
@@ -60,6 +62,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   /** The main camera's place before this frame's shake, restored after the render. */
   private moved: { camera: Phaser.Cameras.Scene2D.Camera; x: number; y: number } | null = null;
   private flashRect: Phaser.GameObjects.Rectangle | null = null;
+  private readonly sprites = new Set<PixfxSpriteFeel>();
 
   constructor(scene: Phaser.Scene, pluginManager: Phaser.Plugins.PluginManager, pluginKey: string) {
     super(scene, pluginManager, pluginKey);
@@ -88,6 +91,22 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     return this.effects.createLayer(cfg);
   }
 
+  /**
+   * Give `sprite` squash, stretch and a blink: it stretches along a fast rise or fall (read from its arcade body's
+   * velocity, else from how far it moved), flattens when the game calls `land`, and blinks on `blink`. Set its
+   * origin at its feet (`setOrigin(0.5, 1)`). Ends when the sprite is destroyed, `destroy()` is called, or the
+   * scene shuts down. Throws before `loadPixfx()`.
+   */
+  squash(sprite: FeelSprite): PixfxSpriteFeel {
+    const engine = loadedEngine();
+    if (!engine) throw new Error("pixfx: call await loadPixfx() before squash()");
+    const s = new PixfxSpriteFeel(sprite, new SpriteFeelCore(engine.squash(), engine.blink()), (gone) =>
+      this.sprites.delete(gone),
+    );
+    this.sprites.add(s);
+    return s;
+  }
+
   /** Live engine instances, textures and images held by this scene's effects and layers. */
   stats(): Counts {
     return this.effects.stats();
@@ -97,6 +116,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     if (this.destroyed) return;
     this.destroyed = true;
     this.effects.destroyAll();
+    this.endSprites();
     this.feel.free();
     const events = this.host.sys.events;
     events.off(Phaser.Scenes.Events.POST_UPDATE, this.onUpdate);
@@ -109,7 +129,8 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   }
 
   private readonly onUpdate = (_time: number, delta: number): void => {
-    this.effects.update(delta, this.host.time.timeScale);
+    const dt = this.effects.update(delta, this.host.time.timeScale);
+    for (const s of [...this.sprites]) s.step(dt);
   };
 
   /** Its own function per plugin: `off` removes every listener sharing a function, and each scene has a plugin. */
@@ -150,8 +171,13 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
       .setVisible(flash > 0);
   }
 
+  private endSprites(): void {
+    for (const s of [...this.sprites]) s.destroy();
+  }
+
   private readonly onShutdown = (): void => {
     this.effects.destroyAll();
+    this.endSprites();
     this.flashRect = null;
   };
 

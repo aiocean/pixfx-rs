@@ -98,13 +98,14 @@ export class EffectManager {
 
   /**
    * One scene update: `deltaMs` real milliseconds pass through the feel (nothing plays in a hit-stop, a fraction in
-   * slow motion), then every effect advances by what played × `timeScale`.
+   * slow motion), then every effect advances by what played × `timeScale`. Returns those seconds of play.
    */
-  update(deltaMs: number, timeScale: number): void {
+  update(deltaMs: number, timeScale: number): number {
     const dt = stepSeconds(this.feel.advance(deltaMs), timeScale);
-    if (dt === 0) return;
+    if (dt === 0) return 0;
     for (const e of [...this.live]) e.step(dt);
     for (const l of [...this.layers]) l.update(dt);
+    return dt;
   }
 
   /** Once per frame, before render: redraw every live layer that changed, so many plays or moves cost one redraw. */
