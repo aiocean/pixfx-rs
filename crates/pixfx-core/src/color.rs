@@ -98,6 +98,16 @@ pub fn luma(c: Rgba) -> f64 {
     (0.299 * f64::from(c.0) + 0.587 * f64::from(c.1) + 0.114 * f64::from(c.2)) / 255.0
 }
 
+/// Step `i` of a list (JS `list[i]` for an integral `i`): `Rgba::NONE` past its end or for a NaN or negative
+/// index, where JS gives `undefined`, which the painter also draws as nothing.
+pub(crate) fn step_at(list: &[Rgba], i: f64) -> Rgba {
+    if i >= 0.0 {
+        list.get(i as usize).copied().unwrap_or(Rgba::NONE)
+    } else {
+        Rgba::NONE
+    }
+}
+
 /// Resample a ramp to exactly n steps, keeping its ends. An empty ramp gives `Rgba::NONE` steps
 /// (pixelfx gives `undefined`, which the painter also draws as nothing).
 pub fn fit(ramp: &[Rgba], n: usize) -> Vec<Rgba> {
@@ -107,14 +117,7 @@ pub fn fit(ramp: &[Rgba], n: usize) -> Vec<Rgba> {
     let last = ramp.len() as f64 - 1.0;
     let span = (n as f64 - 1.0).max(1.0);
     (0..n)
-        .map(|i| {
-            let j = js_round((i as f64 * last) / span);
-            if j >= 0.0 {
-                ramp.get(j as usize).copied().unwrap_or(Rgba::NONE)
-            } else {
-                Rgba::NONE
-            }
-        })
+        .map(|i| step_at(ramp, js_round((i as f64 * last) / span)))
         .collect()
 }
 
@@ -125,25 +128,14 @@ pub fn at(ramp: &[Rgba], t: f64) -> Rgba {
         0.0,
         ramp.len() as f64 - 1.0,
     );
-    if i >= 0.0 {
-        ramp.get(i as usize).copied().unwrap_or(Rgba::NONE)
-    } else {
-        Rgba::NONE
-    }
+    step_at(ramp, i)
 }
 
 /// Blended colour along a ramp (for light, where smooth is right): pixelfx `blend`.
 pub fn blend(ramp: &[Rgba], t: f64) -> Rgba {
     let x = clamp(t, 0.0, 1.0) * (ramp.len() as f64 - 1.0);
     let i = crate::math::js_min(ramp.len() as f64 - 2.0, libm::floor(x));
-    let step = |j: f64| {
-        if j >= 0.0 {
-            ramp.get(j as usize).copied().unwrap_or(Rgba::NONE)
-        } else {
-            Rgba::NONE
-        }
-    };
-    mix(step(i), step(i + 1.0), x - i)
+    mix(step_at(ramp, i), step_at(ramp, i + 1.0), x - i)
 }
 
 /// pixelfx `PAL`: hue-shifted ramps, dark to bright (`src/core/color.js` at 044e12a).

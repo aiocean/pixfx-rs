@@ -6,9 +6,9 @@
 //! MIT License, Copyright (c) 2026 Hugo Duprez. Units here are art pixels and seconds; draw through a Painter,
 //! so effects stay in local space and mirror or rotate like any other.
 
-use crate::color::{Rgba, WHITE, mix, scale};
+use crate::color::{Rgba, WHITE, mix, scale, step_at};
 use crate::effect::Layer;
-use crate::math::{Rng, clamp, js_max, js_min, js_round};
+use crate::math::{Rng, TAU, clamp, js_max, js_min, js_round};
 use crate::painter::Painter;
 use core::ops::BitOr;
 
@@ -45,15 +45,6 @@ pub const SMOKE_RAMP: [Rgba; 5] = [
     Rgba(0x2b, 0x26, 0x30, 255),
     Rgba(0x1a, 0x17, 0x1e, 255),
 ];
-
-/// Step `i` of a list, `Rgba::NONE` past its end or for a NaN or negative index (JS `undefined`).
-fn step_at(list: &[Rgba], i: f64) -> Rgba {
-    if i >= 0.0 {
-        list.get(i as usize).copied().unwrap_or(Rgba::NONE)
-    } else {
-        Rgba::NONE
-    }
-}
 
 /// pixelfx `rampAt`: the ramp step for t in 0..1.
 fn ramp_at(r: &[Rgba], t: f64) -> Rgba {
@@ -96,8 +87,9 @@ impl Flags {
     pub const BIG: Flags = Flags(2);
     pub const BACK: Flags = Flags(4);
 
+    /// Whether every bit of `other` is set.
     pub fn contains(self, other: Flags) -> bool {
-        self.0 & other.0 != 0
+        self.0 & other.0 == other.0
     }
 }
 
@@ -637,6 +629,369 @@ impl Particles {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct Blaze {
+    x: f64,
+    y: f64,
+    life: f64,
+    max: f64,
+    acc: f64,
+    power: f64,
+}
+
+/// Little fires burning where something landed (pixelfx `Blazes`): each feeds FIRE puffs (and the odd ember) into
+/// a particle system, fading over its life; [`Blazes::draw_back`] adds a hot pixel and a glow at its foot. The
+/// particle system and the rng are the caller's (pixelfx keeps `ps` and draws from `ps.R`), so the calls take them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Blazes {
+    list: Vec<Blaze>,
+}
+
+impl Blazes {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Start a blaze at (x, y) burning `life` seconds at `power` (0..1); draws its spawn phase from `rng`.
+    pub fn add(&mut self, rng: &mut Rng, x: f64, y: f64, life: f64, power: f64) {
+        self.list.push(Blaze {
+            x,
+            y,
+            life,
+            max: life,
+            acc: rng.next(),
+            power,
+        });
+    }
+
+    pub fn count(&self) -> usize {
+        self.list.len()
+    }
+
+    /// Burn every blaze for `dt` seconds, spawning its puffs into `ps`.
+    pub fn update(&mut self, ps: &mut Particles, rng: &mut Rng, dt: f64) {
+        for i in (0..self.list.len()).rev() {
+            let Some(b) = self.list.get_mut(i) else {
+                continue;
+            };
+            b.life -= dt;
+            if b.life <= 0.0 {
+                self.list.remove(i);
+                continue;
+            }
+            let k = b.life / b.max;
+            let intensity = b.power
+                * if k > 0.7 {
+                    1.0
+                } else {
+                    0.35 + (k / 0.7) * 0.65
+                };
+            b.acc += dt * (6.0 + 16.0 * intensity);
+            while b.acc > 1.0 {
+                let s = rng.range(1.2, 2.8) * intensity;
+                let fire = Spawn {
+                    kind: Kind::Fire,
+                    x: b.x + rng.range(-1.5, 1.5),
+                    y: b.y - s * 0.6,
+                    vx: rng.range(-6.0, 6.0),
+                    vy: rng.range(-30.0, -12.0),
+                    life: rng.range(0.28, 0.6),
+                    col: None,
+                    size: s,
+                    delay: 0.0,
+                    flags: Flags::BACK
+                        | if rng.chance(0.3) {
+                            Flags::SMOKES
+                        } else {
+                            Flags::NONE
+                        },
+                };
+                ps.spawn(rng, fire);
+                if rng.chance(0.06) {
+                    let ember = Spawn {
+                        kind: Kind::Ember,
+                        x: b.x,
+                        y: b.y - 1.5,
+                        vx: rng.range(-15.0, 15.0),
+                        vy: rng.range(-45.0, -15.0),
+                        life: rng.range(0.6, 1.4),
+                        col: Some(HOT[2]),
+                        size: 1.0,
+                        delay: 0.0,
+                        flags: Flags::BACK,
+                    };
+                    ps.spawn(rng, ember);
+                }
+                b.acc -= 1.0;
+            }
+        }
+    }
+
+    /// The hot pixel and glow at each blaze's foot, drawn behind the particles.
+    pub fn draw_back(&self, p: &mut Painter) {
+        for b in &self.list {
+            let k = b.life / b.max;
+            let c = if k <= 0.4 {
+                HOT[3]
+            } else if libm::sin(b.life * 31.0 + b.x) > 0.0 {
+                HOT[1]
+            } else {
+                HOT[2]
+            };
+            p.px(b.x, b.y, c);
+            p.glow(b.x, b.y, 6.0 + 5.0 * k * b.power, HOT[2], 0.3 * k * b.power);
+        }
+    }
+}
+
+/// Debris kinds (pixelfx `B`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BitKind {
+    Shard,
+    Chunk,
+    Drip,
+}
+
+/// A CHUNK's shading when it names none, dark to bright.
+const CHUNK_RAMP: [Rgba; 5] = [
+    Rgba::hex24(0x1c2030),
+    Rgba::hex24(0x3a4a66),
+    Rgba::hex24(0x6e86a8),
+    Rgba::hex24(0xa8c0dc),
+    Rgba::hex24(0xe8f2ff),
+];
+
+/// One piece of debris (the object pixelfx `Bits.add` takes): angle `a` and spin `va` in radians, size `s`,
+/// colour `c`, `ramp` the CHUNK shading dark to bright (`None` = a cold grey-blue), gravity scale `g`.
+///
+/// As with [`Spawn`], `..Bit::new(..)` is evaluated last: when a field draws from the rng, write the fields in
+/// the JS object literal's order without the base.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Bit {
+    pub kind: BitKind,
+    pub x: f64,
+    pub y: f64,
+    pub vx: f64,
+    pub vy: f64,
+    pub a: f64,
+    pub va: f64,
+    pub s: f64,
+    pub c: Rgba,
+    pub ramp: Option<Vec<Rgba>>,
+    pub g: f64,
+    pub drag: f64,
+    pub bounce: f64,
+    pub life: f64,
+}
+
+impl Bit {
+    /// A still, white, size-1 bit with full gravity and a one-second life (pixelfx's defaults).
+    pub fn new(kind: BitKind, x: f64, y: f64) -> Self {
+        Self {
+            kind,
+            x,
+            y,
+            vx: 0.0,
+            vy: 0.0,
+            a: 0.0,
+            va: 0.0,
+            s: 1.0,
+            c: WHITE,
+            ramp: None,
+            g: 1.0,
+            drag: 0.0,
+            bounce: 0.0,
+            life: 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct Piece {
+    bit: Bit,
+    max: f64,
+    /// Settled on the floor: no more motion.
+    rest: bool,
+}
+
+/// Rigid debris that tumbles, bounces and settles (pixelfx `Bits`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Bits {
+    list: Vec<Piece>,
+    ground: f64,
+}
+
+impl Bits {
+    /// Debris over a floor at y = `ground` (local px; `f64::INFINITY` for none, pixelfx's default).
+    pub fn new(ground: f64) -> Self {
+        Self {
+            list: Vec::new(),
+            ground,
+        }
+    }
+
+    pub fn add(&mut self, b: Bit) {
+        let max = b.life;
+        self.list.push(Piece {
+            bit: b,
+            max,
+            rest: false,
+        });
+    }
+
+    pub fn count(&self) -> usize {
+        self.list.len()
+    }
+
+    pub fn update(&mut self, dt: f64) {
+        let floor = self.ground;
+        for i in (0..self.list.len()).rev() {
+            let Some(q) = self.list.get_mut(i) else {
+                continue;
+            };
+            let b = &mut q.bit;
+            b.life -= dt;
+            if b.life <= 0.0 {
+                self.list.remove(i);
+                continue;
+            }
+            if q.rest {
+                continue;
+            }
+            b.vy += GRAVITY * b.g * dt;
+            b.vx -= b.vx * b.drag * dt;
+            b.vy -= b.vy * b.drag * dt;
+            b.x += b.vx * dt;
+            b.y += b.vy * dt;
+            b.a += b.va * dt;
+            let sp = b.vy;
+            if b.g <= 0.0 || b.y < floor || sp <= 0.0 {
+                continue;
+            }
+            b.y = floor - 0.01;
+            if b.kind == BitKind::Drip {
+                b.life = 0.0;
+            } else if b.bounce > 0.0 && sp > 70.0 {
+                b.vy = -sp * b.bounce;
+                b.vx *= 0.7;
+                b.va *= 0.6;
+            } else {
+                q.rest = true;
+                b.vx = 0.0;
+                b.vy = 0.0;
+            }
+        }
+    }
+
+    pub fn draw(&self, p: &mut Painter) {
+        for q in &self.list {
+            let b = &q.bit;
+            let a = js_min(1.0, b.life / 0.4);
+            let (ca, sa) = (libm::cos(b.a), libm::sin(b.a));
+            match b.kind {
+                BitKind::Shard => {
+                    let mut d = -b.s / 2.0;
+                    while d <= b.s / 2.0 {
+                        let c = if d > b.s / 2.0 - 0.6 { WHITE } else { b.c };
+                        p.dot(b.x + ca * d, b.y + sa * d, c, a);
+                        d += 0.5;
+                    }
+                }
+                BitKind::Drip => {
+                    p.dot(b.x, b.y, b.c, a);
+                    p.dot(b.x, b.y - 1.0, b.c, a * 0.5);
+                }
+                BitKind::Chunk => {
+                    // a shaded chunk: lit top-left, dark bottom-right, a dark rim
+                    let ramp = b.ramp.as_deref().unwrap_or(&CHUNK_RAMP);
+                    let n = ramp.len() as f64;
+                    let (x, y, r) = (js_round(b.x), js_round(b.y), libm::ceil(b.s) + 1.0);
+                    let mut py = -r;
+                    while py <= r {
+                        let mut px = -r;
+                        while px <= r {
+                            let u = (px + 0.5) * ca + (py + 0.5) * sa;
+                            let v = -(px + 0.5) * sa + (py + 0.5) * ca;
+                            let d = u.abs() / b.s + v.abs() / (b.s * 0.62);
+                            let (cx, cy) = (x + px, y + py);
+                            px += 1.0;
+                            if d > 1.3 {
+                                continue;
+                            }
+                            let i = if d > 1.0 {
+                                0.0
+                            } else if v < 0.0 {
+                                if u < 0.0 { n - 1.0 } else { n - 2.0 }
+                            } else if u < 0.0 {
+                                n - 3.0
+                            } else {
+                                js_max(1.0, n - 4.0)
+                            };
+                            p.dot(cx, cy, step_at(ramp, i), a);
+                        }
+                        py += 1.0;
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct Light {
+    x: f64,
+    y: f64,
+    r: f64,
+    color: Rgba,
+    k: f64,
+    life: f64,
+    max: f64,
+}
+
+/// Lights that flare and die (pixelfx `Lights`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Lights {
+    list: Vec<Light>,
+}
+
+impl Lights {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// A light at (x, y) of radius `r` and strength `k` that shrinks and fades over `life` seconds.
+    pub fn add(&mut self, x: f64, y: f64, r: f64, color: Rgba, k: f64, life: f64) {
+        self.list.push(Light {
+            x,
+            y,
+            r,
+            color,
+            k,
+            life,
+            max: life,
+        });
+    }
+
+    pub fn update(&mut self, dt: f64) {
+        for i in (0..self.list.len()).rev() {
+            let Some(l) = self.list.get_mut(i) else {
+                continue;
+            };
+            l.life -= dt;
+            if l.life <= 0.0 {
+                self.list.remove(i);
+            }
+        }
+    }
+
+    pub fn draw(&self, p: &mut Painter) {
+        for l in &self.list {
+            let k = l.life / l.max;
+            p.glow(l.x, l.y, l.r * (0.55 + 0.45 * k), l.color, l.k * k * k);
+        }
+    }
+}
+
 /// A star glint: arms of length `arm` in colour `c` with tips in `tip`, a white heart, light `k` (pixelfx
 /// `sparkle`; its defaults are `tip = c`, `k = 0.6`).
 pub fn sparkle(p: &mut Painter, x: f64, y: f64, arm: f64, c: Rgba, tip: Rgba, k: f64) {
@@ -665,4 +1020,194 @@ pub fn sparkle(p: &mut Painter, x: f64, y: f64, arm: f64, c: Rgba, tip: Rgba, k:
     }
     p.px(cx, cy, WHITE);
     p.glow(x, y, 4.0 + n * 2.0, c, k);
+}
+
+/// An 8-ray flare: rays of length `len` on the axes, shorter between, fading out along their length, light `k`;
+/// `ramp` dark to bright (pixelfx `flare`).
+pub fn flare(p: &mut Painter, x: f64, y: f64, len: f64, k: f64, ramp: &[Rgba]) {
+    if len < 1.0 {
+        return;
+    }
+    let n = ramp.len() as f64;
+    for i in 0..8u8 {
+        let an = (f64::from(i) * core::f64::consts::PI) / 4.0;
+        let l = if i % 4 == 0 {
+            len
+        } else if i % 2 == 0 {
+            len * 0.6
+        } else {
+            len * 0.3
+        };
+        let (ca, sa) = (libm::cos(an), libm::sin(an));
+        let mut d = 0.0;
+        while d <= l {
+            let u = d / l;
+            let c = if u < 0.35 {
+                WHITE
+            } else if u < 0.7 {
+                step_at(ramp, n - 2.0)
+            } else {
+                step_at(ramp, n - 3.0)
+            };
+            let a = if u < 0.6 {
+                1.0
+            } else {
+                k * 1.5 * (1.0 - u) + 0.2
+            };
+            p.dot(x + ca * d, y + sa * d, c, a);
+            d += 0.5;
+        }
+    }
+}
+
+/// A ring on a tilted plane (pixelfx `band`): `sy` squashes it (0.16 lies on the floor, 1 stands up), thickness
+/// `th` inward, alpha `k`, coloured by depth through the band with `ramp` (dark to bright; `hot` makes the inner
+/// edge white). `keep(angle)` picks which part to draw, so the far half can go behind things and the near half in
+/// front: `|g| libm::sin(g) < 0.0` is the far half (pixelfx's defaults: keep all, not hot).
+#[allow(clippy::too_many_arguments)]
+pub fn band(
+    p: &mut Painter,
+    cx: f64,
+    cy: f64,
+    r: f64,
+    sy: f64,
+    th: f64,
+    k: f64,
+    ramp: &[Rgba],
+    keep: impl Fn(f64) -> bool,
+    hot: bool,
+) {
+    if r <= 0.0 || k <= 0.0 {
+        return;
+    }
+    let n = ramp.len() as f64;
+    let m = libm::ceil(r * TAU * 1.2);
+    let mut j = 0.0;
+    while j < m {
+        let ang = (j / m) * TAU;
+        j += 1.0;
+        let (ca, sa) = (libm::cos(ang), libm::sin(ang));
+        if !keep(ang) {
+            continue;
+        }
+        let mut o = th;
+        while o >= 0.0 {
+            let u = o / th;
+            let c = if u < 0.15 {
+                if hot { WHITE } else { step_at(ramp, n - 1.0) }
+            } else if u < 0.4 {
+                step_at(ramp, n - 2.0)
+            } else if u < 0.7 {
+                step_at(ramp, n - 3.0)
+            } else {
+                step_at(ramp, n - 4.0)
+            };
+            let a = k * if u < 0.4 { 1.2 } else { 1.15 - u };
+            p.dot(cx + ca * (r - o), cy + sa * (r - o) * sy, c, a);
+            o -= 0.5;
+        }
+    }
+}
+
+/// Options of [`crystal`]: alpha `a`, `white` flashes it white, `glint` the 0..1 height of a sweeping highlight
+/// (or -1 for none).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CrystalOpts {
+    pub a: f64,
+    pub white: bool,
+    pub glint: f64,
+}
+
+impl Default for CrystalOpts {
+    fn default() -> Self {
+        Self {
+            a: 1.0,
+            white: false,
+            glint: -1.0,
+        }
+    }
+}
+
+/// A faceted crystal spike standing on (x, base), height `h`, base width `w`, leaning `lean` px at the tip, shaded
+/// in `ramp` (dark to bright, 6+ steps): a lit ridge, a bright left face, a darker right face, a dark rim
+/// (pixelfx `crystal`).
+#[allow(clippy::too_many_arguments)]
+pub fn crystal(
+    p: &mut Painter,
+    x: f64,
+    base: f64,
+    h: f64,
+    w: f64,
+    lean: f64,
+    ramp: &[Rgba],
+    o: CrystalOpts,
+) {
+    if h < 1.5 {
+        return;
+    }
+    let n = ramp.len() as f64;
+    let shade = |i: f64| step_at(ramp, js_max(0.0, n - 1.0 - i));
+    let (a, top, ridge0, glint) = (o.a, base - h, x - w * 0.14, o.glint);
+    let inside = |px: f64, py: f64| {
+        let u = (base - (py + 0.5)) / h;
+        (0.0..=1.0).contains(&u)
+            && (px + 0.5 - (x + lean * u)).abs() <= (w / 2.0) * (1.0 - u) + 0.35
+    };
+    let (px0, px1) = (
+        libm::floor(x - w / 2.0 - lean.abs() - 2.0),
+        libm::ceil(x + w / 2.0 + lean.abs() + 2.0),
+    );
+    let mut py = libm::floor(top) - 1.0;
+    while py < libm::ceil(base) {
+        let mut px = px0;
+        while px <= px1 {
+            if !inside(px, py) {
+                if inside(px - 1.0, py)
+                    || inside(px + 1.0, py)
+                    || inside(px, py + 1.0)
+                    || (inside(px, py - 1.0) && py < base - 1.0)
+                {
+                    p.dot(px, py, step_at(ramp, 0.0), a);
+                }
+            } else if o.white {
+                p.dot(px, py, WHITE, a);
+            } else {
+                let u = (base - (py + 0.5)) / h;
+                let rx = ridge0 + (x + lean - ridge0) * u;
+                let c = x + lean * u;
+                let hw = (w / 2.0) * (1.0 - u) + 0.35;
+                let fx = px + 0.5;
+                let mut col = if u > 0.9 {
+                    WHITE
+                } else if (fx - rx).abs() < 0.55 {
+                    shade(1.0)
+                } else if fx < rx {
+                    if fx - (c - hw) < 1.0 {
+                        shade(1.0)
+                    } else if (fx - (c - hw)) / js_max(1.0, rx - (c - hw)) > 0.55 {
+                        shade(2.0)
+                    } else {
+                        shade(3.0)
+                    }
+                } else if c + hw - fx < 1.2 {
+                    shade(js_min(n - 2.0, 6.0))
+                } else if (fx - rx) / js_max(1.0, c + hw - rx) > 0.5 {
+                    shade(5.0)
+                } else {
+                    shade(4.0)
+                };
+                if glint >= 0.0 && fx <= rx + 0.6 {
+                    let g = (u - glint).abs();
+                    if g < 0.05 {
+                        col = WHITE;
+                    } else if g < 0.1 {
+                        col = shade(1.0);
+                    }
+                }
+                p.dot(px, py, col, a);
+            }
+            px += 1.0;
+        }
+        py += 1.0;
+    }
 }

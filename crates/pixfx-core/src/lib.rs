@@ -16,3 +16,7 @@ pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};
 pub use painter::Painter;
 pub use render::{Rendered, edge_fade, render_frames};
+pub use sim::{
+    Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn,
+    band, crystal, flare, sparkle,
+};
