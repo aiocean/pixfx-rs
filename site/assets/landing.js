@@ -2,8 +2,8 @@
 // loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
 import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 import { DECOR, createDuel, step } from "./duel.js";
-import { BARS_TALL, drawBars, drawFighter, drawNumbers, drawStreaks } from "./duel-art.js";
-import { DUSK, advance, createFeel, dusk, numbers, react, shake, streaks } from "./duel-feel.js";
+import { BARS_TALL, drawBars, drawDust, drawFighter, drawNumbers, drawStreaks } from "./duel-art.js";
+import { DUSK, advance, createFeel, dust, dusk, jolts, numbers, react, shake, streaks } from "./duel-feel.js";
 import { createScene, drawScene } from "./duel-scene.js";
 import { createLights, drawLights, fade, kindle } from "./duel-light.js";
 
@@ -66,7 +66,8 @@ function createHero(canvas, signal) {
     view.stage?.free();
     view.handles.clear();
     const narrow = innerWidth < 760;
-    const scale = narrow ? 2 : 3;
+    // the fighters stay big enough to read their poses: bigger pixels on a wider screen
+    const scale = narrow ? 2 : innerWidth < 1200 ? 3 : 4;
     const rect = canvas.getBoundingClientRect();
     const w = Math.ceil(rect.width / scale);
     const h = Math.ceil(rect.height / scale);
@@ -137,7 +138,10 @@ function createHero(canvas, signal) {
       ctx.fillStyle = `rgba(4, 2, 10, ${dark})`;
       ctx.fillRect(-scale * 4, -scale * 4, (w + 8) * scale, (h + 8) * scale);
     }
-    for (const f of view.duel.fighters) drawFighter(ctx, f, ground, scale);
+    // the one a blow struck shudders through the hit-stop
+    const jolt = jolts(view.feel);
+    for (const f of view.duel.fighters) drawFighter(ctx, f, ground, scale, jolt[f.index]);
+    drawDust(ctx, dust(view.feel), ground, scale);
     // the magic lights the dais, the peaks and the fighters in its own colour
     drawLights(ctx, view.lights, w, h, scale, view.layout.lamps, ground, view.duel.time);
     view.stage.drawLayer("front");
