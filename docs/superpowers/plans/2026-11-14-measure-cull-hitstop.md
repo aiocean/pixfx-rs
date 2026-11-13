@@ -27,6 +27,7 @@ at 60 fps on a mid-range phone, shown by measurement"; anti-goal "Logic in a she
 | wasm used by the perf run | built 00:42:39; `Cargo.toml` (now `lto = "fat"`, `codegen-units = 1`) last modified 01:32:34 | `stat` |
 | Stress seeds | every effect gets its own seed (`seed: 1 + this.spawned`), so frames are never shared | `demo/stress.ts:140` |
 | Culling today | none: `Scene::update` and `draw_layer` visit every entry (`stage.rs:366-367`, `:423-466`); Phaser 4.2.1 `willRender` has no camera bounds test (`GameObject.js:707-712`) | code |
+| Baseline (Task 3): main 930dd2c, wasm with `lto = "fat"`, load average 29 to 46 (other sessions' builds), so noisy | Phaser 1× main thread: 10 fires 57 fps, 20 fires 22 fps; 100 fires engine 144.23 ms, texture upload 100.87 ms. 1× worker pool: shared layer holds 60 fps to 100 fires; 100 fires upload 121.79 ms. 4× main thread: 10 fires 10.6 fps; 100 fires engine 412.33, upload 135.03 ms. 4× worker pool: objects 60 fps up to 25, 30 fps up to 50; 100 fires upload 25.43 ms. Objects mode reports 0 textures while effects show. Native `pixfx bench` (50 each, 10 s, 60 Hz): update 0.01 ms; candle 132×152 draw 3.08 / rgba 1.11 ms; campfire 256×256 23.41 / 3.63; brazier 260×296 24.07 / 4.27 | `bun run perf`, `pixfx bench`; raw JSON `/var/folders/.../pixfx-perf-1794599012610.json` |
 | Hit-stop today | every effect freezes (`stage.rs:364-367`, `feel.rs:156-159`, `effects.ts:103-106`) | code |
 
 What this means:
