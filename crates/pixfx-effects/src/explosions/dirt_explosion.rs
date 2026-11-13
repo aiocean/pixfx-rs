@@ -6,7 +6,7 @@
 
 use core::f64::consts::FRAC_PI_2;
 
-use pixfx_core::color::{Rgba, WHITE, mix, rgb};
+use pixfx_core::color::{Rgba, WHITE, mix, ramp, rgb};
 use pixfx_core::math::{Rng, TAU, ease, js_max, js_min, js_round, smooth, to_uint32};
 use pixfx_core::sim::{
     Bit, BitKind, Bits, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn, band,
@@ -14,7 +14,6 @@ use pixfx_core::sim::{
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
 use super::lib::{Stone, crater, cull, dome, draw_dirt, fade_edges, pool, rock};
-use crate::fire::lib::ramp;
 
 pub struct DirtExplosion;
 

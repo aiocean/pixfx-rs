@@ -121,6 +121,12 @@ pub fn fit(ramp: &[Rgba], n: usize) -> Vec<Rgba> {
         .collect()
 }
 
+/// [`fit`] into an array of exactly `N` steps, so steps index without bounds checks failing.
+pub fn ramp<const N: usize>(r: &[Rgba]) -> [Rgba; N] {
+    let v = fit(r, N);
+    core::array::from_fn(|i| v.get(i).copied().unwrap_or(Rgba::NONE))
+}
+
 /// The ramp step for t in 0..1, no blending (pixelfx `at`).
 pub fn at(ramp: &[Rgba], t: f64) -> Rgba {
     let i = clamp(

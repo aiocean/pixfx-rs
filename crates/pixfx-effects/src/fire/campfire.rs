@@ -5,13 +5,13 @@
 
 use core::f64::consts::PI;
 
-use pixfx_core::color::{Rgba, WHITE, mix};
+use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{Rng, clamp, js_max, js_min, js_round, rand, to_uint32};
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
 use super::lib::{
     BACK_LAYERS, Hot, LAYERS, Layers, Life, LoopNoise, drift, ember, fire_puff_up, flame_tongue,
-    floor_light, hot_first, lick, looped, ramp, smoke_puff, spark, spark_at,
+    floor_light, hot_first, lick, looped, smoke_puff, spark, spark_at,
 };
 
 pub struct Campfire;

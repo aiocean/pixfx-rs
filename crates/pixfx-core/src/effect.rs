@@ -85,11 +85,12 @@ pub trait EffectState: Send {
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer);
 }
 
-/// An option value beyond the common ones: a number or a colour ramp.
+/// An option value beyond the common ones: a number, a colour ramp or a single colour.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OptValue {
     Num(f64),
     Ramp(Vec<Rgba>),
+    Color(Rgba),
 }
 
 /// What the caller sets on an instance; anything left unset takes the effect's default.
@@ -149,6 +150,15 @@ impl Options {
             _ => None,
         };
         resolve_ramp(given, default)
+    }
+
+    /// A single-colour option (pixelfx `stone: "#4a3f69"`), or the effect's default when it is unset or not a
+    /// colour (a ramp given for it is not a colour).
+    pub fn color_or(&self, key: &str, default: Rgba) -> Rgba {
+        match self.extra.get(key) {
+            Some(OptValue::Color(c)) => *c,
+            _ => default,
+        }
     }
 
     /// A numeric option, or the effect's default when it is unset or not a number.

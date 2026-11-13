@@ -6,13 +6,12 @@
 
 use core::f64::consts::PI;
 
-use pixfx_core::color::{Rgba, WHITE, mix};
+use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{Rng, TAU, clamp, ease, js_max, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, sparkle};
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
 use super::lib::cull;
-use crate::fire::lib::ramp;
 
 pub struct Implosion;
 

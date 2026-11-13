@@ -6,7 +6,7 @@
 
 use core::f64::consts::FRAC_PI_2;
 
-use pixfx_core::color::{Rgba, WHITE, mix, rgb, scale};
+use pixfx_core::color::{Rgba, WHITE, mix, ramp, rgb, scale};
 use pixfx_core::math::{Rng, TAU, clamp, ease, js_max, js_min, js_round, rand, smooth, to_uint32};
 use pixfx_core::sim::{
     Bit, BitKind, Bits, Blazes, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn, band,
@@ -14,7 +14,6 @@ use pixfx_core::sim::{
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
 use super::lib::{OUTLINE, Stone};
-use crate::fire::lib::ramp;
 
 pub struct SmallExplosion;
 
@@ -164,13 +163,7 @@ impl Effect for SmallExplosion {
         let rad = 18.0 * s;
         let power = 0.9 * libm::pow(s, 0.8);
         let earth = 1.6;
-        // a single colour: a one-step ramp option
-        let stone_c = opts
-            .ramp_or("stone", &[STONE])
-            .first()
-            .copied()
-            .unwrap_or(STONE);
-        let (st, dust) = stone(stone_c);
+        let (st, dust) = stone(opts.color_or("stone", STONE));
         let mut r = Rng::new(to_uint32(seed as f64));
         let mut ps = Particles::new(ParticlesOpts {
             ground: 0.0,
@@ -216,18 +209,18 @@ impl Effect for SmallExplosion {
             let size = r.range(rad * 0.4, rad * 0.55);
             ps.spawn(
                 &mut r,
-                puff(
-                    Kind::Fire,
+                Spawn {
+                    kind: Kind::Fire,
                     x,
-                    py,
+                    y: py,
                     vx,
                     vy,
                     life,
-                    None,
+                    col: None,
                     size,
-                    0.0,
-                    Flags::NONE,
-                ),
+                    delay: 0.0,
+                    flags: Flags::NONE,
+                },
             );
         }
         let mut i = 0.0;
@@ -244,18 +237,18 @@ impl Effect for SmallExplosion {
             };
             ps.spawn(
                 &mut r,
-                puff(
-                    Kind::Fire,
-                    libm::cos(a) * d,
-                    y + libm::sin(a) * d,
-                    libm::cos(a) * sp,
-                    libm::sin(a) * sp * 0.8 - 40.0,
+                Spawn {
+                    kind: Kind::Fire,
+                    x: libm::cos(a) * d,
+                    y: y + libm::sin(a) * d,
+                    vx: libm::cos(a) * sp,
+                    vy: libm::sin(a) * sp * 0.8 - 40.0,
                     life,
-                    None,
+                    col: None,
                     size,
-                    0.0,
+                    delay: 0.0,
                     flags,
-                ),
+                },
             );
             i += 1.0;
         }
@@ -267,18 +260,18 @@ impl Effect for SmallExplosion {
             let delay = r.range(0.06, 0.2);
             ps.spawn(
                 &mut r,
-                puff(
-                    Kind::Smoke,
-                    libm::cos(a) * d,
-                    y + libm::sin(a) * d,
-                    libm::cos(a) * 30.0,
-                    libm::sin(a) * 20.0 - 30.0,
+                Spawn {
+                    kind: Kind::Smoke,
+                    x: libm::cos(a) * d,
+                    y: y + libm::sin(a) * d,
+                    vx: libm::cos(a) * 30.0,
+                    vy: libm::sin(a) * 20.0 - 30.0,
                     life,
-                    Some(rgb(34.0, 29.0, 38.0)),
+                    col: Some(rgb(34.0, 29.0, 38.0)),
                     size,
                     delay,
-                    Flags::BIG,
-                ),
+                    flags: Flags::BIG,
+                },
             );
         }
         for _ in 0..5 {
@@ -295,7 +288,18 @@ impl Effect for SmallExplosion {
             };
             ps.spawn(
                 &mut r,
-                puff(Kind::Fire, x, y, vx, vy, life, None, size, delay, flags),
+                Spawn {
+                    kind: Kind::Fire,
+                    x,
+                    y,
+                    vx,
+                    vy,
+                    life,
+                    col: None,
+                    size,
+                    delay,
+                    flags,
+                },
             );
         }
         let mut i = 0.0;
@@ -308,18 +312,18 @@ impl Effect for SmallExplosion {
             let delay = r.range(0.12, 0.45);
             ps.spawn(
                 &mut r,
-                puff(
-                    Kind::Smoke,
-                    libm::cos(a) * d,
-                    y + libm::sin(a) * d,
-                    libm::cos(a) * sp,
-                    libm::sin(a) * sp * 0.6 - 35.0,
+                Spawn {
+                    kind: Kind::Smoke,
+                    x: libm::cos(a) * d,
+                    y: y + libm::sin(a) * d,
+                    vx: libm::cos(a) * sp,
+                    vy: libm::sin(a) * sp * 0.6 - 35.0,
                     life,
-                    None,
+                    col: None,
                     size,
                     delay,
-                    Flags::BIG,
-                ),
+                    flags: Flags::BIG,
+                },
             );
             i += 1.0;
         }
@@ -394,18 +398,18 @@ impl Effect for SmallExplosion {
             let delay = r.range(0.0, 0.06);
             ps.spawn(
                 &mut r,
-                puff(
-                    Kind::Smoke,
+                Spawn {
+                    kind: Kind::Smoke,
                     x,
-                    py,
+                    y: py,
                     vx,
                     vy,
                     life,
-                    Some(dust),
+                    col: Some(dust),
                     size,
                     delay,
-                    Flags::BIG,
-                ),
+                    flags: Flags::BIG,
+                },
             );
             i += 1.0;
         }
@@ -468,18 +472,18 @@ impl Effect for SmallExplosion {
             let delay = r.range(0.0, 0.15);
             ps.spawn(
                 &mut r,
-                puff(
-                    Kind::Smoke,
+                Spawn {
+                    kind: Kind::Smoke,
                     x,
-                    py,
+                    y: py,
                     vx,
                     vy,
                     life,
-                    Some(dust),
+                    col: Some(dust),
                     size,
                     delay,
-                    Flags::BIG,
-                ),
+                    flags: Flags::BIG,
+                },
             );
             i += 1.0;
         }
@@ -500,34 +504,6 @@ impl Effect for SmallExplosion {
             rings,
             t: 0.0,
         })
-    }
-}
-
-/// pixelfx `spawn` with every argument given.
-#[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
-fn puff(
-    kind: Kind,
-    x: f64,
-    y: f64,
-    vx: f64,
-    vy: f64,
-    life: f64,
-    col: Option<Rgba>,
-    size: f64,
-    delay: f64,
-    flags: Flags,
-) -> Spawn {
-    Spawn {
-        kind,
-        x,
-        y,
-        vx,
-        vy,
-        life,
-        col,
-        size,
-        delay,
-        flags,
     }
 }
 

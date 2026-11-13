@@ -3,7 +3,7 @@
 //! The release (flash, rings, flare, light) and the arcs are adapted from Sprite Fusion's open-source energy
 //! (https://www.spritefusion.com/pixel-art-vfx/energy), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE};
+use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::math::{
     Rng, TAU, clamp, ease, js_max, js_min, js_round, noise, rng, smooth, to_uint32,
 };
@@ -12,7 +12,6 @@ use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, band, flare
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
 use super::lib::cull;
-use crate::fire::lib::ramp;
 
 pub struct PlasmaExplosion;
 

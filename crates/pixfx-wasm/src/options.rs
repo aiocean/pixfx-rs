@@ -13,7 +13,7 @@ pub const MAX_MARGIN: u32 = 4096;
 /// `undefined`/`null` (all defaults) or a plain object: `margin` (whole number up to [`MAX_MARGIN`]: empty pixels round the
 /// canvas, returned beside the options because it is the canvas's, not the effect's), `seed` (non-negative integer), `flip` (boolean),
 /// `angle` (radians), `light` (glow strength), `palette` (array of `"#rgb"`/`"#rrggbb"` strings); any other key is
-/// the effect's own option, a number or an array of hex colours. `x`/`y` are refused: an instance draws on its
+/// the effect's own option, a number, a hex colour or an array of hex colours. `x`/`y` are refused: an instance draws on its
 /// own canvas at the effect's origin. A field of the wrong type is an error naming it.
 pub fn parse_options(v: &JsValue) -> Result<(Options, u32), JsError> {
     let mut opts = Options::default();
@@ -58,9 +58,13 @@ pub fn parse_options(v: &JsValue) -> Result<(Options, u32), JsError> {
                     OptValue::Ramp(ramp(&key, &val)?)
                 } else if val.as_f64().is_some() {
                     OptValue::Num(number(&key, &val)?)
+                } else if let Some(s) = val.as_string() {
+                    OptValue::Color(
+                        hex(&s).map_err(|e| JsError::new(&format!("option {key}: {e}")))?,
+                    )
                 } else {
                     return Err(JsError::new(&format!(
-                        "option {key} must be a number or an array of hex colours"
+                        "option {key} must be a number, a hex colour or an array of hex colours"
                     )));
                 };
                 opts.extra.insert(key, extra);
