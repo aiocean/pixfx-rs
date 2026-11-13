@@ -250,7 +250,6 @@ dependencies = [
  "pixfx-effects",
  "pixfx-wasm",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "web-sys",
 ]
 
@@ -286,7 +285,6 @@ version = "0.1.0"
 dependencies = [
  "gif",
  "pixfx-core",
- "pixfx-effects",
  "png",
  "serde_json",
 ]
@@ -299,7 +297,6 @@ dependencies = [
  "pixfx-core",
  "pixfx-effects",
  "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]

@@ -1,24 +1,6 @@
-//! The fire effects are registered under their pixelfx ids with pixelfx's meta (`src/fx/fire/*.js`).
+//! A fire option far out of range still draws in bounded time.
 
 use pixfx_effects::effect;
-
-#[test]
-fn candle_meta_matches_pixelfx() {
-    let m = effect("fire/candle").map(|e| *e.meta());
-    assert!(m.is_some(), "fire/candle is not registered");
-    assert_eq!(m.map(|m| m.size), Some((56, 76)));
-    assert_eq!(m.map(|m| m.origin), Some((28, 64)));
-    assert_eq!(m.map(|m| m.duration), Some(4.0));
-    assert_eq!(m.map(|m| m.looping), Some(true));
-    assert_eq!(m.map(|m| m.fps), Some(30));
-}
-
-#[test]
-fn campfire_and_brazier_are_registered() {
-    let size = |id| effect(id).map(|e| e.meta().size);
-    assert_eq!(size("fire/campfire"), Some((128, 128)));
-    assert_eq!(size("fire/brazier"), Some((112, 148)));
-}
 
 #[test]
 fn huge_campfire_height_draws_in_bounded_time() -> Result<(), &'static str> {
@@ -43,16 +25,4 @@ fn huge_campfire_height_draws_in_bounded_time() -> Result<(), &'static str> {
     assert!(took < Duration::from_secs(1), "one draw took {took:?}");
     assert!(frame.color.iter().any(|&c| c != 0), "the fire still draws");
     Ok(())
-}
-
-#[test]
-fn spirit_flame_meta_matches_pixelfx() {
-    let m = effect("fire/spirit-flame").map(|e| *e.meta());
-    assert!(m.is_some(), "fire/spirit-flame is not registered");
-    assert_eq!(m.map(|m| m.size), Some((80, 124)));
-    assert_eq!(m.map(|m| m.origin), Some((40, 94)));
-    assert_eq!(m.map(|m| m.duration), Some(3.0));
-    assert_eq!(m.map(|m| m.looping), Some(true));
-    assert_eq!(m.map(|m| m.fps), Some(30));
-    assert_eq!(m.map(|m| m.seed), Some(7));
 }

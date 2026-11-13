@@ -17,6 +17,3 @@ pixfx-export = { path = "../pixfx-export" }
 
 [lints]
 workspace = true
-
-[dev-dependencies]
-gif = "=0.14.2"

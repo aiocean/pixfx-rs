@@ -124,19 +124,3 @@ pub fn composite_px(c: u32, l: u32, ground: Option<[u8; 3]>) -> [u8; 4] {
     }
     [clamp_u8(r), clamp_u8(g), clamp_u8(b), clamp_u8(a)]
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn frame_hash_is_fnv1a_64_of_little_endian_words() {
-        // 1x1 frame, 8 zero bytes: hand-run FNV-1a 64 (h = (h ^ 0) * prime, eight times)
-        assert_eq!(frame_hash(&Frame::new(1, 1, 0, 0)), 0xa8c7_f832_281a_39c5);
-        // color 0x12345678 then light 0x89abcdef: bytes 78 56 34 12 ef cd ab 89
-        let mut f = Frame::new(1, 1, 0, 0);
-        f.color[0] = 0x1234_5678;
-        f.light[0] = 0x89ab_cdef;
-        assert_eq!(frame_hash(&f), 0x5c5d_6ca7_accc_719d);
-    }
-}

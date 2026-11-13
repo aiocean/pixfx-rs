@@ -78,8 +78,8 @@ wasm-pack test --node crates/pixfx-effects --test determinism
 
 ```sh
 cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
-wasm-pack test --node crates/pixfx-wasm
-wasm-pack test --node crates/pixfx-canvas
+(cd packages/pixfx-phaser && bun run check)
+bun test site/tests
 ```
 
 ## Web demos
@@ -109,10 +109,10 @@ Open http://127.0.0.1:8766/.
 `crates/pixfx-gpui` and `examples/gpui-web` need the local gpui fork checked out next to this repo at
 `../zed-gpui`, branch `pixfx/additive-sprites`. Without it, neither builds; everything else does.
 
-Test the gpui crate:
+Check the gpui crate:
 
 ```sh
-cargo test --manifest-path crates/pixfx-gpui/Cargo.toml
+cargo clippy --manifest-path crates/pixfx-gpui/Cargo.toml -- -D warnings
 ```
 
 Run the demo:

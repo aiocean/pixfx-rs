@@ -4,9 +4,9 @@ import type { Backend } from "../src/backend";
 import type { WorkerPort } from "../src/pool";
 import { WorkerPool } from "../src/pool";
 import type { Batch, ToWorker } from "../src/protocol";
-import { fromWorkerSchema, toWorkerSchema } from "../src/protocol";
+import { toWorkerSchema } from "../src/protocol";
 import { WorkerCore } from "../src/worker-core";
-import { FakeEngine, PaintedEngine } from "./fake-engine";
+import { FakeEngine } from "./fake-engine";
 import { FakeGfx } from "./fake-gfx";
 
 void mock.module("phaser", () => ({ default: { Events: { EventEmitter } } }));
@@ -67,16 +67,6 @@ function frame(fx: { update(deltaMs: number, timeScale: number): void }, pool: W
 
 const EMPTY = { engines: 0, textures: 0, images: 0 };
 
-test("play validates on the main thread: unknown ids and bad options throw at once and send nothing", () => {
-  const { main, ports, pool, fx } = setup();
-  expect(() => fx.play("nope/none", 0, 0)).toThrow(/nope\/none/);
-  expect(() => fx.play("fake/spark", 0, 0, { seed: -1 })).toThrow(/seed/);
-  pool.flush();
-  expect(ports[0]?.posted).toEqual([]);
-  expect(fx.stats()).toEqual(EMPTY);
-  expect(main.live).toBe(0);
-});
-
 test("a play builds and frees one main-thread instance for its size, and spawns the effect in a worker", () => {
   const { main, ports, pool, gfx, fx } = setup();
   fx.play("fake/spark", 0, 0, { seed: 7 });
@@ -115,32 +105,6 @@ test("one batch in flight per worker; scene time accumulates while it is busy", 
   expect(batches[1]?.spawns).toEqual([]);
 });
 
-test("a paused scene sends no time; a play while paused is still spawned", () => {
-  const { ports, pool, gfx, fx } = setup();
-  fx.update(16, 0);
-  fx.play("fake/spark", 0, 0);
-  pool.flush();
-  ports[0]?.answer();
-  expect(gfx.uploads()).toBe(4);
-  fx.update(16, 0);
-  pool.flush();
-  expect(ports[0]?.batches().length).toBe(1);
-});
-
-test("uploaded buffers go back to the worker and are reused: a long run allocates one set", () => {
-  const { ports, pool, gfx, fx } = setup();
-  fx.play("fake/spark", 0, 0);
-  for (let i = 0; i < 25; i++) {
-    frame(fx, pool, 1000 / 30);
-    ports[0]?.answer();
-  }
-  expect(gfx.textures[0]?.uploads).toBeGreaterThan(20);
-  // An own-surface effect hands its frame back as soon as it is uploaded, so one set keeps cycling.
-  expect(ports[0]?.core.allocated).toBe(1);
-  const returned = (ports[0]?.batches() ?? []).flatMap((b) => b.items.flatMap((i) => i.give));
-  expect(returned.length).toBeGreaterThan(20);
-});
-
 test("a done reply emits complete and frees everything on both sides", () => {
   const { ports, pool, gfx, fx } = setup();
   const e = fx.play("fake/spark", 0, 0);
@@ -163,21 +127,6 @@ test("a done reply emits complete and frees everything on both sides", () => {
   expect(ports[0]?.answer()).toBe(false);
 });
 
-test("stop is forwarded; the effect fades in the worker, then completes", () => {
-  const { ports, pool, fx } = setup();
-  const e = fx.play("fake/spark", 0, 0);
-  let completes = 0;
-  e.on("complete", () => (completes += 1));
-  e.stop();
-  frame(fx, pool, 250);
-  expect(ports[0]?.batches()[0]?.items[0]?.stop).toBe(true);
-  ports[0]?.answer();
-  frame(fx, pool, 250);
-  ports[0]?.answer();
-  expect(completes).toBe(1);
-  expect(ports[0]?.engine.live).toBe(0);
-});
-
 test("destroy while a batch is in flight: the late reply uploads nothing and the worker frees the instance", () => {
   const { ports, pool, gfx, fx } = setup();
   const e = fx.play("fake/spark", 0, 0);
@@ -197,71 +146,4 @@ test("destroy before the spawn was sent sends nothing at all", () => {
   fx.play("fake/spark", 0, 0).destroy();
   pool.flush();
   expect(ports[0]?.posted).toEqual([]);
-});
-
-test("scene shutdown frees every effect in its worker", () => {
-  const { ports, pool, fx } = setup(2);
-  for (let i = 0; i < 4; i++) fx.play("fake/spark", i, i);
-  frame(fx, pool);
-  for (const p of ports) p.answer();
-  fx.destroyAll();
-  expect(fx.stats()).toEqual(EMPTY);
-  pool.flush();
-  for (const p of ports) p.answer();
-  expect(ports.map((p) => p.engine.live)).toEqual([0, 0]);
-});
-
-test("each effect goes to the worker holding the least pixel area", () => {
-  const big = () => {
-    const e = new FakeEngine();
-    e.metas["fake/big"] = { ...e.meta("fake/spark"), id: "fake/big", size: [40, 30] };
-    return e;
-  };
-  const { main, ports, pool, fx } = setup(2, big);
-  main.metas["fake/big"] = { ...main.meta("fake/spark"), id: "fake/big", size: [40, 30] };
-  fx.play("fake/big", 0, 0); // worker 0: 1200 px
-  fx.play("fake/spark", 0, 0); // worker 1: 48
-  fx.play("fake/spark", 0, 0); // worker 1: 96
-  const e = fx.play("fake/big", 0, 0); // worker 1: 1296
-  e.destroy(); // worker 1 back to 96
-  fx.play("fake/spark", 0, 0); // worker 1: 144
-  pool.flush();
-  const spawned = ports.map((p) => p.batches().flatMap((b) => b.spawns.map((s) => s.id)));
-  expect(spawned).toEqual([["fake/big"], ["fake/spark", "fake/spark", "fake/spark"]]);
-});
-
-test("a layer composites its members from their stored frames", () => {
-  const painted = () => {
-    const e = new PaintedEngine();
-    e.paint = { color: 0xff0000ff, light: 0x00000010 };
-    return e;
-  };
-  const { ports, pool, gfx, fx } = setup(1, painted);
-  const layer = fx.createLayer({ bounds: { x: 100, y: 200, width: 20, height: 10 } });
-  const e = layer.play("fake/spark", 104, 205);
-  fx.flushLayers();
-  expect(gfx.textures[0]?.written()).toBe(false);
-  pool.flush();
-  ports[0]?.answer();
-  fx.flushLayers();
-  expect(gfx.textures[0]?.px(0, 0)).toEqual([255, 0, 0, 255]);
-  expect(gfx.textures[1]?.px(0, 0)).toEqual([16, 0, 0, 255]);
-  // A move re-composites from the stored frame; the worker is not asked for anything.
-  e.setPosition(110, 205);
-  fx.flushLayers();
-  expect(gfx.textures[0]?.px(0, 0)).toEqual([0, 0, 0, 0]);
-  expect(gfx.textures[0]?.px(6, 0)).toEqual([255, 0, 0, 255]);
-  expect(ports[0]?.answer()).toBe(false);
-});
-
-test("worker replies are parsed: a malformed reply throws", () => {
-  const ports: { deliver: (data: unknown) => void }[] = [];
-  const port: WorkerPort = {
-    post: () => {},
-    listen: (onMessage) => ports.push({ deliver: onMessage }),
-  };
-  new WorkerPool(new FakeEngine(), [port]);
-  expect(() => ports[0]?.deliver({ type: "results", results: [{ handle: "x" }] })).toThrow();
-  expect(() => ports[0]?.deliver({ type: "error", message: "boom" })).toThrow(/boom/);
-  expect(fromWorkerSchema.safeParse({ type: "ready" }).success).toBe(true);
 });

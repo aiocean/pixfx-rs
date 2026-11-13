@@ -14,8 +14,5 @@ pixfx-core = { path = "../pixfx-core" }
 pixfx-effects = { path = "../pixfx-effects" }
 wasm-bindgen = "=0.2.130"
 
-[dev-dependencies]
-wasm-bindgen-test = "=0.3.80"
-
 [lints]
 workspace = true
