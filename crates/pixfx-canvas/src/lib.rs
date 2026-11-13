@@ -124,6 +124,16 @@ impl Stage {
         self.renderer.borrow_mut().scene.stop(handle);
     }
 
+    /// Let the effect keep playing real time through a hit-stop while the rest freeze (`on`), as a hit spark does,
+    /// or freeze with them again (`false`, the default). Slow motion still slows it. False for an unknown handle.
+    #[wasm_bindgen(js_name = playThroughHitstop)]
+    pub fn play_through_hitstop(&mut self, handle: u32, on: bool) -> bool {
+        self.renderer
+            .borrow_mut()
+            .scene
+            .set_plays_through_hitstop(handle, on)
+    }
+
     /// Move the effect's origin to game pixel (`x`, `y`), rounded to a whole pixel, without restarting it: for an
     /// effect that follows the pointer or a sprite. Unknown handles are ignored; a non-finite position throws.
     #[wasm_bindgen(js_name = "move")]

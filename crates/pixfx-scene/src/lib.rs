@@ -184,6 +184,8 @@ struct Entry<S> {
     last: [Option<FrameId>; 3],
     /// The host frame each layer first waited for a draw in, past the draw budget; `None` while it is up to date.
     waiting: [Option<u64>; 3],
+    /// Plays real time through a hit-stop instead of freezing with the rest ([`Scene::set_plays_through_hitstop`]).
+    through_hitstop: bool,
 }
 
 /// Why a frame was not put in a surface: the shell failed, or the draw budget leaves it for a later host frame.
@@ -294,6 +296,7 @@ impl<S> Scene<S> {
             own: [None, None, None],
             last: [None, None, None],
             waiting: [None, None, None],
+            through_hitstop: false,
         });
         Ok(handle)
     }
@@ -340,6 +343,17 @@ impl<S> Scene<S> {
             ..p
         };
         Ok(true)
+    }
+
+    /// Let the instance keep playing real time through a hit-stop while the rest of the scene freezes (`on`), as a
+    /// hit spark does, or freeze with the rest again (`!on`, the default). Slow motion still slows it. False if no
+    /// instance has this handle.
+    pub fn set_plays_through_hitstop(&mut self, handle: u32, on: bool) -> bool {
+        self.entries
+            .iter_mut()
+            .find(|e| e.handle == handle)
+            .map(|e| e.through_hitstop = on)
+            .is_some()
     }
 
     /// Let the instance end (loops fade out); false if no instance has this handle.
@@ -414,7 +428,8 @@ impl<S> Scene<S> {
     }
 
     /// Let `dt` real seconds pass: the [`Feel`] says how much of it the effects play (none in a hit-stop, a
-    /// fraction in slow motion), every instance advances by that, the cues they fire go to the feel and queue as
+    /// fraction in slow motion), every instance advances by that (one marked with
+    /// [`Scene::set_plays_through_hitstop`] plays all of `dt` in a hit-stop), the cues they fire go to the feel and queue as
     /// events, and the instances that are done go, their ends queued. Returns the seconds played, for a host that
     /// freezes its own world with the effects. A `dt` that fails [`valid_dt`] (NaN, infinite or negative) is an
     /// error and changes nothing.
@@ -422,10 +437,13 @@ impl<S> Scene<S> {
         if !valid_dt(dt) {
             return Err(StageError::BadStep);
         }
+        // a step that starts in a hit-stop plays nothing for the scene (`advance` gives 0 for all of it)
+        let frozen = self.feel.as_ref().is_some_and(Feel::frozen);
         let run = self.feel.as_mut().map_or(dt, |f| f.advance(dt));
         let mut fired = Vec::new();
         for e in &mut self.entries {
-            e.player.update(run);
+            e.player
+                .update(if frozen && e.through_hitstop { dt } else { run });
             for c in e.player.take_cues() {
                 fired.push((e.handle, on_stage(e, c, self.screen_w)));
             }

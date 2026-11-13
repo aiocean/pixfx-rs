@@ -3,42 +3,19 @@
 use std::error::Error;
 use std::num::NonZeroU32;
 
-use pixfx_core::Effect;
-use pixfx_core::{Cue, EffectState, Layer, Meta, Options, Player, TimedCue};
-use pixfx_draw::{Frame, Painter};
+#[path = "common/hitter.rs"]
+mod hitter;
+#[path = "common/recorder.rs"]
+mod recorder;
+
+use hitter::HITTER;
+use pixfx_core::{Layer, Options, Player};
+use pixfx_draw::Frame;
 use pixfx_effects::effect;
-use pixfx_scene::{Pass, Scene, Shell, View};
+use pixfx_scene::{Scene, View};
+use recorder::Recorder;
 
 type Res = Result<(), Box<dyn Error>>;
-
-/// A shell that keeps each shown layer and counts what it draws.
-#[derive(Default)]
-struct Recorder {
-    made: usize,
-    refilled: usize,
-    shown: Vec<(Pass, Frame)>,
-}
-
-impl Shell for Recorder {
-    type Surface = Frame;
-    type Error = ();
-    fn make(&mut self, frame: &Frame) -> Result<Frame, ()> {
-        self.made += 1;
-        Ok(frame.clone())
-    }
-    fn refill(&mut self, surface: &mut Frame, frame: &Frame) -> Result<(), ()> {
-        self.refilled += 1;
-        surface.clone_from(frame);
-        Ok(())
-    }
-    fn show(&mut self, pass: Pass, surface: &Frame) -> Result<(), ()> {
-        self.shown.push((pass, surface.clone()));
-        Ok(())
-    }
-    fn free(&mut self, _surface: Frame) -> Result<(), ()> {
-        Ok(())
-    }
-}
 
 fn draw_once(scene: &mut Scene<Frame>) -> Recorder {
     let mut r = Recorder::default();
@@ -164,52 +141,6 @@ fn a_fading_effect_coming_back_shows_its_current_fade_frame() -> Res {
     assert_eq!(culled.len(), 2);
     assert_eq!(culled, seen);
     Ok(())
-}
-
-/// A one-shot that draws nothing and hits at 0.1 s: a stop and a full shake.
-struct Hitter;
-
-static HITTER: Hitter = Hitter;
-
-const HITTER_META: Meta = Meta {
-    id: "test/hitter",
-    name: "Hitter",
-    desc: "A one-shot that hits at 0.1 s.",
-    tags: &[],
-    size: (8, 6),
-    origin: (4, 5),
-    duration: 1.0,
-    looping: false,
-    fps: 30,
-    seed: 1,
-    state: None,
-    options: &[],
-};
-
-struct Blank;
-
-impl EffectState for Blank {
-    fn draw(&self, _p: &mut Painter, _t: f64, _layer: Layer) {}
-}
-
-impl Effect for Hitter {
-    fn meta(&self) -> &Meta {
-        &HITTER_META
-    }
-    fn spawn(&self, _opts: &Options, _seed: u64) -> Box<dyn EffectState> {
-        Box::new(Blank)
-    }
-    fn cues(&self, _opts: &Options) -> Vec<TimedCue> {
-        let at = |cue| TimedCue {
-            t: 0.1,
-            cue,
-            pan: None,
-        };
-        vec![
-            at(Cue::Hitstop { dur: 0.1 }),
-            at(Cue::Shake { trauma: 1.0 }),
-        ]
-    }
 }
 
 #[test]
