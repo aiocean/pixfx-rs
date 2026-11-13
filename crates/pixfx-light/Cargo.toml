@@ -1,0 +1,13 @@
+[package]
+name = "pixfx-light"
+description = "Scene light for pixfx: lights are values, pure functions age them and add them to a frame's light layer in hard-edged rings"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm.workspace = true
+pixfx-core = { path = "../pixfx-core" }
+
+[lints]
+workspace = true
