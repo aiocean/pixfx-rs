@@ -8,7 +8,7 @@ use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{TAU, js_min, js_round, rand, smooth, wrap};
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
-use super::lib::{clip, pass, trips};
+use super::lib::{clip, glow, pass, trips};
 
 pub struct Snow;
 
@@ -202,7 +202,7 @@ fn layer_of(q: &mut Painter, t: f64, s: f64, c: &[Rgba; 8], l: usize) {
             q.dot(xl - 1.0, y1, c[6], fade);
             q.dot(xl, y1, WHITE, fade);
             q.dot(xl + 1.0, y1, c[6], fade);
-            q.glow(xl, y1, 5.0, c[5], 0.25 * fade);
+            glow(q, &META, xl, y1, 5.0, c[5], 0.25 * fade);
             return;
         }
         let turn = libm::floor(age * spin + r(8.0) * 2.0) % 2.0 != 0.0;
@@ -269,7 +269,9 @@ fn crystal(q: &mut Painter, x: f64, y: f64, r: i32, turn: bool, c: &[Rgba; 8]) {
     }
     px(q, xi, yi, WHITE);
     // a faint halo, wide enough not to fill the gaps between the arms
-    q.glow(
+    glow(
+        q,
+        &META,
         f64::from(xi) + 0.5,
         f64::from(yi) + 0.5,
         f64::from(r) * 2.5 + 5.0,
@@ -318,6 +320,6 @@ fn drift(q: &mut Painter, t: f64, s: f64, c: &[Rgba; 8]) {
                 q.px(x + dx, y + dy, c[6]);
             }
         }
-        q.glow(x + 0.5, y + 0.5, 6.0, c[6], 0.35 * k);
+        glow(q, &META, x + 0.5, y + 0.5, 6.0, c[6], 0.35 * k);
     }
 }

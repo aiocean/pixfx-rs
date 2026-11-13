@@ -34,10 +34,43 @@ fn canvas(meta: &Meta) -> Canvas {
 }
 
 /// Draw only inside the effect's canvas from here on: colour, blends and light outside it are dropped (pixelfx
-/// `clip`, the painter's local clip with the canvas around the origin as its box).
+/// `clip`, the painter's canvas clip with the canvas around the origin as its box). Draw glows with [`glow`].
 pub fn clip(p: &mut Painter, meta: &Meta) {
     let c = canvas(meta);
     p.clip_box(c.x0, c.y0, c.x1, c.y1);
+}
+
+/// The painter's `glow` with its box cut to the canvas first, so big soft lights stay cheap (pixelfx `clip`'s
+/// `glow`): it walks local pixel cells and measures from their centres, which differs from `Painter::glow`
+/// (screen pixels) at a fractional or rotated placement.
+pub fn glow(p: &mut Painter, meta: &Meta, x: f64, y: f64, r: f64, c: Rgba, k: f64) {
+    if r < 1.0 || k <= 0.004 {
+        return;
+    }
+    let cv = canvas(meta);
+    let (x0, x1) = (
+        js_max(cv.x0, libm::floor(x - r)),
+        js_min(cv.x1 - 1.0, libm::ceil(x + r)),
+    );
+    let (y0, y1) = (
+        js_max(cv.y0, libm::floor(y - r)),
+        js_min(cv.y1 - 1.0, libm::ceil(y + r)),
+    );
+    let mut py = y0;
+    while py <= y1 {
+        let dy = (py + 0.5 - y) / r;
+        let mut px = x0;
+        while px <= x1 {
+            let dx = (px + 0.5 - x) / r;
+            let d = dx * dx + dy * dy;
+            if d < 1.0 {
+                let f = 1.0 - libm::sqrt(d);
+                p.light(px, py, c, f * f * k);
+            }
+            px += 1.0;
+        }
+        py += 1.0;
+    }
 }
 
 /// What a [`pass`] function sets for its pixel: colour `c` (`Rgba::NONE` for none) with alpha `a` (dithered, or
@@ -125,6 +158,7 @@ impl Cell {
 pub fn rows(p: &mut Painter, meta: &Meta, y0: f64, y1: f64, mut f: impl FnMut(f64, &mut [Cell])) {
     let cv = canvas(meta);
     let (first, last) = row_span(&cv, y0, y1);
+    // pixelfx's `R.l` is never reset between rows while this one is; equal today because nothing sets `k > 0`
     let mut row = vec![Cell::NONE; cv.w];
     let mut y = first;
     while y <= last {

@@ -9,7 +9,7 @@ use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{TAU, js_max, js_min, js_round, loop_noise, rand};
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
 
-use super::lib::{clip, rows};
+use super::lib::{clip, glow, rows};
 
 pub struct Fireflies;
 
@@ -204,7 +204,7 @@ fn firefly(q: &mut Painter, t: f64, f: &Fly, c: &[Rgba; 6]) {
             if g > 0.6 { c[4] } else { c[3] },
             js_min(1.0, g * 1.6),
         );
-        q.glow(x, y, 6.0, c[2], 0.45 * g);
+        glow(q, &META, x, y, 6.0, c[2], 0.45 * g);
         return;
     }
     // a short trail of light where it has just been, while it's lit
@@ -230,8 +230,8 @@ fn firefly(q: &mut Painter, t: f64, f: &Fly, c: &[Rgba; 6]) {
         if g > 0.4 {
             q.px(xi, yi + 1.0, c[2]);
         }
-        q.glow(x, y, 9.0, c[2], 0.5 * g);
-        q.glow(x, y, 3.0, c[4], 0.5 * g);
+        glow(q, &META, x, y, 9.0, c[2], 0.5 * g);
+        glow(q, &META, x, y, 3.0, c[4], 0.5 * g);
         return;
     }
     // a close one: a dark body, wings a blur above it, a lantern at its tail; a glint at the peak
@@ -263,9 +263,9 @@ fn firefly(q: &mut Painter, t: f64, f: &Fly, c: &[Rgba; 6]) {
             q.dot(xi - dir + dx, yi + dy, c[3], (g - 0.7) * 3.0);
         }
     }
-    q.glow(x, y, 28.0, c[2], 0.45 * g);
-    q.glow(x, y, 10.0, c[4], 0.5 * g);
-    q.glow(x, y, 4.0, c[5], 0.5 * g);
+    glow(q, &META, x, y, 28.0, c[2], 0.45 * g);
+    glow(q, &META, x, y, 10.0, c[4], 0.5 * g);
+    glow(q, &META, x, y, 4.0, c[5], 0.5 * g);
 }
 
 // the meadow: blades in two rows (the front row drawn over the low fireflies), swaying as the breeze rolls

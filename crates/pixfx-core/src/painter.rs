@@ -80,6 +80,16 @@ pub struct ShadeOut {
     pub k: f64,
 }
 
+/// A local box `[x0, x1) x [y0, y1)` and how a write is tested against it.
+#[derive(Clone, Copy)]
+enum Clip {
+    /// The write's cell centre, in local space, is inside the box (pixelfx transitions `clipTo`).
+    Cells([f64; 4]),
+    /// pixelfx weather `clip`: for an unrotated painter the box's screen rectangle, edges rounded; otherwise
+    /// as `Cells`.
+    Canvas([f64; 4]),
+}
+
 pub struct Painter<'a> {
     frame: &'a mut Frame,
     w: f64,
@@ -95,8 +105,8 @@ pub struct Painter<'a> {
     pub fade: f64,
     /// Light strength applied to every light amount.
     pub light_k: f64,
-    /// The local box `[x0, x1) x [y0, y1)` writes are kept inside, if any (see [`Painter::clip_box`]).
-    clip: Option<[f64; 4]>,
+    /// The box writes are kept inside, if any (see [`Painter::clip_local`], [`Painter::clip_box`]).
+    clip: Option<Clip>,
 }
 
 impl<'a> Painter<'a> {
@@ -148,27 +158,40 @@ impl<'a> Painter<'a> {
     /// whose `put`, `add` and `blendPx` check `inside` first). Follows later placement, and lasts until
     /// [`Painter::reset`] or the end of this painter's use.
     pub fn clip_local(&mut self, w: f64, h: f64) -> &mut Self {
-        self.clip_box(0.0, 0.0, w, h)
-    }
-
-    /// [`Painter::clip_local`] for any local box `[x0, x1) x [y0, y1)`: pixelfx weather `clip`, whose box is the
-    /// canvas around the effect's origin (`x0 = -origin_x`), where transitions' `clipTo` has the origin at its corner.
-    pub fn clip_box(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) -> &mut Self {
-        self.clip = Some([x0, y0, x1, y1]);
+        self.clip = Some(Clip::Cells([0.0, 0.0, w, h]));
         self
     }
 
-    /// Whether the clip drops a write to screen pixel (sx, sy): its cell centre, in local space, is outside
-    /// the clip box. A NaN cell fails every comparison and is dropped, as in pixelfx.
+    /// Pixelfx weather `clip`: keep writes inside the local box `[x0, x1) x [y0, y1)`, the canvas around the
+    /// effect's origin (`x0 = -origin_x`). Unlike [`Painter::clip_local`], an unrotated painter keeps the
+    /// screen columns `round(tx + x0) .. round(tx + x1)` (and rows alike), which at a half-pixel placement
+    /// is not the cells whose centres are inside the box; a rotated one keeps cell centres.
+    pub fn clip_box(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) -> &mut Self {
+        self.clip = Some(Clip::Canvas([x0, y0, x1, y1]));
+        self
+    }
+
+    /// Whether the clip drops a write to screen pixel (sx, sy). A NaN compares false and is dropped, as in
+    /// pixelfx.
     fn clipped(&self, sx: f64, sy: f64) -> bool {
-        let Some([x0, y0, x1, y1]) = self.clip else {
-            return false;
+        let inside = |[x0, y0, x1, y1]: [f64; 4]| {
+            let (lx, ly) = (
+                self.from_x(sx + 0.5, sy + 0.5),
+                self.from_y(sx + 0.5, sy + 0.5),
+            );
+            lx >= x0 && lx < x1 && ly >= y0 && ly < y1
         };
-        let (lx, ly) = (
-            self.from_x(sx + 0.5, sy + 0.5),
-            self.from_y(sx + 0.5, sy + 0.5),
-        );
-        !(lx >= x0 && ly >= y0 && lx < x1 && ly < y1)
+        match self.clip {
+            None => false,
+            Some(Clip::Cells(b)) => !inside(b),
+            Some(Clip::Canvas(b)) if self.sn != 0.0 => !inside(b),
+            Some(Clip::Canvas([x0, y0, x1, y1])) => {
+                let (a, b) = (self.to_x(x0, 0.0), self.to_x(x1, 0.0));
+                let (sx0, sx1) = (js_round(js_min(a, b)), js_round(js_max(a, b)));
+                let (sy0, sy1) = (js_round(self.to_y(0.0, y0)), js_round(self.to_y(0.0, y1)));
+                !(sx >= sx0 && sx < sx1 && sy >= sy0 && sy < sy1)
+            }
+        }
     }
 
     // ---- transforms: local (effect) space <-> screen (frame) space
