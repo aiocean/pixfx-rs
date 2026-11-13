@@ -19,8 +19,8 @@ function phaserGfx(scene: Phaser.Scene): Gfx {
       if (!tex) throw new Error(`pixfx: texture key "${key}" is already in use`);
       tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
       return {
-        upload(rgba) {
-          tex.putData(new ImageData(rgba, width, height), 0, 0);
+        upload(rgba, w, h) {
+          tex.putData(new ImageData(rgba, w, h), 0, 0);
           tex.refresh();
         },
         destroy() {
@@ -35,10 +35,18 @@ function phaserGfx(scene: Phaser.Scene): Gfx {
         .setScrollFactor(scrollFactor)
         .setVisible(textureKey !== null);
       if (blend === "add") img.setBlendMode(Phaser.BlendModes.ADD);
+      /** The crop last set: the image shows that top-left box of its texture. */
+      let crop = { w: -1, h: -1 };
       return {
-        setTexture(key) {
-          // `setTexture` resizes the image to the texture; the top-left origin stays
-          if (img.texture.key !== key) img.setTexture(key);
+        setTexture(key, w, h) {
+          // `setTexture` resizes the image to the texture; the top-left origin stays, and the crop shows the box
+          const changed = img.texture.key !== key;
+          if (changed) img.setTexture(key);
+          // a new texture re-crops too, so its UVs are worked out for its own size
+          if (changed || crop.w !== w || crop.h !== h) {
+            img.setCrop(0, 0, w, h);
+            crop = { w, h };
+          }
         },
         setVisible(visible) {
           img.setVisible(visible);

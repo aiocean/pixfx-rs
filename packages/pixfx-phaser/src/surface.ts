@@ -110,10 +110,11 @@ export class ImageSurface implements Surface {
       this.own = { textures, keys };
     }
     const [backColor, backLight, frontColor, frontLight] = this.own.textures;
-    backColor?.upload(new Uint8ClampedArray(back.color));
-    backLight?.upload(new Uint8ClampedArray(back.light));
-    frontColor?.upload(new Uint8ClampedArray(front.color));
-    frontLight?.upload(new Uint8ClampedArray(front.light));
+    const { width: w, height: h } = this.shape;
+    backColor?.upload(new Uint8ClampedArray(back.color), w, h);
+    backLight?.upload(new Uint8ClampedArray(back.light), w, h);
+    frontColor?.upload(new Uint8ClampedArray(front.color), w, h);
+    frontLight?.upload(new Uint8ClampedArray(front.light), w, h);
     return this.own.keys;
   }
 }
@@ -122,8 +123,8 @@ function showSide(images: SideImages, t: SideTextures | null): void {
   images.color.setVisible(t !== null);
   images.light.setVisible(t !== null);
   if (!t) return;
-  images.color.setTexture(t.color);
-  images.light.setTexture(t.light);
+  images.color.setTexture(t.color, t.box.w, t.box.h);
+  images.light.setTexture(t.light, t.box.w, t.box.h);
 }
 
 function placeSide(images: SideImages, t: SideTextures | null, topLeft: { x: number; y: number }): void {

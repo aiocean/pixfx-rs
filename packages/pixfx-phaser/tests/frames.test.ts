@@ -23,8 +23,12 @@ type Mode = "inline" | "pool";
  * from `workerEngine`). `frame(ms)` is one display frame: scene update, the per-step flush, and (unless `late`)
  * the workers' answers.
  */
-function rig<E extends Engine>(mode: Mode, engine: E, opts: { workers?: number; workerEngine?: () => E; budget?: number } = {}) {
-  const cache = new FrameCache(opts.budget);
+function rig<E extends Engine>(
+  mode: Mode,
+  engine: E,
+  opts: { workers?: number; workerEngine?: () => E; budget?: number; textureBudget?: number } = {},
+) {
+  const cache = new FrameCache(opts.budget, opts.textureBudget);
   const gfx = new FakeGfx();
   const ports = mode === "pool" ? Array.from({ length: opts.workers ?? 1 }, () => new LoopPort(opts.workerEngine?.() ?? engine)) : [];
   const backend: Backend = mode === "pool" ? new WorkerPool(engine, ports, cache) : new InlineBackend(engine, cache);
@@ -97,6 +101,44 @@ for (const mode of ["inline", "pool"] as const) {
     // frame 6 was not baked: drawn live
     r.frame(1000 / 30);
     expect(engine.draws()).toBe(2);
+  });
+
+  test(`${mode}: effects sharing nothing reuse textures instead of making one per frame`, () => {
+    // no room for textures off screen: each frame gives its back as soon as it leaves the screen
+    const r = rig(mode, new FakeEngine(), { textureBudget: 0 });
+    const effects = Array.from({ length: 20 }, (_, i) => r.fx.play("fake/spark", i * 10, 0, { seed: i + 1 }));
+    r.frame(0);
+    for (let i = 0; i < 25; i++) r.frame(1000 / 30);
+    // 20 clips, every frame new: 20 × 26 frames shown, 4 textures each, yet textures are only made while warming up
+    // (the frame shown, the one let go this step and the one just taken), then reused
+    expect(r.cache.size).toBeGreaterThan(20 * 20);
+    const made = r.gfx.textures.length;
+    expect(made).toBeLessThanOrEqual(4 * 20 * 3);
+    for (let i = 0; i < 25; i++) r.frame(1000 / 30);
+    expect(r.gfx.textures.length).toBe(made);
+    // every image shows its frame's box of a texture at least that big
+    for (const img of r.gfx.images.filter((i) => i.visible && i.key?.startsWith("pixfx:frame"))) {
+      const t = r.gfx.shownBy(img);
+      expect(t && img.crop.w <= t.width && img.crop.h <= t.height && img.crop.w > 0).toBe(true);
+    }
+    for (const e of effects) e.destroy();
+  });
+
+  test(`${mode}: under the texture budget a loop replays with no upload`, () => {
+    const r = rig(mode, new FakeEngine());
+    const first = r.fx.play("fake/spark", 0, 0);
+    r.frame(0);
+    for (let i = 0; i < 10; i++) r.frame(1000 / 30);
+    first.destroy();
+    r.frame(0);
+    const uploads = r.gfx.uploads();
+    const made = r.gfx.textures.length;
+    // frames 0 to 10, off screen now, shown again by a twin: their textures are still held, nothing is made or uploaded
+    r.fx.play("fake/spark", 50, 0);
+    r.frame(0);
+    for (let i = 0; i < 10; i++) r.frame(1000 / 30);
+    expect(r.gfx.textures.length).toBe(made);
+    expect(r.gfx.uploads()).toBe(uploads);
   });
 
   test(`${mode}: nothing is drawn or uploaded while the shown frame is the same`, () => {

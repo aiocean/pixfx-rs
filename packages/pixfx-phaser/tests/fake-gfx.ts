@@ -13,9 +13,11 @@ export class FakeTexture implements GfxTexture {
   ) {
     this.pixels = new Uint8ClampedArray(width * height * 4);
   }
-  upload(rgba: Uint8ClampedArray<ArrayBuffer>): void {
-    if (rgba.length !== this.pixels.length) throw new Error(`upload of ${rgba.length} bytes into a ${this.width}×${this.height} texture`);
-    this.pixels.set(rgba);
+  upload(rgba: Uint8ClampedArray<ArrayBuffer>, width: number, height: number): void {
+    if (rgba.length !== width * height * 4 || width > this.width || height > this.height) {
+      throw new Error(`upload of ${rgba.length} bytes (${width}×${height}) into a ${this.width}×${this.height} texture`);
+    }
+    for (let y = 0; y < height; y++) this.pixels.set(rgba.subarray(y * width * 4, (y + 1) * width * 4), y * this.width * 4);
     this.uploads += 1;
     if (this.destroyed) this.uploadsWhenDestroyed += 1;
   }
@@ -45,8 +47,11 @@ export class FakeImage implements GfxImage {
   ) {
     this.visible = key !== null;
   }
-  setTexture(key: string): void {
+  /** The top-left box of its texture it shows. */
+  crop = { w: 0, h: 0 };
+  setTexture(key: string, width: number, height: number): void {
     this.key = key;
+    this.crop = { w: width, h: height };
   }
   setVisible(visible: boolean): void {
     this.visible = visible;

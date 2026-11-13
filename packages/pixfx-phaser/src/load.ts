@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Backend } from "./backend";
 import type { Engine } from "./engine";
 import { wasmEngine } from "./engine";
-import { DEFAULT_FRAME_BUDGET, FrameCache } from "./frames";
+import { DEFAULT_FRAME_BUDGET, DEFAULT_TEXTURE_BUDGET, FrameCache } from "./frames";
 import { InlineBackend } from "./inline";
 import { frameSchema } from "./protocol";
 import { WorkerPool, openWorkers, workerPort } from "./pool";
@@ -12,6 +12,8 @@ const loadOptionsSchema = z.object({
   workers: z.number().int().nonnegative().optional(),
   /** Bytes the frames identical effects share may hold before the least recently shown go. Default 64 MiB. */
   frameBudget: z.number().int().nonnegative().default(DEFAULT_FRAME_BUDGET),
+  /** Bytes the textures of frames off screen may hold before the least recently shown are reused. Default 32 MiB. */
+  textureBudget: z.number().int().nonnegative().default(DEFAULT_TEXTURE_BUDGET),
   /** Perf harness only: each worker batch takes this many times its real time (phone emulation). */
   slowdown: z.number().min(1).default(1),
 });
@@ -47,7 +49,7 @@ async function start(o: z.output<typeof loadOptionsSchema>): Promise<Loaded> {
   const wasm = await import("../wasm/pixfx_wasm.js");
   const { memory } = await wasm.default();
   const engine = wasmEngine(wasm, memory);
-  const cache = new FrameCache(o.frameBudget);
+  const cache = new FrameCache(o.frameBudget, o.textureBudget);
   const n = typeof Worker === "undefined" ? 0 : (o.workers ?? defaultWorkers(globalThis.navigator?.hardwareConcurrency));
   const bakedFrames = (json: string, pages: Uint8Array[]): unknown => wasm.bakedFrames(json, pages);
   if (n === 0) return { engine, backend: new InlineBackend(engine, cache), bakedFrames };

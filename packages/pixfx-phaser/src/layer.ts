@@ -212,10 +212,11 @@ export class PixfxLayer {
       this.compose(s.frame.front, s.topLeft, p.frontColor, p.frontLight);
     }
     const l = this.layers;
-    l.backColor.texture.upload(p.backColor);
-    l.backLight.texture.upload(p.backLight);
-    l.frontColor.texture.upload(p.frontColor);
-    l.frontLight.texture.upload(p.frontLight);
+    const { w, h } = this.bounds;
+    l.backColor.texture.upload(p.backColor, w, h);
+    l.backLight.texture.upload(p.backLight, w, h);
+    l.frontColor.texture.upload(p.frontColor, w, h);
+    l.frontLight.texture.upload(p.frontLight, w, h);
   }
 
   /**
