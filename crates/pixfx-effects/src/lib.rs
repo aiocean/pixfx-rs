@@ -3,6 +3,7 @@
 
 use pixfx_core::effect::{Effect, find};
 
+pub mod explosions;
 pub mod fire;
 pub mod impacts;
 
@@ -12,6 +13,10 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &fire::CAMPFIRE,
     &fire::BRAZIER,
     &impacts::PARRY,
+    &explosions::DIRT_EXPLOSION,
+    &explosions::SMALL_EXPLOSION,
+    &explosions::IMPLOSION,
+    &explosions::PLASMA_EXPLOSION,
 ];
 
 /// The effect with this id (`fire/candle`).
