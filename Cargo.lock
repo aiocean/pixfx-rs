@@ -248,6 +248,7 @@ dependencies = [
  "js-sys",
  "pixfx-core",
  "pixfx-effects",
+ "pixfx-fighter",
  "pixfx-wasm",
  "wasm-bindgen",
  "wasm-bindgen-test",

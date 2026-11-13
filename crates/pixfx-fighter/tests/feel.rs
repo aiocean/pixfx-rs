@@ -1,0 +1,107 @@
+//! The screen's answer to the fight, driven the way a game drives it: what the fight did, then real time passing
+//! (the site's `duel-feel.test.js`).
+
+use pixfx_fighter::feel::{Cue, Feel, NumberKind};
+
+const FRAME: f64 = 1.0 / 60.0;
+
+/// Seconds of fight that `seconds` of real time buys.
+fn fight_time(feel: &mut Feel, seconds: f64) -> f64 {
+    let mut t = 0.0;
+    let frames = pixfx_core::math::js_round(seconds / FRAME) as u32;
+    for _ in 0..frames {
+        t += feel.advance(FRAME);
+    }
+    t
+}
+
+/// A blow at the given weight, from fighter `by` at (`x`, `y`), struck up close.
+fn hit(
+    by: usize,
+    (power, launch, crit): (f64, bool, bool),
+    share: f64,
+    damage: f64,
+    (x, y): (f64, f64),
+) -> Cue {
+    Cue::Hit {
+        by,
+        power,
+        launch,
+        crit,
+        ranged: false,
+        share,
+        damage,
+        x,
+        y,
+    }
+}
+
+#[test]
+fn a_blow_stops_the_fight_for_a_few_frames_then_it_runs_on_at_full_speed() {
+    let mut feel = Feel::new();
+    feel.react(&[hit(0, (5.0, false, false), 12.0, 300.0, (50.0, 20.0))]);
+    assert_eq!(feel.advance(FRAME), 0.0);
+    let stopped = 0.5 - fight_time(&mut feel, 0.5);
+    assert!(stopped > 0.04, "stopped {stopped}");
+    assert!(stopped < 0.13, "stopped {stopped}");
+    assert_eq!(feel.advance(FRAME), FRAME);
+}
+
+#[test]
+fn a_harder_blow_stops_the_fight_longer_and_shakes_the_screen_harder() {
+    let lost = |power: f64, launch: bool, crit: bool, share: f64| {
+        let mut feel = Feel::new();
+        feel.react(&[hit(0, (power, launch, crit), share, 0.0, (0.0, 0.0))]);
+        let trauma = feel.trauma();
+        (1.0 - fight_time(&mut feel, 1.0), trauma)
+    };
+    let (light_stop, light_shake) = lost(5.0, false, false, 4.0);
+    let (heavy_stop, heavy_shake) = lost(20.0, true, false, 20.0);
+    assert!(heavy_stop > light_stop);
+    assert!(heavy_shake > light_shake);
+    // never past the cap, even a crit that throws
+    assert!(lost(20.0, true, true, 30.0).0 <= 13.0 / 60.0 + 1e-9);
+}
+
+#[test]
+fn a_knockout_plays_out_in_slow_motion_then_the_fight_runs_at_full_speed() {
+    let mut feel = Feel::new();
+    feel.react(&[Cue::Ko]);
+    assert!(fight_time(&mut feel, 1.0) < 0.5);
+    fight_time(&mut feel, 1.0);
+    assert_eq!(feel.advance(FRAME), FRAME);
+}
+
+#[test]
+fn the_screen_settles_after_a_shake() {
+    let mut feel = Feel::new();
+    feel.react(&[hit(0, (0.0, false, false), 25.0, 25.0, (0.0, 0.0))]);
+    let most = |feel: &Feel| {
+        let (x, y) = feel.shake(&mut || 0.999);
+        (x.abs(), y.abs())
+    };
+    let (x, y) = most(&feel);
+    assert!(x.max(y) > 0);
+    fight_time(&mut feel, 1.0);
+    assert_eq!(most(&feel), (0, 0));
+}
+
+#[test]
+fn damage_floats_up_from_the_blow_and_fades_away() {
+    let mut feel = Feel::new();
+    feel.react(&[hit(1, (0.0, false, false), 9.4, 940.0, (80.0, 20.0))]);
+    let first = feel.numbers();
+    assert_eq!(first.len(), 1);
+    let first = &first[0];
+    assert_eq!(
+        (first.x, first.text.as_str(), first.by, first.kind),
+        (80.0, "940", Some(1), NumberKind::Hit)
+    );
+    fight_time(&mut feel, 0.4);
+    let later = feel.numbers();
+    assert_eq!(later.len(), 1);
+    let later = &later[0];
+    assert!(later.y > first.y);
+    fight_time(&mut feel, 1.0);
+    assert_eq!(feel.numbers(), vec![]);
+}
