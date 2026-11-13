@@ -13,8 +13,9 @@ wasm-pack build "$root/crates/pixfx-canvas" --release --target web --out-dir "$p
 
 rm -rf "$out"
 mkdir -p "$out/pkg"
-rsync -a --exclude dist --exclude build.sh --exclude tests "$site/" "$out/"
+rsync -a --exclude dist --exclude build.sh --exclude preload.js --exclude tests "$site/" "$out/"
 cp "$pkg/pixfx_canvas.js" "$pkg/pixfx_canvas_bg.wasm" "$out/pkg/"
+bun "$site/preload.js" "$out"
 echo "site: $out"
 
 if [[ "${1:-}" == "--serve" ]]; then

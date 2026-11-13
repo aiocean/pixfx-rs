@@ -233,3 +233,10 @@ input[type="range"] { accent-color: var(--flame); width: 100%; }
 }
 .fx-switch:hover { color: var(--wax); border-color: var(--wax); }
 .fx-switch[aria-pressed="true"] { color: var(--flame); }
+
+/* a click waiting on the network for its page (nav.js) */
+html[aria-busy="true"], html[aria-busy="true"] * { cursor: progress; }
+/* with fx off the browser changes pages itself: the new page fades in, with no blank frame between */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
