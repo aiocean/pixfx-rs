@@ -5,66 +5,60 @@
 use std::fmt;
 use std::num::NonZeroU32;
 
-use js_sys::{Array, Object, Reflect};
 use pixfx_core::math::js_round;
 use pixfx_core::{Effect, Frame, Layer, Options, Placement, composite_px, valid_dt};
 use pixfx_wasm::{Player, parse_options};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsError, JsValue};
 
 /// [`parse_options`] for [`crate::Stage::play`]: the stage sizes each effect's margin itself, so a `margin`
 /// option is an error.
 pub fn stage_options(v: &JsValue) -> Result<Options, JsError> {
-    let has_margin = v.is_object()
-        && Reflect::get(v, &JsValue::from_str("margin"))
-            .map_err(|_| JsError::new("could not read the options"))?
-            != JsValue::UNDEFINED;
-    if has_margin {
+    let (opts, margin) = parse_options(v)?;
+    if margin.is_some() {
         return Err(JsError::new(
-            "option margin is not supported: Stage sizes the margin itself",
+            "options.margin is not supported: Stage sizes the margin itself",
         ));
     }
-    Ok(parse_options(v)?.0)
+    Ok(opts)
 }
 
-/// `base` with the fields of the JS object `v` (`{x?, y?, flip?, angle?, light?}`) put over it, for
-/// [`crate::Stage::set`]. Any other key, or a value of the wrong type, is an error naming the key.
-pub fn placement_patch(base: Placement, v: &JsValue) -> Result<Placement, JsError> {
-    if !v.is_object() || Array::is_array(v) {
-        return Err(JsError::new(
-            "set takes an object {x?, y?, flip?, angle?, light?}",
-        ));
-    }
-    let mut p = base;
-    for entry in Object::entries(&Object::from(v.clone())).iter() {
-        let pair = Array::from(&entry);
-        let key = pair.get(0).as_string().unwrap_or_default();
-        let val = pair.get(1);
-        if val.is_undefined() {
-            continue;
-        }
-        let number = || {
-            val.as_f64()
-                .filter(|n| n.is_finite())
-                .ok_or_else(|| JsError::new(&format!("{key} must be a finite number")))
-        };
-        match key.as_str() {
-            "x" => p.x = number()?,
-            "y" => p.y = number()?,
-            "angle" => p.angle = number()?,
-            "light" => p.light = number()?,
-            "flip" => {
-                p.flip = val
-                    .as_bool()
-                    .ok_or_else(|| JsError::new("flip must be a boolean"))?;
-            }
-            _ => {
-                return Err(JsError::new(&format!(
-                    "unknown key {key:?}: set takes x, y, flip, angle and light"
-                )));
-            }
+/// A change to where and how an effect draws, for [`crate::Stage::set`]: each field left out keeps its value.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, tsify::Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct PlacementChange {
+    /// The effect's origin, in game pixels (rounded to a whole pixel).
+    #[serde(default)]
+    #[tsify(optional)]
+    pub x: Option<f64>,
+    #[serde(default)]
+    #[tsify(optional)]
+    pub y: Option<f64>,
+    /// Mirror left-right.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub flip: Option<bool>,
+    /// Rotation, radians.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub angle: Option<f64>,
+    /// Glow strength.
+    #[serde(default)]
+    #[tsify(optional)]
+    pub light: Option<f64>,
+}
+
+impl PlacementChange {
+    /// `base` with this change put over it.
+    pub fn over(self, base: Placement) -> Placement {
+        Placement {
+            x: self.x.unwrap_or(base.x),
+            y: self.y.unwrap_or(base.y),
+            flip: self.flip.unwrap_or(base.flip),
+            angle: self.angle.unwrap_or(base.angle),
+            light: self.light.unwrap_or(base.light),
         }
     }
-    Ok(p)
 }
 
 /// `effect` with `opts` as the stage plays it: on its canvas plus [`Meta::glow_margin`], so nothing at the
@@ -91,7 +85,8 @@ pub struct Pass {
 }
 
 /// Something that happened on the stage, queued in order until the host drains it ([`Scene::drain_events`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, tsify::Tsify)]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum StageEvent {
     /// The instance is gone: it finished, faded out after a stop, or was removed.
     End { handle: u32 },

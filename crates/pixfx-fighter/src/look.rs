@@ -5,6 +5,9 @@ use pixfx_core::Rgba;
 
 /// How a fighter wears its hair, which also decides its head's shape when lying down.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Hairdo {
     /// Swept up into a topknot under a crown, a ribbon streaming from it.
     Topknot,
@@ -14,6 +17,9 @@ pub enum Hairdo {
 
 /// A fighter's colours (site `duel-art.js` LOOKS). Every field is public: a game builds its own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct Look {
     pub robe: [Rgba; 3],
     pub inner: [Rgba; 2],

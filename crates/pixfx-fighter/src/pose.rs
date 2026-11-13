@@ -2,6 +2,9 @@
 
 /// A fighter's pose. Each has its own clock (`pose_t`), restarted when the pose changes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Pose {
     Idle,
     Walk,
@@ -45,6 +48,9 @@ pub enum Pose {
 
 /// How a spell is gathered, which sets the arms of a channel pose.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Gather {
     /// Both arms raised in a V (zones, voids, orbs).
     Summon,

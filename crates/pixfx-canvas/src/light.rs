@@ -2,9 +2,10 @@
 //! the game adds them as plain objects, moves and puts them out by key, lets time pass, and draws them over its
 //! canvas with `"lighter"`. Objects are read strictly: a missing, misspelt or mistyped field throws, naming it.
 
-use js_sys::{Array, Object, Reflect, Uint8ClampedArray};
-use pixfx_core::{Frame, hex, valid_dt};
+use js_sys::Uint8ClampedArray;
+use pixfx_core::{Frame, valid_dt};
 use pixfx_light::{Glow, Light, Style};
+use pixfx_wasm::js::{parse, to_js};
 use wasm_bindgen::prelude::*;
 use web_sys::{
     CanvasRenderingContext2d, ImageData, OffscreenCanvas, OffscreenCanvasRenderingContext2d,
@@ -58,24 +59,14 @@ impl Lights {
         })
     }
 
-    /// Light one: `{key?, x, y, reach, color, strength, life?}`. `key` (a whole number, or null) finds it again;
-    /// `color` is `"#rrggbb"`; `life` is seconds, or null/absent to burn until put out.
-    pub fn add(&mut self, light: &JsValue) -> Result<(), JsError> {
-        let o = Fields::new(
-            light,
-            "light",
-            &["key", "x", "y", "reach", "color", "strength", "life"],
-        )?;
-        self.lights.push(Light {
-            key: o.key("key")?,
-            x: o.num("x")?,
-            y: o.num("y")?,
-            reach: o.num("reach")?,
-            color: o.color("color")?,
-            strength: o.num("strength")?,
-            life: o.opt_num("life")?,
-            age: 0.0,
-        });
+    /// Light one: `{key?, x, y, reach, color, strength, life?, age?}`. `key` (a whole number, or null) finds it
+    /// again; `color` is `"#rrggbb"`; `life` is seconds, or null/absent to burn until put out; `age` absent for a
+    /// new light (a light from [`Lights::list`] goes back in as it was).
+    pub fn add(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "Light")] light: &JsValue,
+    ) -> Result<(), JsError> {
+        self.lights.push(parse("light", light)?);
         Ok(())
     }
 
@@ -107,23 +98,9 @@ impl Lights {
     }
 
     /// The lights burning: `[{key, x, y, reach, color, strength, life, age}]`, `key` and `life` null when unset.
-    pub fn list(&self) -> Result<Array, JsError> {
-        self.lights
-            .iter()
-            .map(|l| {
-                let opt = |v: Option<f64>| v.map_or(JsValue::NULL, JsValue::from);
-                object(&[
-                    ("key", opt(l.key.map(f64::from))),
-                    ("x", l.x.into()),
-                    ("y", l.y.into()),
-                    ("reach", l.reach.into()),
-                    ("color", pixfx_core::color::to_hex(l.color).into()),
-                    ("strength", l.strength.into()),
-                    ("life", opt(l.life)),
-                    ("age", l.age.into()),
-                ])
-            })
-            .collect()
+    #[wasm_bindgen(unchecked_return_type = "Light[]")]
+    pub fn list(&self) -> Result<JsValue, JsError> {
+        to_js(&self.lights)
     }
 
     /// Add the lights, and `glows` (this instant's extra lights, such as flickering lamps:
@@ -133,12 +110,9 @@ impl Lights {
         &mut self,
         ctx: &CanvasRenderingContext2d,
         scale: u32,
-        glows: &Array,
+        #[wasm_bindgen(unchecked_param_type = "Glow[]")] glows: &JsValue,
     ) -> Result<(), JsError> {
-        let mut all = glows
-            .iter()
-            .map(|g| glow(&g))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut all: Vec<Glow> = parse("glows", glows)?;
         all.extend(self.lights.iter().map(|l| l.glow(&self.style)));
         self.frame.clear();
         pixfx_light::draw(&mut self.frame, &all, &self.style);
@@ -161,93 +135,4 @@ impl Lights {
         ctx.restore();
         drawn.map_err(|e| JsError::new(&js_message("drawing the light failed", &e)))
     }
-}
-
-/// One glow object `{x, y, reach, color, strength}`.
-fn glow(v: &JsValue) -> Result<Glow, JsError> {
-    let o = Fields::new(v, "glow", &["x", "y", "reach", "color", "strength"])?;
-    Ok(Glow {
-        x: o.num("x")?,
-        y: o.num("y")?,
-        reach: o.num("reach")?,
-        color: o.color("color")?,
-        strength: o.num("strength")?,
-    })
-}
-
-/// A JS object read strictly: only the `known` fields, each of the right type.
-struct Fields<'v> {
-    v: &'v JsValue,
-    what: &'static str,
-}
-
-impl<'v> Fields<'v> {
-    fn new(v: &'v JsValue, what: &'static str, known: &[&str]) -> Result<Self, JsError> {
-        if !v.is_object() {
-            return Err(JsError::new(&format!("a {what} must be an object")));
-        }
-        for k in Object::keys(v.unchecked_ref::<Object>()).iter() {
-            let k = k.as_string().unwrap_or_default();
-            if !known.contains(&k.as_str()) {
-                return Err(JsError::new(&format!(
-                    "{what}: unknown field {k:?} (expected {})",
-                    known.join(", ")
-                )));
-            }
-        }
-        Ok(Self { v, what })
-    }
-
-    fn get(&self, k: &str) -> Option<JsValue> {
-        Reflect::get(self.v, &JsValue::from_str(k))
-            .ok()
-            .filter(|v| !v.is_undefined() && !v.is_null())
-    }
-
-    fn err(&self, k: &str, want: &str) -> JsError {
-        JsError::new(&format!("{}.{k} must be {want}", self.what))
-    }
-
-    fn opt_num(&self, k: &str) -> Result<Option<f64>, JsError> {
-        self.get(k)
-            .map(|v| {
-                v.as_f64()
-                    .filter(|n| n.is_finite())
-                    .ok_or_else(|| self.err(k, "a finite number"))
-            })
-            .transpose()
-    }
-
-    fn num(&self, k: &str) -> Result<f64, JsError> {
-        self.opt_num(k)?
-            .ok_or_else(|| self.err(k, "a finite number"))
-    }
-
-    fn key(&self, k: &str) -> Result<Option<u32>, JsError> {
-        self.opt_num(k)?
-            .map(|n| {
-                let whole = n >= 0.0 && n <= f64::from(u32::MAX) && n == n.trunc();
-                whole
-                    .then_some(n as u32)
-                    .ok_or_else(|| self.err(k, "a whole number or null"))
-            })
-            .transpose()
-    }
-
-    fn color(&self, k: &str) -> Result<pixfx_core::Rgba, JsError> {
-        let s = self
-            .get(k)
-            .and_then(|v| v.as_string())
-            .ok_or_else(|| self.err(k, "a \"#rrggbb\" string"))?;
-        hex(&s).map_err(|e| JsError::new(&format!("{}.{k}: {e}", self.what)))
-    }
-}
-
-fn object(fields: &[(&str, JsValue)]) -> Result<JsValue, JsError> {
-    let o = Object::new();
-    for (k, v) in fields {
-        Reflect::set(&o, &JsValue::from_str(k), v)
-            .map_err(|_| JsError::new("could not build an object"))?;
-    }
-    Ok(o.into())
 }

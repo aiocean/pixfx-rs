@@ -8,6 +8,18 @@ license.workspace = true
 [dependencies]
 libm.workspace = true
 pixfx-core = { path = "../pixfx-core" }
+serde = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+[features]
+# serde for the value types, in the shapes JS passes them (camelCase, colours as "#rrggbb")
+serde = ["dep:serde", "pixfx-core/serde"]
+# TypeScript declarations for the value types, for the wasm bindings
+ts = ["serde", "pixfx-core/ts", "dep:tsify", "dep:wasm-bindgen"]
+
+[dev-dependencies]
+serde_json.workspace = true
 
 [lints]
 workspace = true

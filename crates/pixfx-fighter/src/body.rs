@@ -14,6 +14,12 @@ use crate::pose::Pose;
 /// A body's tuning: its size, how it moves, and how it takes a blow. `Default` is the site's duel. A body carries
 /// its spec ([`Body::with_spec`]), so two fighters can be built differently; every rule reads these numbers.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 pub struct BodySpec {
     /// The body's height, in pixels above its feet.
     pub body: f64,
@@ -150,6 +156,9 @@ impl Default for BodySpec {
 
 /// The floor a fight happens on: its edges and the highest a fighter flies.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct Arena {
     pub left: f64,
     pub right: f64,
@@ -158,6 +167,9 @@ pub struct Arena {
 
 /// Where a fighter off its feet is in going down and getting up.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Phase {
     /// Thrown, in the air.
     Air,
@@ -171,6 +183,8 @@ pub enum Phase {
 
 /// A fighter off its feet.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Down {
     pub phase: Phase,
     /// Time in this phase.
@@ -191,6 +205,10 @@ pub struct Down {
 
 /// Something the body did that the screen should feel.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "lowercase"))]
+#[cfg_attr(feature = "ts", tsify(rename = "BodyEvent"))]
 pub enum Event {
     /// Feet or back met the floor at `x`, `strength` 0 to 1.
     Land { x: f64, strength: f64 },
@@ -200,6 +218,13 @@ pub enum Event {
 
 /// How a body moves up and down this step, as the rules have it.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(from = "MotionWire"))]
+#[cfg_attr(
+    feature = "ts",
+    derive(tsify::Tsify),
+    tsify(type = "\"gravity\" | { fly: number } | { dive: number; floor: number }")
+)]
 pub enum Motion {
     /// Gravity's: standing, jumping, thrown.
     Gravity,
@@ -209,8 +234,57 @@ pub enum Motion {
     Dive { speed: f64, floor: f64 },
 }
 
+/// [`Motion`] as JS passes it: `"gravity"`, `{fly: hover}` or `{dive: speed, floor}`.
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum MotionWire {
+    Named(MotionName),
+    Fly(FlyWire),
+    Dive(DiveWire),
+}
+
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum MotionName {
+    Gravity,
+}
+
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FlyWire {
+    fly: f64,
+}
+
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DiveWire {
+    dive: f64,
+    floor: f64,
+}
+
+#[cfg(feature = "serde")]
+impl From<MotionWire> for Motion {
+    fn from(w: MotionWire) -> Self {
+        match w {
+            MotionWire::Named(MotionName::Gravity) => Motion::Gravity,
+            MotionWire::Fly(FlyWire { fly }) => Motion::Fly { hover: fly },
+            MotionWire::Dive(DiveWire { dive, floor }) => Motion::Dive { speed: dive, floor },
+        }
+    }
+}
+
 /// What the rules have a fighter doing this step, for [`Body::step`].
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 pub struct Drive {
     /// Life above zero.
     pub alive: bool,

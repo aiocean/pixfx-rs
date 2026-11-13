@@ -103,3 +103,71 @@ fn stage_rejects_a_margin_option() -> Result<(), JsValue> {
     assert!(stage_options(&JsValue::UNDEFINED).is_ok());
     Ok(())
 }
+
+/// The message of the error a binding threw.
+fn message(e: wasm_bindgen::JsError) -> String {
+    Reflect::get(&JsValue::from(e), &"message".into())
+        .ok()
+        .and_then(|m| m.as_string())
+        .unwrap_or_default()
+}
+
+/// An object from `(key, value)` pairs, as JS would pass it.
+fn object(fields: &[(&str, JsValue)]) -> Result<JsValue, JsValue> {
+    let o = Object::new();
+    for (k, v) in fields {
+        Reflect::set(&o, &JsValue::from_str(k), v)?;
+    }
+    Ok(o.into())
+}
+
+#[wasm_bindgen_test]
+fn stage_set_names_a_misspelt_field() -> Result<(), JsValue> {
+    use pixfx_canvas::stage::PlacementChange;
+    use pixfx_wasm::js::parse;
+
+    let Err(e) = parse::<PlacementChange>("set", &object(&[("flpi", JsValue::TRUE)])?) else {
+        return Err("set({flpi}) was accepted".into());
+    };
+    let text = message(e);
+    assert!(text.contains("flpi"), "error does not name flpi: {text}");
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn body_spec_names_a_misspelt_field() -> Result<(), JsValue> {
+    use pixfx_canvas::fighter::Body;
+
+    let Err(e) = Body::new(0.0, object(&[("gravty", JsValue::from(400))])?) else {
+        return Err("new Body(0, {gravty}) was accepted".into());
+    };
+    let text = message(e);
+    assert!(
+        text.contains("gravty"),
+        "error does not name gravty: {text}"
+    );
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn light_names_a_misspelt_field() -> Result<(), JsValue> {
+    use pixfx_light::Light;
+    use pixfx_wasm::js::parse;
+
+    let light = object(&[
+        ("x", JsValue::from(1)),
+        ("y", JsValue::from(2)),
+        ("reach", JsValue::from(9)),
+        ("color", JsValue::from_str("#ffcc00")),
+        ("strenght", JsValue::from(0.5)),
+    ])?;
+    let Err(e) = parse::<Light>("light", &light) else {
+        return Err("a light with strenght was accepted".into());
+    };
+    let text = message(e);
+    assert!(
+        text.contains("strenght"),
+        "error does not name strenght: {text}"
+    );
+    Ok(())
+}

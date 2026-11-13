@@ -153,6 +153,9 @@ const DUST_DARK: Rgba = Rgba::hex24(0x6e6458);
 /// Something the fight just did that the screen answers. Heights (`y`) are up from the ground; `by` is the index
 /// of the fighter who caused it.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "lowercase"))]
 pub enum Cue {
     /// A blow landed. `power` weighs it (9 and up is a medium), `launch` threw the one struck, `ranged` struck from
     /// afar (a bolt or an orb), `share` is the share of full life it took (0 to 100), `damage` the real amount.
@@ -218,8 +221,30 @@ pub enum Cue {
     Ultimate,
 }
 
+impl Cue {
+    /// The `type` of each cue as data, so a host that mixes cues with its own events can tell which are cues.
+    pub const TYPES: [&str; 13] = [
+        "hit",
+        "tick",
+        "heal",
+        "ward",
+        "dodge",
+        "unyielding",
+        "block",
+        "clash",
+        "land",
+        "bump",
+        "ko",
+        "streak",
+        "ultimate",
+    ];
+}
+
 /// What a floating number says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum NumberKind {
     Hit,
     Crit,
@@ -232,6 +257,9 @@ pub enum NumberKind {
 /// A floating number as drawn this frame: where it is (height above the ground), how faded (`alpha`), its text,
 /// who caused it (none for a dodge) and its kind.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "ts", tsify(rename = "DamageNumber", missing_as_null))]
 pub struct Number {
     pub x: f64,
     pub y: f64,
@@ -251,6 +279,8 @@ pub struct Dust {
 
 /// A qi streak: from where, to where (heights up from the ground), whose, and how faded (1 new, 0 gone).
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Streak {
     pub x0: f64,
     pub y0: f64,

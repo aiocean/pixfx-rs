@@ -10,9 +10,18 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 js-sys = "=0.3.107"
-pixfx-core = { path = "../pixfx-core" }
+pixfx-core = { path = "../pixfx-core", features = ["ts"] }
 pixfx-effects = { path = "../pixfx-effects" }
-wasm-bindgen = "=0.2.130"
+serde.workspace = true
+serde-wasm-bindgen.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+tsify.workspace = true
+wasm-bindgen.workspace = true
+
+[build-dependencies]
+# the build script writes the EffectId union from the registry
+pixfx-effects = { path = "../pixfx-effects" }
 
 [dev-dependencies]
 wasm-bindgen-test = "=0.3.80"

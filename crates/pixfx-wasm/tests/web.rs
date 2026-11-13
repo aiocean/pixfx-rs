@@ -273,3 +273,15 @@ fn hex_string_option_is_a_colour() -> Result<(), JsValue> {
     );
     Ok(())
 }
+
+#[wasm_bindgen_test]
+fn options_name_a_misspelt_field() -> Result<(), JsValue> {
+    // an effect's own options are open (any name), so a misspelt `flip` reads as one of them, and is refused for
+    // not being a number or a colour
+    let Err(e) = Fx::new("fire/candle", obj(&[("flp", JsValue::TRUE)])?) else {
+        return Err("{flp: true} was accepted".into());
+    };
+    let text = error_text(e);
+    assert!(text.contains("flp"), "error does not name flp: {text}");
+    Ok(())
+}

@@ -1,105 +1,144 @@
 //! JS options to typed [`Options`], once, at the boundary.
 
-use js_sys::{Array, Object};
+use std::collections::BTreeMap;
+use std::fmt;
+
 use pixfx_core::{OptValue, Options, Rgba, hex};
+use serde::Deserialize;
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use wasm_bindgen::{JsError, JsValue};
 
-/// Largest integer a JS number holds exactly (`Number.MAX_SAFE_INTEGER`).
-const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
+use crate::js::parse;
 
 /// Largest `margin`: keeps `size + 2 * margin` and the canvas's pixel count far from overflow.
 pub const MAX_MARGIN: u32 = 4096;
 
-/// `undefined`/`null` (all defaults) or a plain object: `margin` (whole number up to [`MAX_MARGIN`]: empty pixels round the
-/// canvas, returned beside the options because it is the canvas's, not the effect's), `seed` (non-negative integer), `flip` (boolean),
-/// `angle` (radians), `light` (glow strength), `palette` (array of `"#rgb"`/`"#rrggbb"` strings); any other key is
-/// the effect's own option, a number, a hex colour or an array of hex colours. `x`/`y` are refused: an instance draws on its
-/// own canvas at the effect's origin. A field of the wrong type is an error naming it.
-pub fn parse_options(v: &JsValue) -> Result<(Options, u32), JsError> {
-    let mut opts = Options::default();
-    let mut margin = 0;
+/// An effect's options as JS passes them: the ones every effect reads, and the effect's own by name.
+#[derive(Default, tsify::Tsify)]
+#[tsify(
+    rename = "FxOptions",
+    type = "{ margin?: number; seed?: number; flip?: boolean; angle?: number; light?: number; palette?: string[]; [option: string]: number | string | string[] | boolean | undefined }"
+)]
+struct Wire {
+    margin: Option<u32>,
+    seed: Option<u64>,
+    flip: Option<bool>,
+    angle: Option<f64>,
+    light: Option<f64>,
+    palette: Option<Vec<Rgba>>,
+    extra: BTreeMap<String, Extra>,
+}
+
+/// Read key by key (not `#[serde(flatten)]`, which buffers the values and loses the key from the error's path).
+impl<'de> Deserialize<'de> for Wire {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_map(WireVisitor)
+    }
+}
+
+struct WireVisitor;
+
+impl<'de> Visitor<'de> for WireVisitor {
+    type Value = Wire;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("an options object")
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Wire, A::Error> {
+        let mut w = Wire::default();
+        while let Some(key) = map.next_key::<String>()? {
+            match key.as_str() {
+                "margin" => w.margin = map.next_value()?,
+                "seed" => w.seed = map.next_value()?,
+                "flip" => w.flip = map.next_value()?,
+                "angle" => w.angle = map.next_value()?,
+                "light" => w.light = map.next_value()?,
+                "palette" => w.palette = map.next_value()?,
+                _ => {
+                    let v: Extra = map.next_value()?;
+                    w.extra.insert(key, v);
+                }
+            }
+        }
+        Ok(w)
+    }
+}
+
+/// One of the effect's own options: a number, a hex colour or a list of hex colours.
+struct Extra(OptValue);
+
+impl<'de> Deserialize<'de> for Extra {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_any(ExtraVisitor)
+    }
+}
+
+struct ExtraVisitor;
+
+impl<'de> Visitor<'de> for ExtraVisitor {
+    type Value = Extra;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a number, a hex colour or an array of hex colours")
+    }
+
+    fn visit_f64<E: de::Error>(self, v: f64) -> Result<Extra, E> {
+        Ok(Extra(OptValue::Num(v)))
+    }
+
+    fn visit_u64<E: de::Error>(self, v: u64) -> Result<Extra, E> {
+        // whole numbers arrive as integers only when a JS number holds them exactly
+        Ok(Extra(OptValue::Num(v as f64)))
+    }
+
+    fn visit_i64<E: de::Error>(self, v: i64) -> Result<Extra, E> {
+        Ok(Extra(OptValue::Num(v as f64)))
+    }
+
+    fn visit_str<E: de::Error>(self, v: &str) -> Result<Extra, E> {
+        hex(v).map(|c| Extra(OptValue::Color(c))).map_err(E::custom)
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Extra, A::Error> {
+        let mut ramp = Vec::new();
+        while let Some(c) = seq.next_element::<Rgba>()? {
+            ramp.push(c);
+        }
+        Ok(Extra(OptValue::Ramp(ramp)))
+    }
+}
+
+/// `undefined`/`null` (all defaults) or a plain object: `margin` (whole number up to [`MAX_MARGIN`]: empty pixels
+/// round the canvas, returned beside the options because it is the canvas's, not the effect's; `None` when not
+/// given), `seed` (non-negative integer), `flip` (boolean), `angle` (radians), `light` (glow strength), `palette`
+/// (array of `"#rgb"`/`"#rrggbb"` strings); any other key is the effect's own option, a number, a hex colour or an
+/// array of hex colours. `x`/`y` are refused: an instance draws on its own canvas at the effect's origin. A field
+/// of the wrong type is an error naming it.
+pub fn parse_options(v: &JsValue) -> Result<(Options, Option<u32>), JsError> {
     if v.is_undefined() || v.is_null() {
-        return Ok((opts, margin));
+        return Ok((Options::default(), None));
     }
-    if !v.is_object() || Array::is_array(v) {
-        return Err(JsError::new("options must be an object"));
-    }
-    for entry in Object::entries(&Object::from(v.clone())).iter() {
-        let pair = Array::from(&entry);
-        let key = pair.get(0).as_string().unwrap_or_default();
-        let val = pair.get(1);
-        if val.is_undefined() {
-            continue;
-        }
-        match key.as_str() {
-            "margin" => {
-                margin = whole_number(&key, &val, MAX_MARGIN.into()).map_err(|_| {
-                    JsError::new(&format!(
-                        "option margin must be a whole number from 0 to {MAX_MARGIN}"
-                    ))
-                })? as u32;
-            }
-            "seed" => opts.seed = Some(whole_number(&key, &val, MAX_SAFE_INTEGER)? as u64),
-            "flip" => {
-                opts.flip = val
-                    .as_bool()
-                    .ok_or_else(|| JsError::new("option flip must be a boolean"))?;
-            }
-            "angle" => opts.angle = number(&key, &val)?,
-            "light" => opts.light = number(&key, &val)?,
-            "palette" => opts.palette = Some(ramp(&key, &val)?),
-            "x" | "y" => {
-                return Err(JsError::new(&format!(
-                    "option {key} is not supported: an Fx draws on its own canvas at the effect's origin"
-                )));
-            }
-            _ => {
-                let extra = if Array::is_array(&val) {
-                    OptValue::Ramp(ramp(&key, &val)?)
-                } else if val.as_f64().is_some() {
-                    OptValue::Num(number(&key, &val)?)
-                } else if let Some(s) = val.as_string() {
-                    OptValue::Color(
-                        hex(&s).map_err(|e| JsError::new(&format!("option {key}: {e}")))?,
-                    )
-                } else {
-                    return Err(JsError::new(&format!(
-                        "option {key} must be a number, a hex colour or an array of hex colours"
-                    )));
-                };
-                opts.extra.insert(key, extra);
-            }
-        }
-    }
-    Ok((opts, margin))
-}
-
-fn number(key: &str, v: &JsValue) -> Result<f64, JsError> {
-    v.as_f64()
-        .filter(|n| n.is_finite())
-        .ok_or_else(|| JsError::new(&format!("option {key} must be a finite number")))
-}
-
-fn whole_number(key: &str, v: &JsValue, max: f64) -> Result<f64, JsError> {
-    v.as_f64()
-        .filter(|n| n.fract() == 0.0 && (0.0..=max).contains(n))
-        .ok_or_else(|| JsError::new(&format!("option {key} must be a non-negative integer")))
-}
-
-fn ramp(key: &str, v: &JsValue) -> Result<Vec<Rgba>, JsError> {
-    if !Array::is_array(v) {
+    let w: Wire = parse("options", v)?;
+    if let Some(m) = w.margin.filter(|&m| m > MAX_MARGIN) {
         return Err(JsError::new(&format!(
-            "option {key} must be an array of hex colours"
+            "options.margin must be a whole number from 0 to {MAX_MARGIN}, not {m}"
         )));
     }
-    Array::from(v)
-        .iter()
-        .enumerate()
-        .map(|(i, c)| {
-            let s = c.as_string().ok_or_else(|| {
-                JsError::new(&format!("option {key}[{i}] must be a hex colour string"))
-            })?;
-            hex(&s).map_err(|e| JsError::new(&format!("option {key}[{i}]: {e}")))
-        })
-        .collect()
+    if let Some(key) = ["x", "y"].into_iter().find(|k| w.extra.contains_key(*k)) {
+        return Err(JsError::new(&format!(
+            "options.{key} is not supported: an Fx draws on its own canvas at the effect's origin"
+        )));
+    }
+    let base = Options::default();
+    let opts = Options {
+        seed: w.seed,
+        flip: w.flip.unwrap_or(base.flip),
+        angle: w.angle.unwrap_or(base.angle),
+        light: w.light.unwrap_or(base.light),
+        palette: w.palette,
+        extra: w.extra.into_iter().map(|(k, Extra(v))| (k, v)).collect(),
+        ..base
+    };
+    Ok((opts, w.margin))
 }

@@ -20,6 +20,9 @@ use pixfx_core::painter::Painter;
 
 /// How a barrier dome is patterned.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum DomeStyle {
     /// Fixed bands across it, every 8 rows, rim to rim (a bell).
     #[default]

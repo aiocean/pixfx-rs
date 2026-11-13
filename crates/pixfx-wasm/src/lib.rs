@@ -3,19 +3,24 @@
 //! which other Rust crates use directly.
 #![forbid(unsafe_code)]
 
+pub mod js;
 mod options;
 mod player;
 
-pub use options::parse_options;
+pub use options::{MAX_MARGIN, parse_options};
 pub use player::Player;
 
-use js_sys::{Array, Object, Reflect, Uint8ClampedArray, Uint32Array};
+use js_sys::{Array, Uint8ClampedArray, Uint32Array};
 use pixfx_core::{Effect, Layer, Meta, valid_dt};
 use pixfx_effects::{EFFECTS, effect};
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen(typescript_custom_section)]
+const EFFECT_ID: &str = include_str!(concat!(env!("OUT_DIR"), "/effect_id.d.ts"));
+
 /// Every effect id, in registry order.
-#[wasm_bindgen]
+#[wasm_bindgen(unchecked_return_type = "EffectId[]")]
 pub fn effects() -> Array {
     EFFECTS
         .iter()
@@ -23,9 +28,36 @@ pub fn effects() -> Array {
         .collect()
 }
 
+/// What an effect is, as JS reads it.
+#[derive(Serialize, tsify::Tsify)]
+#[serde(rename_all = "camelCase")]
+#[tsify(rename = "EffectMeta")]
+struct MetaJs {
+    #[tsify(type = "EffectId")]
+    id: &'static str,
+    name: &'static str,
+    desc: &'static str,
+    tags: &'static [&'static str],
+    /// Canvas size in pixels, `[w, h]`.
+    size: (u32, u32),
+    /// Where the effect's local (0, 0) sits on its canvas, `[x, y]`.
+    origin: (i32, i32),
+    /// The margin that fits the effect's glow.
+    glow_margin: u32,
+    /// Seconds: one loop, or the whole one-shot.
+    duration: f64,
+    #[serde(rename = "loop")]
+    looping: bool,
+    fps: u32,
+    /// Seeds are small; a JS number holds them exactly up to 2^53.
+    seed: u64,
+}
+
 /// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed}` for one effect.
-#[wasm_bindgen]
-pub fn meta(id: &str) -> Result<JsValue, JsError> {
+#[wasm_bindgen(unchecked_return_type = "EffectMeta")]
+pub fn meta(
+    #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
+) -> Result<JsValue, JsError> {
     meta_object(find(id)?.meta())
 }
 
@@ -34,34 +66,19 @@ fn find(id: &str) -> Result<&'static dyn Effect, JsError> {
 }
 
 fn meta_object(m: &Meta) -> Result<JsValue, JsError> {
-    let o = Object::new();
-    let pair = |a: f64, b: f64| Array::of2(&a.into(), &b.into());
-    let tags: Array = m.tags.iter().map(|t| JsValue::from_str(t)).collect();
-    let fields: [(&str, JsValue); 11] = [
-        ("id", m.id.into()),
-        ("name", m.name.into()),
-        ("desc", m.desc.into()),
-        ("tags", tags.into()),
-        (
-            "size",
-            pair(f64::from(m.size.0), f64::from(m.size.1)).into(),
-        ),
-        (
-            "origin",
-            pair(f64::from(m.origin.0), f64::from(m.origin.1)).into(),
-        ),
-        ("glowMargin", m.glow_margin().into()),
-        ("duration", m.duration.into()),
-        ("loop", m.looping.into()),
-        ("fps", m.fps.into()),
-        // seeds are small; a JS number holds them exactly up to 2^53
-        ("seed", (m.seed as f64).into()),
-    ];
-    for (k, v) in fields {
-        Reflect::set(&o, &JsValue::from_str(k), &v)
-            .map_err(|_| JsError::new("could not build the meta object"))?;
-    }
-    Ok(o.into())
+    js::to_js(&MetaJs {
+        id: m.id,
+        name: m.name,
+        desc: m.desc,
+        tags: m.tags,
+        size: m.size,
+        origin: m.origin,
+        glow_margin: m.glow_margin(),
+        duration: m.duration,
+        looping: m.looping,
+        fps: m.fps,
+        seed: m.seed,
+    })
 }
 
 /// A live effect on its own canvas (`meta.size` plus `margin` empty pixels on every side, origin at
@@ -78,11 +95,14 @@ impl Fx {
     /// Spawn effect `id`. `opts`: `undefined` or `{margin?, seed?, flip?, angle?, light?, palette?: string[], ...extra}`
     /// (see [`parse_options`]).
     #[wasm_bindgen(constructor)]
-    pub fn new(id: &str, opts: JsValue) -> Result<Fx, JsError> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
+        #[wasm_bindgen(unchecked_optional_param_type = "FxOptions")] opts: JsValue,
+    ) -> Result<Fx, JsError> {
         let fx = find(id)?;
         let (opts, margin) = parse_options(&opts)?;
         Ok(Fx {
-            player: Player::new(fx, opts, margin),
+            player: Player::new(fx, opts, margin.unwrap_or(0)),
         })
     }
 

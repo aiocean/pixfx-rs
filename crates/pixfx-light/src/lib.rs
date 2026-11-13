@@ -14,9 +14,16 @@ use pixfx_core::{Frame, Rgba};
 
 /// A light in the world: where it is, how far it reaches and how bright it burns at its heart, how long it lives
 /// and how long it has lived.
+///
+/// As data: `{key?, x, y, reach, color: "#rrggbb", strength, life?, age?}`; `key` and `life` absent or null for
+/// none, `age` absent for a new light.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify), tsify(missing_as_null))]
 pub struct Light {
     /// The caller's tag, to find the light again (to move it or put it out); `None` for an untagged light.
+    #[cfg_attr(feature = "serde", serde(default))]
     pub key: Option<u32>,
     /// Centre, in game pixels (world space, the frame's offset applies).
     pub x: f64,
@@ -28,13 +35,18 @@ pub struct Light {
     /// Brightness at its heart at full swell, 0 to 1.
     pub strength: f64,
     /// Seconds it lives; `None` until it is put out ([`Light::put_out`]).
+    #[cfg_attr(feature = "serde", serde(default))]
     pub life: Option<f64>,
     /// Seconds it has lived.
+    #[cfg_attr(feature = "serde", serde(default))]
     pub age: f64,
 }
 
 /// A light as it shows at one instant: what [`draw`] draws.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Glow {
     pub x: f64,
     pub y: f64,

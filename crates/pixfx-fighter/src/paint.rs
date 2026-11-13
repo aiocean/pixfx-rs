@@ -40,6 +40,8 @@ pub struct Windup {
 
 /// What a fighter is doing with its hands, as the caller's rules resolve it.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(from = "ActWire"))]
 pub struct Act {
     /// How it gathers; the site gives blade blows `Palm`.
     pub how: Gather,
@@ -49,8 +51,46 @@ pub struct Act {
     pub windup: Option<Windup>,
 }
 
+/// [`Act`] as JS passes it: the windup flattened, `progress` null once it is no longer winding up.
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[cfg_attr(
+    feature = "ts",
+    derive(tsify::Tsify),
+    tsify(rename = "Act", missing_as_null)
+)]
+#[serde(deny_unknown_fields)]
+struct ActWire {
+    how: Gather,
+    dive: bool,
+    /// 0 to 1 while winding up, else null.
+    progress: Option<f64>,
+    long: bool,
+}
+
+#[cfg(feature = "serde")]
+impl From<ActWire> for Act {
+    fn from(w: ActWire) -> Self {
+        Act {
+            how: w.how,
+            dive: w.dive,
+            windup: w.progress.map(|progress| Windup {
+                progress,
+                long: w.long,
+            }),
+        }
+    }
+}
+
 /// Everything the painter reads off a fighter.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
+#[cfg_attr(feature = "ts", tsify(missing_as_null))]
 pub struct Appearance {
     pub pose: Pose,
     /// Seconds since the pose began.
@@ -88,7 +128,9 @@ pub struct Sprite {
 
 impl Default for Sprite {
     fn default() -> Self {
-        Sprite { px: vec![[0; 4]; SPRITE * SPRITE] }
+        Sprite {
+            px: vec![[0; 4]; SPRITE * SPRITE],
+        }
     }
 }
 
@@ -106,7 +148,9 @@ impl Sprite {
         if !inside {
             return 0;
         }
-        self.px.get(y as usize * SPRITE + x as usize).map_or(0, |p| p[3])
+        self.px
+            .get(y as usize * SPRITE + x as usize)
+            .map_or(0, |p| p[3])
     }
 
     /// Fill a rect as a canvas `fillRect` with an opaque colour does on the CPU: whole pixels where it covers
@@ -139,10 +183,6 @@ impl Sprite {
         }
     }
 }
-
-
-
-
 
 /// JS `Math.sign(v) || fallback`.
 fn sign_or(v: f64, fallback: f64) -> f64 {
@@ -200,7 +240,11 @@ struct Pen<'a> {
 
 impl Pen<'_> {
     fn px(&mut self, dx: f64, dy: f64, w: f64, h: f64, col: Rgba) {
-        let x = if self.face > 0.0 { 32.0 + dx } else { 32.0 - dx - w + 1.0 };
+        let x = if self.face > 0.0 {
+            32.0 + dx
+        } else {
+            32.0 - dx - w + 1.0
+        };
         let col = match self.tint {
             Tint::Own => col,
             Tint::Flash => WHITE,
@@ -220,7 +264,11 @@ impl Pen<'_> {
         let n = js_max(js_max((x1 - x0).abs(), (y1 - y0).abs()), 1.0);
         let mut i = 0.0;
         while i <= n {
-            self.dot(js_round(x0 + ((x1 - x0) * i) / n), js_round(y0 + ((y1 - y0) * i) / n), col);
+            self.dot(
+                js_round(x0 + ((x1 - x0) * i) / n),
+                js_round(y0 + ((y1 - y0) * i) / n),
+                col,
+            );
             i += 1.0;
         }
     }
@@ -251,14 +299,24 @@ impl Pen<'_> {
         for i in 0..4 {
             let a = self.t * 7.0 + (f64::from(i) * PI) / 2.0;
             let col = if i % 2 == 1 { self.c.glow } else { WHITE };
-            self.dot(js_round(cx + self.lean + cos(a) * r), js_round(cy + sin(a) * r * 0.7), col);
+            self.dot(
+                js_round(cx + self.lean + cos(a) * r),
+                js_round(cy + sin(a) * r * 0.7),
+                col,
+            );
         }
     }
 
     fn orb(&mut self, cx: f64, cy: f64, k: f64) {
         let r = 1.0 + js_round(2.0 * k);
         let glow = self.c.glow;
-        self.px(cx + self.lean - floor(r / 2.0), cy - floor(r / 2.0), r, r, glow);
+        self.px(
+            cx + self.lean - floor(r / 2.0),
+            cy - floor(r / 2.0),
+            r,
+            r,
+            glow,
+        );
         if k > 0.5 {
             self.dot(cx + self.lean, cy, WHITE);
         }
@@ -286,7 +344,13 @@ impl Pen<'_> {
                 let x1 = x0 - js_round(len * 0.6);
                 let mut i = 0.0;
                 while i <= len {
-                    self.px(js_round(x0 + ((x1 - x0) * i) / len), up + 5.0 + i, 2.0, 1.0, c.robe[shade]);
+                    self.px(
+                        js_round(x0 + ((x1 - x0) * i) / len),
+                        up + 5.0 + i,
+                        2.0,
+                        1.0,
+                        c.robe[shade],
+                    );
                     i += 1.0;
                 }
                 self.px(x1 - 1.0, up + 6.0 + len, 2.0, 2.0, c.skin[0]);
@@ -299,7 +363,13 @@ impl Pen<'_> {
         self.px(-18.0, up, 7.0, 6.0, c.skin[0]);
         self.px(-18.0, up, 7.0, 1.0, c.skin[1]);
         if eye == Eye::Crossed {
-            for (x, y) in [(-15.0, 3.0), (-14.0, 4.0), (-13.0, 3.0), (-15.0, 5.0), (-13.0, 5.0)] {
+            for (x, y) in [
+                (-15.0, 3.0),
+                (-14.0, 4.0),
+                (-13.0, 3.0),
+                (-15.0, 5.0),
+                (-13.0, 5.0),
+            ] {
                 self.px(x, up + y, 1.0, 1.0, c.outline);
             }
         } else {
@@ -364,7 +434,13 @@ impl Pen<'_> {
                     let sway = js_round(sin(t * 3.0 - fi * 0.45) * (fi / 7.0))
                         + js_round((js_min(0.0, wind) * fi) / 6.0);
                     let col = if i % 4 == 0 { c.hair[1] } else { c.hair[0] };
-                    self.px(-5.0 + lean - js_round(fi / 5.0) + sway, y + 3.0 - fi, 2.0, 1.0, col);
+                    self.px(
+                        -5.0 + lean - js_round(fi / 5.0) + sway,
+                        y + 3.0 - fi,
+                        2.0,
+                        1.0,
+                        col,
+                    );
                 }
                 self.px(-1.0 + lean, y + 9.0, 3.0, 1.0, c.jade);
                 self.px(-2.0 + lean, y + 9.0, 1.0, 1.0, c.trim[1]);
@@ -441,13 +517,31 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
     };
     // limbs thrown about while it flies: they swing every few frames
     let flail = if still { 0.0 } else { floor(t * 12.0) % 2.0 };
-    let mut pen = Pen { sprite: Sprite::default(), c: look, face: a.face, tint, t, wind, lean: 0.0 };
+    let mut pen = Pen {
+        sprite: Sprite::default(),
+        c: look,
+        face: a.face,
+        tint,
+        t,
+        wind,
+        lean: 0.0,
+    };
     let c = look;
     match a.pose {
         Pose::Down => {
             // flat on its back; a knocked-out fighter's eyes are crossed out and its sword lies dropped beside it
-            let breath = if !a.out && !still && floor(t * 2.5) % 2.0 != 0.0 { 1.0 } else { 0.0 };
-            pen.lying(0.0, 0.0, 0.0, breath, if a.out { Eye::Crossed } else { Eye::Shut });
+            let breath = if !a.out && !still && floor(t * 2.5) % 2.0 != 0.0 {
+                1.0
+            } else {
+                0.0
+            };
+            pen.lying(
+                0.0,
+                0.0,
+                0.0,
+                breath,
+                if a.out { Eye::Crossed } else { Eye::Shut },
+            );
             if a.out {
                 pen.line(-6.0, -1.0, 10.0, -1.0, c.blade[2]);
                 pen.px(11.0, -1.0, 1.0, 1.0, c.trim[0]);
@@ -557,7 +651,11 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
     let c = pen.c;
     let (t, wind) = (pen.t, pen.wind);
     let pose = a.pose;
-    let bob = if !a.frozen && sin(t * 3.0) > 0.6 { 1.0 } else { 0.0 };
+    let bob = if !a.frozen && sin(t * 3.0) > 0.6 {
+        1.0
+    } else {
+        0.0
+    };
     let spread_eagled = pose == Pose::Tumble;
     let p = a.act.and_then(|k| k.windup).map(|w| w.progress);
     let how = a.act.map(|k| k.how);
@@ -610,12 +708,22 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
         pen.px(-13.0, -3.0, 2.0, 3.0, c.trim[0]);
         pen.px(-15.0, -2.0, 2.0, 1.0, c.trim[1]);
         if sin(t * 20.0) > -0.3 {
-            pen.line(-16.0 - (js_round(t * 30.0) % 3.0), -2.0, -14.0, -2.0, c.glow);
+            pen.line(
+                -16.0 - (js_round(t * 30.0) % 3.0),
+                -2.0,
+                -14.0,
+                -2.0,
+                c.glow,
+            );
         }
     }
 
     // feet: apart in a stance, staggering back from a blow, one knee on the floor in a kneel
-    let stride = if pose == Pose::Walk { if sin(t * 12.0) > 0.0 { 2.0 } else { -2.0 } } else { 0.0 };
+    let stride = if pose == Pose::Walk {
+        if sin(t * 12.0) > 0.0 { 2.0 } else { -2.0 }
+    } else {
+        0.0
+    };
     let spread = if spread_eagled {
         3.0
     } else if drop > 0.0 && pose != Pose::Kneel {
@@ -630,7 +738,13 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
         pen.px(3.0, 2.0, 6.0, 3.0, c.robe[1]);
         pen.px(3.0, 4.0, 6.0, 1.0, c.robe[0]);
     } else {
-        pen.px(-4.0 + stride - spread - if reel { 2.0 } else { 0.0 }, 0.0, 4.0, 2.0, c.boot);
+        pen.px(
+            -4.0 + stride - spread - if reel { 2.0 } else { 0.0 },
+            0.0,
+            4.0,
+            2.0,
+            c.boot,
+        );
         pen.px(1.0 - stride + spread, 0.0, 4.0, 2.0, c.boot);
     }
     // the lower robe, flaring to the hem, open at the front over the inner robe; shorter as the knees bend
@@ -646,7 +760,13 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
         pen.px(1.0, dy, 2.0, 1.0, c.inner[usize::from(dy < 8.0)]);
         dy += 1.0;
     }
-    pen.px(-7.0 + js_min(0.0, wind), 2.0 + tuck, 13.0 - js_min(0.0, wind), 1.0, c.trim[0]);
+    pen.px(
+        -7.0 + js_min(0.0, wind),
+        2.0 + tuck,
+        13.0 - js_min(0.0, wind),
+        1.0,
+        c.trim[0],
+    );
     pen.px(-6.0, 3.0 + tuck, 1.0, 1.0, c.trim[1]);
 
     // the body: robe crossed over the inner robe, a sash with a jade pendant and a tail that streams back
@@ -663,12 +783,24 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
     pen.px(2.0 + lean, by - 4.0, 1.0, 1.0, c.jade);
     for i in 0..6 {
         let fi = f64::from(i);
-        let flutter = if i > 3 { js_round(sin(t * 6.0 + fi)) } else { 0.0 };
+        let flutter = if i > 3 {
+            js_round(sin(t * 6.0 + fi))
+        } else {
+            0.0
+        };
         let x = -6.0 + lean - fi + js_round(wind * fi * 0.3);
-        pen.dot(x, by + 1.0 - js_round(fi / 2.0) + flutter, c.inner[usize::from(i >= 3)]);
+        pen.dot(
+            x,
+            by + 1.0 - js_round(fi / 2.0) + flutter,
+            c.inner[usize::from(i >= 3)],
+        );
     }
     // the head snaps back further than the body from a fresh blow, and hangs forward as it reels
-    let eye = if recoil || reel || pose == Pose::Shocked || (pose == Pose::Channel && how == Some(Gather::Prayer)) {
+    let eye = if recoil
+        || reel
+        || pose == Pose::Shocked
+        || (pose == Pose::Channel && how == Some(Gather::Prayer))
+    {
         Eye::Shut
     } else {
         Eye::Open
@@ -696,7 +828,13 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
                     for (x0, side, shade) in [(-4.0, -1.0, 2), (3.0, 1.0, 1)] {
                         let x1 = x0 + side * out;
                         pen.line(x0 + lean, sh - 1.0, x1 + lean, sh - 1.0 + up, c.robe[shade]);
-                        pen.line(x0 + lean + side, sh - 1.0, x1 + lean + side, sh - 1.0 + up, c.robe[shade]);
+                        pen.line(
+                            x0 + lean + side,
+                            sh - 1.0,
+                            x1 + lean + side,
+                            sh - 1.0 + up,
+                            c.robe[shade],
+                        );
                         pen.dot(x0 + lean, sh - 1.0, c.trim[0]);
                         pen.hand(x1 - if side < 0.0 { 1.0 } else { 0.0 }, sh + up);
                     }
@@ -713,7 +851,14 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
                     pen.sleeve(3.0, sh - 1.0, 4.0, 2.0, 0);
                     pen.hand(7.0, sh - 1.0);
                     pen.px(9.0 + lean, sh, 2.0, 1.0, c.skin[0]);
-                    pen.sword(if how == Some(Gather::Lunge) { Held::Hip } else { Held::Back }, by);
+                    pen.sword(
+                        if how == Some(Gather::Lunge) {
+                            Held::Hip
+                        } else {
+                            Held::Back
+                        },
+                        by,
+                    );
                 }
                 Some(Gather::Prayer) => {
                     // the hands joined before the chest, eyes shut, qi rising round it
@@ -723,7 +868,11 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
                     pen.px(5.0 + lean, sh - 1.0, 1.0, 3.0, c.skin[0]);
                     for i in 0..3 {
                         let fi = f64::from(i);
-                        pen.dot(-6.0 + fi * 6.0, ((floor(t * 20.0) + fi * 5.0) % 14.0) + by, c.glow);
+                        pen.dot(
+                            -6.0 + fi * 6.0,
+                            ((floor(t * 20.0) + fi * 5.0) % 14.0) + by,
+                            c.glow,
+                        );
                     }
                     pen.sword(Held::Back, by);
                 }
@@ -844,7 +993,11 @@ pub fn outline(sprite: &mut Sprite, color: Rgba) {
             if sprite.alpha(x, y) > 0 {
                 continue;
             }
-            if painted(sprite, x - 1, y) || painted(sprite, x + 1, y) || painted(sprite, x, y - 1) || painted(sprite, x, y + 1) {
+            if painted(sprite, x - 1, y)
+                || painted(sprite, x + 1, y)
+                || painted(sprite, x, y - 1)
+                || painted(sprite, x, y + 1)
+            {
                 ring.push(y as usize * SPRITE + x as usize);
             }
         }
@@ -878,7 +1031,12 @@ fn quarter_turns(a: &Appearance) -> i32 {
 /// was aimed, then the fighter with its gathering aura (site `drawFighter` without its marks).
 pub fn draw(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64) {
     if a.dodged > 0.0 && !a.out {
-        let ghost = Appearance { x: a.x + a.face * 7.0, flash: true, jolt: [0, 0], ..*a };
+        let ghost = Appearance {
+            x: a.x + a.face * 7.0,
+            flash: true,
+            jolt: [0, 0],
+            ..*a
+        };
         blit(frame, look, &ghost, ground_y, a.dodged * 1.5);
     }
     blit(frame, look, a, ground_y, 1.0);
@@ -896,14 +1054,18 @@ fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f6
     };
     outline(&mut sprite, ring);
     // the last fifth of a long wind-up trembles with the power held in
-    let tremble = windup.is_some_and(|w| w.progress > 0.8 && w.long) && floor(t * 30.0) % 2.0 != 0.0;
+    let tremble =
+        windup.is_some_and(|w| w.progress > 0.8 && w.long) && floor(t * 30.0) % 2.0 != 0.0;
     let x = js_round(a.x) as i32 - CX + a.jolt[0] + i32::from(tremble);
     let y = js_round(ground_y - a.air) as i32 - FEET + a.jolt[1];
     if let Some(glow) = glow {
         // an aura in two hard-edged rings, the inner one brighter, swelling as the spell builds
         let k = p.unwrap_or(1.0);
         let (cx, cy) = (f64::from(x + CX), f64::from(y + FEET - 20));
-        for (rx, ry, base) in [(10.0 + 4.0 * k, 22.0 + 3.0 * k, 0.07), (7.0 + 2.0 * k, 17.0 + 2.0 * k, 0.09)] {
+        for (rx, ry, base) in [
+            (10.0 + 4.0 * k, 22.0 + 3.0 * k, 0.07),
+            (7.0 + 2.0 * k, 17.0 + 2.0 * k, 0.09),
+        ] {
             let ga = alpha * (base + 0.12 * k) * (0.85 + 0.15 * sin(t * 9.0));
             // the canvas takes a fill's alpha to 8 bits, then premultiplies the colour by it
             let a8 = js_round(ga * 255.0) as u32;
@@ -943,7 +1105,11 @@ fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f6
                 _ => (u, v),
             };
             let (wx, wy) = (x + CX + dx, y + pv + dy);
-            let src = if alpha >= 1.0 { p } else { p.map(|v| mul_div255(u32::from(v), a8) as u8) };
+            let src = if alpha >= 1.0 {
+                p
+            } else {
+                p.map(|v| mul_div255(u32::from(v), a8) as u8)
+            };
             over_premul(frame, wx, wy, src);
         }
     }
