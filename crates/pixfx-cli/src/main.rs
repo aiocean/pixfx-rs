@@ -5,6 +5,7 @@
 //!   pixfx sheet <id> [--palette WORD] [--outline WORD] [--out DIR]
 //!   pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
 //!   pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]
+//!   pixfx bench [--ids ID,ID...] [--n N] [--secs S] [--hz H]
 //!
 //! `sheet` writes `<name>.png`, `<name>_color.png`, `<name>_light.png` and `<name>.json` (beanfx layout) for
 //! `<id>`; `render --gif` writes `<name>.gif`, each pixel blown up `N` times (default 4); `bake` writes
@@ -19,11 +20,15 @@
 //! right). Each `--opt key=value` sets an option on both sides: `seed` (a whole number), `flip` (0 or 1), or a
 //! numeric option of the effect (`hits=2`). The pixelfx dir is `--pixelfx`, else `$PIXELFX`, else `./pixelfx`; `--out` defaults to
 //! `target/parity`. Exits 0 on PASS, 1 on FAIL, 2 when the check could not run.
+//!
+//! `bench` plays `N` instances of each id (default the three fires, 50 each) for `S` seconds of an `H` Hz display
+//! (default 10 s at 60 Hz) and prints what a display frame costs natively: updating, then per id drawing and RGBA.
 #![forbid(unsafe_code)]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
+use pixfx_cli::bench;
 use pixfx_cli::opts::CliOpts;
 use pixfx_cli::parity::{compare, read_reference, write_side_gif};
 use pixfx_core::{Options, render_frames};
@@ -33,7 +38,8 @@ use pixfx_export::{bake, write_bake, write_gif, write_sheet};
 const USAGE: &str = "usage: pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
        pixfx sheet <id> [--palette WORD] [--outline WORD] [--out DIR]
        pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
-       pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]";
+       pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]
+       pixfx bench [--ids ID,ID...] [--n N] [--secs S] [--hz H]";
 
 /// What `pixfx sheet`, `pixfx render` and `pixfx bake` produce.
 enum Export {
@@ -67,6 +73,12 @@ fn main() -> ExitCode {
         Some((cmd, rest)) if cmd == "sheet" || cmd == "render" || cmd == "bake" => {
             parse_export(cmd, rest).and_then(|a| export(&a).map(|()| true))
         }
+        Some((cmd, rest)) if cmd == "bench" => bench::parse_args(rest)
+            .and_then(|cfg| bench::run(&cfg))
+            .map(|report| {
+                println!("{}", bench::table(&report));
+                true
+            }),
         _ => Err(USAGE.to_string()),
     };
     match result {

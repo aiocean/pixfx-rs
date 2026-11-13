@@ -19,7 +19,7 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 | `crates/pixfx-draw` | Drawing, the lowest layer: frame with colour and additive light, painter, shapes, blending, `composite`, `frame_hash`, palette presets, outline rings, the JS-number maths (`math`). Knows nothing of effects or hosts. |
 | `crates/pixfx-core` | The engine on top of `pixfx-draw`: `Effect`/`Instance`, particles, `render_frames`, `Player`, the frame key and store; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`. |
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
-| `crates/pixfx-cli` | The `pixfx` binary: `parity`, `sheet`, `render`. |
+| `crates/pixfx-cli` | The `pixfx` binary: `parity`, `sheet`, `render`, `bake`, `bench`. |
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
 | `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `move`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick`; for a host-owned loop `update(dt)` then `drawLayer("back")` / `drawLayer("front")` around its own sprites; game feel: `shake(strength)`, `roll(strength)`, `flash()`, `frozen()`, `addTrauma`, `freeze`, `slow`, `setFeel(on)`, cue events. Demo in `crates/pixfx-canvas/demo/`. |
@@ -138,6 +138,18 @@ cargo run -p pixfx-cli -- render fire/campfire --gif --scale 4 --out out
 
 `sheet` writes the composite, colour and light PNGs and the beanfx-layout JSON into `out/`. `render --gif`
 writes a looping GIF.
+
+## What a frame costs
+
+```sh
+cargo run --release -p pixfx-cli -- bench --ids fire/candle,fire/campfire --n 50 --secs 10 --hz 60
+```
+
+`bench` plays `--n` instances of each effect (default: the three fires, 50 each) on a `--hz` display for `--secs`
+seconds, drawing an instance only when its clock reaches a new frame, as hosts do. It prints the milliseconds per
+display frame spent updating every clock, then per effect its frame size (canvas plus glow margin), how many times it
+drew, and the milliseconds spent drawing and turning the lit box into RGBA. Run it on an idle machine; the numbers are
+native, and wasm in a browser is slower. `bun run perf` in `packages/pixfx-phaser` measures the browser.
 
 ## Parity against pixelfx
 
