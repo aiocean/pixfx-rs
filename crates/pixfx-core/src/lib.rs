@@ -2,6 +2,7 @@
 //! that reproduces its JavaScript number semantics, so an effect renders the same pixels here as there.
 #![forbid(unsafe_code)]
 
+pub mod act;
 pub mod color;
 pub mod cue;
 pub mod effect;
@@ -15,6 +16,7 @@ pub mod shapes;
 pub mod sim;
 pub mod state;
 
+pub use act::{Act, ActEvent, Contact, Performance, Phase, Puff};
 pub use color::{ColorError, Rgba, hex};
 pub use cue::{Cue, TimedCue, cues_between, cues_of};
 pub use effect::{

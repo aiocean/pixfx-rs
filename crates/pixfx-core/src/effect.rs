@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::act::Act;
 use crate::color::{Rgba, fit};
 use crate::cue::{TimedCue, cues_between, cues_of};
 use crate::frame::Frame;
@@ -100,6 +101,10 @@ pub trait Effect: Send + Sync {
     /// The game-feel cues this effect fires, in its own space and time (pixelfx `cues(o)`); none by default.
     fn cues(&self, _opts: &Options) -> Vec<TimedCue> {
         Vec::new()
+    }
+    /// The attack timing of this effect when the game's attacker performs it (pixelfx `act`); none by default.
+    fn act(&self) -> Option<Act> {
+        None
     }
 }
 
