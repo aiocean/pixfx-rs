@@ -488,6 +488,25 @@ fn light_words_become_light_over_transparency() {
 }
 
 #[test]
+fn unlit_pixels_are_transparent_and_only_a_lit_one_counts() {
+    // unlit whatever the unused top byte holds, and whatever the buffer held before
+    let dark = tiny([0xffff_ffff; 3], [0, 0xff00_0000, 0x1200_0000]);
+    let mut out = [9u8; 12];
+    assert!(!light_rgba(&dark, &mut out), "a frame with no lit pixel");
+    assert_eq!(out, [0; 12]);
+
+    let one = tiny([0; 3], [0xff00_0000, 0x0000_0100, 0]);
+    let mut out = [9u8; 12];
+    assert!(
+        light_rgba(&one, &mut out),
+        "a frame with exactly one lit pixel"
+    );
+    assert_eq!(&out[0..4], &[0; 4]);
+    assert_eq!(&out[4..8], &composite_px(0, 0x0000_0100, None));
+    assert_eq!(&out[8..12], &[0; 4]);
+}
+
+#[test]
 fn bad_time_steps_are_refused_and_leave_time_alone() -> Res {
     let mut scene = Scene::new(scale(1)?);
     let h = scene.play(player("fire/candle")?, 0.0, 0.0, ())?;
