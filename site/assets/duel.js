@@ -1,5 +1,6 @@
 // The hero's duel: two cultivators fight on the ground and in the air, with spells that are pixfx effects. This
-// module is the game only: rules, spells, and each fighter's mind. It draws nothing and never touches the engine.
+// module is the game only: rules, spells, and each fighter's mind. Each fighter's body (how it moves, falls, gets up
+// and reels from a blow) is pixfx-fighter's `Body`, which `createDuel` is given; the module draws nothing.
 // `step` returns what the engine should show (play, move or stop an effect) and what just happened that the screen
 // should feel (`hit`, `clash`, `land`, `bump`, `ko`, `ultimate`, each with where and how hard); landing.js plays the effects and
 // gives the impacts their weight (hit-stop, shake, numbers).
@@ -14,45 +15,15 @@ const BODY = 34;
 const CHEST = 20;
 const HALF_WIDTH = 6;
 
+// The same numbers as pixfx-fighter's body, which owns them; the rules and the minds reason with them.
 const WALK = 52;
-/** Walking away from the foe is slower than walking toward it, as in fighting games, so no one can run away forever. */
-const BACKWALK = 0.75;
 const JUMP_SPEED = 220;
-const GRAVITY = 520;
-/** Near the top of an arc gravity eases, so a jump hangs a moment before it falls (the apex hang). */
-const APEX = { speed: 45, gravity: 0.45 };
-/** Flying: how fast a fighter climbs or sinks toward the height it wants, the highest it goes, and its qi cost. */
-const FLY = { rate: 7, max: 160, top: 96, cost: 3 };
-/**
- * A blow this strong or stronger throws the target off its feet and up into the air; one of `spin` or more sends it
- * head over heels. A lighter blow that catches a fighter in the air only pops it up (`pop`), and it lands on its feet.
- */
-const LAUNCH = { damage: 12, speed: 130, perDamage: 5, pop: 70, spin: 20 };
-/**
- * Timing follows fighting games, which count in frames at 60 a second, as this duel steps. A blow that keeps the
- * target on its feet holds it reeling (hitstun) for `base` plus `per` a point of power: a slash about 18 frames, a
- * heavier blow up to 25, the span Street Fighter 6 gives its medium and heavy normals.
- */
-const HITSTUN = { base: 0.24, per: 0.012 };
-/**
- * A thrown fighter can be hit `limit` more times before it lands (a juggle), flying less high each time; after that
- * blows pass through it until it is up again, as fighting games cap juggles so one throw is not a whole round.
- */
-const JUGGLE = { decay: 0.7, limit: 1 };
-/**
- * Thrown and landing: falling faster than `bounce` it bounces once off the floor, keeping `keep` of its speed; then it
- * lies `lie` seconds and takes `rise` to get up (sit, kneel, stand), or with chance `quick` flops `flop` and rolls
- * back `rollDistance` pixels over `roll` instead. Nothing touches it from landing until `grace` after it stands, the
- * way fighting games make a knocked-down fighter invulnerable until it is up.
- */
-const KNOCKDOWN = { bounce: 150, keep: 0.3, lie: 0.5, rise: 0.4, quick: 0.4, flop: 0.18, roll: 0.36, rollDistance: 26, grace: 0.1 };
-/** A jump crouches four frames before it leaves the ground; a landing crouches a moment (longer from a fall). */
+/** Flying: the highest a fighter goes, and the qi it costs a second. */
+const FLY = { top: 96, cost: 3 };
+/** A jump crouches four frames before it leaves the ground. */
 const JUMP_SQUAT = 4 / 60;
-const LANDING = { soft: 5 / 60, hard: 0.14 };
 /** Ducking, a fighter is this tall: low enough that a bolt fired from the ground passes over it. */
 const DUCK = 16;
-/** A hit lights the target white this long (a few frames, not the whole stagger). */
-const FLASH = 5 / 60;
 /** Rage is a small whole-number pool: a point for each blow landed; when full, the school's ultimate. */
 export const RAGE = 4;
 /** Status effects: frozen (no moving, no acting) and shocked (a short paralysis), in seconds. */
@@ -86,10 +57,6 @@ export const STATS = {
   frost: { hp: 2450, atk: 370, pdef: 105, mdef: 165, crit: 0.15, critDamage: 1.7, dodge: 0.11, fury: false, unyielding: false, attuned: true },
 };
 
-/** Knocked into the arena's edge faster than this, a fighter bounces off it. */
-const BOUNCE = 80;
-/** Falling faster than this when it lands, a fighter's landing is felt. */
-const HARD_LANDING = 140;
 const QI_REGEN = 3;
 const MEDITATE_REGEN = 16;
 /** How long a fighter takes to notice something new, and how often it thinks. */
@@ -111,8 +78,6 @@ const GUARD_COST = 8;
 /** The share of a blocked blow's damage that still lands. */
 const CHIP = 0.15;
 const KNOCKBACK = 130;
-/** How close two bodies can stand: the space each one takes up, and a little room between. */
-const PERSONAL = 2 * HALF_WIDTH + 6;
 const ROUND_PAUSE = 3.2;
 
 const CAST_CIRCLE = "arcane/rune-circle";
@@ -255,26 +220,35 @@ function random(seed) {
 
 /**
  * A new duel in the arena from `left` to `right` (game pixels), standing on `ground`. `has(id)` says whether an
- * effect is in the registry.
+ * effect is in the registry. `Body` is pixfx-fighter's body (from the engine's wasm package): each fighter gets one.
  */
-export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top }) {
+export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top, Body }) {
   // `sky`: how high above the ground a fighter may fly, below whatever hangs over the arena
-  const duel = { seed, rng: random(seed), left, right, ground, has, top: Math.min(FLY.top, sky), time: 0, round: 0, wins: [0, 0], key: 0, shots: [], pause: 0, out: [] };
+  const top = Math.min(FLY.top, sky);
+  const duel = { seed, rng: random(seed), left, right, ground, has, top, arena: { left, right, top }, Body, time: 0, round: 0, wins: [0, 0], key: 0, shots: [], pause: 0, out: [] };
   const usable = (name) => {
     const fx = SPELLS[name].fx;
     return !fx || has(fx);
   };
   duel.fighters = [
-    fighter(0, "thunder", SCHOOLS.thunder.spells.filter(usable)),
-    fighter(1, "frost", SCHOOLS.frost.spells.filter(usable)),
+    fighter(0, "thunder", SCHOOLS.thunder.spells.filter(usable), new Body(0)),
+    fighter(1, "frost", SCHOOLS.frost.spells.filter(usable), new Body(0)),
   ];
   for (const name of Object.values(DECOR)) if (has(name)) duel.decor = true;
   startRound(duel);
   return duel;
 }
 
-function fighter(index, school, spells) {
-  return { index, school, spells, stats: STATS[school], x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0, down: null, wake: 0, hitT: 9, hitPower: 0, squat: 0, leap: 0, duck: 0, calm: 0, attune: 0, read: { tried: {}, landed: {} } };
+/** The body's fields, read and written on the fighter as if they were its own. */
+const BODY_FIELDS = ["x", "air", "vx", "vy", "face", "stun", "wake", "land", "squat", "leap", "duck", "flash", "hitT", "hitPower", "frozen", "shocked", "poseT"];
+
+function fighter(index, school, spells, body) {
+  const f = { index, school, spells, stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, calm: 0, attune: 0, read: { tried: {}, landed: {} } , body };
+  for (const k of BODY_FIELDS) {
+    Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
+  }
+  for (const k of ["pose", "down"]) Object.defineProperty(f, k, { enumerable: true, get: () => body[k] });
+  return f;
 }
 
 function startRound(duel) {
@@ -285,8 +259,8 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0, calm: 0, down: null, wake: 0, hitT: 9, hitPower: 0, squat: 0, leap: 0, duck: 0 });
-    f.x = duel.left + span * (f.index === 0 ? 0.22 : 0.78);
+    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, calm: 0 });
+    f.body.startRound(duel.left + span * (f.index === 0 ? 0.22 : 0.78));
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
   }
@@ -318,50 +292,17 @@ function tick(duel, dt) {
     mind(duel, me, foe, dt);
     body(duel, me, foe, dt);
   }
-  separate(duel, a, b);
+  if (a.hp > 0 && b.hp > 0) duel.Body.separate(a.body, b.body, duel.arena);
   for (const s of [...duel.shots]) shot(duel, s, dt);
   for (const f of duel.fighters) if (f.hp <= 0 && duel.winner === null) knockOut(duel, f);
 }
 
-/**
- * Two bodies cannot stand in one place: when they overlap at the same height each is pushed half the overlap
- * apart, and neither keeps walking into the other. One far enough above the other passes over it.
- */
-function separate(duel, a, b) {
-  // a fighter lying on the floor or getting up is stepped over, as in fighting games
-  if (a.hp <= 0 || b.hp <= 0 || floored(a) || floored(b) || Math.abs(a.air - b.air) >= BODY - 6) return;
-  const dx = b.x - a.x;
-  const overlap = PERSONAL - Math.abs(dx);
-  if (overlap <= 0) return;
-  // exactly on top of each other: part them along the way they face
-  const dir = dx !== 0 ? Math.sign(dx) : a.face;
-  const lo = duel.left + HALF_WIDTH;
-  const hi = duel.right - HALF_WIDTH;
-  a.x = clamp(a.x - (dir * overlap) / 2, lo, hi);
-  b.x = clamp(b.x + (dir * overlap) / 2, lo, hi);
-  // against a wall one side cannot give: the other takes the rest
-  const left = PERSONAL - Math.abs(b.x - a.x);
-  if (left > 0) {
-    if (a.x === lo || a.x === hi) b.x = clamp(b.x + dir * left, lo, hi);
-    else a.x = clamp(a.x - dir * left, lo, hi);
-  }
-  if (Math.sign(a.vx) === dir) a.vx = 0;
-  if (Math.sign(b.vx) === -dir) b.vx = 0;
-}
+// ---------- bodies: the rules' side of moving, casting, getting hit ----------
 
-// ---------- bodies: moving, casting, getting hit ----------
-
+/** One step of fighter me: its body's clocks, the rules' own timers, then its body moves as the rules drive it. */
 function body(duel, me, foe, dt) {
-  me.flash = Math.max(0, me.flash - dt);
-  me.poseT += dt;
-  me.hitT += dt;
-  me.stun = Math.max(0, me.stun - dt);
-  me.wake = Math.max(0, me.wake - dt);
-  me.duck = Math.max(0, me.duck - dt);
+  me.body.tick(dt, me.hp > 0);
   me.calm = Math.max(0, me.calm - dt);
-  if (me.down) downed(duel, me, foe, dt);
-  me.frozen = Math.max(0, me.frozen - dt);
-  me.shocked = Math.max(0, me.shocked - dt);
   me.sealed = Math.max(0, me.sealed - dt);
   me.defDown = Math.max(0, me.defDown - dt);
   me.silence = Math.max(0, me.silence - dt);
@@ -378,52 +319,13 @@ function body(duel, me, foe, dt) {
   me.guard = Math.max(0, me.guard - dt);
   for (const k of Object.keys(me.cool)) me.cool[k] = Math.max(0, me.cool[k] - dt);
   me.qi = Math.min(100, me.qi + (me.medit ? MEDITATE_REGEN : me.fly ? -FLY.cost : QI_REGEN) * dt);
-  me.land = Math.max(0, me.land - dt);
-  if (!me.act && !reeling(me)) me.face = foe.x >= me.x ? 1 : -1;
   // out of qi, or knocked out of the sky: flight ends and it falls
-  if (me.fly && (me.qi <= 1 || reeling(me))) me.fly = false;
-  // the crouch before a jump ends: up it goes
-  if (me.squat > 0) {
-    me.squat = Math.max(0, me.squat - dt);
-    if (me.squat === 0) me.vy = me.leap;
-  }
-
-  // feet: walking or flying across (only when free), knockback, then up and down
-  const free = !me.act && !reeling(me) && !me.medit && me.frozen === 0 && me.shocked === 0 && me.squat === 0 && me.duck === 0;
-  const away = Math.sign(me.intent.move) === -Math.sign(foe.x - me.x);
-  const walk = free && me.guard === 0 ? me.intent.move * WALK * (me.chilled > 0 ? 0.45 : 1) * (away ? BACKWALK : 1) : 0;
-  // a body sliding along the floor on its back stops sooner
-  me.vx *= Math.exp((me.down?.phase === "down" ? -12 : -6) * dt);
-  const x = me.x + (walk + me.vx) * dt;
-  const lo = duel.left + HALF_WIDTH, hi = duel.right - HALF_WIDTH;
-  if ((x < lo || x > hi) && Math.abs(me.vx) > BOUNCE) {
-    // thrown into the edge of the arena: bounce off it
-    me.vx = -me.vx * 0.5;
-    emit(duel, { type: "bump", x: x < lo ? lo : hi, y: me.air + CHEST, strength: Math.min(1, Math.abs(me.vx) / 120) });
-  }
-  me.x = clamp(x, lo, hi);
+  if (me.fly && (me.qi <= 1 || me.body.reeling())) me.fly = false;
+  // a dive drops straight at the foe's height
   const diving = me.act?.phase === "windup" && SPELLS[me.act.spell].dive;
-  if (diving) {
-    // a dive drops straight at the foe's height
-    me.air = Math.max(foe.air, me.air - SPELLS.dive.speed * dt);
-    me.vy = -SPELLS.dive.speed;
-  } else if (me.fly) {
-    me.vy = clamp((me.hover - me.air) * FLY.rate, -FLY.max, FLY.max);
-    me.air = clamp(me.air + me.vy * dt, 0, duel.top);
-  } else if (me.air > 0 || me.vy > 0) {
-    const g = Math.abs(me.vy) < APEX.speed ? GRAVITY * APEX.gravity : GRAVITY;
-    const falling = -me.vy;
-    me.vy -= g * dt;
-    me.air = Math.max(0, me.air + me.vy * dt);
-    if (me.air === 0) {
-      me.vy = 0;
-      if (me.down?.phase === "air") thrownLands(duel, me, falling);
-      else if (falling > HARD_LANDING) {
-        me.land = LANDING.hard;
-        emit(duel, { type: "land", x: me.x, strength: Math.min(1, falling / 300) });
-      } else if (falling > 40) me.land = LANDING.soft;
-    }
-  }
+  const motion = diving ? { dive: SPELLS.dive.speed, floor: foe.air } : me.fly ? { fly: me.hover } : "gravity";
+  const drive = { alive: me.hp > 0, acting: me.act !== null, meditating: me.medit, guarding: me.guard > 0, chilled: me.chilled > 0, intent: me.intent.move, motion, foeX: foe.x };
+  for (const e of me.body.step(dt, drive, duel.arena, duel.rng)) emit(duel, e);
 
   if (me.act) {
     me.act.t += dt;
@@ -439,131 +341,13 @@ function body(duel, me, foe, dt) {
       me.act = null;
     }
   }
-  setPose(me, poseOf(me));
+  pose(me);
 }
 
-/** A new pose starts its own clock, so each one animates from its first frame. */
-function setPose(f, pose) {
-  if (pose !== f.pose) f.poseT = 0;
-  f.pose = pose;
-}
-
-/** Off its feet or reeling from a blow: it cannot act. */
-function reeling(f) {
-  return f.stun > 0 || f.down !== null;
-}
-
-/** On the floor or getting up from it (or just up): nothing touches it. */
-function floored(f) {
-  return (f.down !== null && f.down.phase !== "air") || f.wake > 0;
-}
-
-/** Nothing touches it: it is on the floor, or thrown and already juggled as often as a throw allows. */
-function untouchable(f) {
-  return floored(f) || (f.down?.phase === "air" && f.down.juggle >= JUGGLE.limit);
-}
-
-/**
- * Throw f off its feet: up into the air from a heavy blow, a little pop from a light one that caught it in the air.
- * Each hit while it is still thrown (a juggle) throws it less high, and past the limit not at all.
- */
-function launch(f, power, dir, heavy) {
-  const juggle = f.down?.phase === "air" ? f.down.juggle + 1 : 0;
-  const k = JUGGLE.decay ** juggle;
-  f.vx += dir * KNOCKBACK * (heavy ? 1.7 : 1) * k;
-  f.vy = Math.max(f.vy, (heavy ? LAUNCH.speed + power * LAUNCH.perDamage : LAUNCH.pop) * k);
-  // a light pop lands on its feet; once thrown by a heavy blow it stays thrown
-  const light = !heavy && !(f.down && !f.down.light);
-  f.down = { phase: "air", t: 0, juggle, light, spin: heavy && power >= LAUNCH.spin, bounced: false, quick: false, dir: 0 };
-  f.stun = 0;
-}
-
-/** A thrown fighter meets the floor falling at `falling`: it bounces once, lands on its feet from a pop, or goes down. */
-function thrownLands(duel, f, falling) {
-  const d = f.down;
-  emit(duel, { type: "land", x: f.x, strength: Math.min(1, falling / 260) });
-  if (!d.bounced && falling > KNOCKDOWN.bounce) {
-    d.bounced = true;
-    f.vy = falling * KNOCKDOWN.keep;
-    return;
-  }
-  if (d.light && f.hp > 0) {
-    f.down = null;
-    f.land = LANDING.hard;
-    return;
-  }
-  // a quick rise rolls away from the foe, unless a wall is behind it
-  const foe = duel.fighters[1 - f.index];
-  const away = Math.sign(f.x - foe.x) || 1;
-  const room = away < 0 ? f.x - duel.left : duel.right - f.x;
-  Object.assign(d, { phase: "down", t: 0, quick: f.hp > 0 && room > KNOCKDOWN.rollDistance + 8 && duel.rng() < KNOCKDOWN.quick, dir: away });
-}
-
-/** Lying, then getting up: time passes, and at the end it stands with a moment's grace. A knocked-out fighter stays down. */
-function downed(duel, f, foe, dt) {
-  const d = f.down;
-  d.t += dt;
-  if (d.phase === "down" && f.hp > 0 && d.t >= (d.quick ? KNOCKDOWN.flop : KNOCKDOWN.lie)) {
-    d.phase = d.quick ? "roll" : "rise";
-    d.t = 0;
-  } else if (d.phase === "roll") {
-    f.vx = (d.dir * KNOCKDOWN.rollDistance) / KNOCKDOWN.roll;
-    if (d.t >= KNOCKDOWN.roll) stand(f);
-  } else if (d.phase === "rise" && d.t >= KNOCKDOWN.rise) stand(f);
-}
-
-function stand(f) {
-  f.down = null;
-  f.vx = 0;
-  f.wake = KNOCKDOWN.grace;
-  f.land = LANDING.soft;
-}
-
-/** How long until fighter f can act again: its stagger, or the rest of its fall, lying and getting up. */
-function outFor(f) {
-  const d = f.down;
-  if (!d) return f.stun;
-  const ground = d.quick ? KNOCKDOWN.flop + KNOCKDOWN.roll : KNOCKDOWN.lie + KNOCKDOWN.rise;
-  if (d.phase === "air") return (d.light ? 0 : ground) + Math.max(0.1, (f.vy + Math.sqrt(Math.max(0, f.vy * f.vy + 2 * GRAVITY * f.air))) / GRAVITY);
-  if (d.phase === "down") return ground - d.t;
-  return (d.phase === "roll" ? KNOCKDOWN.roll : KNOCKDOWN.rise) - d.t;
-}
-
-/** How long until a blow can touch fighter f: none while it is up or in the air, the rest of its time on the floor. */
-function openIn(f) {
-  if (!untouchable(f)) return 0;
-  return f.down ? outFor(f) + KNOCKDOWN.grace : f.wake;
-}
-
-function poseOf(f) {
-  const d = f.down;
-  if (d) {
-    if (d.phase === "air") return d.spin && !d.bounced ? "tumble" : f.vy > 0 && !d.bounced ? "launched" : "fall";
-    if (d.phase === "down") return "down";
-    if (d.phase === "roll") return "roll";
-    // getting up: sit up, kneel, then stand from a crouch
-    const k = d.t / KNOCKDOWN.rise;
-    return k < 0.4 ? "sit" : k < 0.75 ? "kneel" : "crouch";
-  }
-  // struck down this very step: the knockout throws it next
-  if (f.hp <= 0) return "hurt";
-  if (f.frozen > 0) return "frozen";
-  if (f.shocked > 0) return "shocked";
-  if (f.stun > 0) return f.air > 4 ? "fall" : "hurt";
-  if (f.duck > 0) return "duck";
-  if (f.squat > 0) return "crouch";
-  if (f.act) {
-    const k = SPELLS[f.act.spell].kind;
-    if (k === "melee") return f.act.phase === "windup" ? "draw" : "slash";
-    return f.act.phase === "windup" ? "channel" : "cast";
-  }
-  if (f.guard > 0) return "guard";
-  if (f.medit) return "meditate";
-  if (f.land > 0) return "land";
-  if (f.fly) return "fly";
-  if (f.air > 0) return "jump";
-  if (f.intent.move !== 0) return "walk";
-  return "idle";
+/** Settle fighter f's pose from what the rules have it doing; the body decides when it is off its feet or reeling. */
+function pose(f) {
+  const doing = f.act ? f.act.phase : f.guard > 0 ? "guard" : f.medit ? "meditate" : f.fly ? "fly" : f.intent.move !== 0 ? "walk" : "idle";
+  f.body.updatePose(doing, f.act !== null && SPELLS[f.act.spell].kind === "melee", f.hp > 0);
 }
 
 function begin(duel, me, name, target) {
@@ -687,7 +471,7 @@ function release(duel, me, foe, spell) {
  * no fight stalls behind a guard; with too little qi left the guard breaks and the blow lands.
  */
 function blocks(f, fromX, damage = 0) {
-  if (f.guard === 0 || reeling(f) || Math.sign(fromX - f.x) !== f.face) return false;
+  if (f.guard === 0 || f.body.reeling() || Math.sign(fromX - f.x) !== f.face) return false;
   if (f.qi < GUARD_COST) {
     f.guard = 0;
     return false;
@@ -736,7 +520,7 @@ function dropBarrier(duel, f) {
  * `dodge`). Returns whether it landed.
  */
 function hurt(duel, f, power, dir, spell) {
-  if (f.hp <= 0 || untouchable(f)) return false;
+  if (f.hp <= 0 || f.body.untouchable()) return false;
   if (turnsAside(duel, f, dir, spell)) return false;
   const by = duel.fighters[1 - f.index];
   const s = SPELLS[spell];
@@ -751,25 +535,16 @@ function hurt(duel, f, power, dir, spell) {
   const amount = damageOf(by, f, power, s?.type ?? "magic", crit, duel.rng());
   const share = take(duel, f, amount);
   // a frost blow freezes where it strikes: it holds the target in place rather than throwing it
-  const heavy = power >= LAUNCH.damage && !s?.freeze;
-  const thrown = heavy || (!s?.freeze && (f.air > 0 || f.fly || f.down?.phase === "air"));
-  emit(duel, { type: "hit", by: by.index, spell, power, launch: heavy, damage: amount, crit, share, x: f.x, y: f.air + CHEST });
+  const heavy = duel.Body.heavy(power, !!s?.freeze);
+  const ranged = s?.kind === "bolt" || s?.kind === "orb";
+  emit(duel, { type: "hit", by: by.index, spell, power, launch: heavy, ranged, damage: amount, crit, share, x: f.x, y: f.air + CHEST });
   // rage for the blow: an attuned fighter's spells were paid for when cast, so only its blade earns here
   if (!s?.ultimate && !(by.stats.attuned && s?.kind !== "melee")) gainRage(by, 1);
   by.read.landed[spell] = (by.read.landed[spell] ?? 0) + 1;
   if (by.stats.fury) by.fury = Math.min(FURY.max, by.fury + 1);
-  f.flash = FLASH;
-  f.hitT = 0;
-  f.hitPower = power;
-  f.fly = false;
-  f.squat = 0;
-  f.duck = 0;
   // a heavy blow throws it up, where it can be hit again before it lands; a lighter one staggers it where it stands
-  if (thrown) launch(f, power, dir, heavy);
-  else {
-    f.stun = HITSTUN.base + power * HITSTUN.per;
-    f.vx += dir * KNOCKBACK * (s?.freeze ? 0.5 : 1);
-  }
+  f.body.hit(power, dir, !!s?.freeze, f.fly);
+  f.fly = false;
   // a hit breaks a cast: what was gathering is lost
   if (f.act?.circle !== undefined && f.act.phase === "windup") emit(duel, { type: "stop", key: f.act.circle });
   f.act = null;
@@ -843,9 +618,7 @@ function knockOut(duel, f) {
   const other = duel.fighters[1 - f.index];
   emit(duel, { type: "ko", x: f.x, y: f.air + CHEST });
   // the knockout throws the loser off its feet, if the blow has not already
-  if (!f.down) launch(f, LAUNCH.spin, Math.sign(f.x - other.x) || 1, true);
-  else if (f.down.phase !== "air") f.down.phase = "down";
-  f.stun = 0;
+  f.body.knockOut(other.x);
   f.fly = false;
   other.fly = false;
   duel.winner = other.index;
@@ -856,25 +629,10 @@ function knockOut(duel, f) {
   setMeditating(duel, other, false);
 }
 
+/** Between rounds: the loser falls and lies where it lands; the winner comes down and stands over it. */
 function settle(duel, f, dt) {
-  f.poseT += dt;
-  f.hitT += dt;
-  f.flash = Math.max(0, f.flash - dt);
-  if (f.down) f.down.t += dt;
-  f.vx *= Math.exp((f.down?.phase === "down" ? -12 : -6) * dt);
-  f.x = clamp(f.x + f.vx * dt, duel.left + HALF_WIDTH, duel.right - HALF_WIDTH);
-  if (f.air > 0 || f.vy > 0) {
-    const falling = -f.vy;
-    f.vy -= GRAVITY * dt;
-    f.air = Math.max(0, f.air + f.vy * dt);
-    if (f.air === 0) {
-      f.vy = 0;
-      if (f.down?.phase === "air") thrownLands(duel, f, falling + GRAVITY * dt);
-    }
-  }
-  // the loser falls and lies where it lands; the winner comes down and stands over it
-  if (f.index !== duel.winner) setPose(f, poseOf(f));
-  else setPose(f, f.air > 0 ? "jump" : "win");
+  const foe = duel.fighters[1 - f.index];
+  for (const e of f.body.settle(dt, f.index === duel.winner, f.hp > 0, foe.x, duel.arena, duel.rng)) emit(duel, e);
 }
 
 function setMeditating(duel, f, on) {
@@ -1012,7 +770,7 @@ function orbAt(s) {
 
 /** Does a point (x, height above ground) touch fighter f, give or take r? */
 function overlaps(f, x, y, r) {
-  if (untouchable(f)) return false;
+  if (f.body.untouchable()) return false;
   return Math.abs(x - f.x) < HALF_WIDTH + r && y > f.air - r && y < f.air + (f.duck > 0 ? DUCK : BODY) + r;
 }
 
@@ -1038,7 +796,7 @@ function stopShot(duel, s) {
  */
 function mind(duel, me, foe, dt) {
   me.think -= dt;
-  if (me.think > 0 || me.act || reeling(me) || me.squat > 0 || me.duck > 0 || me.frozen > 0 || me.shocked > 0 || me.hp <= 0) return;
+  if (me.think > 0 || me.act || me.body.reeling() || me.squat > 0 || me.duck > 0 || me.frozen > 0 || me.shocked > 0 || me.hp <= 0) return;
   me.think = THINK * (0.8 + duel.rng() * 0.4);
   const threats = [...dangers(duel, me), ...blows(duel, me, foe)];
   const options = [...threats, ...attacks(duel, me, foe), ...positions(duel, me, foe)];
@@ -1181,16 +939,16 @@ function attacks(duel, me, foe) {
   const school = SCHOOLS[me.school];
   const d = Math.abs(foe.x - me.x);
   // how long the foe cannot answer: it is gathering a spell, recovering from one, or staggered
-  const busy = outFor(foe) + (foe.act ? SPELLS[foe.act.spell][foe.act.phase] - foe.act.t + (foe.act.phase === "windup" ? SPELLS[foe.act.spell].recover : 0) : 0);
+  const busy = foe.body.outFor() + (foe.act ? SPELLS[foe.act.spell][foe.act.phase] - foe.act.t + (foe.act.phase === "windup" ? SPELLS[foe.act.spell].recover : 0) : 0);
   // a foe on the floor cannot be touched: a blow is only worth starting if it lands once the foe is up (a meaty)
-  const open = openIn(foe);
-  const free = !reeling(foe) && !foe.act && foe.frozen === 0 && foe.shocked === 0;
+  const open = foe.body.openIn();
+  const free = !foe.body.reeling() && !foe.act && foe.frozen === 0 && foe.shocked === 0;
   // an opening to punish: the foe down, staggered, recovering from a move, or held in a long cast; a blow it is
   // winding up is no opening (striking into it only trades)
   const fact = foe.act ? SPELLS[foe.act.spell] : null;
   const striking = fact && (fact.kind === "melee" || fact.kind === "blast" || fact.kind === "dash");
   const opening =
-    outFor(foe) + foe.frozen + foe.shocked +
+    foe.body.outFor() + foe.frozen + foe.shocked +
     (!fact ? 0 : foe.act.phase === "recover" ? fact.recover - foe.act.t : striking ? 0 : fact.windup - foe.act.t + fact.recover);
   // ahead on life, a miss costs more than it gains; behind, less
   const lead = clamp((me.hp - foe.hp) / 40, -1, 1);
@@ -1231,7 +989,7 @@ function attacks(duel, me, foe) {
   for (const name of ["tribulation", "prison"]) {
     if (!ready(me, name)) continue;
     const lead = SPELLS[name].windup + SPELLS[name].impact;
-    const pace = foe.act || reeling(foe) || foe.medit ? 0 : foe.intent.move * WALK;
+    const pace = foe.act || foe.body.reeling() || foe.medit ? 0 : foe.intent.move * WALK;
     if (lead < open) continue;
     out.push({ spell: name, target: foe.x + pace * lead * 0.8, score: value(name, 0.8, lead) * (SPELLS[name].strikes ?? 1) + 3 });
   }
@@ -1239,7 +997,7 @@ function attacks(duel, me, foe) {
     if (SPELLS[name].kind !== "zone" || SPELLS[name].ultimate || !ready(me, name)) continue;
     // aim where the foe will be when it lands
     const lead = SPELLS[name].windup + (SPELLS[name].sigil ?? 0) + SPELLS[name].impact;
-    const pace = foe.act || reeling(foe) || foe.medit ? 0 : foe.intent.move * WALK;
+    const pace = foe.act || foe.body.reeling() || foe.medit ? 0 : foe.intent.move * WALK;
     const target = foe.x + pace * lead * 0.8;
     // an icicle only finds a foe standing on the floor
     const grounded = SPELLS[name].grounded ? (foe.air < 10 && !foe.fly ? 1 : 0.1) : 1;
@@ -1307,7 +1065,7 @@ function positions(duel, me, foe) {
   // after an exchange, or with the foe behind a barrier, back off to spacing and let it come (footsies): out of its
   // sword's reach at least, and most of the way back to its own range
   const reach = Math.max(SPELLS.slash.range + HALF_WIDTH + 6, range * 0.8);
-  if ((me.calm > 0 || foe.barrier > 0) && Math.abs(d) < reach && Math.abs(foe.air - me.air) < CHEST && !reeling(foe)) {
+  if ((me.calm > 0 || foe.barrier > 0) && Math.abs(d) < reach && Math.abs(foe.air - me.air) < CHEST && !foe.body.reeling()) {
     const back = -Math.sign(d) || 1;
     const room = back < 0 ? me.x - duel.left : duel.right - me.x;
     if (room > 14) out.push({ spell: "move", move: back, score: 2.4 });

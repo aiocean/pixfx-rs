@@ -12,6 +12,7 @@
 //! this file only blits.
 #![forbid(unsafe_code)]
 
+pub mod fighter;
 pub mod stage;
 
 use std::cell::{Cell, RefCell};

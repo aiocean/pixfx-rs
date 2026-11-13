@@ -248,6 +248,7 @@ dependencies = [
  "js-sys",
  "pixfx-core",
  "pixfx-effects",
+ "pixfx-fighter",
  "pixfx-wasm",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -289,6 +290,14 @@ dependencies = [
  "pixfx-effects",
  "png",
  "serde_json",
+]
+
+[[package]]
+name = "pixfx-fighter"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "pixfx-core",
 ]
 
 [[package]]
