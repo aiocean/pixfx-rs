@@ -535,7 +535,7 @@ impl Feel {
                 for side in [-1.0, 1.0] {
                     let x = js_round(d.x + side * out);
                     let y = ground - 1.0 - rise;
-                    crate::status::fill(frame, x as i32, y as i32, w as i32, 1, c, alpha);
+                    pixfx_core::blend::fill(frame, x as i32, y as i32, w as i32, 1, c, alpha);
                 }
                 i += 1.0;
             }

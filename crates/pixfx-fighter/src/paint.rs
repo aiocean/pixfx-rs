@@ -11,6 +11,7 @@ use crate::look::{Hairdo, Look};
 use crate::pose::{Gather, Pose};
 use core::f64::consts::PI;
 use libm::{cos, floor, sin, sqrt};
+use pixfx_core::blend::{cover_over, mul_div255, over_premul, straighten};
 use pixfx_core::math::{js_max, js_min, js_round};
 use pixfx_core::{Frame, Rgba};
 
@@ -97,7 +98,7 @@ impl Sprite {
         if x >= SPRITE {
             return None;
         }
-        self.px.get(y * SPRITE + x).map(|&p| unpremultiply(p))
+        self.px.get(y * SPRITE + x).map(|&p| straighten(p))
     }
 
     fn alpha(&self, x: i32, y: i32) -> u8 {
@@ -139,54 +140,9 @@ impl Sprite {
     }
 }
 
-/// Skia's blend of an opaque colour at `cover`/256 over a premultiplied pixel (SkBlendARGB32).
-fn cover_over(d: [u8; 4], c: Rgba, cover: i32) -> [u8; 4] {
-    if cover >= 256 {
-        return [c.0, c.1, c.2, 255];
-    }
-    let s = cover.max(0) as u32;
-    let ds = 256 - ((255 * s) >> 8);
-    let ch = |sv: u8, dv: u8| (((u32::from(sv) * s) >> 8) + ((u32::from(dv) * ds) >> 8)).min(255) as u8;
-    [ch(c.0, d[0]), ch(c.1, d[1]), ch(c.2, d[2]), ch(255, d[3])]
-}
 
-fn unpremultiply(p: [u8; 4]) -> Rgba {
-    let a = u32::from(p[3]);
-    if a == 0 || a == 255 {
-        return Rgba(p[0], p[1], p[2], p[3]);
-    }
-    let ch = |v: u8| ((u32::from(v) * 255 + a / 2) / a).min(255) as u8;
-    Rgba(ch(p[0]), ch(p[1]), ch(p[2]), p[3])
-}
 
-/// Skia's 8-bit `x / 255`, rounded.
-fn div255(x: u32) -> u32 {
-    ((x + 128) * 257) >> 16
-}
 
-/// A premultiplied pixel source-over the frame's colour layer at world pixel (wx, wy), in 8 bits a channel as
-/// Chrome's canvas blends (`s + d * (256 - sa) >> 8`): the frame's straight colour is premultiplied, blended,
-/// and straightened again (a lossless round trip at 8 bits).
-fn over(frame: &mut Frame, wx: i32, wy: i32, src: [u8; 4]) {
-    let (x, y) = (wx - frame.ox, wy - frame.oy);
-    if src[3] == 0 || x < 0 || y < 0 || x >= frame.w as i32 || y >= frame.h as i32 {
-        return;
-    }
-    let Some(px) = frame.color.get_mut(y as usize * frame.w as usize + x as usize) else {
-        return;
-    };
-    if src[3] == 255 {
-        *px = Rgba(src[0], src[1], src[2], 255).pack();
-        return;
-    }
-    let d = Rgba::unpack(*px);
-    let da = u32::from(d.3);
-    let keep = 256 - u32::from(src[3]);
-    let ch = |s: u8, dp: u32| (u32::from(s) + ((dp * keep) >> 8)).min(255) as u8;
-    let pm = |v: u8| div255(u32::from(v) * da);
-    let out = [ch(src[0], pm(d.0)), ch(src[1], pm(d.1)), ch(src[2], pm(d.2)), ch(src[3], da)];
-    *px = unpremultiply(out).pack();
-}
 
 /// JS `Math.sign(v) || fallback`.
 fn sign_or(v: f64, fallback: f64) -> f64 {
@@ -951,7 +907,7 @@ fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f6
             let ga = alpha * (base + 0.12 * k) * (0.85 + 0.15 * sin(t * 9.0));
             // the canvas takes a fill's alpha to 8 bits, then premultiplies the colour by it
             let a8 = js_round(ga * 255.0) as u32;
-            let ch = |v: u8| div255(u32::from(v) * a8) as u8;
+            let ch = |v: u8| mul_div255(u32::from(v), a8) as u8;
             let src = [ch(glow.0), ch(glow.1), ch(glow.2), a8 as u8];
             let mut row = -js_round(ry);
             while row <= js_round(ry) {
@@ -959,7 +915,7 @@ fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f6
                 if half.is_finite() {
                     let mut i = -half;
                     while i <= half {
-                        over(frame, (cx + i) as i32, (cy + row) as i32, src);
+                        over_premul(frame, (cx + i) as i32, (cy + row) as i32, src);
                         i += 1.0;
                     }
                 }
@@ -987,8 +943,8 @@ fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f6
                 _ => (u, v),
             };
             let (wx, wy) = (x + CX + dx, y + pv + dy);
-            let src = if alpha >= 1.0 { p } else { p.map(|v| div255(u32::from(v) * a8) as u8) };
-            over(frame, wx, wy, src);
+            let src = if alpha >= 1.0 { p } else { p.map(|v| mul_div255(u32::from(v), a8) as u8) };
+            over_premul(frame, wx, wy, src);
         }
     }
 }

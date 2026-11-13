@@ -9,6 +9,7 @@
 //!   the feet and an intensity (0 to 1), so the same call draws the same pixels; draw them after the sprite.
 //!   They write opaque pixels to the colour layer and glow to the light layer.
 
+use pixfx_core::blend::fill;
 use pixfx_core::color::Rgba;
 use pixfx_core::frame::Frame;
 use pixfx_core::math::{clamp, js_round, rand};
@@ -81,63 +82,9 @@ const SNOW: Rgba = Rgba::hex24(0xbff2ff);
 const SEAL: Rgba = Rgba::hex24(0xc9c3e6);
 const FURY: Rgba = Rgba::hex24(0xffc23d);
 
-/// Fill the whole-pixel box (x, y, w, h) with `c` at alpha `a`, source-over into the colour layer (see [`over`]):
-/// a canvas `fillRect` under `globalAlpha`, the way the duel drew its marks and dust.
-pub(crate) fn fill(frame: &mut Frame, x: i32, y: i32, w: i32, h: i32, c: Rgba, a: f64) {
-    let a = clamp(a, 0.0, 1.0);
-    if a <= 0.0 {
-        return;
-    }
-    for yy in y..y + h {
-        for xx in x..x + w {
-            let (lx, ly) = (
-                i64::from(xx) - i64::from(frame.ox),
-                i64::from(yy) - i64::from(frame.oy),
-            );
-            if lx < 0 || ly < 0 || lx >= i64::from(frame.w) || ly >= i64::from(frame.h) {
-                continue;
-            }
-            let i = (ly * i64::from(frame.w) + lx) as usize;
-            if let Some(px) = frame.color.get_mut(i) {
-                *px = over(*px, c, a);
-            }
-        }
-    }
-}
 
-/// Colour `c` at alpha `a` over the ABGR word `d`, as the duel's canvas (Chrome's Skia raster blitter) does it:
-/// the alpha taken to 8 bits, both colours premultiplied to 8 bits, the destination scaled by `256 - alpha`
-/// in 8.8 fixed point, the sum stored premultiplied and read back straight. The rounding through premultiplied
-/// bytes is part of the look: at alpha 20 a channel moves in steps of about 13.
-fn over(d: u32, c: Rgba, a: f64) -> u32 {
-    let sa = js_round(a * 255.0) as u32;
-    if sa == 0 {
-        return d;
-    }
-    let da = d >> 24;
-    let keep = 256 - sa;
-    let oa = sa + ((da * keep) >> 8);
-    let mix = |cv: u8, s: u32| {
-        let dp = mul_div255((d >> s) & 255, da);
-        unpremultiply(mul_div255(u32::from(cv), sa) + ((dp * keep) >> 8), oa)
-    };
-    (oa << 24) | (mix(c.2, 16) << 16) | (mix(c.1, 8) << 8) | mix(c.0, 0)
-}
 
-/// `a * b / 255` rounded, in integers (Skia `SkMulDiv255Round`).
-fn mul_div255(a: u32, b: u32) -> u32 {
-    let p = a * b + 128;
-    (p + (p >> 8)) >> 8
-}
 
-/// A premultiplied channel back to straight at alpha `a` (Skia `SkUnPremultiply`, as `getImageData` reads it).
-fn unpremultiply(p: u32, a: u32) -> u32 {
-    if a == 0 {
-        return 0;
-    }
-    let scale = ((255_u64 << 24) + u64::from(a / 2)) / u64::from(a);
-    ((u64::from(p) * scale + (1 << 23)) >> 24).min(255) as u32
-}
 
 /// A barrier: a dome round the body, faint while it waits and flaring white where a blow has just rung on it.
 fn dome(frame: &mut Frame, m: &Marks, fx: i32, fy: i32) {

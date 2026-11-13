@@ -13,22 +13,22 @@ pub fn js_round(x: f64) -> f64 {
     if up == 0.0 && x < 0.0 { -0.0 } else { up }
 }
 
-/// JS `Math.min(a, b)`: NaN if either is NaN.
+/// JS `Math.min(a, b)`: NaN if either is NaN, and -0 is less than +0.
 pub fn js_min(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         f64::NAN
-    } else if a < b {
+    } else if a < b || (a == b && a.is_sign_negative()) {
         a
     } else {
         b
     }
 }
 
-/// JS `Math.max(a, b)`: NaN if either is NaN.
+/// JS `Math.max(a, b)`: NaN if either is NaN, and +0 is greater than -0.
 pub fn js_max(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         f64::NAN
-    } else if a > b {
+    } else if a > b || (a == b && a.is_sign_positive()) {
         a
     } else {
         b

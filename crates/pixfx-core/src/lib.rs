@@ -2,6 +2,7 @@
 //! that reproduces its JavaScript number semantics, so an effect renders the same pixels here as there.
 #![forbid(unsafe_code)]
 
+pub mod blend;
 pub mod color;
 pub mod effect;
 pub mod frame;
