@@ -95,6 +95,8 @@ pub struct Painter<'a> {
     pub fade: f64,
     /// Light strength applied to every light amount.
     pub light_k: f64,
+    /// The local box `[0, w) x [0, h)` writes are kept inside, if any (see [`Painter::clip_local`]).
+    clip: Option<(f64, f64)>,
 }
 
 impl<'a> Painter<'a> {
@@ -112,12 +114,13 @@ impl<'a> Painter<'a> {
             sn: 0.0,
             fade: 1.0,
             light_k: 1.0,
+            clip: None,
         };
         p.reset();
         p
     }
 
-    /// Re-read the frame and clear placement, fade and light strength.
+    /// Re-read the frame and clear placement, fade, light strength and clip.
     pub fn reset(&mut self) -> &mut Self {
         self.w = f64::from(self.frame.w);
         self.h = f64::from(self.frame.h);
@@ -126,6 +129,7 @@ impl<'a> Painter<'a> {
         (self.tx, self.ty, self.fx, self.cs, self.sn) = (0.0, 0.0, 1.0, 1.0, 0.0);
         self.fade = 1.0;
         self.light_k = 1.0;
+        self.clip = None;
         self
     }
 
@@ -137,6 +141,28 @@ impl<'a> Painter<'a> {
         self.cs = libm::cos(angle);
         self.sn = libm::sin(angle);
         self
+    }
+
+    /// Drop every write whose local pixel cell lies outside `[0, w) x [0, h)`: a full-screen effect's sparks,
+    /// smoke and light stop at its edge instead of spilling past it (pixelfx transitions `clipTo`, a painter
+    /// whose `put`, `add` and `blendPx` check `inside` first). Follows later placement; [`Painter::reset`]
+    /// removes it.
+    pub fn clip_local(&mut self, w: f64, h: f64) -> &mut Self {
+        self.clip = Some((w, h));
+        self
+    }
+
+    /// Whether the clip drops a write to screen pixel (sx, sy): its cell centre, in local space, is outside
+    /// the clip box. A NaN cell fails every comparison and is dropped, as in pixelfx.
+    fn clipped(&self, sx: f64, sy: f64) -> bool {
+        let Some((w, h)) = self.clip else {
+            return false;
+        };
+        let (lx, ly) = (
+            self.from_x(sx + 0.5, sy + 0.5),
+            self.from_y(sx + 0.5, sy + 0.5),
+        );
+        !(lx >= 0.0 && ly >= 0.0 && lx < w && ly < h)
     }
 
     // ---- transforms: local (effect) space <-> screen (frame) space
@@ -188,6 +214,9 @@ impl<'a> Painter<'a> {
 
     // ---- raw writes, screen space, whole pixels. Colour NONE means "nothing": it never erases what's there.
     pub fn put(&mut self, sx: f64, sy: f64, c: Rgba, a: f64) {
+        if self.clipped(sx, sy) {
+            return;
+        }
         let c = c.pack();
         if c == 0 {
             return;
@@ -204,6 +233,9 @@ impl<'a> Painter<'a> {
 
     /// Add light `c * k` (times fade and light strength) to a screen pixel, each channel capped at 255.
     pub fn add(&mut self, sx: f64, sy: f64, c: Rgba, k: f64) {
+        if self.clipped(sx, sy) {
+            return;
+        }
         let k = k * self.fade * self.light_k;
         if k <= 0.004 {
             return;
@@ -229,6 +261,9 @@ impl<'a> Painter<'a> {
     /// Blend a colour over what's there at alpha a (0..1), keeping the result's own alpha: soft smoke,
     /// vapour and mist. Use dithered [`Painter::dot`] for hard pixel fades and this for translucent volumes.
     pub fn blend_px(&mut self, sx: f64, sy: f64, c: Rgba, a: f64) {
+        if self.clipped(sx, sy) {
+            return;
+        }
         let a = a * self.fade;
         let c = c.pack();
         if c == 0 || a <= 0.004 {
@@ -616,7 +651,7 @@ impl<'a> Painter<'a> {
                         let f = 1.0 - libm::sqrt(d);
                         // `add`, with the index known (a NaN strength is written, as `add` writes it)
                         let kk = f * f * k * self.fade * self.light_k;
-                        if kk > 0.004 || kk.is_nan() {
+                        if (kk > 0.004 || kk.is_nan()) && !self.clipped(sx, sy) {
                             self.add_at((row + sx) as usize, c, kk);
                         }
                     }
