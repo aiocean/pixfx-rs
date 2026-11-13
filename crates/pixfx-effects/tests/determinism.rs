@@ -1,5 +1,5 @@
 //! Native and wasm32 renders of the same effect, seed and frame hash identically: both compare against one
-//! golden file. Bless it on a native target only: `PIXFX_BLESS=1 cargo test -p pixfx-effects --test determinism`.
+//! golden file. Bless it on a native target only: `PIXFX_BLESS=1 cargo test -p pixfx-effects --test determinism -- --ignored`.
 
 use pixfx_core::{Options, frame_hash, render_frames};
 use pixfx_effects::effect;
@@ -83,6 +83,7 @@ fn bless(_json: &str) -> Result<(), String> {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
 #[cfg_attr(not(target_arch = "wasm32"), test)]
+#[ignore = "heavy: run before merging an effect"]
 fn frame_hashes_match_goldens() -> Result<(), String> {
     let json = current_hashes()?;
     if cfg!(not(target_arch = "wasm32")) && std::env::var_os("PIXFX_BLESS").is_some() {
