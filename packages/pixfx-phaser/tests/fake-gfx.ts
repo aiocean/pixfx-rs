@@ -36,11 +36,21 @@ export class FakeImage implements GfxImage {
   y = Number.NaN;
   depth = Number.NaN;
   destroyed = false;
+  visible: boolean;
   constructor(
-    readonly key: string,
+    /** The key of the texture it shows; null until it is given one. */
+    public key: string | null,
     readonly blend: GfxBlend,
     readonly scrollFactor: number,
-  ) {}
+  ) {
+    this.visible = key !== null;
+  }
+  setTexture(key: string): void {
+    this.key = key;
+  }
+  setVisible(visible: boolean): void {
+    this.visible = visible;
+  }
   setPosition(x: number, y: number): void {
     this.x = x;
     this.y = y;
@@ -61,12 +71,16 @@ export class FakeGfx implements Gfx {
     this.textures.push(t);
     return t;
   }
-  image(key: string, blend: GfxBlend, scrollFactor: number): FakeImage {
+  image(key: string | null, blend: GfxBlend, scrollFactor: number): FakeImage {
     const i = new FakeImage(key, blend, scrollFactor);
     this.images.push(i);
     return i;
   }
   uploads(): number {
     return this.textures.reduce((n, t) => n + t.uploads, 0);
+  }
+  /** The live texture an image shows. */
+  shownBy(image: FakeImage): FakeTexture | undefined {
+    return this.textures.find((t) => t.key === image.key && !t.destroyed);
   }
 }

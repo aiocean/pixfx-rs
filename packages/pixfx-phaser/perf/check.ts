@@ -38,11 +38,13 @@ const LIT_PIXELS = `(() => {
 })()`;
 
 /**
- * Play fire/campfire (seed 3) through an EffectManager on the main thread and one on a worker pool, each with a
- * Gfx that records every upload, step both by the same scene times, and compare the uploaded bytes.
+ * Play fire/campfire (seed 3) through an EffectManager on the main thread and one on a worker pool, each with its
+ * own frame cache and a Gfx that records every upload, step both by the same scene times, and compare the
+ * uploaded sizes and bytes.
  */
 const SAME_PIXELS = `(async () => {
   const { EffectManager } = await import("${SRC}/effects.ts");
+  const { PixfxFeel } = await import("${SRC}/feel.ts");
   const { InlineBackend } = await import("${SRC}/inline.ts");
   const { WorkerPool, openWorkers, workerPort } = await import("${SRC}/pool.ts");
   const engine = window.pixfxDemo.engine;
@@ -50,8 +52,8 @@ const SAME_PIXELS = `(async () => {
     const uploads = [];
     return {
       uploads,
-      texture: (key) => ({ upload: (rgba) => uploads.push({ key, bytes: Array.from(rgba) }), destroy() {} }),
-      image: () => ({ setPosition() {}, setDepth() {}, destroy() {} }),
+      texture: (key, w, h) => ({ upload: (rgba) => uploads.push({ size: w + "x" + h, bytes: Array.from(rgba) }), destroy() {} }),
+      image: () => ({ setTexture() {}, setVisible() {}, setPosition() {}, setDepth() {}, destroy() {} }),
     };
   };
   const workers = await openWorkers(1, 1);
@@ -59,8 +61,8 @@ const SAME_PIXELS = `(async () => {
   const inline = new InlineBackend(engine);
   const a = recorder();
   const b = recorder();
-  const main = new EffectManager(a, () => inline, "a:");
-  const off = new EffectManager(b, () => pool, "b:");
+  const main = new EffectManager(a, () => inline, "a:", new PixfxFeel(() => engine));
+  const off = new EffectManager(b, () => pool, "b:", new PixfxFeel(() => engine));
   main.play("fire/campfire", 50, 50, { seed: 3 });
   off.play("fire/campfire", 50, 50, { seed: 3 });
   const settle = async (n) => {
@@ -75,7 +77,7 @@ const SAME_PIXELS = `(async () => {
     await settle(a.uploads.length);
   }
   workers.forEach((w) => w.terminate());
-  const strip = (u) => u.map((x) => x.key.slice(2) + ":" + x.bytes.join(","));
+  const strip = (u) => u.map((x) => x.size + ":" + x.bytes.join(","));
   const sa = strip(a.uploads);
   const sb = strip(b.uploads);
   const nonEmpty = a.uploads.filter((u) => u.bytes.some((v) => v !== 0)).length;

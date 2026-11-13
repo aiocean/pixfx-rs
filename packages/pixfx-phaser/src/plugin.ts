@@ -7,11 +7,15 @@ import { type FeelSprite, PixfxSpriteFeel, SpriteFeelCore } from "./sprite-feel"
 import type { LayerConfig, PixfxLayer } from "./layer";
 import type { Gfx } from "./gfx";
 
-/** Phaser-backed textures (canvas, nearest-filtered) and images (top-left origin) for one scene. */
+/**
+ * Phaser-backed textures (canvas, nearest-filtered) and images (top-left origin) for one scene. Textures live in
+ * the game's texture manager, so a texture made through one scene shows in every scene.
+ */
 function phaserGfx(scene: Phaser.Scene): Gfx {
+  const textures = scene.textures;
   return {
     texture(key, width, height) {
-      const tex = scene.textures.createCanvas(key, width, height);
+      const tex = textures.createCanvas(key, width, height);
       if (!tex) throw new Error(`pixfx: texture key "${key}" is already in use`);
       tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
       return {
@@ -20,14 +24,25 @@ function phaserGfx(scene: Phaser.Scene): Gfx {
           tex.refresh();
         },
         destroy() {
-          scene.textures.remove(tex);
+          textures.remove(tex);
         },
       };
     },
     image(textureKey, blend, scrollFactor) {
-      const img = scene.add.image(0, 0, textureKey).setOrigin(0, 0).setScrollFactor(scrollFactor);
+      const img = scene.add
+        .image(0, 0, textureKey ?? "__DEFAULT")
+        .setOrigin(0, 0)
+        .setScrollFactor(scrollFactor)
+        .setVisible(textureKey !== null);
       if (blend === "add") img.setBlendMode(Phaser.BlendModes.ADD);
       return {
+        setTexture(key) {
+          // `setTexture` resizes the image to the texture; the top-left origin stays
+          if (img.texture.key !== key) img.setTexture(key);
+        },
+        setVisible(visible) {
+          img.setVisible(visible);
+        },
         setPosition(x, y) {
           img.setPosition(x, y);
         },

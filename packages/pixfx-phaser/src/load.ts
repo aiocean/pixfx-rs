@@ -2,12 +2,15 @@ import { z } from "zod";
 import type { Backend } from "./backend";
 import type { Engine } from "./engine";
 import { wasmEngine } from "./engine";
+import { DEFAULT_FRAME_BUDGET, FrameCache } from "./frames";
 import { InlineBackend } from "./inline";
 import { WorkerPool, openWorkers, workerPort } from "./pool";
 
 const loadOptionsSchema = z.object({
   /** Worker threads that draw effects; 0 draws on the main thread. Default: one per spare core, 1 to 4. */
   workers: z.number().int().nonnegative().optional(),
+  /** Bytes the frames identical effects share may hold before the least recently shown go. Default 64 MiB. */
+  frameBudget: z.number().int().nonnegative().default(DEFAULT_FRAME_BUDGET),
   /** Perf harness only: each worker batch takes this many times its real time (phone emulation). */
   slowdown: z.number().min(1).default(1),
 });
@@ -36,10 +39,11 @@ async function start(o: z.output<typeof loadOptionsSchema>): Promise<{ engine: E
   const wasm = await import("../wasm/pixfx_wasm.js");
   const { memory } = await wasm.default();
   const engine = wasmEngine(wasm, memory);
+  const cache = new FrameCache(o.frameBudget);
   const n = typeof Worker === "undefined" ? 0 : (o.workers ?? defaultWorkers(globalThis.navigator?.hardwareConcurrency));
-  if (n === 0) return { engine, backend: new InlineBackend(engine) };
+  if (n === 0) return { engine, backend: new InlineBackend(engine, cache) };
   const workers = await openWorkers(n, o.slowdown);
-  return { engine, backend: new WorkerPool(engine, workers.map(workerPort)) };
+  return { engine, backend: new WorkerPool(engine, workers.map(workerPort), cache) };
 }
 
 /** The loaded engine, or null before `loadPixfx()` resolves. */
@@ -52,7 +56,10 @@ export function getBackend(): Backend {
   return loaded.backend;
 }
 
-/** Send the work every scene queued this frame. Does nothing before `loadPixfx()` resolves. */
+/**
+ * Once per game step: drop shared frames over the budget and send the work every scene queued. Does nothing
+ * before `loadPixfx()` resolves.
+ */
 export function flushPixfx(): void {
   loaded?.backend.flush();
 }

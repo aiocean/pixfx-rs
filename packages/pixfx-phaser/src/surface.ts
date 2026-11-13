@@ -1,56 +1,133 @@
-import type { FrameBuffers } from "./backend";
-import type { Counts, Layer, Layers } from "./effect";
+import type { Shape, View } from "./backend";
+import type { Counts } from "./effect";
+import type { FrameTextures, SharedFrame, Side, SideTextures } from "./frames";
+import type { Gfx, GfxImage, GfxTexture } from "./gfx";
 
 /** Where one effect is shown: its own four images, or a share of a layer's. */
 export interface Surface {
   /** Set the depths of the back and front image pairs (a shared surface ignores it). */
   setDepths(back: number, front: number): void;
-  /** Show a new frame. Returns a frame no longer read (this one or an older one), or null. */
-  show(frame: FrameBuffers): FrameBuffers | null;
+  /** Show what the effect shows now. */
+  show(view: View): void;
   /** Put the effect's top-left at `topLeft`. */
   moveTo(topLeft: { x: number; y: number }): void;
   /** Free what the surface holds for this effect. */
   release(): void;
 }
 
-/** Four textures and four images owned by one effect. */
-export class OwnSurface implements Surface {
-  private readonly all: readonly Layer[];
+/** A colour image and the light image drawn over it. */
+export interface SideImages {
+  color: GfxImage;
+  light: GfxImage;
+}
 
+/** The four images of one effect, in draw order at equal depth (colour, then its light). */
+export interface EffectImages {
+  back: SideImages;
+  front: SideImages;
+}
+
+/**
+ * Four images owned by one effect. A shared frame is shown from its textures, each side at its lit box; a fade
+ * frame is uploaded into the effect's own four textures (the whole canvas), made the first time it fades.
+ */
+export class ImageSurface implements Surface {
+  private topLeft = { x: 0, y: 0 };
+  private textures: FrameTextures = { back: null, front: null };
+  private shared: SharedFrame | null = null;
+  private own: { textures: GfxTexture[]; keys: FrameTextures } | null = null;
+
+  /** @param ownKey prefix of the keys of the effect's own textures, unique in the game. */
   constructor(
-    private readonly layers: Layers,
+    private readonly images: EffectImages,
+    private readonly gfx: Gfx,
+    private readonly ownKey: string,
+    private readonly shape: Shape,
     private readonly counts: Counts,
-  ) {
-    this.all = [layers.backColor, layers.backLight, layers.frontColor, layers.frontLight];
-  }
+  ) {}
 
   setDepths(back: number, front: number): void {
-    this.layers.backColor.image.setDepth(back);
-    this.layers.backLight.image.setDepth(back);
-    this.layers.frontColor.image.setDepth(front);
-    this.layers.frontLight.image.setDepth(front);
+    this.images.back.color.setDepth(back);
+    this.images.back.light.setDepth(back);
+    this.images.front.color.setDepth(front);
+    this.images.front.light.setDepth(front);
   }
 
-  /** Uploads at once, so the frame comes straight back. */
-  show(frame: FrameBuffers): FrameBuffers {
-    const [backColor, backLight, frontColor, frontLight] = frame;
-    this.layers.backColor.texture.upload(new Uint8ClampedArray(backColor));
-    this.layers.backLight.texture.upload(new Uint8ClampedArray(backLight));
-    this.layers.frontColor.texture.upload(new Uint8ClampedArray(frontColor));
-    this.layers.frontLight.texture.upload(new Uint8ClampedArray(frontLight));
-    return frame;
+  show(view: View): void {
+    if (view.kind === "shared") {
+      view.frame.retain();
+      this.shared?.release();
+      this.shared = view.frame;
+      this.textures = view.frame.textures(this.gfx);
+    } else {
+      this.shared?.release();
+      this.shared = null;
+      this.textures = this.upload(view.frame.back, view.frame.front);
+    }
+    showSide(this.images.back, this.textures.back);
+    showSide(this.images.front, this.textures.front);
+    this.place();
   }
 
   moveTo(topLeft: { x: number; y: number }): void {
-    for (const l of this.all) l.image.setPosition(topLeft.x, topLeft.y);
+    this.topLeft = topLeft;
+    this.place();
   }
 
   release(): void {
-    for (const l of this.all) {
-      l.image.destroy();
-      this.counts.images -= 1;
-      l.texture.destroy();
-      this.counts.textures -= 1;
+    for (const i of [this.images.back, this.images.front]) {
+      i.color.destroy();
+      i.light.destroy();
     }
+    this.counts.images -= 4;
+    for (const t of this.own?.textures ?? []) t.destroy();
+    this.counts.textures -= this.own?.textures.length ?? 0;
+    this.own = null;
+    this.shared?.release();
+    this.shared = null;
   }
+
+  private place(): void {
+    placeSide(this.images.back, this.textures.back, this.topLeft);
+    placeSide(this.images.front, this.textures.front, this.topLeft);
+  }
+
+  /** Upload a fade frame into the effect's own textures, made the first time. */
+  private upload(back: Side, front: Side): FrameTextures {
+    if (!this.own) {
+      const textures: GfxTexture[] = [];
+      const box = { x: 0, y: 0, w: this.shape.width, h: this.shape.height };
+      const make = (name: string): string => {
+        const key = `${this.ownKey}${name}`;
+        textures.push(this.gfx.texture(key, box.w, box.h));
+        return key;
+      };
+      const keys = {
+        back: { color: make("back-color"), light: make("back-light"), box },
+        front: { color: make("front-color"), light: make("front-light"), box },
+      };
+      this.counts.textures += textures.length;
+      this.own = { textures, keys };
+    }
+    const [backColor, backLight, frontColor, frontLight] = this.own.textures;
+    backColor?.upload(new Uint8ClampedArray(back.color));
+    backLight?.upload(new Uint8ClampedArray(back.light));
+    frontColor?.upload(new Uint8ClampedArray(front.color));
+    frontLight?.upload(new Uint8ClampedArray(front.light));
+    return this.own.keys;
+  }
+}
+
+function showSide(images: SideImages, t: SideTextures | null): void {
+  images.color.setVisible(t !== null);
+  images.light.setVisible(t !== null);
+  if (!t) return;
+  images.color.setTexture(t.color);
+  images.light.setTexture(t.light);
+}
+
+function placeSide(images: SideImages, t: SideTextures | null, topLeft: { x: number; y: number }): void {
+  if (!t) return;
+  images.color.setPosition(topLeft.x + t.box.x, topLeft.y + t.box.y);
+  images.light.setPosition(topLeft.x + t.box.x, topLeft.y + t.box.y);
 }

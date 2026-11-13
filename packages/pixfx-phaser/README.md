@@ -60,17 +60,38 @@ class MyScene extends Phaser.Scene {
 `loadPixfx()` starts worker threads that draw the effects, one per core the main thread leaves free (1 to 4),
 each with its own copy of the engine. The pixels are exactly those the engine draws on the main thread; a new
 frame shows one display frame after the scene step that asked for it, and `"complete"` fires when the worker
-reports the effect finished. Each effect stays in one worker for its life. `play()` still validates the id and
-options on the main thread and throws at once.
+reports the effect finished. Each effect stays in one worker for its life, and identical effects share one
+worker. `play()` still validates the id and options on the main thread and throws at once.
 
 ```ts
 await loadPixfx({ workers: 2 }); // a fixed number of workers
 await loadPixfx({ workers: 0 }); // draw on the main thread
+await loadPixfx({ frameBudget: 32 * 1024 * 1024 }); // bytes of shared frames held (default 64 MiB)
 ```
 
 Without `Worker` support effects draw on the main thread. Options apply to the first call; later calls return
 the loaded engine. The worker is bundled by Vite from `new Worker(new URL(...), { type: "module" })`, with no
 plugin.
+
+### How frames are drawn
+
+An effect plays its rendered frames: what it shows depends only on the effect, its options and the frame its
+clock is on. Effects with the same id and options (seed, flip, angle, light, palette, outline, their own
+options) show the same frames, so the game draws each frame once and every such effect shows it:
+
+- A running effect reports the frame it is on. The first effect to reach a frame the game does not hold draws
+  it, cropped to the lit box of its back and of its front, and sends it once; the rest show the held frame.
+  Nothing is drawn or uploaded while the frame an effect shows stays the same.
+- A per-object effect shows a held frame through that frame's four textures, uploaded once for every effect on
+  it, each image placed at the frame's lit box. A layer composites its members from the held bytes.
+- The held frames are game-wide (they outlive a scene) and stay under `frameBudget` bytes: at each game step the
+  least recently shown go first, never a frame an effect shows now or showed this step. A frame dropped is drawn
+  again, byte for byte, by the next effect that reaches it.
+- A stopped effect's fade-out is its own: it draws into its own four textures (the whole canvas), only when its
+  clock reaches a new frame.
+
+`stats()` counts what the scene itself holds: engine instances, images, and textures of fading effects and
+layers. Shared frames' textures belong to the game, not to a scene.
 
 ## Play an effect
 
@@ -162,8 +183,8 @@ scene shuts down.
 
 ## Layer mode
 
-Every per-effect object holds four textures. For many effects in one region, a layer shares four textures
-between them:
+Every per-effect object has four images. For many different effects in one region, a layer draws them all into
+four textures:
 
 ```ts
 const layer = this.pixfx.createLayer({

@@ -1,55 +1,14 @@
 import { expect, mock, test } from "bun:test";
 import EventEmitter from "eventemitter3";
 import type { Backend } from "../src/backend";
-import type { WorkerPort } from "../src/pool";
 import { WorkerPool } from "../src/pool";
-import type { Batch, ToWorker } from "../src/protocol";
-import { toWorkerSchema } from "../src/protocol";
-import { WorkerCore } from "../src/worker-core";
 import { FakeEngine } from "./fake-engine";
 import { FakeGfx } from "./fake-gfx";
+import { LoopPort } from "./loop-port";
 
 void mock.module("phaser", () => ({ default: { Events: { EventEmitter } } }));
 const { EffectManager } = await import("../src/effects");
 const { PixfxFeel } = await import("../src/feel");
-
-/**
- * A worker without a thread: posts are structured-cloned with their transfer list (so a transferred buffer is
- * detached on the sending side, as in a browser) and wait until the test calls `answer()`, which runs them
- * through a real `WorkerCore` on its own fake engine.
- */
-class LoopPort implements WorkerPort {
-  readonly engine: FakeEngine;
-  readonly core: WorkerCore;
-  readonly posted: ToWorker[] = [];
-  private queue: ToWorker[] = [];
-  private deliver: ((data: unknown) => void) | null = null;
-
-  constructor(engine: FakeEngine = new FakeEngine()) {
-    this.engine = engine;
-    this.core = new WorkerCore(engine);
-  }
-  post(message: ToWorker, transfer: ArrayBuffer[]): void {
-    const copy = toWorkerSchema.parse(structuredClone(message, { transfer }));
-    this.posted.push(copy);
-    this.queue.push(copy);
-  }
-  listen(onMessage: (data: unknown) => void): void {
-    this.deliver = onMessage;
-  }
-  /** Run the oldest posted batch and deliver the reply; false when nothing is in flight. */
-  answer(): boolean {
-    const msg = this.queue.shift();
-    if (!msg) return false;
-    if (msg.type !== "batch") throw new Error("the pool only posts batches");
-    const { reply, transfer } = this.core.run(msg);
-    this.deliver?.(structuredClone(reply, { transfer }));
-    return true;
-  }
-  batches(): Batch[] {
-    return this.posted.flatMap((m) => (m.type === "batch" ? [m] : []));
-  }
-}
 
 function setup(workers = 1, workerEngine: () => FakeEngine = () => new FakeEngine()) {
   const main = new FakeEngine();
@@ -73,10 +32,10 @@ test("a play builds and frees one main-thread instance for its size, and spawns 
   fx.play("fake/spark", 0, 0, { seed: 7 });
   expect(main.created.length).toBe(1);
   expect(main.live).toBe(0);
-  expect(gfx.textures.map((t) => [t.width, t.height])).toEqual(Array.from({ length: 4 }, () => [8, 6]));
-  expect(fx.stats()).toEqual({ engines: 1, textures: 4, images: 4 });
+  expect(gfx.images.length).toBe(4);
+  expect(fx.stats()).toEqual({ engines: 1, textures: 0, images: 4 });
   pool.flush();
-  expect(ports[0]?.batches()[0]?.spawns).toEqual([{ handle: 0, id: "fake/spark", opts: { seed: 7, margin: 4 }, fps: 30 }]);
+  expect(ports[0]?.batches()[0]?.spawns).toEqual([{ handle: 0, id: "fake/spark", opts: { seed: 7, margin: 4 } }]);
 });
 
 test("textures upload when the worker's reply arrives, not before", () => {
@@ -121,7 +80,8 @@ test("a done reply emits complete and frees everything on both sides", () => {
   expect(completes).toBe(1);
   expect(destroys).toBe(0);
   expect(fx.stats()).toEqual(EMPTY);
-  expect(gfx.textures.every((t) => t.destroyed)).toBe(true);
+  // what stays is the game's shared frames, not the effect's
+  expect(gfx.textures.filter((t) => !t.destroyed).every((t) => t.key.startsWith("pixfx:frame"))).toBe(true);
   expect(gfx.images.every((i) => i.destroyed)).toBe(true);
   expect(ports[0]?.engine.live).toBe(0);
   frame(fx, pool);

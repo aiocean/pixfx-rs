@@ -1,6 +1,5 @@
 import Phaser from "phaser";
-import type { FrameBuffers, FxInstance, TimedCue } from "./backend";
-import type { GfxImage, GfxTexture } from "./gfx";
+import type { FxInstance, TimedCue, View } from "./backend";
 import type { FollowTarget } from "./lifecycle";
 import { EffectCore } from "./lifecycle";
 import type { Surface } from "./surface";
@@ -10,20 +9,6 @@ export interface Counts {
   engines: number;
   textures: number;
   images: number;
-}
-
-/** One drawable: a texture and the image showing it. */
-export interface Layer {
-  texture: GfxTexture;
-  image: GfxImage;
-}
-
-/** The four drawables of one effect, in draw order at equal depth (colour, then its light). */
-export interface Layers {
-  backColor: Layer;
-  backLight: Layer;
-  frontColor: Layer;
-  frontLight: Layer;
 }
 
 /** Where an effect's cues go once placed in the world: the scene's feel. */
@@ -53,7 +38,7 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     this.core = new EffectCore(instance.shape, x, y);
     this.setDepths(depths.back, depths.front);
     this.place();
-    instance.start({ frame: (f) => this.show(f), cues: (c) => this.fire(c), done: () => this.complete() });
+    instance.start({ show: (v) => this.show(v), cues: (c) => this.fire(c), done: () => this.complete() });
   }
 
   /** Let it end: loops fade out, one-shots are cut short. Does nothing once finished. */
@@ -105,10 +90,8 @@ export class PixfxEffect extends Phaser.Events.EventEmitter {
     return this.core.state === "destroyed";
   }
 
-  private show(frame: FrameBuffers): void {
-    if (this.gone()) return;
-    const old = this.surface.show(frame);
-    if (old) this.instance.recycle(old);
+  private show(view: View): void {
+    if (!this.gone()) this.surface.show(view);
   }
 
   /** Place cues in the world (relative to the effect's origin until now), emit each, and hand them to the feel. */

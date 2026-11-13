@@ -2,7 +2,7 @@ import { z } from "zod";
 import type * as Wasm from "../wasm/pixfx_wasm.js";
 import type { EngineOptions, PlayOptions } from "./options";
 import { engineOptions, parsePlayOptions } from "./options";
-import type { TimedCue } from "./protocol";
+import type { Box, TimedCue } from "./protocol";
 import { timedCueSchema } from "./protocol";
 
 export type { EngineOptions };
@@ -17,11 +17,17 @@ export interface FxLike {
   height(): number;
   originX(): number;
   originY(): number;
+  /** Frames of `1 / fps` its clock has passed: what it draws changes only when this does. */
+  clockFrame(): number;
+  /** The shared frame it shows now (`"{key}:{index}"`), or undefined while it fades after `stop()`. */
+  shown(): string | undefined;
   draw(layer: "back" | "front"): void;
-  /** The colour layer as RGBA bytes (straight alpha); a view valid until the next call on this instance. */
-  colorRgba(): Uint8ClampedArray;
-  /** The light layer as RGBA bytes (lit pixels opaque, unlit `0,0,0,0`); valid until the next call. */
-  lightRgba(): Uint8ClampedArray;
+  /** The box holding every pixel the last `draw` showed; `w` and `h` 0 when it showed nothing. */
+  litBox(): Box;
+  /** The colour of the pixels in `box` as RGBA bytes (straight alpha); a view valid until the next call on this instance. */
+  colorRgba(box: Box): Uint8ClampedArray;
+  /** The light of the pixels in `box` as RGBA bytes (lit pixels opaque, unlit `0,0,0,0`); valid until the next call. */
+  lightRgba(box: Box): Uint8ClampedArray;
   /** The cues fired since the last call, oldest first; clears them. */
   takeCues(): TimedCue[];
   free(): void;
@@ -105,9 +111,8 @@ export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engin
     meta: (id) => effectMetaSchema.parse(wasm.meta(effectId(id))),
     create: (id, opts) => {
       const fx = new wasm.Fx(effectId(id), opts);
-      const bytes = fx.width() * fx.height() * 4;
       // A view on wasm memory, made after the call: a call may grow the memory and detach older buffers.
-      const view = (ptr: number): Uint8ClampedArray => new Uint8ClampedArray(memory.buffer, ptr, bytes);
+      const view = (ptr: number, box: Box): Uint8ClampedArray => new Uint8ClampedArray(memory.buffer, ptr, box.w * box.h * 4);
       return {
         update: (dt) => fx.update(dt),
         stop: () => fx.stop(),
@@ -117,9 +122,15 @@ export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engin
         height: () => fx.height(),
         originX: () => fx.originX(),
         originY: () => fx.originY(),
+        clockFrame: () => fx.clockFrame(),
+        shown: () => fx.shown(),
         draw: (layer) => fx.draw(layer),
-        colorRgba: () => view(fx.colorRgbaPtr()),
-        lightRgba: () => view(fx.lightRgbaPtr()),
+        litBox: () => {
+          const [x = 0, y = 0, w = 0, h = 0] = fx.litBox();
+          return { x, y, w, h };
+        },
+        colorRgba: (b) => view(fx.colorRgbaBoxPtr(b.x, b.y, b.w, b.h), b),
+        lightRgba: (b) => view(fx.lightRgbaBoxPtr(b.x, b.y, b.w, b.h), b),
         takeCues: () => z.array(timedCueSchema).parse(fx.takeCues()),
         free: () => fx.free(),
       };
@@ -167,13 +178,11 @@ export interface Prepared {
   id: string;
   play: PlayOptions;
   engineOpts: EngineOptions;
-  fps: number;
 }
 
 /** Validate `opts` and `id` for `engine`; throws on an unknown id or invalid options. Creates nothing. */
 export function prepare(engine: Engine, id: string, opts: unknown): Prepared {
   const play = parsePlayOptions(opts);
   if (!engine.effects().includes(id)) throw new Error(`pixfx: unknown effect "${id}"`);
-  const meta = engine.meta(id);
-  return { id, play, engineOpts: engineOptions(play, meta.glowMargin), fps: meta.fps };
+  return { id, play, engineOpts: engineOptions(play, engine.meta(id).glowMargin) };
 }

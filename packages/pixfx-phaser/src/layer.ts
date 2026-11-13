@@ -1,7 +1,8 @@
 import { z } from "zod";
-import type { Backend, FrameBuffers, Shape } from "./backend";
-import type { CueSink, Counts, Layer, Layers } from "./effect";
+import type { Backend, View } from "./backend";
+import type { CueSink, Counts } from "./effect";
 import { PixfxEffect } from "./effect";
+import type { Frame, SharedFrame, Side } from "./frames";
 import type { Gfx, GfxBlend, GfxImage, GfxTexture } from "./gfx";
 import { clipRect } from "./layout";
 import type { Rect } from "./layout";
@@ -32,25 +33,40 @@ export function parseLayerConfig(input: unknown): z.output<typeof layerConfigSch
   throw new Error(`pixfx: invalid layer config (${msg})`);
 }
 
+/** One drawable: a texture and the image showing it. */
+interface Layer {
+  texture: GfxTexture;
+  image: GfxImage;
+}
+
+/** The four drawables of a layer, in draw order at equal depth (colour, then its light). */
+interface Layers {
+  backColor: Layer;
+  backLight: Layer;
+  frontColor: Layer;
+  frontLight: Layer;
+}
+
 /** One member's share of a layer: keeps the member's latest frame and place; the layer composites them. */
 class LayerSurface implements Surface {
-  frame: FrameBuffers | null = null;
+  frame: Frame | null = null;
   topLeft = { x: 0, y: 0 };
+  /** The shared frame shown, held while it is. */
+  private shared: SharedFrame | null = null;
 
-  constructor(
-    private readonly layer: PixfxLayer,
-    readonly shape: Shape,
-  ) {}
+  constructor(private readonly layer: PixfxLayer) {}
 
   /** No-op: the layer owns the depths of its four images. */
   setDepths(): void {}
 
-  /** Keep the new frame for the next composite; the previous one is no longer read. */
-  show(frame: FrameBuffers): FrameBuffers | null {
-    const old = this.frame;
-    this.frame = frame;
+  /** Keep the new frame for the next composite. */
+  show(view: View): void {
+    const shared = view.kind === "shared" ? view.frame : null;
+    shared?.retain();
+    this.shared?.release();
+    this.shared = shared;
+    this.frame = view.kind === "shared" ? view.frame.frame : view.frame;
     this.layer.invalidate();
-    return old;
   }
 
   /** Redraw the layer when the member moved; a still member costs nothing. */
@@ -61,6 +77,8 @@ class LayerSurface implements Surface {
   }
 
   release(): void {
+    this.shared?.release();
+    this.shared = null;
     this.layer.drop(this);
   }
 }
@@ -124,7 +142,7 @@ export class PixfxLayer {
     if (this.destroyed) throw new Error("pixfx: layer is destroyed");
     const { instance } = this.backend().spawn(id, opts);
     this.counts.engines += 1;
-    const surface = new LayerSurface(this, instance.shape);
+    const surface = new LayerSurface(this);
     this.surfaces.add(surface);
     try {
       const effect = new PixfxEffect(
@@ -190,9 +208,8 @@ export class PixfxLayer {
     for (const px of [p.backColor, p.backLight, p.frontColor, p.frontLight]) px.fill(0);
     for (const s of this.surfaces) {
       if (!s.frame) continue;
-      const [backColor, backLight, frontColor, frontLight] = s.frame;
-      this.compose(s.shape, s.topLeft, backColor, backLight, p.backColor, p.backLight);
-      this.compose(s.shape, s.topLeft, frontColor, frontLight, p.frontColor, p.frontLight);
+      this.compose(s.frame.back, s.topLeft, p.backColor, p.backLight);
+      this.compose(s.frame.front, s.topLeft, p.frontColor, p.frontLight);
     }
     const l = this.layers;
     l.backColor.texture.upload(p.backColor);
@@ -202,30 +219,26 @@ export class PixfxLayer {
   }
 
   /**
-   * Composite one side of a member: its colour RGBA read as ABGR words, its light RGBA as light words (alpha 255
-   * where lit, which `compositeLight` masks off).
+   * Composite one side of a member, its box placed from the member's top-left `at`: its colour RGBA read as ABGR
+   * words, its light RGBA as light words (alpha 255 where lit, which `compositeLight` masks off).
    */
-  private compose(
-    shape: Shape,
-    at: { x: number; y: number },
-    color: ArrayBuffer,
-    light: ArrayBuffer,
-    colorOut: Uint8ClampedArray,
-    lightOut: Uint8ClampedArray,
-  ): void {
-    const clip = clipRect(this.bounds, { x: at.x, y: at.y, w: shape.width, h: shape.height });
+  private compose(side: Side, at: { x: number; y: number }, colorOut: Uint8ClampedArray, lightOut: Uint8ClampedArray): void {
+    const { box } = side;
+    const x = at.x + box.x;
+    const y = at.y + box.y;
+    const clip = clipRect(this.bounds, { x, y, w: box.w, h: box.h });
     if (!clip) return;
     const blit = {
-      srcX: clip.x - at.x,
-      srcY: clip.y - at.y,
+      srcX: clip.x - x,
+      srcY: clip.y - y,
       dstX: clip.x - this.bounds.x,
       dstY: clip.y - this.bounds.y,
       w: clip.w,
       h: clip.h,
-      srcStride: shape.width,
+      srcStride: box.w,
       dstStride: this.bounds.w,
     };
-    compositeColor(new Uint32Array(color), colorOut, blit);
-    compositeLight(new Uint32Array(light), lightOut, blit);
+    compositeColor(new Uint32Array(side.color), colorOut, blit);
+    compositeLight(new Uint32Array(side.light), lightOut, blit);
   }
 }

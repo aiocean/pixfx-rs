@@ -39,16 +39,19 @@ test("light images blend additively, colour images normally, light drawn after c
   expect(gfx.images.map((i) => i.key)).toEqual(gfx.textures.map((t) => t.key));
 });
 
-test("scene shutdown with three effects playing frees everything", () => {
+test("scene shutdown with three effects playing frees everything the scene holds", () => {
   const { engine, gfx, fx } = setup();
   for (let i = 0; i < 3; i++) fx.play("fake/spark", i, i);
-  expect(fx.stats()).toEqual({ engines: 3, textures: 12, images: 12 });
+  // three identical effects show one shared frame: four textures for the game, none of the scene's own
+  expect(fx.stats()).toEqual({ engines: 3, textures: 0, images: 12 });
+  expect(gfx.textures.length).toBe(4);
   fx.destroyAll();
   expect(fx.stats()).toEqual(EMPTY);
   expect(engine.live).toBe(0);
-  expect(gfx.textures.every((t) => t.destroyed)).toBe(true);
   expect(gfx.images.every((i) => i.destroyed)).toBe(true);
-  // A restarted scene plays again with fresh, distinct texture keys.
-  fx.play("fake/spark", 0, 0);
-  expect(new Set(gfx.textures.map((t) => t.key)).size).toBe(16);
+  // A restarted scene plays again and shows the frame the game still holds.
+  const again = fx.play("fake/spark", 0, 0);
+  expect(gfx.textures.length).toBe(4);
+  expect(gfx.images.slice(12).map((i) => i.key)).toEqual(gfx.textures.map((t) => t.key));
+  again.destroy();
 });

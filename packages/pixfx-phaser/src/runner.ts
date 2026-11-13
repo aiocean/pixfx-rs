@@ -1,47 +1,57 @@
 import type { FxLike } from "./engine";
-import type { FrameBuffers, TimedCue } from "./protocol";
-
-/** What one step did: finished, drew a new frame, or neither; and the cues the effect fired on the way. */
-export type Step = ({ kind: "done" } | { kind: "frame"; frame: FrameBuffers } | { kind: "same" }) & { cues: TimedCue[] };
+import type { Box, Frame, Side, TimedCue } from "./protocol";
 
 /**
- * Drives one engine instance: advances it, and draws back and front into RGBA buffers only when it reached a
- * new frame of its authored fps. Buffers handed back with `give` are reused before new ones are allocated.
+ * What one step did, and the cues the effect fired on the way: finished; moved to shared frame `id` (drawn,
+ * cropped to each side's lit box, when the holder lacked it; else `frame` is null); drew its own fade frame (the
+ * whole canvas); or nothing to show.
+ */
+export type Step = (
+  | { kind: "done" }
+  | { kind: "shared"; id: string; frame: Frame | null }
+  | { kind: "own"; frame: Frame }
+  | { kind: "same" }
+) & { cues: TimedCue[] };
+
+/**
+ * Drives one engine instance: advances it and reports the frame it shows. A running effect shows shared frames
+ * and draws one only when whoever holds the shared frames lacks it; a fading effect draws its own frame on each
+ * new clock frame.
  */
 export class FxRunner {
-  /** Buffer sets allocated so far. */
-  allocated = 0;
-  private shown = -1;
+  /** The shared frame last reported, or null while fading (or before the first step). */
+  private id: string | null = null;
+  /** The clock frame of the last own frame drawn. */
+  private clock = -1;
   private freed = false;
-  private readonly spare: FrameBuffers[] = [];
-  private readonly bytes: number;
 
-  constructor(
-    private readonly fx: FxLike,
-    private readonly fps: number,
-  ) {
-    this.bytes = fx.width() * fx.height() * 4;
-  }
+  constructor(private readonly fx: FxLike) {}
 
   /** Let it end; takes effect from the next step. */
   stop(): void {
     this.fx.stop();
   }
 
-  /** Advance by `dt` seconds (0: none) and report what changed and the cues fired. The first step always draws. */
-  step(dt: number): Step {
+  /**
+   * Advance by `dt` seconds (0: none) and report what it shows, if that changed (or, with `again`, even if not).
+   * `held(id)` says whether the holder of the shared frames has `id`. The first step always reports.
+   */
+  step(dt: number, held: (id: string) => boolean, again = false): Step {
     if (dt > 0) this.fx.update(dt);
     const cues = this.fx.takeCues();
     if (this.fx.done()) return { kind: "done", cues };
-    const frame = Math.floor(this.fx.t() * this.fps);
-    if (frame === this.shown) return { kind: "same", cues };
-    this.shown = frame;
-    return { kind: "frame", frame: this.draw(), cues };
-  }
-
-  /** Take back a set for reuse; a set of the wrong size (or detached by a transfer) is dropped. */
-  give(set: FrameBuffers): void {
-    if (set.every((b) => b.byteLength === this.bytes)) this.spare.push(set);
+    const id = this.fx.shown();
+    if (id === undefined) {
+      this.id = null;
+      const clock = this.fx.clockFrame();
+      if (clock === this.clock && !again) return { kind: "same", cues };
+      this.clock = clock;
+      return { kind: "own", frame: this.draw(false), cues };
+    }
+    this.clock = -1;
+    if (id === this.id && !again) return { kind: "same", cues };
+    this.id = id;
+    return { kind: "shared", id, frame: held(id) ? null : this.draw(true), cues };
   }
 
   free(): void {
@@ -50,20 +60,16 @@ export class FxRunner {
     this.fx.free();
   }
 
-  private draw(): FrameBuffers {
-    const set = this.spare.pop() ?? this.allocate();
-    this.fx.draw("back");
-    new Uint8ClampedArray(set[0]).set(this.fx.colorRgba());
-    new Uint8ClampedArray(set[1]).set(this.fx.lightRgba());
-    this.fx.draw("front");
-    new Uint8ClampedArray(set[2]).set(this.fx.colorRgba());
-    new Uint8ClampedArray(set[3]).set(this.fx.lightRgba());
-    return set;
+  /** Draw back and front, each cropped to its lit box or the whole canvas, into new buffers. */
+  private draw(crop: boolean): Frame {
+    return { back: this.side("back", crop), front: this.side("front", crop) };
   }
 
-  private allocate(): FrameBuffers {
-    this.allocated += 1;
-    const b = this.bytes;
-    return [new ArrayBuffer(b), new ArrayBuffer(b), new ArrayBuffer(b), new ArrayBuffer(b)];
+  private side(layer: "back" | "front", crop: boolean): Side {
+    this.fx.draw(layer);
+    const box: Box = crop ? this.fx.litBox() : { x: 0, y: 0, w: this.fx.width(), h: this.fx.height() };
+    const color = this.fx.colorRgba(box).slice().buffer;
+    const light = this.fx.lightRgba(box).slice().buffer;
+    return { box, color, light };
   }
 }

@@ -1,10 +1,11 @@
 import { stepSeconds } from "./clock";
-import type { CueSink, Counts, Layer, Layers } from "./effect";
+import type { CueSink, Counts } from "./effect";
 import { PixfxEffect } from "./effect";
 import type { PixfxFeel } from "./feel";
 import type { Backend } from "./backend";
-import type { Gfx, GfxBlend, GfxImage, GfxTexture } from "./gfx";
-import { OwnSurface } from "./surface";
+import type { Gfx, GfxBlend, GfxImage } from "./gfx";
+import type { EffectImages } from "./surface";
+import { ImageSurface } from "./surface";
 import { PixfxLayer } from "./layer";
 import type { LayerConfig } from "./layer";
 
@@ -34,35 +35,31 @@ export class EffectManager {
 
   private readonly sink: CueSink;
 
-  /** Play effect `id` with its origin at world (x, y). Throws on an unknown id or invalid options. */
+  /**
+   * Play effect `id` with its origin at world (x, y): four images showing the frames it shares with every
+   * identical effect, and its own textures once it fades. Throws on an unknown id or invalid options.
+   */
   play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
     const { instance, play: p } = this.backend().spawn(id, opts);
     this.counts.engines += 1;
     const n = this.nextId++;
-    const textures: GfxTexture[] = [];
-    const images: GfxImage[] = [];
-    const layer = (name: string, blend: GfxBlend): Layer => {
-      const key = `${this.keyPrefix}${n}-${name}`;
-      const texture = this.gfx.texture(key, instance.shape.width, instance.shape.height);
-      textures.push(texture);
-      this.counts.textures += 1;
-      const image = this.gfx.image(key, blend, p.scrollFactor);
-      images.push(image);
+    const made: GfxImage[] = [];
+    const image = (blend: GfxBlend): GfxImage => {
+      const i = this.gfx.image(null, blend, p.scrollFactor);
+      made.push(i);
       this.counts.images += 1;
-      return { texture, image };
+      return i;
     };
     try {
-      const layers: Layers = {
-        backColor: layer("back-color", "normal"),
-        backLight: layer("back-light", "add"),
-        frontColor: layer("front-color", "normal"),
-        frontLight: layer("front-light", "add"),
+      const images: EffectImages = {
+        back: { color: image("normal"), light: image("add") },
+        front: { color: image("normal"), light: image("add") },
       };
       const effect = new PixfxEffect(
         instance,
         x,
         y,
-        new OwnSurface(layers, this.counts),
+        new ImageSurface(images, this.gfx, `${this.keyPrefix}${n}-`, instance.shape, this.counts),
         p.depth ?? DEFAULT_DEPTHS,
         this.counts,
         (e) => this.live.delete(e),
@@ -71,10 +68,8 @@ export class EffectManager {
       this.live.add(effect);
       return effect;
     } catch (err) {
-      for (const i of images) i.destroy();
-      for (const t of textures) t.destroy();
-      this.counts.images -= images.length;
-      this.counts.textures -= textures.length;
+      for (const i of made) i.destroy();
+      this.counts.images -= made.length;
       instance.free();
       this.counts.engines -= 1;
       throw err;

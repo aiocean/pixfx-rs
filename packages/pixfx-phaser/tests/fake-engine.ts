@@ -1,24 +1,47 @@
 import type { BlinkLike, EffectMeta, Engine, EngineOptions, FeelLike, FxLike, SquashLike } from "../src/engine";
-import type { TimedCue } from "../src/protocol";
+import type { Box, TimedCue } from "../src/protocol";
 
 /** Stopping lets an effect fade for this long before it is done. */
 const FADE_SECONDS = 0.5;
 
+/**
+ * A one-shot of `duration` seconds at `meta.fps`. Its shown frame is `"{clip}:{k}"`, `clip` its id and options;
+ * every RGBA byte a draw writes is `2k + 1` (back) or `2k + 2` (front), mod 256, so equal frames are equal bytes
+ * and a test can tell frames apart. While fading, a draw writes `128 + 2c + 1` or `+ 2` for clock frame `c`.
+ */
 export class FakeFx implements FxLike {
   elapsed = 0;
   stopped = false;
   freed = false;
-  /** Number of `draw` calls; every RGBA byte of a frame is this count (mod 256), so a test can tell frames apart. */
+  /** Number of `draw` calls. */
   draws = 0;
   /** Cues it fires once its time passes them (`t` in seconds of playback). */
   schedule: TimedCue[] = [];
+  /** The lit box every draw reports; the whole canvas when null. */
+  box: Box | null = null;
+  /** The byte the last draw wrote. */
+  protected painted = 0;
   private fired: TimedCue[] = [];
+  private readonly last: number;
   constructor(
     private readonly owner: FakeEngine,
     private duration: number,
     private readonly size: readonly [number, number],
     private readonly origin: readonly [number, number],
-  ) {}
+    private readonly fps = 30,
+    private readonly clip = "fake",
+  ) {
+    this.last = Math.round(duration * fps);
+  }
+  clockFrame(): number {
+    return Math.floor(this.elapsed * this.fps + 1e-9);
+  }
+  shown(): string | undefined {
+    return this.stopped ? undefined : `${this.clip}:${Math.min(this.clockFrame(), this.last)}`;
+  }
+  litBox(): Box {
+    return this.box ?? { x: 0, y: 0, w: this.size[0], h: this.size[1] };
+  }
   update(dt: number): void {
     const from = this.elapsed;
     this.elapsed += dt;
@@ -51,14 +74,16 @@ export class FakeFx implements FxLike {
   originY(): number {
     return this.origin[1];
   }
-  draw(_layer: "back" | "front"): void {
+  draw(layer: "back" | "front"): void {
     this.draws += 1;
+    const side = layer === "back" ? 1 : 2;
+    this.painted = (this.stopped ? 128 + 2 * this.clockFrame() + side : 2 * Math.min(this.clockFrame(), this.last) + side) & 0xff;
   }
-  colorRgba(): Uint8ClampedArray {
-    return new Uint8ClampedArray(this.size[0] * this.size[1] * 4).fill(this.draws & 0xff);
+  colorRgba(box: Box): Uint8ClampedArray {
+    return new Uint8ClampedArray(box.w * box.h * 4).fill(this.painted);
   }
-  lightRgba(): Uint8ClampedArray {
-    return new Uint8ClampedArray(this.size[0] * this.size[1] * 4).fill(this.draws & 0xff);
+  lightRgba(box: Box): Uint8ClampedArray {
+    return new Uint8ClampedArray(box.w * box.h * 4).fill(this.painted);
   }
   free(): void {
     if (this.freed) throw new Error("double free");
@@ -188,13 +213,20 @@ export class FakeEngine implements Engine {
     if (!m) throw new Error(`unknown effect: ${id}`);
     return m;
   }
-  create(id: string, _opts: EngineOptions): FxLike {
+  /** The lit box every effect it creates from now on reports (null: the whole canvas). */
+  box: Box | null = null;
+  create(id: string, opts: EngineOptions): FxLike {
     const m = this.meta(id);
-    const fx = new FakeFx(this, m.duration, m.size, m.origin);
+    const fx = new FakeFx(this, m.duration, m.size, m.origin, m.fps, clipOf(id, opts));
     fx.schedule = this.schedule;
+    fx.box = this.box;
     this.live += 1;
     this.created.push(fx);
     return fx;
+  }
+  /** `draw` calls of every effect it created. */
+  draws(): number {
+    return this.created.reduce((n, fx) => n + fx.draws, 0);
   }
   feel(): FeelLike {
     const f = new FakeFeel();
@@ -213,13 +245,13 @@ export class FakeEngine implements Engine {
 export class PaintedFx extends FakeFx {
   colorWord = 0;
   lightWord = 0;
-  override colorRgba(): Uint8ClampedArray {
+  override colorRgba(box: Box): Uint8ClampedArray {
     const w = this.colorWord;
-    return fill(this.width() * this.height(), [w & 0xff, (w >>> 8) & 0xff, (w >>> 16) & 0xff, w >>> 24]);
+    return fill(box.w * box.h, [w & 0xff, (w >>> 8) & 0xff, (w >>> 16) & 0xff, w >>> 24]);
   }
-  override lightRgba(): Uint8ClampedArray {
+  override lightRgba(box: Box): Uint8ClampedArray {
     const w = this.lightWord & 0xffffff;
-    return fill(this.width() * this.height(), w === 0 ? [0, 0, 0, 0] : [w & 0xff, (w >>> 8) & 0xff, (w >>> 16) & 0xff, 255]);
+    return fill(box.w * box.h, w === 0 ? [0, 0, 0, 0] : [w & 0xff, (w >>> 8) & 0xff, (w >>> 16) & 0xff, 255]);
   }
 }
 
@@ -229,12 +261,18 @@ function fill(pixels: number, rgba: readonly [number, number, number, number]): 
   return out;
 }
 
-/** Effects it creates paint `paint` (read at creation). */
+/** The clip of effect `id` with `opts`: equal for equal ids and options, as the engine's key is. */
+function clipOf(id: string, opts: EngineOptions): string {
+  return `${id}~${JSON.stringify(opts)}`;
+}
+
+/** Effects it creates paint `paint` (read at creation; part of their clip, as an option would be). */
 export class PaintedEngine extends FakeEngine {
   paint = { color: 0, light: 0 };
-  override create(id: string, _opts: EngineOptions): FxLike {
+  override create(id: string, opts: EngineOptions): FxLike {
     const m = this.meta(id);
-    const fx = new PaintedFx(this, m.duration, m.size, m.origin);
+    const clip = `${clipOf(id, opts)}~${this.paint.color}-${this.paint.light}`;
+    const fx = new PaintedFx(this, m.duration, m.size, m.origin, m.fps, clip);
     fx.colorWord = this.paint.color;
     fx.lightWord = this.paint.light;
     this.live += 1;
