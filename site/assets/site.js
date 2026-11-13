@@ -1,11 +1,13 @@
 // Every page loads this one script. It mounts the page's own script (picked by the body's class), starts the
 // site's fx, and with fx on changes pages in place so the old page can burn open over the new one.
 import { mount as mountDocs } from "./docs.js";
+import { mount as mountEffect } from "./effect.js";
+import { mount as mountGallery } from "./gallery.js";
 import { mount as mountLanding } from "./landing.js";
 import { startNavigation } from "./nav.js";
 import { startFx } from "./fx.js";
 
-const PAGES = { landing: mountLanding, "docs-page": mountDocs };
+const PAGES = { landing: mountLanding, "docs-page": mountDocs, "effects-gallery": mountGallery, "effect-page": mountEffect };
 
 const fx = await startFx();
 

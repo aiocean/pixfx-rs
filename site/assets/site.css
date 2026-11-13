@@ -121,13 +121,6 @@ th { font-weight: 600; color: var(--ash); }
 
 
 
-.gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin-top: 2rem; }
-.tile { background: var(--ground); display: flex; flex-direction: column; }
-.tile canvas { width: 100%; height: auto; image-rendering: pixelated; background: var(--ground); display: block; }
-.tile-body { padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: 0.75rem; flex: 1; }
-.tile h3 { margin: 0; }
-.tile .facts { margin: 0; font-size: 0.85rem; color: var(--ash); }
-.tile .desc { margin: 0; font-size: 0.95rem; }
 .controls { display: grid; grid-template-columns: auto 1fr auto; gap: 0.4rem 0.75rem; align-items: center; font-size: 0.9rem; }
 .controls label { color: var(--ash); }
 .controls output { font-family: var(--mono); font-size: 0.85rem; min-width: 3ch; text-align: right; }
@@ -138,7 +131,29 @@ th { font-weight: 600; color: var(--ash); }
 .controls button { cursor: pointer; }
 .controls button:hover { border-color: var(--wax); }
 input[type="range"] { accent-color: var(--flame); width: 100%; }
-.tile pre { margin: auto 0 0; font-size: 0.8rem; border-left-color: var(--soot); background: var(--night); }
+
+/* ---------- effects: the gallery of stills, and one effect's page ---------- */
+
+.page { padding: 2.5rem clamp(1rem, 4vw, 2.5rem) 4rem; max-width: 76rem; margin: 0 auto; }
+.page > .lead { max-width: 60ch; color: var(--ash); font-size: 1.1rem; }
+.cards { list-style: none; padding: 0; margin: 2rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1.25rem; }
+.cards li { margin: 0; }
+.card { display: flex; flex-direction: column; gap: 0.2rem; text-decoration: none; color: var(--wax); background: var(--ground); padding: 0 0 0.9rem; border: 1px solid transparent; }
+.card canvas { width: 100%; height: auto; aspect-ratio: 4 / 3; image-rendering: pixelated; display: block; margin-bottom: 0.6rem; }
+.card-name { font-weight: 600; padding: 0 1rem; }
+.card .card-id { background: none; padding: 0 1rem; font-size: 0.8rem; color: var(--ash); }
+.card:hover, .card:focus-visible { border-color: var(--flame); color: var(--wax); }
+.card:hover .card-name { color: var(--flame); }
+
+.crumbs { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.effect-page .page > .lead { max-width: 70ch; }
+.effect-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr); gap: 2rem; align-items: start; margin-top: 1.5rem; }
+.effect-stage canvas { width: 100%; height: auto; image-rendering: pixelated; display: block; background: var(--ground); border: 1px solid var(--soot); }
+.effect-side { display: flex; flex-direction: column; gap: 1.25rem; }
+.effect-side pre { margin: 0; font-size: 0.85rem; border-left-color: var(--soot); }
+.effect-side table { margin: 0; }
+.page .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--soot); }
+.page .pager a { text-decoration: none; }
 
 .tabs [role="tablist"] { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 1px solid var(--soot); margin-bottom: 1.25rem; }
 .tabs [role="tab"] {
@@ -198,7 +213,7 @@ input[type="range"] { accent-color: var(--flame); width: 100%; }
 }
 
 @media (max-width: 900px) {
-  .gallery { grid-template-columns: minmax(0, 1fr); max-width: 30rem; }
+  .effect-layout { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 760px) {
