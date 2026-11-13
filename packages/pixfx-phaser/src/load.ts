@@ -4,6 +4,7 @@ import type { Engine } from "./engine";
 import { wasmEngine } from "./engine";
 import { DEFAULT_FRAME_BUDGET, FrameCache } from "./frames";
 import { InlineBackend } from "./inline";
+import { frameSchema } from "./protocol";
 import { WorkerPool, openWorkers, workerPort } from "./pool";
 
 const loadOptionsSchema = z.object({
@@ -22,8 +23,15 @@ export function defaultWorkers(hardwareConcurrency: number | undefined): number 
   return Math.min(4, Math.max(1, (hardwareConcurrency ?? 2) - 1));
 }
 
-let loading: Promise<{ engine: Engine; backend: Backend }> | null = null;
-let loaded: { engine: Engine; backend: Backend } | null = null;
+/** The engine, where effects run, and the wasm reader of baked clips. */
+interface Loaded {
+  engine: Engine;
+  backend: Backend;
+  bakedFrames: (json: string, pages: Uint8Array[]) => unknown;
+}
+
+let loading: Promise<Loaded> | null = null;
+let loaded: Loaded | null = null;
 
 /**
  * Load the engine once and start the effect workers; `play()` works after this resolves. Later calls return the
@@ -35,21 +43,52 @@ export async function loadPixfx(options?: LoadOptions): Promise<Engine> {
   return loaded.engine;
 }
 
-async function start(o: z.output<typeof loadOptionsSchema>): Promise<{ engine: Engine; backend: Backend }> {
+async function start(o: z.output<typeof loadOptionsSchema>): Promise<Loaded> {
   const wasm = await import("../wasm/pixfx_wasm.js");
   const { memory } = await wasm.default();
   const engine = wasmEngine(wasm, memory);
   const cache = new FrameCache(o.frameBudget);
   const n = typeof Worker === "undefined" ? 0 : (o.workers ?? defaultWorkers(globalThis.navigator?.hardwareConcurrency));
-  if (n === 0) return { engine, backend: new InlineBackend(engine, cache) };
+  const bakedFrames = (json: string, pages: Uint8Array[]): unknown => wasm.bakedFrames(json, pages);
+  if (n === 0) return { engine, backend: new InlineBackend(engine, cache), bakedFrames };
   const workers = await openWorkers(n, o.slowdown);
-  return { engine, backend: new WorkerPool(engine, workers.map(workerPort), cache) };
+  return { engine, backend: new WorkerPool(engine, workers.map(workerPort), cache), bakedFrames };
 }
 
 /** The loaded engine, or null before `loadPixfx()` resolves. */
 export function loadedEngine(): Engine | null {
   return loaded?.engine ?? null;
 }
+
+const heldFramesSchema = z.array(z.object({ id: z.string(), frame: frameSchema }));
+
+/**
+ * Hold the frames of a clip baked by `pixfx bake` (`<name>.bake.json` and the PNG pages it names, fetched from
+ * `url`'s folder): effects playing that effect with the same options then show the baked frames instead of drawing
+ * them. Baked frames are held like drawn ones: past the frame budget they go, and are drawn again if shown.
+ * Returns how many frames were loaded. Call after `loadPixfx()` resolves.
+ */
+export async function loadBaked(url: string): Promise<number> {
+  if (!loaded) throw new Error("pixfx: call await loadPixfx() before loadBaked()");
+  const { backend, bakedFrames } = loaded;
+  const fetchOk = async (u: URL): Promise<Response> => {
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(`pixfx: fetching ${u.href} failed: ${r.status}`);
+    return r;
+  };
+  const jsonUrl = new URL(url, globalThis.location?.href);
+  const json = await (await fetchOk(jsonUrl)).text();
+  const { pages } = bakeIndexSchema.parse(JSON.parse(json));
+  const bytes = await Promise.all(
+    pages.map(async (p) => new Uint8Array(await (await fetchOk(new URL(p.file, jsonUrl))).arrayBuffer())),
+  );
+  const frames = heldFramesSchema.parse(bakedFrames(json, bytes));
+  backend.hold(frames);
+  return frames.length;
+}
+
+/** The part of a bake index the loader reads itself: the page files (the engine reads the rest). */
+const bakeIndexSchema = z.object({ pages: z.array(z.object({ file: z.string() })) });
 
 export function getBackend(): Backend {
   if (!loaded) throw new Error("pixfx: call await loadPixfx() before play()");

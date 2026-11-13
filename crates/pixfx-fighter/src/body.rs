@@ -83,6 +83,9 @@ pub struct BodySpec {
     pub duck: f64,
     /// A hit lights the target white this long.
     pub flash: f64,
+    /// After a blow lands, blows pass through the body this long and it blinks (0: never, so combos and juggles
+    /// land; 0.5 to 1 for a player's character, so one mistake costs one hit).
+    pub invincible: f64,
     /// Knocked into the arena's edge faster than this, a fighter bounces off it.
     pub bounce: f64,
     /// Falling faster than this when it lands, a fighter's landing is felt.
@@ -141,6 +144,7 @@ impl Default for BodySpec {
             landing_hard: 0.14,
             duck: 16.0,
             flash: 5.0 / 60.0,
+            invincible: 0.0,
             bounce: 80.0,
             hard_landing: 140.0,
             knockback: 130.0,
@@ -362,6 +366,8 @@ pub struct Body {
     pub duck: f64,
     /// White flash left from the last hit.
     pub flash: f64,
+    /// Invincibility left from the last hit ([`BodySpec::invincible`]).
+    pub invincible: f64,
     /// Time since the last hit, and its power.
     pub hit_t: f64,
     pub hit_power: f64,
@@ -397,6 +403,7 @@ impl Body {
             leap: 0.0,
             duck: 0.0,
             flash: 0.0,
+            invincible: 0.0,
             hit_t: 9.0,
             hit_power: 0.0,
             frozen: 0.0,
@@ -421,6 +428,7 @@ impl Body {
     /// The body's clocks run on, and a fighter that is down lies, rolls or gets up. `alive`: life above zero.
     pub fn tick(&mut self, dt: f64, alive: bool) {
         self.flash = max(0.0, self.flash - dt);
+        self.invincible = max(0.0, self.invincible - dt);
         self.pose_t += dt;
         self.hit_t += dt;
         self.stun = max(0.0, self.stun - dt);
@@ -538,8 +546,13 @@ impl Body {
     }
 
     /// The body takes a blow that landed: it flashes, and a heavy blow (or any blow that catches it off the
-    /// ground, unless it freezes) throws it; a lighter one staggers it where it stands and pushes it back.
+    /// ground, unless it freezes) throws it; a lighter one staggers it where it stands and pushes it back. Inside the
+    /// invincibility a blow before it left ([`BodySpec::invincible`]), nothing happens.
     pub fn hit(&mut self, blow: Blow) {
+        if self.invincible > 0.0 {
+            return;
+        }
+        self.invincible = self.spec.invincible;
         let heavy = blow.heavy(&self.spec);
         let thrown = heavy || (!blow.freeze && (self.air > 0.0 || blow.flying || self.thrown()));
         self.flash = self.spec.flash;
@@ -628,6 +641,7 @@ impl Body {
         self.pose_t += dt;
         self.hit_t += dt;
         self.flash = max(0.0, self.flash - dt);
+        self.invincible = max(0.0, self.invincible - dt);
         if let Some(d) = &mut self.down {
             d.t += dt;
         }
@@ -677,9 +691,11 @@ impl Body {
         self.down.is_some_and(|d| d.phase != Phase::Air) || self.wake > 0.0
     }
 
-    /// Nothing touches it: on the floor, or thrown and already juggled as often as a throw allows.
+    /// Nothing touches it: on the floor, thrown and already juggled as often as a throw allows, or invincible after
+    /// a blow.
     pub fn untouchable(&self) -> bool {
-        self.floored()
+        self.invincible > 0.0
+            || self.floored()
             || self
                 .down
                 .is_some_and(|d| d.phase == Phase::Air && d.juggle >= self.spec.juggle_limit)
@@ -712,16 +728,18 @@ impl Body {
         }
     }
 
-    /// How long until a blow can touch it: none while it is up or in the air, the rest of its time on the floor.
+    /// How long until a blow can touch it: none while it is up or in the air, the rest of its time on the floor,
+    /// and the rest of its invincibility.
     pub fn open_in(&self) -> f64 {
         if !self.untouchable() {
             return 0.0;
         }
-        if self.down.is_some() {
+        let floor = if self.down.is_some() {
             self.out_for() + self.spec.knockdown_grace
         } else {
             self.wake
-        }
+        };
+        max(floor, self.invincible)
     }
 
     /// The pose for this step: the body's own state first (thrown, down, getting up, knocked out, frozen, shocked,

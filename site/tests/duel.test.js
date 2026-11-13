@@ -1,6 +1,6 @@
 // The duel's rules and minds, driven the way the hero drives them: step after step, playing what comes back.
 import { describe, expect, test } from "bun:test";
-import { SPELLS, createDuel, step } from "../assets/duel.js";
+import { RAGE, SCHOOLS, SPELLS, createDuel, skillBar, step } from "../assets/duel.js";
 import { Body, Fx, effects } from "./engine.js";
 
 const PLAN2 = new Set([
@@ -86,6 +86,47 @@ describe("duel", () => {
     expect(poses.slice(poses.indexOf("down"))).toEqual(["down", "sit", "kneel", "crouch", "land"]);
     expect(lands.length).toBe(2);
   });
+  test("a cast puts its whole skill slot on cooldown: no spell in that slot is cast until it runs out", () => {
+    let checked = 0;
+    for (const seed of [1, 2, 3, 4]) {
+      const duel = arena(seed);
+      const was = [null, null];
+      // the slot each fighter cast from last, and how long it stays shut
+      const shut = [null, null];
+      for (let i = 0; i < 90 * 60; i++) {
+        step(duel, 1 / 60);
+        for (const f of duel.fighters) {
+          const spell = f.act?.spell ?? null;
+          const fresh = spell !== null && spell !== was[f.index] && f.act.t < 1 / 30;
+          was[f.index] = spell;
+          if (shut[f.index] && duel.time >= shut[f.index].until) shut[f.index] = null;
+          if (!fresh) continue;
+          const i = SCHOOLS[f.school].slots.findIndex((slot) => slot.includes(spell));
+          if (i < 0) continue;
+          expect(shut[f.index]?.slot === i && duel.round === shut[f.index].round).toBe(false);
+          const slot = skillBar(f)[i];
+          expect(slot.ready).toBe(false);
+          expect(slot.full).toBeCloseTo(SPELLS[spell].cooldown + SPELLS[spell].windup, 5);
+          shut[f.index] = { slot: i, round: duel.round, until: duel.time + slot.left - 1e-6 };
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+  });
+
+  test("the skill bar shows four slots, the last one the ultimate, charged by rage", () => {
+    const duel = arena(3);
+    for (const f of duel.fighters) {
+      const bar = skillBar(f);
+      expect(bar.map((s) => s.ultimate)).toEqual([false, false, false, true]);
+      f.rage = RAGE - 1;
+      expect(skillBar(f)[3]).toMatchObject({ charge: (RAGE - 1) / RAGE, ready: false });
+      f.rage = RAGE;
+      expect(skillBar(f)[3]).toMatchObject({ charge: 1, ready: true });
+    }
+  });
+
   test("every effect the duel plays takes the options it is given, with every effect in the engine", () => {
     // the hero's duel has the whole registry, so spells such as a dive's slam play effects PLAN2 leaves out
     const all = new Set(effects());

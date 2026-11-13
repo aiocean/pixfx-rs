@@ -147,6 +147,7 @@ fields! {
     leap / set_leap: "leap" => leap,
     duck / set_duck: "duck" => duck,
     flash / set_flash: "flash" => flash,
+    invincible / set_invincible: "invincible" => invincible,
     hit_t / set_hit_t: "hitT" => hit_t,
     hit_power / set_hit_power: "hitPower" => hit_power,
     frozen / set_frozen: "frozen" => frozen,

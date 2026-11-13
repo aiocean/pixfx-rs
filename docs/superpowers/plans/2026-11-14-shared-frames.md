@@ -50,8 +50,15 @@ images. `FrameStore` itself: `crates/pixfx-core/tests/frames.rs`.
 
 ## 6. Bake
 
-`pixfx bake <id>[:<options json>]… --out <dir>`: per key an atlas PNG (each frame cropped to its lit box, four
-layers) and a JSON of rects and offsets. `scene.pixfx.loadBaked(url)` and `stage.loadBaked(url)` fill the hosts' stores.
+`pixfx bake <id> [--palette WORD] [--outline WORD] --out <dir>` (`pixfx_export::bake`): every frame as
+`Player::live` draws it (back and front), each layer half (colour RGBA, light `r, g, b, 255`) cropped and
+shelf-packed onto PNG pages of 2048 px, plus `<name>.bake.json` keyed by the `ClipKey`. `pixfx_export::decode`
+reads it back exactly (light compared by rgb: a light word's top byte is unused). Hosts: the canvas
+`stage.loadBaked(json, pages)` (`Scene::load` into the frame store); Phaser `loadBaked(url)` (wasm `bakedFrames`
+crops each side as `Fx.litBox` does, `Backend.hold` puts it in the `FrameCache` and tells every worker in its
+next batch's `holds`). Tests: `pixfx-export/tests/bake.rs` (round trip equals live play at uneven steps),
+`pixfx-canvas/tests/stage.rs` (a baked clip is shown with nothing drawn), `tests/frames.test.ts` (held frames
+draw nothing, inline and pool).
 
 ## 7. SIMD (measured: no gain, not adopted)
 

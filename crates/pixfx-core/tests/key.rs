@@ -136,3 +136,18 @@ fn every_input_changes_the_key() -> Result<(), String> {
     }
     Ok(())
 }
+
+#[test]
+fn a_key_reads_back_from_its_hex_form() {
+    let opts = Options {
+        palette: Some(vec![Rgba(1, 2, 3, 255)]),
+        ..Options::default()
+    };
+    let k = key(&opts, 4, place());
+    assert_eq!(k.to_string().parse::<ClipKey>(), Ok(k.clone()));
+    assert!("".parse::<ClipKey>().is_err());
+    assert!("0".parse::<ClipKey>().is_err());
+    assert!("zz".parse::<ClipKey>().is_err());
+    let other_version = format!("02{}", &k.to_string()[2..]);
+    assert!(other_version.parse::<ClipKey>().is_err());
+}

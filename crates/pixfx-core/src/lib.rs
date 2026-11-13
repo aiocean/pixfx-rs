@@ -39,7 +39,7 @@ pub use key::{ClipKey, FrameId};
 pub use math::{Rng, rand};
 pub use outline::{Outline, OutlineError, Ring};
 pub use painter::Painter;
-pub use player::{PixelBox, Player};
+pub use player::{PixelBox, Player, color_rgba_in, light_rgba_in};
 pub use render::{Rendered, edge_fade, render_frames};
 pub use screen::{Ripple, flash, ripple};
 pub use sim::{

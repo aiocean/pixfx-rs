@@ -1,4 +1,4 @@
-import type { Backend, FxEvents, FxInstance, Shape } from "./backend";
+import type { Backend, FxEvents, FxInstance, HeldFrame, Shape } from "./backend";
 import { shapeOf } from "./backend";
 import type { Engine } from "./engine";
 import { prepare } from "./engine";
@@ -21,6 +21,8 @@ interface Lane {
   area: number;
   /** The shared frames its worker believes the main thread holds: the ones it sent, less the drops sent back. */
   held: Set<string>;
+  /** Frames the main thread holds that its worker did not send (baked), not yet told. */
+  holds: string[];
   drops: string[];
   spawns: Spawn[];
   frees: number[];
@@ -85,7 +87,7 @@ export class WorkerPool implements Backend {
     private readonly cache = new FrameCache(),
   ) {
     if (ports.length === 0) throw new Error("pixfx: a worker pool needs at least one worker");
-    this.lanes = ports.map((port) => ({ port, busy: false, area: 0, held: new Set(), drops: [], spawns: [], frees: [], items: new Map() }));
+    this.lanes = ports.map((port) => ({ port, busy: false, area: 0, held: new Set(), holds: [], drops: [], spawns: [], frees: [], items: new Map() }));
     for (const lane of this.lanes) lane.port.listen((data) => this.receive(lane, data));
   }
 
@@ -114,13 +116,29 @@ export class WorkerPool implements Backend {
         const l = this.live.get(s.handle);
         if (l) l.sent = true;
       }
-      const batch: ToWorker = { type: "batch", drops: lane.drops, frees: lane.frees, spawns: lane.spawns, items: [...lane.items.values()] };
+      const batch: ToWorker = { type: "batch", holds: lane.holds, drops: lane.drops, frees: lane.frees, spawns: lane.spawns, items: [...lane.items.values()] };
+      lane.holds = [];
       lane.drops = [];
       lane.spawns = [];
       lane.frees = [];
       lane.items = new Map();
       lane.busy = true;
       lane.port.post(batch, []);
+    }
+  }
+
+  /**
+   * Hold `frames` (baked) in the cache and tell every worker, in its next batch, that the main thread has them, so
+   * no worker draws them. A frame already held keeps what it has.
+   */
+  hold(frames: readonly HeldFrame[]): void {
+    for (const f of frames) {
+      this.cache.put(f.id, f.frame);
+      for (const lane of this.lanes) {
+        if (lane.held.has(f.id)) continue;
+        lane.held.add(f.id);
+        lane.holds.push(f.id);
+      }
     }
   }
 

@@ -13,7 +13,7 @@ use core::f64::consts::PI;
 use libm::{cos, floor, sin, sqrt};
 use pixfx_core::blend::{cover_over, mul_div255, over_premul, straighten};
 use pixfx_core::math::{js_max, js_min, js_round};
-use pixfx_core::squash::{self, SquashSpec};
+use pixfx_core::squash::{self, Shape, SquashSpec};
 use pixfx_core::{Frame, Rgba};
 
 /// Sprite width and height, in pixels.
@@ -1024,33 +1024,39 @@ fn pivot(pose: Pose) -> Option<i32> {
     }
 }
 
-/// How tall the body is drawn against its own height (its width the inverse, so it keeps its size), by the
-/// engine's squash and stretch ([`pixfx_core::squash`]): stretched along its flight while it rises or falls fast,
-/// squashed as it lands and easing back, itself otherwise. Frozen bodies and tumbling ones (turned, so their height
-/// is not up) keep their shape.
-fn stretch(a: &Appearance) -> f64 {
+/// The body's shape by the engine's squash and stretch ([`pixfx_core::squash`]), its area kept: stretched along
+/// its flight (rising, falling, or both and sideways at once) while it moves fast, squashed upright as it lands
+/// and easing back, itself otherwise. Frozen bodies and tumbling ones (turned, so their height is not up) keep
+/// their shape.
+fn shape(a: &Appearance) -> Shape {
     if a.frozen {
-        return 1.0;
+        return Shape::IDENTITY;
     }
     let spec = SquashSpec::default();
     match a.pose {
-        Pose::Jump | Pose::Launched | Pose::Fall => squash::stretch(&spec, a.vy),
-        Pose::Land => squash::squash(&spec, a.pose_t, 1.0),
-        _ => 1.0,
+        // `vy` counts up and the sprite's rows count down
+        Pose::Jump | Pose::Launched | Pose::Fall => {
+            Shape::along(a.vx, -a.vy, squash::stretch(&spec, libm::hypot(a.vx, a.vy)))
+        }
+        Pose::Land => Shape::upright(squash::squash(&spec, a.pose_t, 1.0)),
+        _ => Shape::IDENTITY,
     }
 }
 
-/// `sprite` drawn `tall` times its height and `1 / tall` its width, in whole pixels (each drawn pixel takes the
-/// nearest painted one), about the feet so it stays on the floor.
-fn deform(sprite: &Sprite, tall: f64) -> Sprite {
-    if tall == 1.0 || !tall.is_finite() || tall <= 0.0 {
+/// `sprite` drawn through `shape` about the feet so it stays on the floor, in whole pixels (each drawn pixel takes
+/// the nearest painted one).
+fn deform(sprite: &Sprite, shape: Shape) -> Sprite {
+    if shape == Shape::IDENTITY {
         return sprite.clone();
     }
     let mut out = Sprite::default();
     for y in 0..SPRITE as i32 {
-        let sy = FEET + js_round(f64::from(y - FEET) / tall) as i32;
         for x in 0..SPRITE as i32 {
-            let sx = CX + js_round(f64::from(x - CX) * tall) as i32;
+            let (fx, fy) = shape.source(f64::from(x - CX), f64::from(y - FEET));
+            if !(fx.is_finite() && fy.is_finite()) {
+                continue;
+            }
+            let (sx, sy) = (CX + js_round(fx) as i32, FEET + js_round(fy) as i32);
             let inside = (0..SPRITE as i32).contains(&sx) && (0..SPRITE as i32).contains(&sy);
             if !inside {
                 continue;
@@ -1089,11 +1095,15 @@ pub fn draw(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64) {
     blit(frame, look, a, ground_y, untouchable_alpha(a));
 }
 
-/// How strongly a fighter is drawn: whole, or blinking faint ([`squash::blink`]) while nothing can touch it.
-/// Faint, not gone, so the pose still reads.
+/// How strongly a fighter is drawn: whole, or blinking faint at 10 Hz ([`squash::blink`]) while nothing can touch
+/// it. Faint, not gone, so the pose still reads.
 fn untouchable_alpha(a: &Appearance) -> f64 {
     if a.untouchable && !a.out {
-        squash::blink(&SquashSpec::default(), a.pose_t)
+        let spec = SquashSpec {
+            blink_rate: 10.0,
+            ..SquashSpec::default()
+        };
+        squash::blink(&spec, a.pose_t)
     } else {
         1.0
     }
@@ -1101,7 +1111,7 @@ fn untouchable_alpha(a: &Appearance) -> f64 {
 
 fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f64) {
     let t = a.pose_t;
-    let mut sprite = deform(&paint(look, a), stretch(a));
+    let mut sprite = deform(&paint(look, a), shape(a));
     let windup = a.act.and_then(|k| k.windup);
     let p = windup.map(|w| w.progress);
     let glow = matches!(a.pose, Pose::Channel | Pose::Cast).then_some(look.glow);

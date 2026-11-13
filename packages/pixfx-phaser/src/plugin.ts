@@ -107,10 +107,10 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   }
 
   /**
-   * Give `sprite` squash, stretch and a blink: it stretches along a fast rise or fall (read from its arcade body's
-   * velocity, else from how far it moved), flattens when the game calls `land`, and blinks on `blink`. Set its
-   * origin at its feet (`setOrigin(0.5, 1)`). Ends when the sprite is destroyed, `destroy()` is called, or the
-   * scene shuts down. Throws before `loadPixfx()`.
+   * Give `sprite` squash, stretch and a blink: it stretches along its velocity when it moves fast, upright (read
+   * from its arcade body's velocity, else from how far it moved), flattens when the game calls `land`, and blinks
+   * on `blink`. Set its origin at its feet (`setOrigin(0.5, 1)`). Ends when the sprite is destroyed, `destroy()`
+   * is called, or the scene shuts down. Throws before `loadPixfx()`.
    */
   squash(sprite: FeelSprite): PixfxSpriteFeel {
     const engine = loadedEngine();

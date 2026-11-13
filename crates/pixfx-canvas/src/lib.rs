@@ -27,13 +27,11 @@ use std::cell::{Cell, RefCell};
 use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
-use js_sys::{Array, Uint8ClampedArray};
-use pixfx_core::{Feel, Frame, Layer};
+use js_sys::{Array, Uint8Array, Uint8ClampedArray};
+use pixfx_core::{Feel, Frame, Layer, Player};
 use pixfx_effects::effect;
 use pixfx_wasm::js::{pair, parse, to_js};
-use stage::{
-    Pass, PlacementChange, Scene, Shell, color_rgba, light_rgba, live_player, stage_options,
-};
+use stage::{Pass, PlacementChange, Scene, Shell, color_rgba, light_rgba, stage_options};
 use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 use web_sys::{
@@ -86,9 +84,37 @@ impl Stage {
         #[wasm_bindgen(unchecked_optional_param_type = "FxOptions")] opts: JsValue,
     ) -> Result<u32, JsError> {
         let fx = effect(id).ok_or_else(|| JsError::new(&format!("unknown effect {id:?}")))?;
-        let player = live_player(fx, stage_options(fx.meta(), &opts)?);
+        let player = Player::live(fx, stage_options(fx.meta(), &opts)?);
         let mut r = self.renderer.borrow_mut();
         Ok(r.scene.play(player, x, y)?)
+    }
+
+    /// Hold the frames of a clip baked by `pixfx bake`: `json` is the text of `<name>.bake.json`, `pages` the bytes
+    /// of the PNG files it names, in its order. Effects playing that effect with the same options then show the
+    /// baked frames and draw nothing; held like drawn frames, they go past the frame budget and are drawn live
+    /// if shown again. Returns how many frame layers were loaded.
+    #[wasm_bindgen(js_name = loadBaked)]
+    pub fn load_baked(&mut self, json: &str, pages: Vec<Uint8Array>) -> Result<u32, JsError> {
+        let pages: Vec<Vec<u8>> = pages.iter().map(Uint8Array::to_vec).collect();
+        let refs: Vec<&[u8]> = pages.iter().map(Vec::as_slice).collect();
+        let layers = pixfx_export::decode(json, &refs).map_err(|e| JsError::new(&e))?;
+        let mut r = self.renderer.borrow_mut();
+        let Renderer {
+            ctx,
+            scene,
+            scratch,
+            ..
+        } = &mut *r;
+        let mut shell = CanvasShell {
+            stage: ctx,
+            bytes: scratch,
+        };
+        for l in &layers {
+            scene
+                .load(&l.id, l.layer, &l.frame, &mut shell)
+                .map_err(|e| JsError::new(&e))?;
+        }
+        Ok(u32::try_from(layers.len()).unwrap_or(u32::MAX))
     }
 
     /// Let the effect end: loops fade out, one-shots are cut short; it is removed once done. Unknown handles

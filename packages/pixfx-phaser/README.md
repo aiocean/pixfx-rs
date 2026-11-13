@@ -102,6 +102,20 @@ options) show the same frames, so the game draws each frame once and every such 
 `stats()` counts what the scene itself holds: engine instances, images, and textures of fading effects and
 layers. Shared frames' textures belong to the game, not to a scene.
 
+### Baked frames
+
+`pixfx bake <id> [--palette WORD] [--outline WORD] --out public/fx` writes `<name>.bake.json` and its PNG pages:
+every frame of the effect as the game would draw it, cropped. Load it once after `loadPixfx()`:
+
+```ts
+await loadPixfx();
+await loadBaked("fx/fire_campfire.bake.json"); // pages are fetched from the same folder
+```
+
+Effects playing that effect with the same options then show the baked frames and draw nothing; other options
+draw live. Baked frames are held like drawn ones, under `frameBudget`: past it they go and are drawn again if
+shown.
+
 ## Play an effect
 
 `scene.pixfx.play(id, x, y, opts?)` places the effect's origin at world `(x, y)` and returns a `PixfxEffect`.
@@ -183,9 +197,11 @@ const look = this.pixfx.squash(hero);
 // on taking a hit: look.blink(1.2);
 ```
 
-Each scene update it stretches the sprite along a fast rise or fall, using the arcade body's velocity when there
-is one and otherwise how far the sprite moved. It flattens the sprite on `land(strength)` and eases back,
-keeping its area, and blinks it for `blink(secs)`. It scales over the sprite's scale and alpha at creation; call
+Each scene update it stretches the sprite along its velocity when it moves fast, using the arcade body's velocity
+when there is one and otherwise how far the sprite moved. It reaches 1.3 times its length at 220 px/s, so it is
+tall for a jump or fall and wide for a dash. A Phaser sprite cannot skew, so the stretch stays upright, and a
+flight at exactly 45° has none. On `land(strength)` it flattens the sprite to 0.7 tall and eases back within
+0.15 s. The other axis takes the inverse, so the area stays the same. It blinks the sprite for `blink(secs)`. It scales over the sprite's scale and alpha at creation; call
 `setBase(scaleX, scaleY, alpha)` when the game changes them. In a hit-stop it holds its shape. The collision body
 keeps its size. It ends when the sprite is destroyed, on `destroy()` (the sprite returns to its base), or when the
 scene shuts down.

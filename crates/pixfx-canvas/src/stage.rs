@@ -9,7 +9,7 @@ use pixfx_core::cue::Cue;
 use pixfx_core::math::clamp;
 use pixfx_core::math::js_round;
 use pixfx_core::{
-    Effect, Feel, Frame, FrameStore, Layer, Meta, Options, Placement, TimedCue, composite_px,
+    Feel, Frame, FrameId, FrameStore, Layer, Meta, Options, Placement, TimedCue, composite_px,
     valid_dt,
 };
 use pixfx_wasm::{Player, parse_options};
@@ -64,12 +64,6 @@ impl PlacementChange {
             light: self.light.unwrap_or(base.light),
         }
     }
-}
-
-/// `effect` with `opts` as the stage plays it: on its canvas plus [`Meta::glow_margin`], so nothing at the
-/// canvas edge is faded or cut.
-pub fn live_player(effect: &'static dyn Effect, opts: Options) -> Player {
-    Player::new(effect, opts, effect.meta().glow_margin())
 }
 
 /// A target rectangle in canvas pixels (game pixels times the scale).
@@ -402,6 +396,21 @@ impl<S> Scene<S> {
     /// Bytes the shared frames hold now.
     pub fn frame_bytes(&self) -> u64 {
         self.store.bytes()
+    }
+
+    /// Hold `frame` as `layer` of frame `id` (a baked frame), so effects showing it draw nothing. Held like a
+    /// drawn frame: past the budget it goes, least recently shown first, and is drawn live if shown again.
+    pub fn load<H: Shell<Surface = S>>(
+        &mut self,
+        id: &FrameId,
+        layer: Layer,
+        frame: &Frame,
+        shell: &mut H,
+    ) -> Result<(), H::Error> {
+        self.store.show(id, layer, self.draws, || {
+            Ok((shell.make(frame)?, frame_bytes(frame)))
+        })?;
+        Ok(())
     }
 
     /// Draw the back layer of every instance, then the front layer of every instance, oldest first

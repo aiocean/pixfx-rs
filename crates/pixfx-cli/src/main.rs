@@ -4,9 +4,12 @@
 //!
 //!   pixfx sheet <id> [--palette WORD] [--outline WORD] [--out DIR]
 //!   pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
+//!   pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]
 //!
 //! `sheet` writes `<name>.png`, `<name>_color.png`, `<name>_light.png` and `<name>.json` (beanfx layout) for
-//! `<id>`; `render --gif` writes `<name>.gif`, each pixel blown up `N` times (default 4). `<name>` is `<id>`
+//! `<id>`; `render --gif` writes `<name>.gif`, each pixel blown up `N` times (default 4); `bake` writes
+//! `<name>.bake.json` and its pages `<name>.bake.<n>.png`, every frame as live hosts draw it, which hosts load to
+//! play the effect without drawing it. `<name>` is `<id>`
 //! with `/` as `_`; `--out` defaults to `target/out`. `--outline` outlines the effect: `off`, a preset (`dark`,
 //! `black`, `white`, `thick`) or a hex colour (`#ffcc00`); left out, it looks as designed. `--palette` recolours
 //! it with a preset (`fire`, `ice`, `poison`, `holy`, `shadow`, `arcane`, `blood`, `electric`, `nature`, `gold`).
@@ -24,15 +27,17 @@ use std::process::{Command, ExitCode};
 use pixfx_cli::opts::CliOpts;
 use pixfx_cli::parity::{compare, read_reference, write_side_gif};
 use pixfx_core::{Options, Outline, render_frames};
-use pixfx_export::{write_gif, write_sheet};
+use pixfx_export::{bake, write_bake, write_gif, write_sheet};
 
 const USAGE: &str = "usage: pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
        pixfx sheet <id> [--palette WORD] [--outline WORD] [--out DIR]
-       pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]";
+       pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
+       pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]";
 
-/// What `pixfx sheet` and `pixfx render` produce.
+/// What `pixfx sheet`, `pixfx render` and `pixfx bake` produce.
 enum Export {
     Sheet,
+    Bake,
     Gif { scale: u32 },
 }
 
@@ -58,7 +63,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.split_first() {
         Some((cmd, rest)) if cmd == "parity" => parse_parity(rest).and_then(|a| parity(&a)),
-        Some((cmd, rest)) if cmd == "sheet" || cmd == "render" => {
+        Some((cmd, rest)) if cmd == "sheet" || cmd == "render" || cmd == "bake" => {
             parse_export(cmd, rest).and_then(|a| export(&a).map(|()| true))
         }
         _ => Err(USAGE.to_string()),
@@ -130,6 +135,7 @@ fn parse_export(cmd: &str, args: &[String]) -> Result<ExportArgs, String> {
     }
     let export = match (cmd, gif) {
         ("sheet", _) => Export::Sheet,
+        ("bake", _) => Export::Bake,
         (_, true) => Export::Gif { scale },
         _ => return Err(format!("render needs --gif\n{USAGE}")),
     };
@@ -142,7 +148,7 @@ fn parse_export(cmd: &str, args: &[String]) -> Result<ExportArgs, String> {
     })
 }
 
-/// Render `a.id` and write the sheet or gif into `a.out`.
+/// Render `a.id` and write the sheet, gif or baked clip into `a.out`.
 fn export(a: &ExportArgs) -> Result<(), String> {
     let id = a.id.as_str();
     let effect = pixfx_effects::effect(id)
@@ -152,18 +158,28 @@ fn export(a: &ExportArgs) -> Result<(), String> {
         palette: a.palette.clone(),
         ..Options::default()
     };
-    let rendered = render_frames(effect, &opts, 0);
     let name = id.replace('/', "_");
     std::fs::create_dir_all(&a.out).map_err(|e| format!("creating {}: {e}", a.out.display()))?;
+    let rendered = || render_frames(effect, &opts, 0);
     match a.export {
+        Export::Bake => {
+            let clip = bake(effect, opts.clone())?;
+            let files = write_bake(&clip, &a.out, &name)
+                .map_err(|e| format!("writing the {id} bake: {e}"))?;
+            println!(
+                "{id}: {} ({} pages)",
+                files.json.display(),
+                files.pages.len()
+            );
+        }
         Export::Sheet => {
-            let files = write_sheet(&rendered, effect.meta(), &a.out, &name)
+            let files = write_sheet(&rendered(), effect.meta(), &a.out, &name)
                 .map_err(|e| format!("writing the {id} sheet: {e}"))?;
             println!("{id}: {}", files.json.display());
         }
         Export::Gif { scale } => {
             let path = a.out.join(format!("{name}.gif"));
-            write_gif(&path, &rendered, scale)
+            write_gif(&path, &rendered(), scale)
                 .map_err(|e| format!("writing {}: {e}", path.display()))?;
             println!("{id}: {}", path.display());
         }

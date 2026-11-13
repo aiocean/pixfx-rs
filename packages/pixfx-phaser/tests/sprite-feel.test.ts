@@ -6,6 +6,7 @@ import { FakeBlink, FakeSquash } from "./fake-engine";
 function sprite(body?: unknown): FeelSprite & { drawn: [number, number, number][] } {
   const drawn: [number, number, number][] = [];
   const s = {
+    x: 50,
     y: 100,
     scaleX: 2,
     scaleY: 2,
@@ -47,11 +48,24 @@ test("a sprite at rest keeps its own scale; moving, it stretches over that scale
   expect(s.drawn.at(-1)).toEqual([2 / 1.5, 3, 1]);
 });
 
-test("its body's velocity says how fast it moves when it has one", () => {
+test("its body's velocity says how fast and which way it moves when it has one", () => {
   const s = sprite({ velocity: { x: 0, y: 300 } });
   const { f } = feel(s);
   f.step(0.1);
   expect(s.drawn.at(-1)).toEqual([2 / 1.5, 3, 1]);
+});
+
+test("moving sideways stretches it wide", () => {
+  const dashing = sprite({ velocity: { x: -400, y: 20 } });
+  feel(dashing).f.step(0.1);
+  expect(dashing.drawn.at(-1)).toEqual([3, 2 / 1.5, 1]);
+
+  const s = sprite();
+  const { f } = feel(s);
+  f.step(0.1);
+  s.x = 80;
+  f.step(0.1);
+  expect(s.drawn.at(-1)).toEqual([3, 2 / 1.5, 1]);
 });
 
 test("landing squashes it until the squash eases out", () => {

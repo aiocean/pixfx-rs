@@ -38,6 +38,33 @@ impl fmt::Display for ClipKey {
     }
 }
 
+impl std::str::FromStr for ClipKey {
+    type Err = String;
+
+    /// A key from its [`fmt::Display`] form; a key of another encoding version is an error.
+    fn from_str(hex: &str) -> Result<Self, String> {
+        let bad = || format!("{hex:?} is not a frame key");
+        if !hex.len().is_multiple_of(2) {
+            return Err(bad());
+        }
+        let bytes = (0..hex.len())
+            .step_by(2)
+            .map(|i| {
+                hex.get(i..i + 2)
+                    .and_then(|pair| u8::from_str_radix(pair, 16).ok())
+                    .ok_or_else(bad)
+            })
+            .collect::<Result<Vec<u8>, String>>()?;
+        match bytes.first() {
+            Some(&VERSION) => Ok(Self(bytes)),
+            Some(v) => Err(format!(
+                "frame key of version {v}, this build reads {VERSION}"
+            )),
+            None => Err(bad()),
+        }
+    }
+}
+
 /// A frame an effect shows: frame `index` of the clip `key`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FrameId {

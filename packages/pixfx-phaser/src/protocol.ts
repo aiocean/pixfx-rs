@@ -45,6 +45,8 @@ const itemSchema = z.object({
 
 const batchSchema = z.object({
   type: z.literal("batch"),
+  /** Shared frames the main thread holds without this worker having sent them (baked frames); applied before `drops`. */
+  holds: z.array(z.string()),
   /** Shared frames the main thread no longer holds. */
   drops: z.array(z.string()),
   frees: z.array(handle),

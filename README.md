@@ -57,9 +57,12 @@ Effects say what an impact should do to the screen, and every host answers the s
   returns the played seconds for the host's own world. `setFeel(false)` leaves the answer to the game, and cues
   still arrive in `events()`. In Phaser, `scene.pixfx.feel` shakes and tilts the main camera, flashes, and freezes the
   scene's effects; the game reads `feel.timeScale`. Any other JS host uses `Fx.takeCues()` with a `Feel`.
-- **Sprites.** `Squash` stretches a body along a fast rise or fall, flattens it as it lands and eases back,
-  keeping its area. `Blink` blinks it while it cannot be hurt. In Phaser, use `scene.pixfx.squash(sprite)`. The
-  fighter paints with the same rules.
+- **Sprites.** `Squash` stretches a body along its velocity when it moves fast (up to 1.3 long at 220 px/s and
+  faster), flattens it to 0.7 tall as it lands and eases back to itself within 0.15 s. The other axis takes the
+  inverse, so the area stays the same, and the shape pivots at the feet. `shape(vx, vy)` gives the full shape as
+  `[a, b, c, d]` for a canvas `transform` about the feet, leaning on a diagonal flight. `scale(vx, vy)` gives the
+  nearest upright `[sx, sy]` for hosts that cannot skew. `Blink` blinks a body while it cannot be hurt. In Phaser,
+  use `scene.pixfx.squash(sprite)`. The fighter paints with the full shape.
 
 ## Outlines
 

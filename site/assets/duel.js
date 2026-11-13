@@ -147,14 +147,17 @@ export const SPELLS = {
 };
 
 /**
- * The two schools: their spells, the distance each likes to fight at, how eager it is, how long it takes a breath
- * after each attack (`tempo`, seconds), the distance it keeps when its qi runs low (`dry`: Thunder presses in to sword's
- * length, Frost stays at middle distance while its qi gathers again), the height it likes to hover at while it has the qi
- * (`sky`; Frost casts from the air, Thunder fights on the ground), and its colours.
+ * The two schools. A school's spells are its `basics` (the blade, the dive and the blink, each on its own cooldown)
+ * and its skill `slots`, in the order its skill bar shows them: 1, 2, 3 and the ultimate. The spells in a slot share
+ * one cooldown: casting any of them puts the whole slot on the cooldown of the one cast. Then the distance each
+ * school likes to fight at, how eager it is, how long it takes a breath after each attack (`tempo`, seconds), the
+ * distance it keeps when its qi runs low (`dry`: Thunder presses in to sword's length, Frost stays at middle distance
+ * while its qi gathers again), the height it likes to hover at while it has the qi (`sky`; Frost casts from the air,
+ * Thunder fights on the ground), and its colours.
  */
 export const SCHOOLS = {
   thunder: {
-    name: "Thunder", spells: ["slash", "dive", "palm", "step", "seal", "bolt", "orb", "bell", "blink", "heal", "tribulation"], range: 64, dry: SPELLS.slash.range - 4, aggression: 1.15, tempo: 0.8, sky: 22,
+    name: "Thunder", basics: ["slash", "dive", "blink"], slots: [["bolt", "palm", "step"], ["seal", "orb"], ["bell", "heal"], ["tribulation"]], range: 64, dry: SPELLS.slash.range - 4, aggression: 1.15, tempo: 0.8, sky: 22,
     bolt: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#ffe98a", "#fff6c4", "#ffffff"],
     circle: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"],
     // every effect a Thunder spell plays is drawn in gold and white, so it is plain whose it is
@@ -169,7 +172,7 @@ export const SCHOOLS = {
     },
   },
   frost: {
-    name: "Frost", spells: ["slash", "dive", "lotus", "collapse", "shatter", "frostfire", "bolt", "icicle", "void", "mirror", "blink", "ward", "prison"], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
+    name: "Frost", basics: ["slash", "dive", "blink"], slots: [["bolt", "lotus"], ["shatter", "icicle", "collapse", "frostfire", "void"], ["mirror", "ward"], ["prison"]], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
     // every effect a Frost spell plays is drawn in ice blue and white
@@ -221,10 +224,7 @@ export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top, 
     const fx = SPELLS[name].fx;
     return !fx || has(fx);
   };
-  duel.fighters = [
-    fighter(0, "thunder", SCHOOLS.thunder.spells.filter(usable), new Body(0)),
-    fighter(1, "frost", SCHOOLS.frost.spells.filter(usable), new Body(0)),
-  ];
+  duel.fighters = [fighter(0, "thunder", usable, new Body(0)), fighter(1, "frost", usable, new Body(0))];
   for (const name of Object.values(DECOR)) if (has(name)) duel.decor = true;
   startRound(duel);
   return duel;
@@ -233,8 +233,16 @@ export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top, 
 /** The body's fields, read and written on the fighter as if they were its own. */
 const BODY_FIELDS = ["x", "air", "vx", "vy", "face", "stun", "wake", "land", "squat", "leap", "duck", "flash", "hitT", "hitPower", "frozen", "shocked", "poseT"];
 
-function fighter(index, school, spells, body) {
-  const f = { index, school, spells, stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, calm: 0, attune: 0, read: { tried: {}, landed: {} } , body, spec: body.spec };
+/** Fighter `index` of `school`, with the school's spells that are `usable`. */
+function fighter(index, school, usable, body) {
+  const { basics, slots } = SCHOOLS[school];
+  const spells = [...basics, ...slots.flat()].filter(usable);
+  // the cooldown each spell runs on: its slot's, or its own for a basic
+  const timer = Object.fromEntries(spells.map((name) => {
+    const i = slots.findIndex((slot) => slot.includes(name));
+    return [name, i < 0 ? name : `slot${i}`];
+  }));
+  const f = { index, school, spells, timer, stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, coolFull: {}, think: 0, intent: { move: 0 }, aura: null, calm: 0, attune: 0, read: { tried: {}, landed: {} } , body, spec: body.spec };
   for (const k of BODY_FIELDS) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
@@ -250,7 +258,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, calm: 0 });
+    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, coolFull: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, calm: 0 });
     f.body.startRound(duel.left + span * (f.index === 0 ? 0.22 : 0.78));
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
@@ -348,7 +356,7 @@ function begin(duel, me, name, target) {
     me.rage = 0;
     emit(duel, { type: "ultimate", by: me.index, x: me.x, y: me.air + me.spec.chest });
   }
-  me.cool[name] = spell.cooldown + spell.windup;
+  me.cool[me.timer[name]] = me.coolFull[me.timer[name]] = spell.cooldown + spell.windup;
   me.act = { spell: name, phase: "windup", t: 0, target };
   // an attack is a commitment: a breath in neutral follows it, and it counts toward what the fighter learns
   if (spell.damage) {
@@ -826,10 +834,30 @@ function mind(duel, me, foe, dt) {
 }
 
 const ready = (me, name) =>
-  me.spells.includes(name) && !(me.cool[name] > 0) && me.qi >= SPELLS[name].cost && (!SPELLS[name].ultimate || me.rage >= RAGE) &&
+  me.spells.includes(name) && !(me.cool[me.timer[name]] > 0) && me.qi >= SPELLS[name].cost && (!SPELLS[name].ultimate || me.rage >= RAGE) &&
   !(name === "blink" && me.sealed > 0) &&
   // silenced, only the blade answers
   !(me.silence > 0 && SPELLS[name].kind !== "melee");
+
+/**
+ * What fighter f's skill bar shows, slot by slot (1, 2, 3, then the ultimate): whether any spell in it can be cast
+ * now, the cooldown it has `left` out of the `full` cooldown it began, and how charged it is (an ultimate charges
+ * with rage; a slot with none of its spells in the fight is `empty`).
+ */
+export function skillBar(f) {
+  return SCHOOLS[f.school].slots.map((slot, i) => {
+    const owned = slot.filter((name) => f.spells.includes(name));
+    const ultimate = owned.some((name) => SPELLS[name].ultimate);
+    return {
+      empty: owned.length === 0,
+      ultimate,
+      ready: f.hp > 0 && owned.some((name) => ready(f, name)),
+      left: f.cool[`slot${i}`] ?? 0,
+      full: f.coolFull[`slot${i}`] ?? 0,
+      charge: ultimate ? f.rage / RAGE : 1,
+    };
+  });
+}
 
 /** What is coming at me, and the ways out of each. */
 function dangers(duel, me) {

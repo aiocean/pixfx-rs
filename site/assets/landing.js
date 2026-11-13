@@ -2,7 +2,7 @@
 // loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
 import init, { Body, FightFeel, Lights, Sprites, Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 import { DECOR, createDuel, step } from "./duel.js";
-import { BARS_TALL, drawBars, drawFighters, drawNumbers, drawStreaks } from "./duel-art.js";
+import { BARS_TALL, drawBars, drawFighters, drawNumbers, drawSkills, drawStreaks } from "./duel-art.js";
 import { createScene, drawScene } from "./duel-scene.js";
 import { kindle, lampGlows } from "./duel-light.js";
 
@@ -159,6 +159,8 @@ function createHero(canvas, signal) {
       ctx.fillRect(0, (h - band) * scale, w * scale, band * scale);
     }
     drawBars(ctx, view.sprites, view.duel, scale, view.layout.barTop);
+    // each fighter's skills, on the floor under its own side
+    drawSkills(ctx, view.duel, scale, ground, h);
   };
 
   let pending = null;

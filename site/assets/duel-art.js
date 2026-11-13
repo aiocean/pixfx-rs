@@ -3,7 +3,7 @@
 // they raise) are drawn by the engine (pixfx-fighter, through the wasm `Sprites`); this module tells it what each
 // fighter is doing, in the duel's own terms. Everything is in game pixels times `s`, the canvas scale.
 import { lookColors } from "../pkg/pixfx_canvas.js";
-import { RAGE, SPELLS } from "./duel.js";
+import { RAGE, SPELLS, skillBar } from "./duel.js";
 
 /** Each school's colours the HUD draws in, from the engine's looks (asked once the engine has loaded). */
 const LOOKS = {};
@@ -236,4 +236,102 @@ function medallion(f, x, top, size, box, c, faces) {
   box(x + 4, top + 4, size - 8, size - 8, f.rage >= RAGE ? c.glow : "#241a30", f.rage >= RAGE ? 0.35 : 1);
   // the face: the sprite's head at twice its size, facing into the arena
   faces.push({ f, x: x + 3, y: top + 3, size: size - 6 });
+}
+
+// ---------- the skill bars ----------
+
+/** Each slot's mark, 5 by 5, in slot order: a strike, a seal, a guard, and the ultimate's burst. */
+const GLYPH = [
+  ["..##.", ".##..", "#####", "..##.", ".##.."],
+  [".###.", "#...#", "#.#.#", "#...#", ".###."],
+  ["#####", "#...#", "#...#", ".#.#.", "..#.."],
+  ["#.#.#", ".###.", "#####", ".###.", "#.#.#"],
+];
+/** The numbers on slots 1, 2 and 3, 3 by 5. */
+const DIGIT = [
+  [".#.", "##.", ".#.", ".#.", "###"],
+  ["##.", "..#", ".#.", "#..", "###"],
+  ["##.", "..#", ".#.", "..#", "##."],
+];
+const SLOT = { field: "#1a1424", shade: "#06050c" };
+/** How long a slot flashes when a spell in it is cast, and glints when its cooldown ends, in seconds. */
+const GLINT = 0.25;
+/** For each fighter, each slot's cooldown last frame and when it last came off cooldown. */
+const glints = new WeakMap();
+
+/**
+ * Each fighter's skill bar on the floor of the dais, under its own side: slots 1, 2 and 3 and the ultimate, the
+ * ultimate nearest the middle. A slot's mark is lit while a spell in it can be cast; a cooldown darkens it and
+ * sweeps back clockwise as it runs out; a cast flashes it and the end of a cooldown glints its frame. The
+ * ultimate's slot fills with rage and blazes once full. The floor runs from row `ground` to row `bottom`.
+ */
+export function drawSkills(ctx, duel, s, ground, bottom) {
+  const box = (x, y, w, h, col, a = 1) => {
+    ctx.globalAlpha = a;
+    ctx.fillStyle = col;
+    ctx.fillRect(x * s, y * s, w * s, h * s);
+    ctx.globalAlpha = 1;
+  };
+  // under the slab's lip, centred in what is left of the floor
+  const room = bottom - ground - 3;
+  const size = Math.max(9, Math.min(15, room - 2));
+  const top = ground + 3 + Math.floor((room - size) / 2);
+  const n = size - 4;
+  const dot = Math.max(1, Math.floor(n / 5));
+  for (const f of duel.fighters) {
+    const c = colors(f.school);
+    const seen = glints.get(f) ?? { left: [], at: [] };
+    glints.set(f, seen);
+    skillBar(f).forEach((slot, i) => {
+      const x = f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2);
+      if (seen.left[i] > 0 && slot.left === 0) seen.at[i] = duel.time;
+      seen.left[i] = slot.left;
+      const full = slot.ultimate && slot.ready;
+      const blaze = full && Math.sin(duel.time * 12) > 0;
+      box(x, top, size, size, BRONZE.deep);
+      box(x + 1, top + 1, size - 2, size - 2, full ? c.glow : BRONZE.mid);
+      box(x + 1, top + 1, size - 2, 1, full && blaze ? "#ffffff" : BRONZE.light);
+      box(x + 2, top + 2, n, n, SLOT.field);
+      if (slot.empty) return;
+      // the ultimate's rage, rising from the foot of the slot
+      const rage = Math.round(n * slot.charge);
+      if (slot.ultimate) box(x + 2, top + 2 + n - rage, n, rage, c.glow, full ? (blaze ? 0.45 : 0.25) : 0.3);
+      const gx = x + 2 + Math.floor((n - 5 * dot) / 2);
+      const gy = top + 2 + Math.floor((n - 5 * dot) / 2);
+      GLYPH[i].forEach((row, r) => {
+        // a slot that cannot be cast (its cooldown, too little qi, a silence) keeps its mark, faint
+        for (let k = 0; k < 5; k++) if (row[k] === "#") box(gx + k * dot, gy + r * dot, dot, dot, c.glow, slot.ready ? 1 : 0.3);
+      });
+      if (slot.ready) box(gx, gy, 5 * dot, 1, "#ffffff", 0.25);
+      // the cooldown: the share still to run stays dark, sweeping clockwise from twelve o'clock
+      if (slot.left > 0 && slot.full > 0) {
+        const dark = slot.left / slot.full;
+        const mid = (n - 1) / 2;
+        for (let py = 0; py < n; py++) {
+          for (let px = 0; px < n; px++) {
+            const turn = (Math.atan2(px - mid, mid - py) / (2 * Math.PI) + 1) % 1;
+            if (turn >= 1 - dark) box(x + 2 + px, top + 2 + py, 1, 1, SLOT.shade, 0.6);
+          }
+        }
+        const since = slot.full - slot.left;
+        if (since < GLINT) box(x + 2, top + 2, n, n, "#ffffff", 0.6 * (1 - since / GLINT));
+      }
+      const ago = duel.time - (seen.at[i] ?? -Infinity);
+      if (ago < GLINT && slot.ready) {
+        const a = 0.8 * (1 - ago / GLINT);
+        box(x, top, size, 1, "#ffffff", a);
+        box(x, top + size - 1, size, 1, "#ffffff", a);
+        box(x, top + 1, 1, size - 2, "#ffffff", a);
+        box(x + size - 1, top + 1, 1, size - 2, "#ffffff", a);
+      }
+      // the slot's number, on a bronze tab at its foot, where there is room for it
+      if (!slot.ultimate && size >= 13) {
+        const tx = f.index === 0 ? x + size - 5 : x;
+        box(tx, top + size - 7, 5, 7, BRONZE.deep);
+        DIGIT[i].forEach((row, r) => {
+          for (let k = 0; k < 3; k++) if (row[k] === "#") box(tx + 1 + k, top + size - 6 + r, 1, 1, BRONZE.light);
+        });
+      }
+    });
+  }
 }

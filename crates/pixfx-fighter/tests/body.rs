@@ -162,3 +162,45 @@ fn a_body_built_lighter_and_floatier_is_thrown_by_a_blow_that_only_staggers_the_
     };
     assert!(airtime(light) > airtime(stock) + 20);
 }
+
+#[test]
+fn a_body_with_invincibility_frames_shrugs_off_blows_for_that_long_after_one_lands() {
+    let light = |dir: f64| Blow {
+        power: 8.0,
+        dir,
+        freeze: false,
+        flying: false,
+    };
+    let spec = BodySpec {
+        invincible: 0.75,
+        ..BodySpec::default()
+    };
+    let mut body = Body::with_spec(100.0, spec);
+    assert!(!body.untouchable(), "open before the first blow");
+
+    // the source stands to the right: the blow pushes it left, away from the source
+    body.hit(light(-1.0));
+    assert!(body.vx < 0.0, "knocked back away from the source");
+    assert!(body.untouchable(), "the window opens with the blow");
+    assert!((body.open_in() - 0.75).abs() < 1e-12);
+
+    let before = body.clone();
+    body.hit(light(1.0));
+    assert_eq!(body, before, "a second blow inside the window does nothing");
+
+    let mut t = 0.0;
+    while body.untouchable() {
+        run(&mut body, &mut || 0.0);
+        t += DT;
+    }
+    assert!((t - 0.75).abs() <= DT, "the window lasts its length ({t})");
+    body.hit(light(1.0));
+    assert_eq!(body.hit_t, 0.0, "the next blow after the window lands");
+
+    let mut stock = Body::new(100.0);
+    stock.hit(light(-1.0));
+    assert!(
+        !stock.untouchable(),
+        "the stock body has none: combos still land"
+    );
+}

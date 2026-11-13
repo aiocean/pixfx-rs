@@ -2,18 +2,15 @@
 
 ## Unreleased
 
-- `pixfx-effects`: each effect is a cargo feature (`fire-candle`), each category a feature that turns on its effects
-  (`fire`), and `all` (the default) every one. `pixfx-wasm` and `pixfx-canvas` build with
-  `--no-default-features --features pixfx-effects/<effect or category>` to ship only the effects a game plays;
-  `EffectId` then lists only those.
-- Release builds favour play speed: fat LTO in one codegen unit (opt-level 3), and wasm-pack's `wasm-opt` pass at
-  `-O3` for `pixfx-wasm` and `pixfx-canvas`. The 25-effect wasm is 235 KB gzip instead of 246 KB.
 - `pixfx-core`, `pixfx-wasm`, `pixfx-cli`, `pixfx-phaser`: every effect takes an `outline` (off, a preset, a hex colour
   or `{color, width, corners}`) and a `palette` by preset name (`fire`, `ice`, `poison`, `holy`, `shadow`, `arcane`,
   `blood`, `electric`, `nature`, `gold`); the CLI takes `--outline` and `--palette`.
 - `pixfx-canvas`: the stage's own loop bends the view by the ripples alive; `Stage.warp()` does it for a host that
   owns the loop. `pixfx-core`: `screen::ripple_rgba` bends RGBA pixels at any scale.
 - `pixfx-core`, `pixfx-wasm`: `HitFlash` fills a struck sprite for a few frames on play time, held through a hit-stop.
+- `site/`: the hero's duel shows each fighter's skill bar on the dais floor: slots 1, 2 and 3 and the ultimate. The
+  spells in a slot share one cooldown, which darkens the slot and sweeps back as it runs out; the ultimate's slot
+  fills with rage.
 - `site/`: the effect page picks a palette preset, an outline and (for impact effects) the feel, and copies the call.
 - `pixfx-core`: the trauma shake follows the usual model on every axis: `Feel::roll(strength)` tilts the screen
   (radians, `FeelSpec::roll`) next to `shake`'s x and y, each axis is the most it can move times trauma squared times
@@ -23,6 +20,12 @@
 - `pixfx-wasm`, `pixfx-canvas`: `Feel.roll(strength)` and `Stage.roll(strength)`; the Canvas stage's own loop leaves
   roll out to keep the pixel grid. `pixfx-phaser`: `feel.roll`, and the plugin tilts the main camera by it for the
   render, keeping the game's own rotation.
+- `pixfx-effects`: each effect is a cargo feature (`fire-candle`), each category a feature that turns on its effects
+  (`fire`), and `all` (the default) every one. `pixfx-wasm` and `pixfx-canvas` build with
+  `--no-default-features --features pixfx-effects/<effect or category>` to ship only the effects a game plays;
+  `EffectId` then lists only those.
+- Release builds favour play speed: fat LTO in one codegen unit (opt-level 3), and wasm-pack's `wasm-opt` pass at
+  `-O3` for `pixfx-wasm` and `pixfx-canvas`. The 25-effect wasm is 235 KB gzip instead of 246 KB.
 - `pixfx-canvas`: `Stage.move(handle, x, y)` moves a playing effect without restarting it, for effects that follow
   the pointer or a sprite.
 - `site/`: landing page and docs, with an fx layer (`site/assets/fx.js`) that plays engine effects for the cursor,

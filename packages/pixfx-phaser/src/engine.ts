@@ -33,12 +33,12 @@ export interface FxLike {
   free(): void;
 }
 
-/** One body's squash and stretch: it lands, time passes, it is scaled for its speed. */
+/** One body's squash and stretch: it lands, time passes, it is scaled for its velocity. */
 export interface SquashLike {
   land(strength: number): void;
   advance(dt: number): void;
-  /** `[sx, sy]` for a body moving up or down at `vy` px/s; the area is kept. */
-  scale(vy: number): [number, number];
+  /** `[sx, sy]` for a body moving at `(vx, vy)` px/s: its stretch along its velocity, upright; the area is kept. */
+  scale(vx: number, vy: number): [number, number];
   free(): void;
 }
 
@@ -156,7 +156,7 @@ export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engin
       return {
         land: (strength) => s.land(strength),
         advance: (dt) => s.advance(dt),
-        scale: (vy) => pair.parse(s.scale(vy)),
+        scale: (vx, vy) => pair.parse(s.scale(vx, vy)),
         free: () => s.free(),
       };
     },

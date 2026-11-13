@@ -7,12 +7,18 @@ export interface Look {
   alpha: number;
 }
 
+/** A velocity in pixels a second, y down. */
+export interface Velocity {
+  x: number;
+  y: number;
+}
+
 /**
- * One sprite's squash, stretch and blink, with no Phaser calls: each step it reads how fast the sprite moved up or
- * down (from its velocity when it has one, else from how far it moved) and says how to draw it.
+ * One sprite's squash, stretch and blink, with no Phaser calls: each step it reads how fast and which way the
+ * sprite moved (from its velocity when it has one, else from how far it moved) and says how to draw it.
  */
 export class SpriteFeelCore {
-  private lastY: number | null = null;
+  private last: { x: number; y: number } | null = null;
 
   constructor(
     private readonly squash: SquashLike,
@@ -34,15 +40,18 @@ export class SpriteFeelCore {
   }
 
   /**
-   * Let `dt` seconds of play pass for a sprite now at height `y`, moving up or down at `vy` px/s when the game
-   * knows it (a physics body), and return how to draw it. A frame with no play time (a hit-stop) holds its shape.
+   * Let `dt` seconds of play pass for a sprite now at `(x, y)`, moving at `velocity` when the game knows it (a
+   * physics body), and return how to draw it. A frame with no play time (a hit-stop) holds its shape.
    */
-  step(dt: number, y: number, vy: number | null): Look {
-    const moved = this.lastY === null || dt <= 0 ? 0 : (y - this.lastY) / dt;
-    this.lastY = y;
+  step(dt: number, x: number, y: number, velocity: Velocity | null): Look {
+    const last = this.last;
+    const moved =
+      last === null || dt <= 0 ? { x: 0, y: 0 } : { x: (x - last.x) / dt, y: (y - last.y) / dt };
+    this.last = { x, y };
     this.squash.advance(dt);
     this.blinking.advance(dt);
-    const [scaleX, scaleY] = this.squash.scale(vy ?? moved);
+    const v = velocity ?? moved;
+    const [scaleX, scaleY] = this.squash.scale(v.x, v.y);
     return { scaleX, scaleY, alpha: this.blinking.alpha() };
   }
 
@@ -54,27 +63,32 @@ export class SpriteFeelCore {
 
 /** What `scene.pixfx.squash(sprite)` drives: a Phaser sprite or image (any game object with these). */
 export interface FeelSprite {
+  x: number;
   y: number;
   scaleX: number;
   scaleY: number;
   alpha: number;
   active: boolean;
-  /** An arcade body: its vertical speed is read from it when there is one. */
+  /** An arcade body: its velocity is read from it when there is one. */
   body?: unknown;
   setScale(x: number, y: number): unknown;
   setAlpha(alpha: number): unknown;
 }
 
-function velocityY(body: unknown): number | null {
+function velocityOf(body: unknown): Velocity | null {
   if (typeof body !== "object" || body === null || !("velocity" in body)) return null;
   const v: unknown = body.velocity;
-  if (typeof v !== "object" || v === null || !("y" in v)) return null;
-  return typeof v.y === "number" && Number.isFinite(v.y) ? v.y : null;
+  if (typeof v !== "object" || v === null || !("x" in v) || !("y" in v)) return null;
+  const { x, y } = v;
+  return typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y)
+    ? { x, y }
+    : null;
 }
 
 /**
  * One sprite's squash, stretch and blink (`scene.pixfx.squash(sprite)`). Each scene update it stretches the
- * sprite along a fast rise or fall, flattens it as it lands (`land`) and eases back, and blinks it while the game
+ * sprite along its velocity when it moves fast (upright: tall for a rise or fall, wide for a dash, since a Phaser
+ * sprite cannot skew), flattens it as it lands (`land`) and eases back, and blinks it while the game
  * keeps it from harm (`blink`). It sets the sprite's scale and alpha over a base (`setBase`, by default what they
  * were when it was made), so give the sprite its origin at its feet (`setOrigin(0.5, 1)`) to keep them on the
  * floor. Its body for collisions keeps its size. In a hit-stop it holds its shape.
@@ -137,7 +151,7 @@ export class PixfxSpriteFeel {
       return;
     }
     if (!(dt > 0)) return;
-    const look = this.core.step(dt, this.sprite.y, velocityY(this.sprite.body));
+    const look = this.core.step(dt, this.sprite.x, this.sprite.y, velocityOf(this.sprite.body));
     this.sprite.setScale(this.base.scaleX * look.scaleX, this.base.scaleY * look.scaleY);
     this.sprite.setAlpha(this.base.alpha * look.alpha);
   }

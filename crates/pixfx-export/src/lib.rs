@@ -1,8 +1,9 @@
-//! pixfx export: a rendered effect as sprite sheets plus beanfx's Aseprite-style JSON ([`write_sheet`]), or
-//! as a gif ([`write_gif`]). Layout and JSON values are pure functions ([`Grid`], [`beanfx_json`]); only
+//! pixfx export: a rendered effect as sprite sheets plus beanfx's Aseprite-style JSON ([`write_sheet`]), as
+//! a gif ([`write_gif`]), or baked for hosts to play without drawing ([`bake`], [`write_bake`], [`decode`]). Layout and JSON values are pure functions ([`Grid`], [`beanfx_json`]); only
 //! the `write_*` functions touch files.
 #![forbid(unsafe_code)]
 
+pub mod bake;
 mod gif;
 mod json;
 mod sheet;
@@ -10,6 +11,7 @@ mod sheet;
 use std::fmt;
 use std::io;
 
+pub use bake::{bake, decode, write_bake};
 pub use gif::write_gif;
 pub use json::{FileNames, beanfx_json};
 pub use sheet::{Grid, SheetFiles, write_sheet};

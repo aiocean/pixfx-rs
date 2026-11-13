@@ -15,11 +15,12 @@ export class WorkerCore {
   constructor(private readonly engine: Engine) {}
 
   /**
-   * Forget dropped frames, free, spawn, then for each item: stop, advance. Replies with the shared frames drawn
+   * Learn held frames, forget dropped ones, free, spawn, then for each item: stop, advance. Replies with the shared frames drawn
    * (their buffers in the transfer list) and every instance that moved to a new frame, fired cues, or finished
    * (freed here).
    */
   run(batch: Batch): { reply: FromWorker; transfer: ArrayBuffer[] } {
+    for (const id of batch.holds) this.held.add(id);
     for (const id of batch.drops) this.held.delete(id);
     for (const h of batch.frees) this.free(h);
     const spawned = new Set<number>();

@@ -145,7 +145,7 @@ export class FakeFeel implements FeelLike {
   }
 }
 
-/** Stretches 1.5 tall at any speed, squashes 0.5 tall until 0.1 s after a landing. */
+/** Stretches 1.5 along its faster axis at any speed, squashes 0.5 tall until 0.1 s after a landing. */
 export class FakeSquash implements SquashLike {
   freed = false;
   private since: number | null = null;
@@ -155,9 +155,10 @@ export class FakeSquash implements SquashLike {
   advance(dt: number): void {
     if (this.since !== null) this.since = this.since + dt >= 0.1 ? null : this.since + dt;
   }
-  scale(vy: number): [number, number] {
-    const tall = this.since !== null ? 0.5 : vy !== 0 ? 1.5 : 1;
-    return [1 / tall, tall];
+  scale(vx: number, vy: number): [number, number] {
+    if (this.since !== null) return [2, 0.5];
+    if (vx === 0 && vy === 0) return [1, 1];
+    return Math.abs(vx) > Math.abs(vy) ? [1.5, 1 / 1.5] : [1 / 1.5, 1.5];
   }
   free(): void {
     this.freed = true;

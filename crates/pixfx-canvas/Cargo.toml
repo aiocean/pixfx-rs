@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 js-sys = "=0.3.107"
 pixfx-core = { path = "../pixfx-core", features = ["ts"] }
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
+pixfx-export = { path = "../pixfx-export" }
 pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"] }
 pixfx-light = { path = "../pixfx-light", features = ["ts"] }
 pixfx-wasm = { path = "../pixfx-wasm", default-features = false }

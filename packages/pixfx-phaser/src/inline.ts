@@ -1,4 +1,4 @@
-import type { Backend, FxEvents, FxInstance, Shape } from "./backend";
+import type { Backend, FxEvents, FxInstance, HeldFrame, Shape } from "./backend";
 import { shapeOf } from "./backend";
 import type { Engine } from "./engine";
 import { prepare } from "./engine";
@@ -67,6 +67,10 @@ export class InlineBackend implements Backend {
     const p = prepare(this.engine, id, opts);
     const fx = this.engine.create(p.id, p.engineOpts);
     return { instance: new InlineFx(new FxRunner(fx), shapeOf(fx), this.cache), play: p.play };
+  }
+
+  hold(frames: readonly HeldFrame[]): void {
+    for (const f of frames) this.cache.put(f.id, f.frame);
   }
 
   flush(): void {

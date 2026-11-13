@@ -1,5 +1,6 @@
-//! A body's squash, stretch and blink for JS ([`Squash`], [`Blink`] over [`pixfx_core::squash`]): the host scales
-//! its own sprite by `scale(vy)` about the feet and draws it at `alpha()`.
+//! A body's squash, stretch and blink for JS ([`Squash`], [`Blink`] over [`pixfx_core::squash`]): the host draws
+//! its own sprite through `shape(vx, vy)` about the feet (or scales it by `scale(vx, vy)` when it cannot skew) and
+//! at `alpha()`.
 
 use pixfx_core::squash::{self, SquashSpec};
 use wasm_bindgen::prelude::*;
@@ -15,8 +16,9 @@ fn spec_of(v: &JsValue) -> Result<SquashSpec, JsError> {
     }
 }
 
-/// One body's squash and stretch: `land(strength)` when it lands, `advance(dt)` each frame, then scale the sprite
-/// by `scale(vy)` (`[sx, sy]`, its area kept) with its origin at its feet.
+/// One body's squash and stretch: `land(strength)` when it lands, `advance(dt)` each frame, then draw the sprite
+/// with its origin at its feet through `shape(vx, vy)` (stretched along its velocity), or scaled by
+/// `scale(vx, vy)` where it cannot skew. Its area is kept.
 #[wasm_bindgen]
 pub struct Squash {
     inner: squash::Squash,
@@ -25,8 +27,8 @@ pub struct Squash {
 #[wasm_bindgen]
 impl Squash {
     /// `spec`: `undefined`, or `{fullSpeed?, mostStretch?, mostSquash?, squashTime?, blinkRate?, blinkAlpha?}`
-    /// over the defaults (stretched all the way at 220 px/s, 1.15 tall at most, 0.8 as it lands hard, easing
-    /// back over 0.12 s).
+    /// over the defaults (stretched all the way at 220 px/s, 1.3 long at most along its velocity, 0.7 tall as it
+    /// lands hard, easing back over 0.15 s).
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_optional_param_type = "SquashSpec")] spec: JsValue,
@@ -45,10 +47,22 @@ impl Squash {
         self.inner.advance(dt);
     }
 
-    /// The sprite's scale this frame, `[sx, sy]`, moving up or down at `vy` pixels a second.
+    /// The sprite's shape this frame, moving at `(vx, vy)` pixels a second (y down): `[a, b, c, d]` for a
+    /// canvas `transform(a, b, c, d, feetX, feetY)` drawn with the feet at the origin.
+    #[wasm_bindgen(unchecked_return_type = "[number, number, number, number]")]
+    pub fn shape(&self, vx: f64, vy: f64) -> Array {
+        let s = self.inner.shape(vx, vy);
+        [s.a, s.b, s.c, s.d]
+            .into_iter()
+            .map(JsValue::from_f64)
+            .collect()
+    }
+
+    /// The sprite's upright scale this frame, `[sx, sy]`, moving at `(vx, vy)` pixels a second: the shape
+    /// without its lean, for a host that cannot skew a sprite.
     #[wasm_bindgen(unchecked_return_type = "[number, number]")]
-    pub fn scale(&self, vy: f64) -> Array {
-        let (sx, sy) = squash::scale(self.inner.tall(vy));
+    pub fn scale(&self, vx: f64, vy: f64) -> Array {
+        let (sx, sy) = self.inner.shape(vx, vy).axis_scale();
         pair(sx, sy)
     }
 }

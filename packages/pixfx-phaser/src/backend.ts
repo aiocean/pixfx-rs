@@ -18,6 +18,12 @@ export function shapeOf(fx: FxLike): Shape {
   return { width: fx.width(), height: fx.height(), originX: fx.originX(), originY: fx.originY() };
 }
 
+/** A shared frame and its id (`"{key}:{index}"`, as `Fx.shown()` gives it). */
+export interface HeldFrame {
+  id: string;
+  frame: Frame;
+}
+
 /** What an effect shows: a frame it shares with every effect on the same one, or its own fade frame. */
 export type View = { kind: "shared"; frame: SharedFrame } | { kind: "own"; frame: Frame };
 
@@ -47,6 +53,8 @@ export interface FxInstance {
 export interface Backend {
   /** Validate and create effect `id`; throws on an unknown id or invalid options. */
   spawn(id: string, opts: unknown): { instance: FxInstance; play: PlayOptions };
+  /** Hold `frames` (baked) as shared frames, so effects reaching them draw nothing. */
+  hold(frames: readonly HeldFrame[]): void;
   /** Once per game step: drop shared frames over the budget, then send the work queued (where work runs elsewhere). */
   flush(): void;
 }

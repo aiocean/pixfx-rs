@@ -71,6 +71,34 @@ for (const mode of ["inline", "pool"] as const) {
     for (const e of effects) e.destroy();
   });
 
+  test(`${mode}: held (baked) frames are shown without drawing, and the rest are drawn`, () => {
+    // a first run draws the frames, as a bake would
+    const first = rig(mode, new FakeEngine());
+    first.fx.play("fake/spark", 0, 0);
+    first.frame(0);
+    for (let i = 0; i < 8; i++) first.frame(1000 / 30);
+    const baked = Array.from({ length: 6 }, (_, k) => sparkId(k)).flatMap((id) => {
+      const f = first.cache.get(id);
+      return f ? [{ id, frame: f.frame }] : [];
+    });
+    expect(baked.length).toBe(6);
+
+    const engine = new FakeEngine();
+    const r = rig(mode, engine);
+    r.backend.hold(baked);
+    r.fx.play("fake/spark", 0, 0);
+    r.frame(0);
+    // frames 0 to 5 at 30 fps are held: nothing drawn
+    for (let i = 0; i < 5; i++) r.frame(1000 / 30);
+    expect(engine.draws()).toBe(0);
+    const held = r.cache.get(sparkId(5))?.frame;
+    const want = baked[5]?.frame;
+    expect(held && want && bytesOf(held) === bytesOf(want)).toBe(true);
+    // frame 6 was not baked: drawn live
+    r.frame(1000 / 30);
+    expect(engine.draws()).toBe(2);
+  });
+
   test(`${mode}: nothing is drawn or uploaded while the shown frame is the same`, () => {
     const engine = new FakeEngine();
     const r = rig(mode, engine);

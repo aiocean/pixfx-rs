@@ -210,7 +210,7 @@ impl FxView {
     /// The effect at its origin, on the canvas `opts` give it ([`Effect::canvas`]), in a frame with room round
     /// that canvas for glow that spills past it ([`pixfx_core::Meta::glow_margin`] on every side).
     pub fn new(effect: &'static dyn Effect, opts: Options) -> Self {
-        let player = Player::new(effect, opts, effect.meta().glow_margin());
+        let player = Player::live(effect, opts);
         let (origin, margin) = (player.canvas().origin, player.margin() as i32);
         Self {
             pivot: (origin.0 + margin, origin.1 + margin),

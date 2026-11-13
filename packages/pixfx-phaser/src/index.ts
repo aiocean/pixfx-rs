@@ -5,7 +5,7 @@ export type { WorldCue } from "./feel";
 export { PixfxSpriteFeel } from "./sprite-feel";
 export type { FeelSprite } from "./sprite-feel";
 export type { Counts } from "./effect";
-export { loadPixfx } from "./load";
+export { loadBaked, loadPixfx } from "./load";
 export { PALETTE_PRESETS } from "./options";
 export type { LoadOptions } from "./load";
 export type { EffectMeta, Engine } from "./engine";

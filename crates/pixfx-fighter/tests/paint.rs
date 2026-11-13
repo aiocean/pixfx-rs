@@ -114,8 +114,8 @@ fn an_untouchable_fighter_blinks_and_a_touchable_one_does_not() {
         };
         drawn(&look, &a).color
     };
-    // one fifteenth of a second in, a blink is on its faint beat
-    let beat = 1.5 / 15.0;
+    // a blink runs at 10 Hz: whole for a twentieth of a second, then faint for one
+    let beat = 1.5 / 20.0;
     assert_eq!(
         at_t(false, beat),
         at_t(false, beat),
@@ -127,9 +127,14 @@ fn an_untouchable_fighter_blinks_and_a_touchable_one_does_not() {
         "untouchable: faint on the off beat"
     );
     assert_eq!(
-        at_t(true, 0.5 / 15.0),
-        at_t(false, 0.5 / 15.0),
+        at_t(true, 0.5 / 20.0),
+        at_t(false, 0.5 / 20.0),
         "untouchable: whole on the on beat"
+    );
+    assert_ne!(
+        at_t(true, 3.5 / 20.0),
+        at_t(false, 3.5 / 20.0),
+        "untouchable: faint again a tenth of a second later"
     );
     let out = |untouchable: bool| {
         let a = Appearance {
@@ -215,4 +220,48 @@ fn a_body_stretches_as_it_flies_fast_and_squashes_as_it_lands_feet_on_the_floor(
         hit_bottom, after_bottom,
         "the squash keeps its feet on the floor"
     );
+}
+
+/// The mean column of the body's top `rows` drawn rows, and its lowest drawn row.
+fn head_and_feet(f: &Frame, rows: u32) -> (f64, u32) {
+    let covered = |x: u32, y: u32| f.color.get((y * f.w + x) as usize).is_some_and(|&c| c != 0);
+    let (top, bottom, _) = extent(f);
+    let xs: Vec<u32> = (top..top + rows)
+        .flat_map(|y| (0..f.w).filter(move |&x| covered(x, y)))
+        .collect();
+    (
+        xs.iter().map(|&x| f64::from(x)).sum::<f64>() / xs.len().max(1) as f64,
+        bottom,
+    )
+}
+
+#[test]
+fn a_body_flying_up_and_sideways_leans_along_its_flight_feet_where_they_were() {
+    let look = Look::thunder();
+    let leap = |vx: f64| {
+        head_and_feet(
+            &drawn(
+                &look,
+                &Appearance {
+                    vx,
+                    vy: 200.0,
+                    ..standing(Pose::Jump)
+                },
+            ),
+            6,
+        )
+    };
+    let (straight, feet) = leap(0.0);
+    let (right, right_feet) = leap(200.0);
+    let (left, left_feet) = leap(-200.0);
+    assert!(right > straight + 1.0, "leans right: {right} vs {straight}");
+    assert!(left < straight - 1.0, "leans left: {left} vs {straight}");
+    // the lean turns about the feet, so the soles tilt by a pixel at most; a body only leans in the air, and a
+    // landing squashes upright with its feet on the floor
+    for f in [right_feet, left_feet] {
+        assert!(
+            f.abs_diff(feet) <= 1,
+            "feet stay where they were: {f} vs {feet}"
+        );
+    }
 }

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::num::NonZeroU32;
 
-use pixfx_canvas::stage::{Pass, Rect, Scene, Shell, StageEvent, color_rgba, live_player};
+use pixfx_canvas::stage::{Pass, Rect, Scene, Shell, StageEvent, color_rgba};
 use pixfx_core::{
     Canvas, Effect, EffectState, Frame, Layer, Meta, OptValue, Options, Painter, Placement, Rgba,
     render_frames,
@@ -126,7 +126,7 @@ impl Effect for Layered {
 
 fn player(id: &str) -> Result<Player, Box<dyn Error>> {
     let fx = effect(id).ok_or_else(|| format!("{id} not registered"))?;
-    Ok(live_player(fx, Options::default()))
+    Ok(Player::live(fx, Options::default()))
 }
 
 fn scale(n: u32) -> Result<NonZeroU32, Box<dyn Error>> {
@@ -136,7 +136,7 @@ fn scale(n: u32) -> Result<NonZeroU32, Box<dyn Error>> {
 #[test]
 fn finished_one_shot_is_removed() -> Res {
     let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    let shot = scene.play(live_player(&BLIP, Options::default()), 0.0, 0.0)?;
+    let shot = scene.play(Player::live(&BLIP, Options::default()), 0.0, 0.0)?;
     let fire = scene.play(player("fire/candle")?, 0.0, 0.0)?;
     scene.update(0.05)?;
     assert_eq!(scene.handles().collect::<Vec<_>>(), vec![shot, fire]);
@@ -152,7 +152,7 @@ fn finished_one_shot_is_removed() -> Res {
 #[test]
 fn a_host_draw_between_the_layers_lands_over_back_and_under_front() -> Res {
     let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    scene.play(live_player(&LAYERED, Options::default()), 20.0, 20.0)?;
+    scene.play(Player::live(&LAYERED, Options::default()), 20.0, 20.0)?;
     scene.update(0.1)?;
     let (red, blue) = (0xff00_00ff_u32, 0xffff_0000_u32);
     // (what happened, red shown, blue shown): the host's draw is the middle event
@@ -218,7 +218,7 @@ fn a_sized_instance_gets_its_own_canvas_and_rect() -> Res {
         ]),
         ..Options::default()
     };
-    let live = live_player(fx, opts);
+    let live = Player::live(fx, opts);
     assert_eq!(
         live.canvas(),
         Canvas {
@@ -295,12 +295,12 @@ fn fronts(scene: &mut Scene<Frame>) -> Vec<Vec<u32>> {
 #[test]
 fn setting_flip_mid_play_draws_it_flipped_without_restarting() -> Res {
     let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    let plain = scene.play(live_player(&LAYERED, Options::default()), 10.0, 10.0)?;
+    let plain = scene.play(Player::live(&LAYERED, Options::default()), 10.0, 10.0)?;
     let flipped = Options {
         flip: true,
         ..Options::default()
     };
-    scene.play(live_player(&LAYERED, flipped), 10.0, 10.0)?;
+    scene.play(Player::live(&LAYERED, flipped), 10.0, 10.0)?;
     scene.update(0.25)?;
     let before = fronts(&mut scene);
     assert_ne!(
@@ -321,9 +321,9 @@ fn setting_flip_mid_play_draws_it_flipped_without_restarting() -> Res {
 #[test]
 fn ended_effects_are_drained_once_in_order() -> Res {
     let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    let blip = scene.play(live_player(&BLIP, Options::default()), 0.0, 0.0)?;
-    let held = scene.play(live_player(&LAYERED, Options::default()), 0.0, 0.0)?;
-    let kept = scene.play(live_player(&LAYERED, Options::default()), 0.0, 0.0)?;
+    let blip = scene.play(Player::live(&BLIP, Options::default()), 0.0, 0.0)?;
+    let held = scene.play(Player::live(&LAYERED, Options::default()), 0.0, 0.0)?;
+    let kept = scene.play(Player::live(&LAYERED, Options::default()), 0.0, 0.0)?;
     assert!(scene.remove(held));
     scene.update(0.2)?;
 
@@ -393,7 +393,7 @@ const FRAME: f64 = 1.0 / 60.0;
 #[test]
 fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
     let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    let hitter = scene.play(live_player(&HITTER, Options::default()), 0.0, 0.0)?;
+    let hitter = scene.play(Player::live(&HITTER, Options::default()), 0.0, 0.0)?;
     let candle = scene.play(player("fire/candle")?, 0.0, 0.0)?;
     // play until the hit lands
     let mut played = 0.0;
@@ -424,12 +424,12 @@ fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
 fn cues_come_out_as_events_where_they_fire_on_the_stage() -> Res {
     let mut scene: Scene<Frame> = Scene::new(scale(1)?);
     scene.set_screen_w(100.0);
-    let mirrored = scene.play(live_player(&HITTER, Options::default()), 50.0, 20.0)?;
+    let mirrored = scene.play(Player::live(&HITTER, Options::default()), 50.0, 20.0)?;
     scene.set(
         mirrored,
         Placement {
             flip: true,
-            ..live_player(&HITTER, Options::default()).placement()
+            ..Player::live(&HITTER, Options::default()).placement()
         },
     )?;
     scene.move_to(mirrored, 50.0, 20.0)?;
@@ -471,7 +471,7 @@ fn cues_come_out_as_events_where_they_fire_on_the_stage() -> Res {
 fn a_host_with_its_own_answer_gets_the_cues_and_every_second() -> Res {
     let mut scene: Scene<Frame> = Scene::new(scale(1)?);
     scene.set_feel(None);
-    scene.play(live_player(&HITTER, Options::default()), 0.0, 0.0)?;
+    scene.play(Player::live(&HITTER, Options::default()), 0.0, 0.0)?;
     let mut played = 0.0;
     for _ in 0..20 {
         played += scene.update(FRAME)?;
@@ -588,5 +588,37 @@ fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
         before.iter().map(|(_, f)| f).collect::<Vec<_>>(),
         "byte-equal to the first time"
     );
+    Ok(())
+}
+
+#[test]
+fn a_baked_clip_is_shown_without_drawing() -> Res {
+    let fx = effect("fire/candle").ok_or("no candle")?;
+    let clip = pixfx_export::bake(fx, Options::default())?;
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut loader = Recorder::default();
+    for (k, [back, front]) in (0..).zip(&clip.frames) {
+        let id = pixfx_core::FrameId {
+            key: clip.key.clone(),
+            index: k,
+        };
+        assert_eq!(scene.load(&id, Layer::Back, back, &mut loader), Ok(()));
+        assert_eq!(scene.load(&id, Layer::Front, front, &mut loader), Ok(()));
+    }
+    scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    // a whole loop at uneven steps: every frame shown comes from the bake
+    for step in [0.013, 0.021, 0.034, 0.008].iter().cycle().take(100) {
+        scene.update(*step)?;
+        let r = draw_once(&mut scene);
+        assert_eq!((r.made, r.shown.len()), (0, 2), "shown, not drawn");
+    }
+    // other options are another clip: drawn live
+    let other = Options {
+        seed: Some(7),
+        ..Options::default()
+    };
+    scene.play(Player::live(fx, other), 60.0, 40.0)?;
+    scene.update(0.0)?;
+    assert_eq!(draw_once(&mut scene).made, 2);
     Ok(())
 }

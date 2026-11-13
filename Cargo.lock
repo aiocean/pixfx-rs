@@ -248,6 +248,7 @@ dependencies = [
  "js-sys",
  "pixfx-core",
  "pixfx-effects",
+ "pixfx-export",
  "pixfx-fighter",
  "pixfx-light",
  "pixfx-wasm",
@@ -293,7 +294,9 @@ version = "0.1.0"
 dependencies = [
  "gif",
  "pixfx-core",
+ "pixfx-effects",
  "png",
+ "serde",
  "serde_json",
 ]
 
@@ -327,6 +330,7 @@ dependencies = [
  "js-sys",
  "pixfx-core",
  "pixfx-effects",
+ "pixfx-export",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
