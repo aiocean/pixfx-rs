@@ -140,31 +140,127 @@ impl Player {
 
     /// The last drawn colour layer alone as RGBA8 bytes (`w * h * 4`, straight alpha): each ABGR word unpacked.
     pub fn color_rgba(&mut self) -> &[u8] {
-        for (out, word) in self
-            .rgba
-            .as_chunks_mut::<4>()
-            .0
-            .iter_mut()
-            .zip(&self.frame.color)
-        {
-            *out = word.to_le_bytes();
-        }
-        &self.rgba
+        let all = self.whole();
+        self.color_rgba_in(all)
     }
 
     /// The last drawn light layer alone as RGBA8 bytes (`w * h * 4`): a lit pixel is `r, g, b, 255`, an unlit
     /// one `0, 0, 0, 0`, so drawn with additive blending it adds exactly the light and nothing elsewhere.
     pub fn light_rgba(&mut self) -> &[u8] {
-        for (out, word) in self
-            .rgba
-            .as_chunks_mut::<4>()
-            .0
-            .iter_mut()
-            .zip(&self.frame.light)
-        {
-            let rgb = word & 0x00ff_ffff;
-            *out = if rgb == 0 { 0u32 } else { rgb | 0xff00_0000 }.to_le_bytes();
-        }
-        &self.rgba
+        let all = self.whole();
+        self.light_rgba_in(all)
     }
+
+    /// The smallest box holding every pixel the last drawn frame shows (colour alpha or light rgb not 0), or
+    /// none when it shows nothing: the part of the frame a host keeps.
+    pub fn lit_box(&self) -> Option<PixelBox> {
+        let f = &self.frame;
+        let w = f.w as usize;
+        if w == 0 {
+            return None;
+        }
+        let lit = |(c, l): (&u32, &u32)| c >> 24 != 0 || l & 0x00ff_ffff != 0;
+        let mut found: Option<(usize, usize, usize, usize)> = None;
+        for (y, (colors, lights)) in f.color.chunks(w).zip(f.light.chunks(w)).enumerate() {
+            let mut row = colors.iter().zip(lights);
+            let Some(first) = row.position(lit) else {
+                continue;
+            };
+            let last = colors.iter().zip(lights).rposition(lit).unwrap_or(first);
+            found = Some(match found {
+                None => (first, y, last, y),
+                Some((x0, y0, x1, _)) => (x0.min(first), y0, x1.max(last), y),
+            });
+        }
+        let (x0, y0, x1, y1) = found?;
+        Some(PixelBox {
+            x: x0 as u32,
+            y: y0 as u32,
+            w: (x1 - x0 + 1) as u32,
+            h: (y1 - y0 + 1) as u32,
+        })
+    }
+
+    /// As [`Player::color_rgba`] for the pixels in `b` alone (`b.w * b.h * 4` bytes, row-major), `b` clipped to
+    /// the frame.
+    pub fn color_rgba_in(&mut self, b: PixelBox) -> &[u8] {
+        let b = b.within(self.frame.w, self.frame.h);
+        unpack(
+            &self.frame.color,
+            self.frame.w,
+            b,
+            &mut self.rgba,
+            u32::to_le_bytes,
+        )
+    }
+
+    /// As [`Player::light_rgba`] for the pixels in `b` alone (`b.w * b.h * 4` bytes, row-major), `b` clipped to
+    /// the frame.
+    pub fn light_rgba_in(&mut self, b: PixelBox) -> &[u8] {
+        let b = b.within(self.frame.w, self.frame.h);
+        unpack(&self.frame.light, self.frame.w, b, &mut self.rgba, |word| {
+            let rgb = word & 0x00ff_ffff;
+            if rgb == 0 { 0u32 } else { rgb | 0xff00_0000 }.to_le_bytes()
+        })
+    }
+
+    /// The whole frame as a box.
+    fn whole(&self) -> PixelBox {
+        PixelBox {
+            x: 0,
+            y: 0,
+            w: self.frame.w,
+            h: self.frame.h,
+        }
+    }
+}
+
+/// A box of whole pixels on a player's frame: its top-left at (`x`, `y`), `w` × `h` pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PixelBox {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+impl PixelBox {
+    /// The part of the box on a `w` × `h` frame.
+    fn within(self, w: u32, h: u32) -> Self {
+        let x = self.x.min(w);
+        let y = self.y.min(h);
+        Self {
+            x,
+            y,
+            w: self.w.min(w - x),
+            h: self.h.min(h - y),
+        }
+    }
+}
+
+/// Write the words of `words` (rows of `stride`) inside `b` into `out` as RGBA8 bytes, row-major, each word
+/// turned into bytes by `px`; returns the bytes written.
+fn unpack<'a>(
+    words: &[u32],
+    stride: u32,
+    b: PixelBox,
+    out: &'a mut [u8],
+    px: impl Fn(u32) -> [u8; 4],
+) -> &'a [u8] {
+    let (stride, x, w) = (stride as usize, b.x as usize, b.w as usize);
+    let mut dst = out.as_chunks_mut::<4>().0.iter_mut();
+    for y in b.y as usize..(b.y + b.h) as usize {
+        let start = y * stride + x;
+        // the row first: `zip` takes from it before `dst`, so a row's end leaves `dst` where it was
+        for (&word, o) in words
+            .get(start..start + w)
+            .unwrap_or(&[])
+            .iter()
+            .zip(dst.by_ref())
+        {
+            *o = px(word);
+        }
+    }
+    let n = w * b.h as usize * 4;
+    out.get(..n).unwrap_or(&[])
 }

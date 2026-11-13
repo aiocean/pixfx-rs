@@ -17,7 +17,7 @@ pub use pixfx_core::Player;
 pub use squash::{Blink, Squash};
 
 use js_sys::{Array, Uint8ClampedArray, Uint32Array};
-use pixfx_core::{Effect, Layer, Meta, OptKind, Rgba, valid_dt};
+use pixfx_core::{Effect, Layer, Meta, OptKind, PixelBox, Rgba, valid_dt};
 use pixfx_effects::{EFFECTS, effect};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -206,6 +206,22 @@ impl Fx {
         u32::try_from(self.player.frame_index()).unwrap_or(u32::MAX)
     }
 
+    /// Frames of `1 / fps` its clock has passed: what it draws changes only when this does. A fading effect
+    /// (no [`Fx::shown`]) redraws when it changes.
+    #[wasm_bindgen(js_name = clockFrame)]
+    pub fn clock_frame(&self) -> u32 {
+        u32::try_from(self.player.clock_frame()).unwrap_or(u32::MAX)
+    }
+
+    /// The frame `draw` draws now, as `"{key}:{index}"`: instances showing the same one draw the same bytes,
+    /// so a host draws it once and shows it for all of them. `undefined` while the effect fades after `stop()`
+    /// (a fade frame is its own).
+    pub fn shown(&self) -> Option<String> {
+        self.player
+            .shown(self.player.placement())
+            .map(|id| format!("{}:{}", id.key, id.index))
+    }
+
     /// Seconds since the instance started.
     pub fn t(&self) -> f64 {
         self.player.t()
@@ -269,6 +285,27 @@ impl Fx {
     #[wasm_bindgen(js_name = lightRgbaPtr)]
     pub fn light_rgba_ptr(&mut self) -> usize {
         self.player.light_rgba().as_ptr() as usize
+    }
+
+    /// The box holding every pixel the last `draw` showed (colour alpha or light), as `[x, y, w, h]` on the
+    /// canvas; `[0, 0, 0, 0]` when it showed nothing.
+    #[wasm_bindgen(js_name = litBox)]
+    pub fn lit_box(&self) -> Vec<u32> {
+        let b = self.player.lit_box().unwrap_or_default();
+        vec![b.x, b.y, b.w, b.h]
+    }
+
+    /// As [`Fx::color_rgba_ptr`] for the box at (`x`, `y`) of `w` × `h` pixels alone (clipped to the canvas):
+    /// `w * h * 4` bytes, row-major.
+    #[wasm_bindgen(js_name = colorRgbaBoxPtr)]
+    pub fn color_rgba_box_ptr(&mut self, x: u32, y: u32, w: u32, h: u32) -> usize {
+        self.player.color_rgba_in(PixelBox { x, y, w, h }).as_ptr() as usize
+    }
+
+    /// As [`Fx::light_rgba_ptr`] for the box at (`x`, `y`) of `w` × `h` pixels alone (clipped to the canvas).
+    #[wasm_bindgen(js_name = lightRgbaBoxPtr)]
+    pub fn light_rgba_box_ptr(&mut self, x: u32, y: u32, w: u32, h: u32) -> usize {
+        self.player.light_rgba_in(PixelBox { x, y, w, h }).as_ptr() as usize
     }
 
     /// The canvas composited over transparency: RGBA8 bytes, ready for `new ImageData(px, width, height)`.
