@@ -346,7 +346,8 @@ impl<S> Scene<S> {
     }
 
     /// Let the instance keep playing real time through a hit-stop while the rest of the scene freezes (`on`), as a
-    /// hit spark does, or freeze with the rest again (`!on`, the default). Slow motion still slows it. False if no
+    /// hit spark does, or freeze with the rest again (`!on`, the default). Slow motion, which starts after
+    /// the stop, slows it with the rest. Its own hit-stops do not renew the stop it plays through. False if no
     /// instance has this handle.
     pub fn set_plays_through_hitstop(&mut self, handle: u32, on: bool) -> bool {
         self.entries
@@ -429,8 +430,8 @@ impl<S> Scene<S> {
 
     /// Let `dt` real seconds pass: the [`Feel`] says how much of it the effects play (none in a hit-stop, a
     /// fraction in slow motion), every instance advances by that (one marked with
-    /// [`Scene::set_plays_through_hitstop`] plays all of `dt` in a hit-stop), the cues they fire go to the feel and queue as
-    /// events, and the instances that are done go, their ends queued. Returns the seconds played, for a host that
+    /// [`Scene::set_plays_through_hitstop`] plays all of `dt` in a hit-stop, and its own hit-stops then do not
+    /// renew the stop), the cues they fire go to the feel and queue as events, and the instances that are done go, their ends queued. Returns the seconds played, for a host that
     /// freezes its own world with the effects. A `dt` that fails [`valid_dt`] (NaN, infinite or negative) is an
     /// error and changes nothing.
     pub fn update(&mut self, dt: f64) -> Result<f64, StageError> {
@@ -441,16 +442,21 @@ impl<S> Scene<S> {
         let frozen = self.feel.as_ref().is_some_and(Feel::frozen);
         let run = self.feel.as_mut().map_or(dt, |f| f.advance(dt));
         let mut fired = Vec::new();
+        let mut felt = Vec::new();
         for e in &mut self.entries {
-            e.player
-                .update(if frozen && e.through_hitstop { dt } else { run });
+            let through = frozen && e.through_hitstop;
+            e.player.update(if through { dt } else { run });
             for c in e.player.take_cues() {
-                fired.push((e.handle, on_stage(e, c, self.screen_w)));
+                let c = on_stage(e, c, self.screen_w);
+                // an effect playing through a stop cannot renew it, or a looping one would freeze the game for good
+                if !(through && matches!(c.cue, Cue::Hitstop { .. })) {
+                    felt.push(c);
+                }
+                fired.push((e.handle, c));
             }
         }
         if let Some(feel) = &mut self.feel {
-            let cues: Vec<TimedCue> = fired.iter().map(|&(_, c)| c).collect();
-            feel.take(&cues);
+            feel.take(&felt);
         }
         self.events
             .extend(fired.into_iter().map(|(handle, c)| StageEvent::Cue {

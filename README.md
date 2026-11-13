@@ -58,7 +58,7 @@ Effects say what an impact should do to the screen, and every host answers the s
 - **Hosts.** The Canvas `Stage` answers cues itself: its own loop shakes and flashes the view, and `update(dt)`
   returns the played seconds for the host's own world. `setFeel(false)` leaves the answer to the game, and cues
   still arrive in `events()`. `playThroughHitstop(handle, true)` lets one effect, a hit spark, play on in real time while
-  a hit-stop freezes the rest (slow motion still slows it). In Phaser, `scene.pixfx.feel` shakes and tilts the main camera, flashes, and freezes the
+  a hit-stop freezes the rest (slow motion, which starts after the stop, slows it with the rest; its own hit-stops do not renew the stop). In Phaser, `scene.pixfx.feel` shakes and tilts the main camera, flashes, and freezes the
   scene's effects; the game reads `feel.timeScale`. Any other JS host uses `Fx.takeCues()` with a `Feel`.
 - **Sprites.** `Squash` stretches a body along its velocity when it moves fast (up to 1.3 long at 220 px/s and
   faster), flattens it to 0.7 tall as it lands and eases back to itself within 0.15 s. The other axis takes the

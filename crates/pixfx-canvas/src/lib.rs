@@ -125,7 +125,8 @@ impl Stage {
     }
 
     /// Let the effect keep playing real time through a hit-stop while the rest freeze (`on`), as a hit spark does,
-    /// or freeze with them again (`false`, the default). Slow motion still slows it. False for an unknown handle.
+    /// or freeze with them again (`false`, the default). Slow motion, which starts after
+    /// the stop, slows it with the rest. False for an unknown handle.
     #[wasm_bindgen(js_name = playThroughHitstop)]
     pub fn play_through_hitstop(&mut self, handle: u32, on: bool) -> bool {
         self.renderer

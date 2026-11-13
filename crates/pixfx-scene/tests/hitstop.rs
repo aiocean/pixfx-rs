@@ -107,3 +107,29 @@ fn unmarking_freezes_it_again_and_an_unknown_handle_is_false() -> Res {
     assert_eq!(t(&scene, candle)?, held);
     Ok(())
 }
+
+#[test]
+fn a_marked_effect_cannot_stretch_the_stop_it_plays_through() -> Res {
+    let mut scene = scene()?;
+    let hitter = scene.play(Player::live(&HITTER, Options::default()), 0.0, 0.0)?;
+    assert!(scene.set_plays_through_hitstop(hitter, true));
+    scene.feel_mut().ok_or("no feel")?.freeze(0.15);
+    // the hitter's own stop (0.1 s) lands 0.1 s into the game's freeze: it must not renew it
+    let mut frozen_for = 0.0;
+    while scene.feel().is_some_and(|f| f.frozen()) {
+        scene.update(FRAME)?;
+        frozen_for += FRAME;
+        if frozen_for > 1.0 {
+            return Err("still frozen after a second".into());
+        }
+    }
+    assert!(
+        (frozen_for - 0.15).abs() <= FRAME + 1e-9,
+        "the freeze ran {frozen_for} s, not 0.15 s"
+    );
+    assert!(
+        scene.feel().is_some_and(|f| f.trauma() > 0.0),
+        "its shake still lands"
+    );
+    Ok(())
+}
