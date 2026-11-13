@@ -134,3 +134,29 @@ mod effect_cues {
         assert!((frozen - want).abs() < FRAME, "froze {frozen}, want {want}");
     }
 }
+
+#[test]
+fn the_duel_shakes_by_its_own_screen_spec() {
+    use pixfx_fighter::feel::FeelSpec;
+    let most = FeelSpec::default().screen.shake;
+    let mut worst = 0;
+    for start in 0..20 {
+        let mut feel = Feel::new();
+        fight_time(&mut feel, f64::from(start) * 0.1);
+        // the heaviest moment: a crit that takes a quarter of life, then the knockout
+        feel.react(&[
+            hit(0, (12.0, true, true), 25.0, 900.0, (50.0, 20.0)),
+            Cue::Ko,
+        ]);
+        for _ in 0..90 {
+            let (x, y) = feel.shake(1.0);
+            worst = worst.max(x.abs().max(y.abs()));
+            feel.advance(FRAME);
+        }
+    }
+    assert!(
+        f64::from(worst) <= most,
+        "shook {worst} px, the duel's spec allows {most}"
+    );
+    assert!(worst >= 3, "a knockout reads clearly: {worst} px");
+}

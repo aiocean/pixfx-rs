@@ -107,7 +107,12 @@ impl Default for FeelSpec {
             jolt: 2.0,
             share_trauma: 25.0,
             crit_trauma: 0.2,
-            screen: ScreenSpec::default(),
+            // a blow's trauma (its share of life over `share_trauma`) and a knockout's 0.8 run high, and the hero
+            // shows each game pixel 2 to 4 times: the engine's 16 px would throw a knockout 50 screen pixels
+            screen: ScreenSpec {
+                shake: 6.0,
+                ..ScreenSpec::default()
+            },
             unyielding: Answer {
                 stop: 0.18,
                 trauma: 0.4,
@@ -327,7 +332,7 @@ struct Jolt {
 
 /// The screen's answer to a fight: feed it [`Cue`]s with [`Feel::react`], let time pass with [`Feel::advance`],
 /// and read where the screen sits and what floats over the fight.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Feel {
     spec: FeelSpec,
     screen: Screen,
@@ -356,18 +361,29 @@ fn hit_stop(stop: &Stop, cap: f64, power: f64, launch: bool, crit: bool, ranged:
     js_min(cap * 60.0, frames) / 60.0
 }
 
+impl Default for Feel {
+    fn default() -> Self {
+        Self::with_spec(FeelSpec::default())
+    }
+}
+
 impl Feel {
     /// The site's duel's answer ([`FeelSpec::default`]).
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Answering as `spec` has it.
+    /// Answering as `spec` has it, its screen included.
     pub fn with_spec(spec: FeelSpec) -> Self {
         Self {
             spec,
             screen: Screen::with_spec(spec.screen),
-            ..Self::default()
+            dusk: 0.0,
+            numbers: Vec::new(),
+            streaks: Vec::new(),
+            dust: Vec::new(),
+            jolt: None,
+            tick: 0,
         }
     }
 
