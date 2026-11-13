@@ -6,11 +6,12 @@
 //! The star's key frames and the spark spray are adapted from Sprite Fusion's open-source impact
 //! (https://www.spritefusion.com/pixel-art-vfx/impact), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE};
 use pixfx_core::cue::{FEEL, TimedCue, impact};
-use pixfx_core::math::{Rng, TAU, ease, js_max, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn};
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE};
+use pixfx_draw::math::{Rng, TAU, ease, js_max, smooth, to_uint32};
 
 use super::lib::{Seg, Spike, broken_ring, star};
 

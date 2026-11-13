@@ -16,7 +16,8 @@ use gpui::{
     Bounds, Corners, Pixels, Point, RenderImage, SpriteBlend, SpriteFilter, Window, point, px, size,
 };
 use image::{Frame as ImageFrame, RgbaImage};
-use pixfx_core::{Effect, Frame, FrameStore, Layer, Options, Player};
+use pixfx_core::{Effect, FrameStore, Layer, Options, Player};
+use pixfx_draw::Frame;
 
 /// A rectangle of source pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -78,7 +79,7 @@ pub fn rect_bgra(
     out
 }
 
-/// A colour word (ABGR, see [`pixfx_core::Rgba::pack`]) as straight-alpha BGRA, as gpui's normal sprites
+/// A colour word (ABGR, see [`pixfx_draw::Rgba::pack`]) as straight-alpha BGRA, as gpui's normal sprites
 /// expect.
 fn color_bgra(word: u32) -> [u8; 4] {
     let [r, g, b, a] = word.to_le_bytes();

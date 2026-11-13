@@ -3,8 +3,9 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use pixfx_core::outline::{DARK, MAX_WIDTH, Outline, Ring};
-use pixfx_core::{Meta, OptValue, Options, Rgba, check_options, hex};
+use pixfx_core::{Meta, OptValue, Options, check_options};
+use pixfx_draw::outline::{DARK, MAX_WIDTH, Outline, Ring};
+use pixfx_draw::{Rgba, hex};
 use serde::Deserialize;
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use wasm_bindgen::{JsError, JsValue};
@@ -68,7 +69,7 @@ impl<'de> Visitor<'de> for WireVisitor {
     }
 }
 
-/// The `palette` option as JS gives it: a preset's name ([`pixfx_core::palette::PRESETS`]) or a list of hex
+/// The `palette` option as JS gives it: a preset's name ([`pixfx_draw::palette::PRESETS`]) or a list of hex
 /// colours, dark to light.
 #[derive(tsify::Tsify)]
 #[tsify(
@@ -93,7 +94,7 @@ impl<'de> Visitor<'de> for PaletteVisitor {
     }
 
     fn visit_str<E: de::Error>(self, word: &str) -> Result<PaletteIn, E> {
-        pixfx_core::palette::parse(word)
+        pixfx_draw::palette::parse(word)
             .map(PaletteIn)
             .map_err(E::custom)
     }

@@ -6,10 +6,11 @@
 
 use core::f64::consts::PI;
 
-use pixfx_core::color::{Rgba, WHITE, ramp};
-use pixfx_core::math::{Rng, TAU, js_round, lerp, rand, tile_fbm, to_uint32};
 use pixfx_core::sim::{Flags, Kind};
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter, RampOpt};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, RampOpt};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, ramp};
+use pixfx_draw::math::{Rng, TAU, js_round, lerp, rand, tile_fbm, to_uint32};
 
 use super::lib::{Birth, Ghosts};
 

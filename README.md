@@ -16,7 +16,8 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 
 | Crate | What it is |
 |---|---|
-| `crates/pixfx-core` | The engine: frame with colour and additive light, painter, `Effect`/`Instance`, `render_frames`, `composite`, `frame_hash`; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`. |
+| `crates/pixfx-draw` | Drawing, the lowest layer: frame with colour and additive light, painter, shapes, blending, `composite`, `frame_hash`, palette presets, outline rings, the JS-number maths (`math`). Knows nothing of effects or hosts. |
+| `crates/pixfx-core` | The engine on top of `pixfx-draw`: `Effect`/`Instance`, particles, `render_frames`, `Player`, the frame key and store; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`. |
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
 | `crates/pixfx-cli` | The `pixfx` binary: `parity`, `sheet`, `render`. |
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |

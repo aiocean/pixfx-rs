@@ -7,9 +7,9 @@ use std::num::NonZeroU32;
 
 use pixfx_canvas::stage::{Pass, Rect, Scene, Shell, StageEvent, color_rgba};
 use pixfx_core::{
-    Canvas, Effect, EffectState, Frame, Layer, Meta, OptValue, Options, Painter, Placement, Rgba,
-    render_frames,
+    Canvas, Effect, EffectState, Layer, Meta, OptValue, Options, Placement, render_frames,
 };
+use pixfx_draw::{Frame, Painter, Rgba};
 use pixfx_effects::effect;
 use pixfx_wasm::Player;
 

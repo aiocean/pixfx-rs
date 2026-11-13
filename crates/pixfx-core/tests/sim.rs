@@ -15,19 +15,20 @@ const PIXELFX_SCENE: [(u32, usize, u64); 5] = [
 const PIXELFX_MOST_BLAZES: usize = 2;
 
 /// A 160x120 frame with a painter placed at (80, 100), as the golden script draws.
-fn draw(f: impl FnOnce(&mut pixfx_core::Painter)) -> u64 {
-    let mut frame = pixfx_core::Frame::new(160, 120, 0, 0);
-    let mut p = pixfx_core::Painter::new(&mut frame);
+fn draw(f: impl FnOnce(&mut pixfx_draw::Painter)) -> u64 {
+    let mut frame = pixfx_draw::Frame::new(160, 120, 0, 0);
+    let mut p = pixfx_draw::Painter::new(&mut frame);
     p.place(80.0, 100.0, false, 0.0);
     f(&mut p);
-    pixfx_core::frame_hash(&frame)
+    pixfx_draw::frame_hash(&frame)
 }
 
 #[test]
-fn particle_scene_matches_pixelfx() -> Result<(), pixfx_core::ColorError> {
-    use pixfx_core::color::hex;
+fn particle_scene_matches_pixelfx() -> Result<(), pixfx_draw::ColorError> {
+    use pixfx_core::Layer;
     use pixfx_core::sim::{Blazes, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn};
-    use pixfx_core::{Layer, Rng};
+    use pixfx_draw::Rng;
+    use pixfx_draw::color::hex;
 
     // pixelfx `P` numbers 0..=11, in order
     const KINDS: [Kind; 12] = [

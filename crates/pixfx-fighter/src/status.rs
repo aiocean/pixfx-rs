@@ -12,11 +12,11 @@
 //!   layer and glow to the light layer.
 
 use crate::pose::Pose;
-use pixfx_core::blend::fill;
-use pixfx_core::color::Rgba;
-use pixfx_core::frame::Frame;
-use pixfx_core::math::{clamp, js_round, rand};
-use pixfx_core::painter::Painter;
+use pixfx_draw::blend::fill;
+use pixfx_draw::color::Rgba;
+use pixfx_draw::frame::Frame;
+use pixfx_draw::math::{clamp, js_round, rand};
+use pixfx_draw::painter::Painter;
 
 /// How a barrier dome is patterned.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

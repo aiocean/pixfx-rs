@@ -7,10 +7,11 @@
 
 use core::f64::consts::PI;
 
-use pixfx_core::color::{Rgba, WHITE, scale};
-use pixfx_core::math::{js_max, js_min, js_round, rand};
+use pixfx_core::Layer;
 use pixfx_core::sim::{Bit, Kind, Particles};
-use pixfx_core::{Layer, Painter};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, scale};
+use pixfx_draw::math::{js_max, js_min, js_round, rand};
 
 pub const OUTLINE: Rgba = Rgba::hex24(0x1a1422);
 

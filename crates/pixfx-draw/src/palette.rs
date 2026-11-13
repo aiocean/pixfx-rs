@@ -1,5 +1,5 @@
 //! Palette presets: one word recolours any effect. Every effect's `palette` runs from its darkest colour to its
-//! lightest, and a palette of another length is resampled to the effect's own ([`crate::Options::palette_or`]),
+//! lightest, and a palette of another length is resampled to the effect's own (`Options::palette_or` in pixfx-core),
 //! so one 8-step ramp per preset fits them all.
 
 use std::fmt;

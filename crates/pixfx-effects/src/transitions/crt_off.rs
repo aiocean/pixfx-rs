@@ -4,9 +4,10 @@
 //! Sprite Fusion's open-source lightning strike (https://www.spritefusion.com/pixel-art-vfx/lightning),
 //! MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE, ramp};
-use pixfx_core::math::{clamp, ease, js_max, js_min, js_round, noise, rand};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, ramp};
+use pixfx_draw::math::{clamp, ease, js_max, js_min, js_round, noise, rand};
 
 use super::lib::{COLOR, H, W, clip_to, glint, rect, screen_meta};
 

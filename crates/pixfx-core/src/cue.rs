@@ -7,7 +7,7 @@
 //! ([`crate::effect::Instance::take_cues`]).
 
 use crate::effect::{Effect, Meta, NumOpt, Options};
-use crate::math::{clamp, js_round};
+use pixfx_draw::math::{clamp, js_round};
 
 /// One thing an effect asks the game to do.
 #[derive(Clone, Copy, Debug, PartialEq)]

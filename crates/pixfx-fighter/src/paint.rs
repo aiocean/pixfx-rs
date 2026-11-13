@@ -11,10 +11,10 @@ use crate::look::{Hairdo, Look};
 use crate::pose::{Gather, Pose};
 use core::f64::consts::PI;
 use libm::{cos, floor, sin, sqrt};
-use pixfx_core::blend::{cover_over, mul_div255, over_premul, straighten};
-use pixfx_core::math::{js_max, js_min, js_round};
 use pixfx_core::squash::{self, Shape, SquashSpec};
-use pixfx_core::{Frame, Rgba};
+use pixfx_draw::blend::{cover_over, mul_div255, over_premul, straighten};
+use pixfx_draw::math::{js_max, js_min, js_round};
+use pixfx_draw::{Frame, Rgba};
 
 /// Sprite width and height, in pixels.
 pub const SPRITE: usize = 64;

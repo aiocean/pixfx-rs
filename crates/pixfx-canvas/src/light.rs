@@ -3,7 +3,8 @@
 //! canvas with `"lighter"`. Objects are read strictly: a missing, misspelt or mistyped field throws, naming it.
 
 use js_sys::Uint8ClampedArray;
-use pixfx_core::{Frame, valid_dt};
+use pixfx_core::valid_dt;
+use pixfx_draw::Frame;
 use pixfx_light::{Glow, Light, Style};
 use pixfx_wasm::js::{parse, to_js};
 use wasm_bindgen::prelude::*;

@@ -2,10 +2,10 @@
 
 use std::collections::BTreeMap;
 
-use pixfx_core::color::{Rgba, WHITE};
 use pixfx_core::effect::{Canvas, Effect, EffectState, Layer, Meta, NumOpt, OptValue, Options};
-use pixfx_core::painter::Painter;
 use pixfx_core::render::render_frames;
+use pixfx_draw::color::{Rgba, WHITE};
+use pixfx_draw::painter::Painter;
 
 /// Light everywhere, to see the edge fade.
 struct Glow {

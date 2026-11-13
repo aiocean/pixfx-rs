@@ -6,12 +6,10 @@ use std::fmt;
 use std::num::NonZeroU32;
 
 use pixfx_core::cue::Cue;
-use pixfx_core::math::clamp;
-use pixfx_core::math::js_round;
-use pixfx_core::{
-    Feel, Frame, FrameId, FrameStore, Layer, Meta, Options, Placement, TimedCue, composite_px,
-    valid_dt,
-};
+use pixfx_core::{Feel, FrameId, FrameStore, Layer, Meta, Options, Placement, TimedCue, valid_dt};
+use pixfx_draw::math::clamp;
+use pixfx_draw::math::js_round;
+use pixfx_draw::{Frame, composite_px};
 use pixfx_wasm::{Player, parse_options};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsError, JsValue};

@@ -1,9 +1,10 @@
 //! Weather `clip` with its `glow`, and `pass`, match pixelfx (`src/fx/weather/_lib.js`) at whole, fractional,
 //! mirrored and rotated placements. Hashes from `pixfx-core/tests/golden/weather_clip.mjs` (pixelfx 044e12a).
 
-use pixfx_core::color::{Rgba, WHITE, hex};
-use pixfx_core::frame::frame_hash;
-use pixfx_core::{Canvas, Frame, Painter};
+use pixfx_core::Canvas;
+use pixfx_draw::color::{Rgba, WHITE, hex};
+use pixfx_draw::frame::frame_hash;
+use pixfx_draw::{Frame, Painter};
 use pixfx_effects::weather::lib::{clip, glow, pass};
 
 #[test]

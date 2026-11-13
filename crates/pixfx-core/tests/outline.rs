@@ -1,9 +1,9 @@
 //! Outlines as a host sees them: an instance drawn with `Options::outline` set, read back from its frame.
 
 use pixfx_core::effect::{Effect, EffectState, Instance, Layer, Meta, Options};
-use pixfx_core::outline::{DARK, Outline, PRESETS, Ring};
-use pixfx_core::painter::Painter;
-use pixfx_core::{Frame, Rgba};
+use pixfx_draw::outline::{DARK, Outline, PRESETS, Ring};
+use pixfx_draw::painter::Painter;
+use pixfx_draw::{Frame, Rgba};
 
 const RED: Rgba = Rgba::hex24(0xff0000);
 const WHITE: Rgba = Rgba::hex24(0xffffff);

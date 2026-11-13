@@ -1,7 +1,8 @@
 //! A number option set absurdly high must not hang an effect: each option that sizes a loop is held to a
 //! documented maximum (`NumOpt::within`). Before the clamps these four never returned.
 
-use pixfx_core::{Frame, Instance, Layer, OptValue, Options};
+use pixfx_core::{Instance, Layer, OptValue, Options};
+use pixfx_draw::Frame;
 use pixfx_effects::effect;
 use std::time::{Duration, Instant};
 

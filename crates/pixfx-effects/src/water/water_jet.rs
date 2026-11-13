@@ -6,10 +6,11 @@
 //! flare where it leaves the source) follows Sprite Fusion's open-source energy beam
 //! (https://www.spritefusion.com/pixel-art-vfx/energy), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE, ramp};
-use pixfx_core::math::{TAU, js_max, js_min, smooth, tile_noise};
 use pixfx_core::particles::cycle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, ramp};
+use pixfx_draw::math::{TAU, js_max, js_min, smooth, tile_noise};
 
 use super::lib::{WATER, bead};
 

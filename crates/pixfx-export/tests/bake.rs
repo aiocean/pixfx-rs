@@ -2,7 +2,8 @@
 
 use std::path::PathBuf;
 
-use pixfx_core::{Frame, Layer, Options, Player};
+use pixfx_core::{Layer, Options, Player};
+use pixfx_draw::Frame;
 use pixfx_export::bake::{BakeIndex, decode};
 use pixfx_export::{bake, write_bake};
 

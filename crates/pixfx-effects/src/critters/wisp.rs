@@ -3,11 +3,12 @@
 //! The flame tail, puffs and embers are adapted from Sprite Fusion's open-source fire
 //! (https://www.spritefusion.com/pixel-art-vfx/fire), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, ramp};
-use pixfx_core::math::{TAU, clamp, js_min, js_round, wrap};
 use pixfx_core::particles::{cycle, fly};
 use pixfx_core::sim::{Flags, Kind};
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, ramp};
+use pixfx_draw::math::{TAU, clamp, js_min, js_round, wrap};
 
 use super::lib::{Swarm, fire_puff, lnoise, shadow, shift, tongue};
 

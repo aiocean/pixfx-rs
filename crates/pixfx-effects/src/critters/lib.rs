@@ -6,10 +6,11 @@
 //!
 //! This file has the functions wisp uses: `shift`, `lnoise`, `Swarm`, `tongue`, `fire_puff`, `shadow`.
 
-use pixfx_core::color::Rgba;
-use pixfx_core::math::{js_max, js_min, js_round, tile_noise, wrap};
+use pixfx_core::Layer;
 use pixfx_core::sim::{Flags, Kind, Particle, Particles, ParticlesOpts};
-use pixfx_core::{Layer, Painter};
+use pixfx_draw::Painter;
+use pixfx_draw::color::Rgba;
+use pixfx_draw::math::{js_max, js_min, js_round, tile_noise, wrap};
 
 /// The loop time for this critter: seeds other than 1 start it at a different point in its loop, so a crowd of
 /// the same critter doesn't move in lockstep.

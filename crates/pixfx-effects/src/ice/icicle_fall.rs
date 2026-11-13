@@ -9,15 +9,16 @@
 
 use core::f64::consts::{FRAC_PI_2, PI};
 
-use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::cue::{self, FEEL, TimedCue};
-use pixfx_core::math::{
-    Rng, TAU, clamp, ease, js_max, js_min, js_round, js_sign, rand, seg, smooth, to_uint32,
-};
 use pixfx_core::sim::{
     Bit, BitKind, Bits, GRAVITY, Kind, Lights, Particles, ParticlesOpts, Spawn, band, sparkle,
 };
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, ramp};
+use pixfx_draw::math::{
+    Rng, TAU, clamp, ease, js_max, js_min, js_round, js_sign, rand, seg, smooth, to_uint32,
+};
 
 use super::lib::{Pane, PaneEvent, Panes, centroid, end_by, split_poly};
 

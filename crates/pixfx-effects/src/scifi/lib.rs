@@ -8,9 +8,9 @@
 //! over an unbounded floor; the other kinds, `ground`, stars and the flash and arc helpers arrive with the effects
 //! that need them). JS `Ghosts` also builds an `Rng` for its `Particles`; nothing draws from it, so it is not kept.
 
-use pixfx_core::color::{Rgba, WHITE};
-use pixfx_core::math::{js_min, rand};
 use pixfx_core::sim::{Flags, GRAVITY, Kind, Particle, Particles, ParticlesOpts};
+use pixfx_draw::color::{Rgba, WHITE};
+use pixfx_draw::math::{js_min, rand};
 
 const STEP: f64 = 1.0 / 240.0;
 

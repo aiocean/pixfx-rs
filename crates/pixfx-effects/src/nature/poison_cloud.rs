@@ -2,10 +2,11 @@
 //!
 //! Beyond pixelfx: the `spread` option is held to 0..=16, so a huge number cannot hang the draw.
 
-use pixfx_core::color::{Rgba, ramp};
-use pixfx_core::math::{TAU, clamp, js_max, js_min, js_round, js_sign, rng, smooth, tile_noise};
 use pixfx_core::particles::cycle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, ramp};
+use pixfx_draw::math::{TAU, clamp, js_max, js_min, js_round, js_sign, rng, smooth, tile_noise};
 
 /// Held to 16 at most, the widest cloud drawn (beyond pixelfx, which draws any spread; see the module doc).
 const SPREAD: NumOpt = NumOpt::new("spread", 1.0).within(0.0, 16.0);

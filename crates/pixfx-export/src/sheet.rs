@@ -5,7 +5,8 @@ use std::fs;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 
-use pixfx_core::{Frame, Meta, Rendered, composite};
+use pixfx_core::{Meta, Rendered};
+use pixfx_draw::{Frame, composite};
 
 use crate::ExportError;
 use crate::json::{FileNames, beanfx_json};

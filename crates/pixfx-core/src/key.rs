@@ -8,9 +8,9 @@
 
 use std::fmt;
 
-use crate::color::Rgba;
 use crate::effect::{OptValue, Options, Placement};
-use crate::outline::Outline;
+use pixfx_draw::color::Rgba;
+use pixfx_draw::outline::Outline;
 
 /// Bumped whenever the encoding changes, so keys written by an older build (baked sheets) never match.
 const VERSION: u8 = 1;

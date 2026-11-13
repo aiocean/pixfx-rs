@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `pixfx-draw` (new): frames, colour, painter, shapes, blending, palettes, outline rings and `math` move out of
+  `pixfx-core`; import them from `pixfx_draw` (`pixfx_draw::Frame`, `pixfx_draw::color::Rgba`, ...). `pixfx-core`
+  keeps effects, particles, cues, feel and the player. `pixfx-light` depends on `pixfx-draw` only.
 - `pixfx-core`, `pixfx-wasm`, `pixfx-cli`, `pixfx-phaser`: every effect takes an `outline` (off, a preset, a hex colour
   or `{color, width, corners}`) and a `palette` by preset name (`fire`, `ice`, `poison`, `holy`, `shadow`, `arcane`,
   `blood`, `electric`, `nature`, `gold`); the CLI takes `--outline` and `--palette`.

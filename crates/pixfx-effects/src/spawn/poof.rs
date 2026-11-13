@@ -6,11 +6,12 @@
 //! The soft, top-lit smoke puffs (a body, a denser core, a lit cap) follow Sprite Fusion's open-source explosion
 //! (https://www.spritefusion.com/pixel-art-vfx/explosion), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE, ramp};
 use pixfx_core::cue::{FEEL, TimedCue, impact};
-use pixfx_core::math::{Rng, TAU, clamp, ease, js_min, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, flare};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, RampOpt};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, ramp};
+use pixfx_draw::math::{Rng, TAU, clamp, ease, js_min, smooth, to_uint32};
 
 pub struct Poof;
 
@@ -408,7 +409,7 @@ impl EffectState for State {
                 0.0,
                 CY,
                 8.0 + 18.0 * ease::out_cubic(rk),
-                pixfx_core::math::js_max(1.0, 2.5 * (1.0 - rk)),
+                pixfx_draw::math::js_max(1.0, 2.5 * (1.0 - rk)),
                 if rk < 0.3 { WHITE } else { c[4] },
                 1.1 - rk,
             );

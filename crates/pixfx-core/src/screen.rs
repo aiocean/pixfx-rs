@@ -1,8 +1,8 @@
 //! Screen passes: the camera of a hit. Shake moves the view, ripples bend it, a flash lifts it toward white.
 //! Port of the camera pass in game-factory `references/pixelfx/demo/bloater.js`.
 
-use crate::frame::Frame;
-use crate::math::js_round;
+use pixfx_draw::frame::Frame;
+use pixfx_draw::math::js_round;
 
 /// A ring of screen distortion alive now: centred on (`x`, `y`) in the destination frame's pixels, growing from
 /// `r0` to `r1` over `dur` seconds, `age` seconds in.

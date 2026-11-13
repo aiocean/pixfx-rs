@@ -4,7 +4,7 @@
 //! feet (or [`Shape::axis_scale`] when it cannot skew), at [`Blink::alpha`]. The drawing stays the host's;
 //! collision shapes keep their size.
 
-use crate::math::{clamp, ease, js_min};
+use pixfx_draw::math::{clamp, ease, js_min};
 
 /// How a body answers. `Default` suits a pixel-art body a few dozen pixels tall jumping at about 220 px/s.
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -2,7 +2,8 @@
 
 use std::collections::BTreeMap;
 
-use pixfx_core::{ClipKey, OptValue, Options, Outline, Placement, Rgba, Ring};
+use pixfx_core::{ClipKey, OptValue, Options, Placement};
+use pixfx_draw::{Outline, Rgba, Ring};
 
 fn place() -> Placement {
     Placement {

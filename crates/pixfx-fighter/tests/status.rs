@@ -1,6 +1,6 @@
 //! The marks and states a fighter carries, drawn the way a player sees them.
 
-use pixfx_core::{Frame, Rgba};
+use pixfx_draw::{Frame, Rgba};
 use pixfx_fighter::pose::Pose;
 use pixfx_fighter::status::{
     DomeStyle, Figure, Mark, Silhouette, draw_burning, draw_frozen, draw_marks, draw_shocked,

@@ -3,9 +3,10 @@
 //! The layered tongue, its noise-torn edges and the shed puffs are adapted from Sprite Fusion's open-source fire
 //! (https://www.spritefusion.com/pixel-art-vfx/fire), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp};
-use pixfx_core::math::{TAU, js_max, js_min, js_round};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
+use pixfx_draw::math::{TAU, js_max, js_min, js_round};
 
 use super::lib::{Hot, Life, LoopNoise, Noise, drift, hot_first, looped, soft};
 

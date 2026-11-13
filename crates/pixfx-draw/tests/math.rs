@@ -1,6 +1,6 @@
 //! Fractal, tiling and loop noise against pixelfx `src/core/math.js`, values printed by `tests/golden/math.mjs`.
 
-use pixfx_core::math::{fbm, loop_noise, tile_fbm, tile_noise};
+use pixfx_draw::math::{fbm, loop_noise, tile_fbm, tile_noise};
 
 const EPS: f64 = 1e-12;
 
@@ -46,7 +46,7 @@ fn noise_matches_pixelfx() {
 
 #[test]
 fn perlin_is_smooth_bounded_and_never_rests() {
-    use pixfx_core::math::perlin;
+    use pixfx_draw::math::perlin;
     let step = 1.0 / 64.0;
     let mut prev = perlin(0.0, 7.0);
     for i in 1..=64 * 16 {

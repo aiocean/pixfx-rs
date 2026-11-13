@@ -7,9 +7,10 @@
 //! `glint` is adapted from Sprite Fusion's open-source sparkle (https://www.spritefusion.com/pixel-art-vfx/sparkle),
 //! MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE};
-use pixfx_core::math::{TAU, clamp, js_min};
-use pixfx_core::{ColorOpt, Meta, OptSpec, Painter};
+use pixfx_core::{ColorOpt, Meta, OptSpec};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE};
+use pixfx_draw::math::{TAU, clamp, js_min};
 
 pub const W: usize = 320;
 pub const H: usize = 180;

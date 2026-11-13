@@ -4,9 +4,10 @@
 //!
 //! Port of pixelfx `src/fx/holy/_lib.js`: the functions feather burst uses (`feather`, `Feathers`).
 
-use pixfx_core::color::{Rgba, WHITE};
-use pixfx_core::math::{Rng, TAU, clamp, js_max, js_min, js_round, smooth};
-use pixfx_core::{Layer, Painter};
+use pixfx_core::Layer;
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE};
+use pixfx_draw::math::{Rng, TAU, clamp, js_max, js_min, js_round, smooth};
 
 /// A feather of light from its quill at (x, y) pointing along ang, len px long, with a rounded tip; the
 /// trailing vane, wid px wide, falls on side (1: clockwise of the shaft, -1: the other way), the leading vane

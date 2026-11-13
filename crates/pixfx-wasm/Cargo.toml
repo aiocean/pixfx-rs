@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 js-sys = "=0.3.107"
 pixfx-core = { path = "../pixfx-core", features = ["ts"] }
+pixfx-draw = { path = "../pixfx-draw" }
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
 pixfx-export = { path = "../pixfx-export" }
 serde.workspace = true

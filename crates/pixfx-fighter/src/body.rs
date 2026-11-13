@@ -973,7 +973,7 @@ fn max(a: f64, b: f64) -> f64 {
     if a == 0.0 && b == 0.0 {
         return if a.is_sign_positive() { a } else { b };
     }
-    pixfx_core::math::js_max(a, b)
+    pixfx_draw::math::js_max(a, b)
 }
 
 /// JS `Math.min(a, b)`, signed zeros included (-0 beats +0).
@@ -981,7 +981,7 @@ fn min(a: f64, b: f64) -> f64 {
     if a == 0.0 && b == 0.0 {
         return if a.is_sign_negative() { a } else { b };
     }
-    pixfx_core::math::js_min(a, b)
+    pixfx_draw::math::js_min(a, b)
 }
 
 /// The duel's `clamp`: `Math.max(lo, Math.min(hi, v))`.

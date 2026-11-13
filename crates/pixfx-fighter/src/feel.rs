@@ -7,11 +7,11 @@
 //! part (trauma, shake, freeze, slow motion, ripples, flash) is the engine's [`pixfx_core::feel::Feel`]; this adds
 //! what only a fight has.
 
-use pixfx_core::color::Rgba;
 use pixfx_core::feel::{Feel as Screen, FeelSpec as ScreenSpec};
-use pixfx_core::frame::Frame;
-use pixfx_core::math::{js_max, js_min, js_round, to_int32};
 use pixfx_core::screen::Ripple;
+use pixfx_draw::color::Rgba;
+use pixfx_draw::frame::Frame;
+use pixfx_draw::math::{js_max, js_min, js_round, to_int32};
 
 /// Hit-stop, in frames at 60 a second, the way fighting games and Sakurai's Smash count it: both fighters freeze
 /// together, longer the heavier the blow (Street Fighter 6 gives its mediums 11 frames, its heavies 13); a blow of
@@ -661,7 +661,7 @@ impl Feel {
                 for side in [-1.0, 1.0] {
                     let x = js_round(d.x + side * out);
                     let y = ground - 1.0 - rise;
-                    pixfx_core::blend::fill(frame, x as i32, y as i32, w as i32, 1, c, alpha);
+                    pixfx_draw::blend::fill(frame, x as i32, y as i32, w as i32, 1, c, alpha);
                 }
                 i += 1.0;
             }

@@ -3,7 +3,8 @@
 //! one-shot's last frame). Uneven frame times, stalls and zero steps change nothing.
 
 use pixfx_core::effect::MAX_DT;
-use pixfx_core::{Frame, Instance, Layer, Options, edge_fade, render_frames};
+use pixfx_core::{Instance, Layer, Options, edge_fade, render_frames};
+use pixfx_draw::Frame;
 use pixfx_effects::EFFECTS;
 
 /// A fixed sequence of host steps: mostly 60 and 144 Hz with jitter, some zero steps (a hit-stop) and stalls

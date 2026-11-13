@@ -3,9 +3,10 @@
 //! The hover, floor shadow and glints follow Sprite Fusion's open-source pickup
 //! (https://www.spritefusion.com/pixel-art-vfx/pickup), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE, ramp};
-use pixfx_core::math::{TAU, js_round, rand};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, ramp};
+use pixfx_draw::math::{TAU, js_round, rand};
 
 use super::lib::{CoinLayer, blob_shadow, coin3d, glint};
 

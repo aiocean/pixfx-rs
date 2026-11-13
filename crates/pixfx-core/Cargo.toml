@@ -1,21 +1,22 @@
 [package]
 name = "pixfx-core"
-description = "Deterministic pixel-art effect core: frames, colour, painter, light (port of pixelfx)"
+description = "Deterministic pixel-art effect engine: effects, particles, cues, game feel and the player, drawn with pixfx-draw (port of pixelfx)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 libm.workspace = true
+pixfx-draw = { path = "../pixfx-draw" }
 serde = { workspace = true, optional = true }
 tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 [features]
 # serde for the value types (colours as "#rrggbb"), for hosts that pass them as data
-serde = ["dep:serde"]
+serde = ["dep:serde", "pixfx-draw/serde"]
 # TypeScript declarations for the value types, for the wasm bindings
-ts = ["serde", "dep:tsify", "dep:wasm-bindgen"]
+ts = ["serde", "dep:tsify", "dep:wasm-bindgen", "pixfx-draw/ts"]
 
 [lints]
 workspace = true

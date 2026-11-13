@@ -9,8 +9,8 @@
 //! drew the same rings itself.
 #![forbid(unsafe_code)]
 
-use pixfx_core::math::{js_max, js_min, js_round};
-use pixfx_core::{Frame, Rgba};
+use pixfx_draw::math::{js_max, js_min, js_round};
+use pixfx_draw::{Frame, Rgba};
 
 /// A light in the world: where it is, how far it reaches and how bright it burns at its heart, how long it lives
 /// and how long it has lived.

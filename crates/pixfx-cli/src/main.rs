@@ -26,7 +26,8 @@ use std::process::{Command, ExitCode};
 
 use pixfx_cli::opts::CliOpts;
 use pixfx_cli::parity::{compare, read_reference, write_side_gif};
-use pixfx_core::{Options, Outline, render_frames};
+use pixfx_core::{Options, render_frames};
+use pixfx_draw::Outline;
 use pixfx_export::{bake, write_bake, write_gif, write_sheet};
 
 const USAGE: &str = "usage: pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
@@ -46,7 +47,7 @@ struct ExportArgs {
     out: PathBuf,
     export: Export,
     outline: Option<Outline>,
-    palette: Option<Vec<pixfx_core::Rgba>>,
+    palette: Option<Vec<pixfx_draw::Rgba>>,
 }
 
 /// The reference script, found from this crate's source so `pixfx` runs from any directory of the repo.
@@ -118,7 +119,7 @@ fn parse_export(cmd: &str, args: &[String]) -> Result<ExportArgs, String> {
             }
             "--palette" => {
                 let word = it.next().ok_or(USAGE)?;
-                palette = Some(pixfx_core::palette::parse(word).map_err(|e| e.to_string())?);
+                palette = Some(pixfx_draw::palette::parse(word).map_err(|e| e.to_string())?);
             }
             "--gif" if cmd == "render" => gif = true,
             "--scale" if cmd == "render" => {

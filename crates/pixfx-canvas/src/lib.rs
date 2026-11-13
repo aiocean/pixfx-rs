@@ -28,7 +28,8 @@ use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
 use js_sys::{Array, Uint8Array, Uint8ClampedArray};
-use pixfx_core::{Feel, Frame, Layer, Player};
+use pixfx_core::{Feel, Layer, Player};
+use pixfx_draw::Frame;
 use pixfx_effects::effect;
 use pixfx_wasm::js::{pair, parse, to_js};
 use stage::{Pass, PlacementChange, Scene, Shell, color_rgba, light_rgba, stage_options};

@@ -8,7 +8,7 @@ const FRAME: f64 = 1.0 / 60.0;
 /// Seconds of fight that `seconds` of real time buys.
 fn fight_time(feel: &mut Feel, seconds: f64) -> f64 {
     let mut t = 0.0;
-    let frames = pixfx_core::math::js_round(seconds / FRAME) as u32;
+    let frames = pixfx_draw::math::js_round(seconds / FRAME) as u32;
     for _ in 0..frames {
         t += feel.advance(FRAME);
     }

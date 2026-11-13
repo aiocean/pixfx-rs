@@ -9,11 +9,12 @@
 
 use core::f64::consts::PI;
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::cue::{FEEL, TimedCue, impact};
-use pixfx_core::math::{Rng, TAU, clamp, ease, js_max, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, sparkle};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
+use pixfx_draw::math::{Rng, TAU, clamp, ease, js_max, to_uint32};
 
 use super::lib::cull;
 

@@ -9,9 +9,10 @@
 //! whole width as densely as on the effect's own 320, the flies keep to the same heights over the grass, and
 //! the haze fills the whole canvas.
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp};
-use pixfx_core::math::{TAU, js_max, js_min, js_round, loop_noise, rand};
-use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, NumOpt, Options, Painter, RampOpt};
+use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, NumOpt, Options, RampOpt};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
+use pixfx_draw::math::{TAU, js_max, js_min, js_round, loop_noise, rand};
 
 use super::lib::{clip, count, glow, rows, size_options, sized};
 

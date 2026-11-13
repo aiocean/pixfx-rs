@@ -1,7 +1,8 @@
 //! Palette presets as a caller uses them: a word for a ramp every effect can take.
 
-use pixfx_core::palette::{PRESETS, parse, preset};
-use pixfx_core::{Options, Rgba};
+use pixfx_core::Options;
+use pixfx_draw::Rgba;
+use pixfx_draw::palette::{PRESETS, parse, preset};
 
 fn luma(c: Rgba) -> f64 {
     0.2126 * f64::from(c.0) + 0.7152 * f64::from(c.1) + 0.0722 * f64::from(c.2)

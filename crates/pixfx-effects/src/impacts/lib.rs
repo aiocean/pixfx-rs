@@ -5,9 +5,9 @@
 //!
 //! Port of pixelfx `src/fx/impacts/_lib.js`: the functions parry uses (`star`, `brokenRing`).
 
-use pixfx_core::Painter;
-use pixfx_core::color::Rgba;
-use pixfx_core::math::{TAU, js_max, js_min};
+use pixfx_draw::Painter;
+use pixfx_draw::color::Rgba;
+use pixfx_draw::math::{TAU, js_max, js_min};
 
 /// One spike of a hit star: angle, length and root half-width.
 #[derive(Clone, Copy, Debug)]

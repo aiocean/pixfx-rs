@@ -7,10 +7,10 @@
 //! Port of pixelfx `src/fx/fire/_lib.js`: the functions candle, campfire and brazier use (`flameBlade`,
 //! `flicker` and `simDraw` arrive with the effects that need them).
 
-use pixfx_core::Painter;
-use pixfx_core::color::{Rgba, WHITE, mix, step_at};
-use pixfx_core::math::{Rng, clamp, js_max, js_min, js_round, noise, or_one, rand, rng, wrap};
 use pixfx_core::sim::SMOKE_RAMP;
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, step_at};
+use pixfx_draw::math::{Rng, clamp, js_max, js_min, js_round, noise, or_one, rand, rng, wrap};
 
 /// A fire ramp hot-first: `H[0]` white .. `H[8]` smouldering.
 pub type Hot = [Rgba; 9];

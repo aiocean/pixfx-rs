@@ -8,9 +8,10 @@
 //! across the whole width as densely as on the effect's own 320, the haze fills the whole canvas, and the
 //! flakes fall from its top, so on a taller canvas they fall the longer way in the same time.
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp};
-use pixfx_core::math::{TAU, js_min, js_round, rand, smooth, wrap};
-use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
+use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, NumOpt, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
+use pixfx_draw::math::{TAU, js_min, js_round, rand, smooth, wrap};
 
 use super::lib::{clip, count, glow, pass, size_options, sized, trips};
 

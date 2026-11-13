@@ -10,7 +10,8 @@ use std::fs;
 use std::io::{BufWriter, Cursor};
 use std::path::{Path, PathBuf};
 
-use pixfx_core::{ClipKey, Effect, Frame, FrameId, Layer, Options, Player};
+use pixfx_core::{ClipKey, Effect, FrameId, Layer, Options, Player};
+use pixfx_draw::Frame;
 use serde::{Deserialize, Serialize};
 
 use crate::ExportError;

@@ -11,13 +11,14 @@
 
 use core::f64::consts::FRAC_PI_2;
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp, rgb, scale};
 use pixfx_core::cue::{FEEL, TimedCue, impact};
-use pixfx_core::math::{Rng, TAU, clamp, ease, js_max, js_min, js_round, rand, smooth, to_uint32};
 use pixfx_core::sim::{
     Bit, BitKind, Bits, Blazes, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn, band,
 };
-use pixfx_core::{ColorOpt, Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
+use pixfx_core::{ColorOpt, Effect, EffectState, Layer, Meta, NumOpt, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp, rgb, scale};
+use pixfx_draw::math::{Rng, TAU, clamp, ease, js_max, js_min, js_round, rand, smooth, to_uint32};
 
 use super::lib::{OUTLINE, Stone};
 

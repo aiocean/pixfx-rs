@@ -3,9 +3,10 @@
 //! The layered flame tongue is adapted from Sprite Fusion's open-source fire
 //! (https://www.spritefusion.com/pixel-art-vfx/fire), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp};
-use pixfx_core::math::{clamp, js_max, js_min, js_round, smooth};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, RampOpt};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
+use pixfx_draw::math::{clamp, js_max, js_min, js_round, smooth};
 
 use super::lib::{
     Hot, Life, LoopNoise, drift, flame_tongue, floor_light, hot_first, looped, smoke_puff,

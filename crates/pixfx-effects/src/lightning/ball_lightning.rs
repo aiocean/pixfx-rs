@@ -4,10 +4,11 @@
 //! open-source energy orb and bolt (https://www.spritefusion.com/pixel-art-vfx/energy),
 //! MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE, ramp};
-use pixfx_core::math::{TAU, clamp, rng};
 use pixfx_core::particles::cycle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, RampOpt};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, ramp};
+use pixfx_draw::math::{TAU, clamp, rng};
 
 use super::lib::{PLASMA, VOLT, crackle, flight, spark, stroke, zigzag};
 

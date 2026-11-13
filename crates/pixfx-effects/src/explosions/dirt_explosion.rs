@@ -9,13 +9,14 @@
 
 use core::f64::consts::FRAC_PI_2;
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp, rgb};
 use pixfx_core::cue::{FEEL, TimedCue, impact};
-use pixfx_core::math::{Rng, TAU, ease, js_max, js_min, js_round, smooth, to_uint32};
 use pixfx_core::sim::{
     Bit, BitKind, Bits, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn, band,
 };
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter, RampOpt};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, RampOpt};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp, rgb};
+use pixfx_draw::math::{Rng, TAU, ease, js_max, js_min, js_round, smooth, to_uint32};
 
 use super::lib::{OUTLINE, Stone, crater, cull, dome, draw_dirt, fade_edges, pool, rock};
 

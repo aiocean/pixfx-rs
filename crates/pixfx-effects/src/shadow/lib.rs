@@ -5,9 +5,9 @@
 //! `ringLight`, `ringFast`, `unlight`). `ringFast`'s colour and alpha and `ringLight`'s `keep` stay constants
 //! here (the functions of the ring's radius and angle pixelfx also accepts have no caller yet).
 
-use pixfx_core::Painter;
-use pixfx_core::color::Rgba;
-use pixfx_core::math::js_max;
+use pixfx_draw::Painter;
+use pixfx_draw::color::Rgba;
+use pixfx_draw::math::js_max;
 
 /// Dark magic, dark to bright: void black, deep violet, a white-lilac edge.
 pub const VOID: [Rgba; 8] = [

@@ -7,12 +7,13 @@
 //! open. Each replaces pixelfx's seeded centre on its own axis, and the two satellite spots that catch a beat
 //! later follow the overridden centre; the seeded centre is still drawn, so every other random draw is unchanged.
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp};
-use pixfx_core::math::{
+use pixfx_core::sim::{Flags, Kind, Lights, Particles, ParticlesOpts, SMOKE_RAMP, Spawn};
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
+use pixfx_draw::math::{
     Rng, TAU, clamp, ease, fbm, js_max, js_min, js_round, noise, noise2, rand, smooth, to_uint32,
 };
-use pixfx_core::sim::{Flags, Kind, Lights, Particles, ParticlesOpts, SMOKE_RAMP, Spawn};
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, Painter};
 
 use super::lib::{COLOR, Field, H, W, clip_to, field, life_left, pixels, rect, screen_meta};
 

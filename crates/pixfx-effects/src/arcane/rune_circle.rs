@@ -3,11 +3,12 @@
 //! The floor glow and the specks rising off it follow Sprite Fusion's open-source mana heal
 //! (https://www.spritefusion.com/pixel-art-vfx/heal), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::color::{Rgba, WHITE, pal, ramp};
-use pixfx_core::math::{Rng, TAU, ease, js_min, smooth};
 use pixfx_core::particles::cycle;
 use pixfx_core::sim::sparkle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, pal, ramp};
+use pixfx_draw::math::{Rng, TAU, ease, js_min, smooth};
 
 use super::lib::{floor_ring, glyph, mote};
 

@@ -4,9 +4,9 @@
 //! Port of pixelfx `src/fx/pickups/_lib.js`: the functions coin-spin uses (`Layer`, `coin3d`, `glint`,
 //! `blobShadow`). The JS `Layer` is [`CoinLayer`] here so it does not shadow [`pixfx_core::Layer`].
 
-use pixfx_core::Painter;
-use pixfx_core::color::{Rgba, WHITE, scale};
-use pixfx_core::math::{js_max, js_min, js_round, js_sign};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, scale};
+use pixfx_draw::math::{js_max, js_min, js_round, js_sign};
 
 /// A scratch layer: draw a sprite into it, give it a dark outline, then stamp it onto the frame. Lets a
 /// procedural shape get a hand-made 1 px outline. Only what coin-spin needs of pixelfx's `Layer`: `begin`,

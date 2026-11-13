@@ -1,8 +1,8 @@
 //! The beanfx JSON of a sheet: Aseprite "array" layout with beanfx's fields under `meta.beanfx`
 //! (beanfx `docs/output-json.md`). Pure: values in, [`serde_json::Value`] out.
 
-use pixfx_core::math::js_round;
 use pixfx_core::{Meta, Rendered};
+use pixfx_draw::math::js_round;
 use serde_json::{Value, json};
 
 use crate::sheet::Grid;
@@ -85,7 +85,7 @@ pub fn beanfx_json(r: &Rendered, meta: &Meta, grid: &Grid, name: &str, files: &F
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pixfx_core::Frame;
+    use pixfx_draw::Frame;
 
     #[test]
     fn pivot_is_the_rendered_origin_plus_the_margin_not_the_meta_origin() {

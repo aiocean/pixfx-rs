@@ -2007,6 +2007,14 @@ name = "pixfx-core"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "pixfx-draw",
+]
+
+[[package]]
+name = "pixfx-draw"
+version = "0.1.0"
+dependencies = [
+ "libm",
 ]
 
 [[package]]
@@ -2015,6 +2023,7 @@ version = "0.1.0"
 dependencies = [
  "libm",
  "pixfx-core",
+ "pixfx-draw",
 ]
 
 [[package]]
@@ -2025,6 +2034,7 @@ dependencies = [
  "gpui",
  "image",
  "pixfx-core",
+ "pixfx-draw",
  "pixfx-effects",
 ]
 

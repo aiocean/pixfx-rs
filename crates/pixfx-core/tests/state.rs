@@ -2,8 +2,8 @@
 
 use pixfx_core::cue::{Cue, TimedCue};
 use pixfx_core::effect::{Effect, EffectState, Layer, Meta, OptValue, Options};
-use pixfx_core::painter::Painter;
 use pixfx_core::state::{Creature, StateError, StateMeta};
+use pixfx_draw::painter::Painter;
 
 struct Blank;
 

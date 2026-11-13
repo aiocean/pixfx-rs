@@ -1,5 +1,6 @@
 use pixfx_cli::parity::compare;
-use pixfx_core::{Frame, Rendered};
+use pixfx_core::Rendered;
+use pixfx_draw::Frame;
 
 /// One 10 x 10 frame, every pixel the same colour and light.
 fn flat(color: u32, light: u32) -> Rendered {

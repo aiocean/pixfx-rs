@@ -1,9 +1,10 @@
 //! Void orb: port of pixelfx `src/fx/shadow/void-orb.js`.
 
-use pixfx_core::color::{Rgba, WHITE, ramp};
-use pixfx_core::math::{Rng, TAU, clamp, ease, fbm, js_max, js_min, js_sign, smooth};
 use pixfx_core::particles::cycle;
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, ramp};
+use pixfx_draw::math::{Rng, TAU, clamp, ease, fbm, js_max, js_min, js_sign, smooth};
 
 use super::lib::{VOID, halo, ring_fast, ring_light, unlight};
 

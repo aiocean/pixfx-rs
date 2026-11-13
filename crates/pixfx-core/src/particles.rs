@@ -1,6 +1,6 @@
 //! Particles without a simulation: each one's position is a closed-form function of its age (pixelfx `particles.js`).
 
-use crate::math::{Rng, rng};
+use pixfx_draw::math::{Rng, rng};
 
 /// Where a particle is after `t` seconds, launched from `(x, y)` at `(vx, vy)` px/s, under gravity `g` (px/s^2,
 /// positive is down) and linear drag (1/s).

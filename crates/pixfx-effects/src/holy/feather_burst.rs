@@ -3,11 +3,12 @@
 //! Beyond pixelfx: it fires impact cues ([`pixfx_core::cue::impact`]) for the game to answer; the `feel` option
 //! scales them, 0 for none.
 
-use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::cue::{FEEL, TimedCue, impact};
-use pixfx_core::math::{Rng, TAU, ease, js_max, js_min, smooth, to_uint32};
 use pixfx_core::sim::{Kind, Lights, Particles, ParticlesOpts, Spawn, sparkle};
-use pixfx_core::{ColorOpt, Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{ColorOpt, Effect, EffectState, Layer, Meta, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
+use pixfx_draw::math::{Rng, TAU, ease, js_max, js_min, smooth, to_uint32};
 
 use super::lib::{Feathers, NewFeather};
 

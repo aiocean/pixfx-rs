@@ -4,7 +4,8 @@ use std::fs;
 use std::io::BufWriter;
 use std::path::Path;
 
-use pixfx_core::{Rendered, composite};
+use pixfx_core::Rendered;
+use pixfx_draw::composite;
 
 use crate::ExportError;
 

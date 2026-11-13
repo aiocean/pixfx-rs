@@ -10,13 +10,13 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::act::Act;
-use crate::color::{Rgba, fit};
 use crate::cue::{TimedCue, cues_between, cues_of};
-use crate::frame::Frame;
-use crate::math::{clamp, js_max, js_min, js_round};
-use crate::outline::{Outline, ring_round};
-use crate::painter::Painter;
 use crate::state::StateMeta;
+use pixfx_draw::color::{Rgba, fit};
+use pixfx_draw::frame::Frame;
+use pixfx_draw::math::{clamp, js_max, js_min, js_round};
+use pixfx_draw::outline::{Outline, ring_round};
+use pixfx_draw::painter::Painter;
 
 /// The longest step [`Instance::update`] takes: a live host that stalls (a background tab, a debugger)
 /// resumes where it left off instead of simulating the whole gap. pixelfx has no such clamp; renders never
@@ -163,7 +163,7 @@ pub struct Options {
     /// Glow strength.
     pub light: f64,
     pub palette: Option<Vec<Rgba>>,
-    /// Its outline: unset looks as designed, `Off` has none, `On` rings it ([`crate::outline`]).
+    /// Its outline: unset looks as designed, `Off` has none, `On` rings it ([`pixfx_draw::outline`]).
     pub outline: Option<Outline>,
     /// The effect's own options by name (pixelfx `height`, `wood`, ...).
     pub extra: BTreeMap<String, OptValue>,
@@ -379,6 +379,16 @@ fn resolve_ramp(given: Option<&[Rgba]>, default: &[Rgba]) -> Vec<Rgba> {
 }
 
 impl Options {
+    /// For an effect that draws its own outline: the colour to draw it in, `default` unless the caller set one,
+    /// or none when the caller turned outlines off.
+    pub fn outline_color(&self, default: Rgba) -> Option<Rgba> {
+        match self.outline {
+            None => Some(default),
+            Some(Outline::Off) => None,
+            Some(Outline::On(r)) => Some(r.color()),
+        }
+    }
+
     /// The palette, resolved against the effect's default as pixelfx `resolveOptions` does.
     pub fn palette_or(&self, default: &[Rgba]) -> Vec<Rgba> {
         resolve_ramp(self.palette.as_deref(), default)

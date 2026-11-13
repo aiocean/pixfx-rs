@@ -1,7 +1,7 @@
 //! The camera pass: shake offsets the view, ripples bend it, flash lifts it toward white.
 
-use pixfx_core::Frame;
 use pixfx_core::screen::{Ripple, flash, ripple, ripple_rgba};
+use pixfx_draw::Frame;
 
 fn gradient(w: u32, h: u32) -> Frame {
     let mut f = Frame::new(w, h, 0, 0);

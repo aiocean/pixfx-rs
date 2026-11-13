@@ -3,7 +3,7 @@
 //! [`HitFlash::amount`] where it can draw at partial strength. It runs on play time, so a hit-stop holds the
 //! struck sprite lit for the whole freeze, the way fighting games show who was hit.
 
-use crate::math::clamp;
+use pixfx_draw::math::clamp;
 
 /// How long a hit flashes when the game does not say: 5 frames at 60 a second.
 pub const HIT_FLASH: f64 = 5.0 / 60.0;

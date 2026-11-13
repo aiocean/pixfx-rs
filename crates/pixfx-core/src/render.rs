@@ -2,8 +2,8 @@
 //! backdrop, no stand-in actor) and `edgeFade`.
 
 use crate::effect::{Effect, Instance, Layer, Options};
-use crate::frame::Frame;
-use crate::math::js_round;
+use pixfx_draw::frame::Frame;
+use pixfx_draw::math::js_round;
 
 /// An effect's frames, each `w` x `h` (its canvas, [`Effect::canvas`], plus the margin) with its top-left at
 /// (-margin, -margin) in effect canvas space.

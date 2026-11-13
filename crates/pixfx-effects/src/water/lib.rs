@@ -6,9 +6,9 @@
 //!
 //! Port of pixelfx `src/fx/water/_lib.js`: the functions water-jet uses (`WATER`, `bead`).
 
-use pixfx_core::Painter;
-use pixfx_core::color::{Rgba, WHITE};
-use pixfx_core::math::{js_min, or_one};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE};
+use pixfx_draw::math::{js_min, or_one};
 
 /// Water, deep to white: deep color only in shadow, tinted middles, white crests.
 pub const WATER: [Rgba; 8] = [

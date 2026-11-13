@@ -3,7 +3,7 @@
 //!
 //! Port of pixelfx `src/fx/projectiles/_lib.js`: the functions laser-bolt uses (`beat`).
 
-use pixfx_core::math::{Rng, rng, wrap};
+use pixfx_draw::math::{Rng, rng, wrap};
 
 /// Like `cycle`, but particle i is born exactly at i * period / n: an emitter with a steady beat, so a trail
 /// has no clumps or gaps. Loops seamlessly over period. `f(age, life, r, i)`, r the same rng every period.

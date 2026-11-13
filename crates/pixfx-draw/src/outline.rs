@@ -1,13 +1,12 @@
 //! Outlines: a ring of one colour round what an effect draws, so it reads over any background. Every effect
-//! takes [`Options::outline`]: unset, it looks as designed (no ring, or the outline it draws itself); `Off`, it
-//! has none; `On`, it has a ring of that colour and width. An effect that draws its own outline
-//! ([`crate::Effect::draws_outline`]) recolours or drops that one ([`Options::outline_color`]) instead of getting a
-//! second ring. pixelfx has no such option, so unset renders match it.
+//! takes an outline option (`Options::outline` in pixfx-core): unset, it looks as designed (no ring, or the outline
+//! it draws itself); `Off`, it has none; `On`, it has a ring of that colour and width. An effect that draws its own
+//! outline recolours or drops that one instead of getting a second ring. pixelfx has no such option, so unset
+//! renders match it.
 
 use std::fmt;
 
 use crate::color::{Rgba, hex};
-use crate::effect::Options;
 use crate::frame::Frame;
 
 /// The widest ring, in pixels.
@@ -131,22 +130,10 @@ impl Outline {
     }
 }
 
-impl Options {
-    /// For an effect that draws its own outline: the colour to draw it in, `default` unless the caller set one,
-    /// or none when the caller turned outlines off.
-    pub fn outline_color(&self, default: Rgba) -> Option<Rgba> {
-        match self.outline {
-            None => Some(default),
-            Some(Outline::Off) => None,
-            Some(Outline::On(r)) => Some(r.color),
-        }
-    }
-}
-
 /// Ring the pixels drawn into `frame` since its colour was `before` (same size): each empty pixel within the ring's
 /// width of a drawn one (part of a shape: [`SHAPE_NEIGHBOURS`]) takes the ring's colour, as opaque as the most opaque drawn pixel it
 /// rings, so the ring fades with the effect. Light is left alone.
-pub(crate) fn ring_round(frame: &mut Frame, before: &[u32], ring: Ring) {
+pub fn ring_round(frame: &mut Frame, before: &[u32], ring: Ring) {
     let (w, h) = (frame.w as usize, frame.h as usize);
     let reach = ring.width as isize;
     let drawn: Vec<bool> = frame

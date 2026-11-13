@@ -8,10 +8,10 @@
 
 use core::f64::consts::FRAC_PI_2;
 
-use pixfx_core::Painter;
-use pixfx_core::color::{Rgba, WHITE, step_at};
-use pixfx_core::math::{clamp, js_max, js_min, js_round};
 use pixfx_core::sim::{Bits, GRAVITY, Particles};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, WHITE, step_at};
+use pixfx_draw::math::{clamp, js_max, js_min, js_round};
 
 /// A polygon's corners `[(x, y), ...]`.
 pub type Poly = Vec<(f64, f64)>;

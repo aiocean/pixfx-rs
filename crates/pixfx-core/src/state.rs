@@ -8,7 +8,7 @@ use std::fmt;
 
 use crate::cue::TimedCue;
 use crate::effect::{Effect, Instance, Layer, Options, Placement, find};
-use crate::frame::Frame;
+use pixfx_draw::frame::Frame;
 
 /// What makes an effect one state of a creature (pixelfx `meta.state`).
 #[derive(Clone, Copy, Debug, PartialEq)]

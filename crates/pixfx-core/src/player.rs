@@ -2,9 +2,9 @@
 
 use crate::cue::TimedCue;
 use crate::effect::{Canvas, Effect, Instance, Layer, Meta, Options, Placement};
-use crate::frame::{Frame, composite};
 use crate::key::{ClipKey, FrameId};
 use crate::render::edge_fade;
+use pixfx_draw::frame::{Frame, composite};
 
 /// An effect instance and the canvas it draws into: the instance's canvas ([`Effect::canvas`]: `meta.size`
 /// unless its options size it) plus `margin` empty pixels on every side, with the effect's origin at the

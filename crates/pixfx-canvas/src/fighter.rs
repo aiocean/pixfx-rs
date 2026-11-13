@@ -372,7 +372,8 @@ fn with_roll<T>(
 
 use crate::Surface;
 use crate::stage::{Pass, Rect};
-use pixfx_core::{Frame, Layer, Rgba};
+use pixfx_core::Layer;
+use pixfx_draw::{Frame, Rgba};
 use pixfx_fighter::look::Look;
 use pixfx_fighter::paint::{self, Appearance};
 use pixfx_fighter::status::{self, DomeStyle, Figure, Mark, Silhouette};
@@ -530,7 +531,7 @@ impl Sprites {
                 if c.3 == 0 {
                     continue;
                 }
-                let a = pixfx_core::math::js_round(f64::from(c.3) * alpha).clamp(0.0, 255.0) as u8;
+                let a = pixfx_draw::math::js_round(f64::from(c.3) * alpha).clamp(0.0, 255.0) as u8;
                 if let Some(slot) = self.frame.color.get_mut((py * w + px) as usize) {
                     *slot = Rgba(c.0, c.1, c.2, a).pack();
                 }

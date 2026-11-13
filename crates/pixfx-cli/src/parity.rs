@@ -6,7 +6,8 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use pixfx_core::{Frame, Rendered, composite};
+use pixfx_core::Rendered;
+use pixfx_draw::{Frame, composite};
 
 /// The largest fraction of colour or light pixels that may differ for a port to pass.
 pub const GATE: f64 = 0.005;

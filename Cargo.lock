@@ -247,6 +247,7 @@ version = "0.1.0"
 dependencies = [
  "js-sys",
  "pixfx-core",
+ "pixfx-draw",
  "pixfx-effects",
  "pixfx-export",
  "pixfx-fighter",
@@ -264,12 +265,24 @@ version = "0.1.0"
 dependencies = [
  "gif",
  "pixfx-core",
+ "pixfx-draw",
  "pixfx-effects",
  "pixfx-export",
 ]
 
 [[package]]
 name = "pixfx-core"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "pixfx-draw",
+ "serde",
+ "tsify",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "pixfx-draw"
 version = "0.1.0"
 dependencies = [
  "libm",
@@ -284,6 +297,7 @@ version = "0.1.0"
 dependencies = [
  "libm",
  "pixfx-core",
+ "pixfx-draw",
  "serde_json",
  "wasm-bindgen-test",
 ]
@@ -294,6 +308,7 @@ version = "0.1.0"
 dependencies = [
  "gif",
  "pixfx-core",
+ "pixfx-draw",
  "pixfx-effects",
  "png",
  "serde",
@@ -306,6 +321,7 @@ version = "0.1.0"
 dependencies = [
  "libm",
  "pixfx-core",
+ "pixfx-draw",
  "serde",
  "serde_json",
  "tsify",
@@ -317,7 +333,7 @@ name = "pixfx-light"
 version = "0.1.0"
 dependencies = [
  "libm",
- "pixfx-core",
+ "pixfx-draw",
  "serde",
  "tsify",
  "wasm-bindgen",
@@ -329,6 +345,7 @@ version = "0.1.0"
 dependencies = [
  "js-sys",
  "pixfx-core",
+ "pixfx-draw",
  "pixfx-effects",
  "pixfx-export",
  "serde",

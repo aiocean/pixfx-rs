@@ -18,12 +18,8 @@ list is this plan's scope).
 
 ## Before starting
 
-Two other sessions (agents a04a260, 30 fps work, and fdd31fa, wasm build size) had uncommitted changes in about
-40 of the files this plan moves when it was written. Start only when `git status --short` lists none of
-`crates/pixfx-core`, `crates/pixfx-effects`, `crates/pixfx-canvas`, `crates/pixfx-wasm`, `crates/pixfx-fighter`,
-`packages/pixfx-phaser`. Work in a worktree off `main` (`superpowers:using-git-worktrees`). Re-read every file named
-below before editing it: line numbers and some imports (for example `Player`, which commit b643821 moved into
-`pixfx-core`) will have moved.
+Work in the main tree on `main` (the owner's call: no worktree). Other sessions share this tree: before a task, tell
+the sessions working in its files, and re-read every file named below before editing it, since line numbers move.
 
 ## Global Constraints
 

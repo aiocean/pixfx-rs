@@ -6,11 +6,11 @@
 //! MIT License, Copyright (c) 2026 Hugo Duprez. Units here are art pixels and seconds; draw through a Painter,
 //! so effects stay in local space and mirror or rotate like any other.
 
-use crate::color::{Rgba, WHITE, mix, scale, step_at};
 use crate::effect::Layer;
-use crate::math::{Rng, TAU, clamp, js_max, js_min, js_round, or_one};
-use crate::painter::Painter;
 use core::ops::BitOr;
+use pixfx_draw::color::{Rgba, WHITE, mix, scale, step_at};
+use pixfx_draw::math::{Rng, TAU, clamp, js_max, js_min, js_round, or_one};
+use pixfx_draw::painter::Painter;
 
 /// Downward acceleration of falling particles, px/s².
 pub const GRAVITY: f64 = 950.0;

@@ -8,9 +8,10 @@
 //! through the painter's pixel writes, which land on the same pixels and values (pixelfx's own path for a
 //! rotated painter).
 
-use pixfx_core::color::Rgba;
-use pixfx_core::math::{js_max, js_min, js_round, rand};
-use pixfx_core::{Canvas, Meta, NumOpt, Options, Painter};
+use pixfx_core::{Canvas, Meta, NumOpt, Options};
+use pixfx_draw::Painter;
+use pixfx_draw::color::Rgba;
+use pixfx_draw::math::{js_max, js_min, js_round, rand};
 
 /// The longest side a weather canvas takes from its options: room for any screen at 2 screen pixels per
 /// pixel, and a frame small enough to allocate.

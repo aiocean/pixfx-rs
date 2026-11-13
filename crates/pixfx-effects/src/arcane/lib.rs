@@ -6,9 +6,9 @@
 //!
 //! Port of pixelfx `src/fx/arcane/_lib.js`: the functions rune-circle uses (`floorRing`, `glyph`, `mote`).
 
-use pixfx_core::Painter;
-use pixfx_core::color::{Rgba, scale};
-use pixfx_core::math::{js_max, js_min, js_round, or_one};
+use pixfx_draw::Painter;
+use pixfx_draw::color::{Rgba, scale};
+use pixfx_draw::math::{js_max, js_min, js_round, or_one};
 
 /// A drifting mote at (x, y) moving (vx, vy) px/s, drawn like the sim's MOTE: bright head, darker tail, light.
 /// JS defaults: `size = 1`, `k = 1`, `glow = 0.4`.

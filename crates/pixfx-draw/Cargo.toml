@@ -1,0 +1,21 @@
+[package]
+name = "pixfx-draw"
+description = "Pixel drawing for pixfx: frames with colour and additive light, the painter, shapes, blending, palettes and outline rings (port of pixelfx)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm.workspace = true
+serde = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+[features]
+# serde for the value types (colours as "#rrggbb"), for hosts that pass them as data
+serde = ["dep:serde"]
+# TypeScript declarations for the value types, for the wasm bindings
+ts = ["serde", "dep:tsify", "dep:wasm-bindgen"]
+
+[lints]
+workspace = true

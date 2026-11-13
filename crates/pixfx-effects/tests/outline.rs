@@ -1,8 +1,9 @@
 //! The `outline` option on the shipped effects: one that draws its own outline recolours or drops it, any other
 //! gets the engine's ring, and unset renders as designed.
 
-use pixfx_core::outline::Outline;
-use pixfx_core::{Effect, Frame, Options, Rgba, render_frames};
+use pixfx_core::{Effect, Options, render_frames};
+use pixfx_draw::outline::Outline;
+use pixfx_draw::{Frame, Rgba};
 use pixfx_effects::effect;
 
 /// The effects that draw an outline of their own, and its colour as designed.

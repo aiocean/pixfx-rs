@@ -10,8 +10,8 @@
 //! freeze runs on real time, and ripples and flash keep moving through it.
 
 use crate::cue::{Cue, TimedCue};
-use crate::math::{js_max, js_min, js_round, perlin, to_int32};
 use crate::screen::Ripple;
+use pixfx_draw::math::{js_max, js_min, js_round, perlin, to_int32};
 
 /// What is left of a timer after `dt`, counted in whole frames: what is left after the last one is rounding, not
 /// another frame.

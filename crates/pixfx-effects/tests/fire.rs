@@ -6,7 +6,8 @@ use pixfx_effects::effect;
 fn huge_campfire_height_draws_in_bounded_time() -> Result<(), &'static str> {
     use std::time::{Duration, Instant};
 
-    use pixfx_core::{Frame, Instance, Layer, OptValue, Options};
+    use pixfx_core::{Instance, Layer, OptValue, Options};
+    use pixfx_draw::Frame;
 
     let fx = effect("fire/campfire").ok_or("fire/campfire is not registered")?;
     let (w, h) = fx.meta().size;

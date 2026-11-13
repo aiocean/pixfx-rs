@@ -9,10 +9,10 @@
 
 use std::collections::HashMap;
 
-use pixfx_core::Painter;
-use pixfx_core::color::Rgba;
-use pixfx_core::math::{Rng, js_max, js_min, js_round, or_one};
 use pixfx_core::sim::GRAVITY;
+use pixfx_draw::Painter;
+use pixfx_draw::color::Rgba;
+use pixfx_draw::math::{Rng, js_max, js_min, js_round, or_one};
 
 /// Default palette, dark to bright: deep violet shadow, electric blue, icy white.
 pub const VOLT: [Rgba; 8] = [

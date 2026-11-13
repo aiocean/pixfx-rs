@@ -17,7 +17,8 @@ pub use pixfx_core::Player;
 pub use squash::{Blink, Squash};
 
 use js_sys::{Array, Uint8ClampedArray, Uint32Array};
-use pixfx_core::{Effect, Layer, Meta, OptKind, PixelBox, Rgba, valid_dt};
+use pixfx_core::{Effect, Layer, Meta, OptKind, PixelBox, valid_dt};
+use pixfx_draw::Rgba;
 use pixfx_effects::{EFFECTS, effect};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -330,7 +331,7 @@ pub fn baked_frames(json: &str, pages: Vec<js_sys::Uint8Array>) -> Result<Array,
             .map_err(|_| JsError::new("could not build a baked frame"))
     };
     let mut bytes = Vec::new();
-    let mut side = |frame: &pixfx_core::Frame| -> Result<js_sys::Object, JsError> {
+    let mut side = |frame: &pixfx_draw::Frame| -> Result<js_sys::Object, JsError> {
         let b = PixelBox::lit(frame).unwrap_or_default();
         bytes.resize(b.w as usize * b.h as usize * 4, 0);
         let o = js_sys::Object::new();

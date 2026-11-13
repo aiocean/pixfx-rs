@@ -1,7 +1,8 @@
 //! Native and wasm32 renders of the same effect, seed and frame hash identically: both compare against one
 //! golden file. Bless it on a native target only: `PIXFX_BLESS=1 cargo test -p pixfx-effects --test determinism -- --ignored`.
 
-use pixfx_core::{Options, frame_hash, render_frames};
+use pixfx_core::{Options, render_frames};
+use pixfx_draw::frame_hash;
 use pixfx_effects::EFFECTS;
 use std::fmt::Write;
 

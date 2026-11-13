@@ -4,7 +4,8 @@
 
 use std::collections::BTreeMap;
 
-use pixfx_core::{Canvas, Effect, Frame, Instance, Layer, OptValue, Options};
+use pixfx_core::{Canvas, Effect, Instance, Layer, OptValue, Options};
+use pixfx_draw::Frame;
 use pixfx_effects::weather::{FIREFLIES, SNOW};
 
 fn sized(width: f64, height: f64) -> Options {

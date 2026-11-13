@@ -1,4 +1,4 @@
-use pixfx_core::{Frame, Rgba};
+use pixfx_draw::{Frame, Rgba};
 use pixfx_fighter::look::Look;
 use pixfx_fighter::paint::{Act, Appearance, Windup, draw};
 use pixfx_fighter::pose::{Gather, Pose};

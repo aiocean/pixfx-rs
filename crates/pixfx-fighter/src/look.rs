@@ -1,7 +1,7 @@
 //! The palette a fighter is drawn in: each part's colours, darker tones after the first where a part is shaded. A
 //! look is plain data: build any palette, or start from a preset ([`Look::preset`]) and change what you like.
 
-use pixfx_core::Rgba;
+use pixfx_draw::Rgba;
 
 /// How a fighter wears its hair, which also decides its head's shape when lying down.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

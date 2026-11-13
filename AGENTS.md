@@ -78,7 +78,7 @@ Dependencies point one way, top to bottom. A lower layer never depends on a high
 | JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it. |
 | Scene | `pixfx-scene` (today `Scene`, `Shell`, `Pass`, `Rect` in `pixfx-canvas/src/stage.rs`) | What plays, where, on which layer, which frame, the shared frame store, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
 | Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies | Pure and deterministic: no clock, no I/O, no host types. |
-| Drawing | `pixfx-draw` (today `frame`, `painter`, `shapes`, `blend`, `color`, `palette`, `outline` in `pixfx-core`) | Frames with colour and light, painting, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
+| Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `blend`, `color`, `palette`, `outline`, `math`) | Frames with colour and light, painting, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
 
 Where a new piece of code goes:
 
@@ -102,11 +102,9 @@ Where a new piece of code goes:
 Each item is a refactor. Each lands with every test green, the parity gate passing and `frame_hash` unchanged; a
 change to a JS shell also shows `bun run perf` before and after.
 
-1. **Drawing lives inside `pixfx-core`.** Move `frame`, `painter`, `shapes`, `blend`, `color`, `palette` and
-   `outline` into `pixfx-draw`; callers import from there.
-2. **`Scene` and `Shell` live in `pixfx-canvas`, a wasm crate.** Move them into `pixfx-scene`. `pixfx-canvas` keeps
+1. **`Scene` and `Shell` live in `pixfx-canvas`, a wasm crate.** Move them into `pixfx-scene`. `pixfx-canvas` keeps
    only its Canvas 2D shell and JS surface, and `pixfx-gpui` drops its own layout and uses `Scene`.
-3. **`packages/pixfx-phaser` makes decisions in TypeScript.**
+2. **`packages/pixfx-phaser` makes decisions in TypeScript.**
    - `pixels.ts` (`compositeColor`, `compositeLight`, `snap`) copies the Rust compositing;
    - `layer.ts` and `layout.ts` place and composite scene-wide layers;
    - `lifecycle.ts` and `effects.ts` keep effect state (playing, stopping, destroyed), follow and per-scene ticking;
@@ -118,7 +116,7 @@ change to a JS shell also shows `bun run perf` before and after.
 
    These move into `Scene` and the engine behind `pixfx-wasm`; the package keeps Phaser textures and images, the
    camera, wasm loading, workers and boundary parsing.
-4. **No Pixi shell.** Add `packages/pixfx-pixi` once item 3 has left the Phaser package a pure shell, so the Pixi
+3. **No Pixi shell.** Add `packages/pixfx-pixi` once item 2 has left the Phaser package a pure shell, so the Pixi
    shell is written against the same contract and stays as thin.
 
 ## Rules

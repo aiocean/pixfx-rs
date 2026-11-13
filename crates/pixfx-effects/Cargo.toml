@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 libm.workspace = true
 pixfx-core = { path = "../pixfx-core" }
+pixfx-draw = { path = "../pixfx-draw" }
 
 [features]
 default = ["all"]

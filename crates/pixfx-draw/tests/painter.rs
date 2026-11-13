@@ -1,8 +1,8 @@
 //! Painter behaviour against pixelfx `src/core/painter.js`.
 
-use pixfx_core::color::{Rgba, WHITE};
-use pixfx_core::frame::Frame;
-use pixfx_core::painter::Painter;
+use pixfx_draw::color::{Rgba, WHITE};
+use pixfx_draw::frame::Frame;
+use pixfx_draw::painter::Painter;
 
 fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> u64 {
     bytes.into_iter().fold(0xcbf2_9ce4_8422_2325, |h, b| {
@@ -13,8 +13,8 @@ fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> u64 {
 /// Every ported Painter method, placed flipped and rotated with fade and light strength, against hashes
 /// printed by node from pixelfx 044e12a (the same calls in JS; script in the task-3 report).
 #[test]
-fn scene_matches_pixelfx() -> Result<(), pixfx_core::ColorError> {
-    use pixfx_core::{composite, hex};
+fn scene_matches_pixelfx() -> Result<(), pixfx_draw::ColorError> {
+    use pixfx_draw::{composite, hex};
     let (a, b, c) = (hex("#c9281f")?, hex("#ffc23d")?, hex("#3a62e0")?);
     let mut frame = Frame::new(40, 32, -4, -3);
     {
