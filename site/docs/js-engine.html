@@ -55,7 +55,7 @@ requestAnimationFrame(frame);</code></pre>
 <p><code>{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed}</code>. Throws <code>unknown effect "..."</code> for an id not in the registry. Fields are described in <a href="concepts.html#metadata">Concepts</a>.</p>
 
 <h2>Fx</h2>
-<p>A live effect on its own canvas: <code>meta.size</code> plus <code>margin</code> empty pixels on every side, with the effect's origin at <code>meta.origin + margin</code>.</p>
+<p>A live effect on its own canvas: <code>meta.size</code> plus <code>margin</code> empty pixels on every side, with the effect's origin at <code>meta.origin + margin</code>. Weather takes <code>width</code> and <code>height</code> options that size its canvas instead (whole pixels, 1 to 2048; the origin stays mid-width and as far above the foot), so one instance can cover a scene of any size; read <code>width()</code>, <code>height()</code>, <code>originX()</code> and <code>originY()</code> to place an instance rather than <code>meta</code>.</p>
 
 <h3><code>new Fx(id, opts?)</code></h3>
 <p><code>opts</code> is <code>undefined</code>, <code>null</code> or a plain object with the <a href="concepts.html#options">common options</a>, the effect's own options, and:</p>

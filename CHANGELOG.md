@@ -13,6 +13,11 @@
   `pixfx parity`; the frame-hash determinism test covers all of them and is run on demand
   (`-- --ignored`).
 - `pixfx-canvas`: `light_rgba` skips unlit pixels.
+- `pixfx-core`: `Painter::disc`, `circle`, `ring` and `light`; `OptValue::Color` and `Options::color_or` for colour
+  options; `Options::num_in`, `math::js_sign`, `math::or_one`; `color::step_at` is public.
+- `pixfx-wasm`: an extra option may be a hex colour string (`{ stone: "#7a6a58" }`), read as `OptValue::Color`.
+- `pixfx-effects`: the number options that size loops (`water-jet` and `laser-bolt` `length`, `small-explosion`
+  `size`, `poison-cloud` `spread`) are held to a documented maximum so a huge value cannot hang an effect.
 
 ## 0.1.0
 

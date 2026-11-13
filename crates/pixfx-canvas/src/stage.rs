@@ -252,7 +252,7 @@ impl<T> Scene<T> {
     /// The instance's frame (its canvas plus margin) placed so the effect's origin lands on `e.at`.
     fn rect_of(&self, e: &Entry<T>) -> Rect {
         let s = u64::from(self.scale.get());
-        let m = e.player.meta();
+        let origin = e.player.canvas().origin;
         let pad = i64::from(e.player.margin());
         let frame = e.player.frame();
         let corner = |at: i64, origin: i32| {
@@ -261,8 +261,8 @@ impl<T> Scene<T> {
                 .saturating_mul(s as i64)
         };
         Rect {
-            x: corner(e.at.0, m.origin.0),
-            y: corner(e.at.1, m.origin.1),
+            x: corner(e.at.0, origin.0),
+            y: corner(e.at.1, origin.1),
             w: u64::from(frame.w) * s,
             h: u64::from(frame.h) * s,
         }

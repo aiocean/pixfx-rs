@@ -400,15 +400,14 @@ impl State {
         if roll < 0.0 {
             let life = life_left(r.range(0.9, 1.6), t, end);
             if life > 0.3 {
-                let s = Spawn {
-                    kind: Kind::Ember,
+                let s = Spawn::new(
+                    Kind::Ember,
                     x,
-                    y: y - 2.0,
-                    vx: r.range(-18.0, 18.0),
-                    vy: -r.range(25.0, 60.0),
+                    y - 2.0,
+                    r.range(-18.0, 18.0),
+                    -r.range(25.0, 60.0),
                     life,
-                    ..Spawn::new(Kind::Ember, 0.0, 0.0, 0.0, 0.0, 0.0)
-                };
+                );
                 self.ash.spawn(r, s);
             }
             return;
@@ -753,15 +752,14 @@ impl EffectState for State {
                     flags: Flags::NONE,
                 }
             } else {
-                Spawn {
-                    kind: Kind::Ember,
+                Spawn::new(
+                    Kind::Ember,
                     x,
                     y,
-                    vx: r.range(-12.0, 12.0),
-                    vy: -r.range(15.0, 40.0),
-                    life: r.range(0.4, 0.8),
-                    ..Spawn::new(Kind::Ember, 0.0, 0.0, 0.0, 0.0, 0.0)
-                }
+                    r.range(-12.0, 12.0),
+                    -r.range(15.0, 40.0),
+                    r.range(0.4, 0.8),
+                )
             };
             self.ps.spawn(r, s);
         }

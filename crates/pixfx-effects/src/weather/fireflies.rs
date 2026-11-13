@@ -4,12 +4,16 @@
 //! beating wings and a lantern that throws a big soft light, grass blades swaying underneath) is adapted from
 //! Sprite Fusion's open-source fireflies (https://www.spritefusion.com/pixel-art-vfx/fireflies), MIT License,
 //! Copyright (c) 2026 Hugo Duprez.
+//!
+//! The `width` and `height` options size the canvas ([`sized`]): the meadow and the flies spread across the
+//! whole width as densely as on the effect's own 320, the flies keep to the same heights over the grass, and
+//! the haze fills the whole canvas.
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{TAU, js_max, js_min, js_round, loop_noise, rand};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, Options, Painter};
 
-use super::lib::{clip, glow, rows};
+use super::lib::{clip, count, glow, rows, sized};
 
 pub struct Fireflies;
 
@@ -56,6 +60,7 @@ const GRASS: [Rgba; 6] = [
 ];
 
 const D: f64 = META.duration;
+/// Flies over the effect's own width.
 const FLIES: usize = 32;
 
 /// `2 pi n t / D + ph`: `n` whole cycles a loop.
@@ -80,18 +85,20 @@ struct Fly {
 }
 
 impl Fly {
-    fn new(s: f64, i: usize, t: f64) -> Fly {
-        let i = i as f64;
-        let r = |n: f64| rand(&[s, i, n]);
-        let depth: u8 = if i < 14.0 {
+    /// Fly `i` of `n` on canvas `cv`: the first 14 in 32 far, the next 12 mid, the rest near.
+    fn new(s: f64, i: usize, n: usize, cv: Canvas, t: f64) -> Fly {
+        let depth: u8 = if i * FLIES < 14 * n {
             0
-        } else if i < 26.0 {
+        } else if i * FLIES < 26 * n {
             1
         } else {
             2
         };
+        let i = i as f64;
+        let r = |n: f64| rand(&[s, i, n]);
         let k = [0.5, 0.8, 1.0][usize::from(depth)];
-        let cx = -150.0 + r(1.0) * 300.0;
+        let (left, span) = (-f64::from(cv.origin.0), f64::from(cv.size.0));
+        let cx = left + 10.0 + r(1.0) * (span - 20.0);
         let cy = -16.0 - r(2.0) * if depth == 2 { 70.0 } else { 130.0 };
         let ax = (14.0 + r(3.0) * 26.0) * k;
         let ay = (8.0 + r(4.0) * 14.0) * k;
@@ -145,11 +152,17 @@ impl Effect for Fireflies {
     fn meta(&self) -> &Meta {
         &META
     }
+    fn canvas(&self, opts: &Options) -> Canvas {
+        sized(&META, opts)
+    }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
+        let cv = self.canvas(opts);
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
             g: ramp(&opts.ramp_or("grass", &GRASS)),
             s: seed as f64,
+            cv,
+            flies: count(FLIES, f64::from(cv.size.0), f64::from(META.size.0)),
         })
     }
 }
@@ -158,17 +171,23 @@ struct State {
     c: [Rgba; 6],
     g: [Rgba; 6],
     s: f64,
+    cv: Canvas,
+    flies: usize,
 }
 
 impl EffectState for State {
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
-        clip(p, &META);
+        let cv = self.cv;
+        clip(p, cv);
         let (s, c, g) = (self.s, &self.c, &self.g);
-        let flies: Vec<Fly> = (0..FLIES).map(|i| Fly::new(s, i, t)).collect();
+        let flies: Vec<Fly> = (0..self.flies)
+            .map(|i| Fly::new(s, i, self.flies, cv, t))
+            .collect();
         if layer == Layer::Back {
-            // a cool night haze, so the sky's stars don't read as fireflies
-            rows(p, &META, -170.0, 9.0, |y, row| {
-                let k = (y + 170.0) / 180.0;
+            // a cool night haze over the whole canvas, so the sky's stars don't read as fireflies
+            let (top, tall) = (-f64::from(cv.origin.1), f64::from(cv.size.1));
+            rows(p, cv, top, top + tall - 1.0, |y, row| {
+                let k = (y - top) / tall;
                 let haze = mix(g[0], g[1], k);
                 let a = (0.48 + 0.14 * k) as f32;
                 for cell in row.iter_mut() {
@@ -177,20 +196,20 @@ impl EffectState for State {
                     cell.b = true;
                 }
             });
-            grass(p, t, s, g, c, &flies, false);
+            grass(p, self, t, &flies, false);
             for f in flies.iter().filter(|f| f.depth < 2) {
-                firefly(p, t, f, c);
+                firefly(p, cv, t, f, c);
             }
         } else {
-            grass(p, t, s, g, c, &flies, true);
+            grass(p, self, t, &flies, true);
             for f in flies.iter().filter(|f| f.depth == 2) {
-                firefly(p, t, f, c);
+                firefly(p, cv, t, f, c);
             }
         }
     }
 }
 
-fn firefly(q: &mut Painter, t: f64, f: &Fly, c: &[Rgba; 6]) {
+fn firefly(q: &mut Painter, cv: Canvas, t: f64, f: &Fly, c: &[Rgba; 6]) {
     let (x, y) = f.pos(t);
     let g = f.glow;
     let (xi, yi) = (js_round(x), js_round(y));
@@ -204,7 +223,7 @@ fn firefly(q: &mut Painter, t: f64, f: &Fly, c: &[Rgba; 6]) {
             if g > 0.6 { c[4] } else { c[3] },
             js_min(1.0, g * 1.6),
         );
-        glow(q, &META, x, y, 6.0, c[2], 0.45 * g);
+        glow(q, cv, x, y, 6.0, c[2], 0.45 * g);
         return;
     }
     // a short trail of light where it has just been, while it's lit
@@ -230,8 +249,8 @@ fn firefly(q: &mut Painter, t: f64, f: &Fly, c: &[Rgba; 6]) {
         if g > 0.4 {
             q.px(xi, yi + 1.0, c[2]);
         }
-        glow(q, &META, x, y, 9.0, c[2], 0.5 * g);
-        glow(q, &META, x, y, 3.0, c[4], 0.5 * g);
+        glow(q, cv, x, y, 9.0, c[2], 0.5 * g);
+        glow(q, cv, x, y, 3.0, c[4], 0.5 * g);
         return;
     }
     // a close one: a dark body, wings a blur above it, a lantern at its tail; a glint at the peak
@@ -263,22 +282,15 @@ fn firefly(q: &mut Painter, t: f64, f: &Fly, c: &[Rgba; 6]) {
             q.dot(xi - dir + dx, yi + dy, c[3], (g - 0.7) * 3.0);
         }
     }
-    glow(q, &META, x, y, 28.0, c[2], 0.45 * g);
-    glow(q, &META, x, y, 10.0, c[4], 0.5 * g);
-    glow(q, &META, x, y, 4.0, c[5], 0.5 * g);
+    glow(q, cv, x, y, 28.0, c[2], 0.45 * g);
+    glow(q, cv, x, y, 10.0, c[4], 0.5 * g);
+    glow(q, cv, x, y, 4.0, c[5], 0.5 * g);
 }
 
 // the meadow: blades in two rows (the front row drawn over the low fireflies), swaying as the breeze rolls
 // across, a few seed heads; blade tips near a lit firefly catch its light
-fn grass(
-    q: &mut Painter,
-    t: f64,
-    s: f64,
-    g: &[Rgba; 6],
-    c: &[Rgba; 6],
-    flies: &[Fly],
-    front: bool,
-) {
+fn grass(q: &mut Painter, st: &State, t: f64, flies: &[Fly], front: bool) {
+    let (cv, s, g, c) = (st.cv, st.s, &st.g, &st.c);
     let lit: Vec<(f64, f64, f64)> = flies
         .iter()
         .filter(|f| f.glow > 0.25 && f.depth > 0)
@@ -287,12 +299,14 @@ fn grass(
             (x, y, f.glow)
         })
         .collect();
-    let n: usize = if front { 150 } else { 230 };
+    // the blades stand 2 pixels past each side of the canvas
+    let (left, span) = (-f64::from(cv.origin.0) - 2.0, f64::from(cv.size.0) + 4.0);
+    let n = count(if front { 150 } else { 230 }, span, 324.0);
     let sd = s * 3.0 + if front { 1.0 } else { 0.0 };
     for i in 0..n {
         let i = i as f64;
         let r = |k: f64| rand(&[sd, i, k]);
-        let x = -162.0 + (i + r(1.0)) * (324.0 / n as f64);
+        let x = left + (i + r(1.0)) * (span / n as f64);
         let h = if front { 4.0 } else { 5.0 }
             + r(2.0) * if front { 8.0 } else { 11.0 }
             + if r(3.0) < 0.1 { 6.0 } else { 0.0 };

@@ -15,7 +15,8 @@ pub mod sim;
 
 pub use color::{ColorError, Rgba, hex};
 pub use effect::{
-    Effect, EffectState, Instance, Layer, Meta, OptValue, Options, Placement, find, valid_dt,
+    Canvas, Effect, EffectState, Instance, Layer, Meta, OptValue, Options, Placement, find,
+    valid_dt,
 };
 pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};

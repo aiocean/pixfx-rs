@@ -57,6 +57,21 @@ impl Meta {
     pub fn glow_margin(&self) -> u32 {
         self.size.0.max(self.size.1) / 2
     }
+
+    /// The canvas an instance draws on unless its effect sizes it from its options: `size` and `origin`.
+    pub fn canvas(&self) -> Canvas {
+        Canvas {
+            size: self.size,
+            origin: self.origin,
+        }
+    }
+}
+
+/// The canvas one instance draws on: its size in pixels and where the effect's local (0, 0) sits on it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Canvas {
+    pub size: (u32, u32),
+    pub origin: (i32, i32),
 }
 
 /// Which part of an effect to draw: what goes behind a character, what goes in front, or both.
@@ -70,6 +85,11 @@ pub enum Layer {
 /// An effect: a static, spawned into any number of instances.
 pub trait Effect: Send + Sync {
     fn meta(&self) -> &Meta;
+    /// The canvas an instance spawned with `opts` draws on: [`Meta::canvas`], unless the effect sizes its
+    /// canvas from its options (weather's `width` and `height`).
+    fn canvas(&self, _opts: &Options) -> Canvas {
+        self.meta().canvas()
+    }
     /// Fresh state for one instance (pixelfx `create(opts)`; a draw-only module returns state holding just
     /// its resolved options). `seed` is the caller's seed or [`Meta::seed`].
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState>;
@@ -167,6 +187,12 @@ impl Options {
             Some(OptValue::Num(v)) => *v,
             _ => default,
         }
+    }
+
+    /// [`Options::num_or`] held to `lo..=hi`, for an option that sizes a loop: an effect names the largest value
+    /// it draws in reasonable time, so a huge number cannot hang it. NaN stays NaN, which draws nothing.
+    pub fn num_in(&self, key: &str, default: f64, lo: f64, hi: f64) -> f64 {
+        clamp(self.num_or(key, default), lo, hi)
     }
 }
 

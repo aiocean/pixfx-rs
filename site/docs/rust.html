@@ -55,14 +55,15 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
     write_gif(&amp;out.join("blue_campfire.gif"), &amp;rendered, 3)?;
     println!("{}", files.json.display());
 
-    // live: step an instance and draw it into a frame you own
-    let meta = fx.meta();
+    // live: step an instance and draw it into a frame you own, the size of the canvas its options give it
+    let opts = Options::default();
+    let canvas = fx.canvas(&amp;opts);
     let mut inst = Instance::new(fx, Options {
-        x: f64::from(meta.origin.0),
-        y: f64::from(meta.origin.1),
-        ..Options::default()
+        x: f64::from(canvas.origin.0),
+        y: f64::from(canvas.origin.1),
+        ..opts
     });
-    let mut frame = Frame::new(meta.size.0, meta.size.1, 0, 0);
+    let mut frame = Frame::new(canvas.size.0, canvas.size.1, 0, 0);
     inst.update(1.0 / 60.0);
     frame.clear();
     inst.draw(&amp;mut frame, Layer::Both);
@@ -90,7 +91,7 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
 <table>
   <thead><tr><th>Item</th><th>What it is</th></tr></thead>
   <tbody>
-    <tr><td><code>trait Effect</code></td><td><code>meta() -&gt; &amp;Meta</code> and <code>spawn(&amp;Options, seed) -&gt; Box&lt;dyn EffectState&gt;</code>. See <a href="writing-effects.html">Write an effect</a>.</td></tr>
+    <tr><td><code>trait Effect</code></td><td><code>meta() -&gt; &amp;Meta</code>, <code>canvas(&amp;Options) -&gt; Canvas</code> (the size and origin an instance with those options draws on: <code>meta.canvas()</code> unless the effect sizes it from its options, as weather does with <code>width</code> and <code>height</code>) and <code>spawn(&amp;Options, seed) -&gt; Box&lt;dyn EffectState&gt;</code>. See <a href="writing-effects.html">Write an effect</a>.</td></tr>
     <tr><td><code>trait EffectState</code></td><td><code>update(dt)</code> for one simulation sub-step (default: nothing) and <code>draw(&amp;mut Painter, t, Layer)</code>.</td></tr>
     <tr><td><code>struct Meta</code></td><td><code>id, name, desc, tags, size, origin, duration, looping, fps, seed</code>; <code>is_screen()</code> and <code>glow_margin()</code>. See <a href="concepts.html#metadata">Concepts</a>.</td></tr>
     <tr><td><code>struct Options</code></td><td><code>x, y, flip, angle, seed: Option&lt;u64&gt;, light, palette: Option&lt;Vec&lt;Rgba&gt;&gt;, extra: BTreeMap&lt;String, OptValue&gt;</code>. <code>Default</code> is origin (0, 0), no flip, angle 0, effect seed, light 1, effect palette.</td></tr>

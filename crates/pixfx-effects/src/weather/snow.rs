@@ -3,12 +3,16 @@
 //! The snow recipe (depth layers falling at their own speeds with a sway, a gusty wind, flakes that settle on a
 //! drift for a while) is adapted from Sprite Fusion's open-source snow
 //! (https://www.spritefusion.com/pixel-art-vfx/snow), MIT License, Copyright (c) 2026 Hugo Duprez.
+//!
+//! The `width` and `height` options size the canvas ([`sized`]): the snow, the drift and its glints spread
+//! across the whole width as densely as on the effect's own 320, the haze fills the whole canvas, and the
+//! flakes fall from its top, so on a taller canvas they fall the longer way in the same time.
 
 use pixfx_core::color::{Rgba, WHITE, mix, ramp};
 use pixfx_core::math::{TAU, js_min, js_round, rand, smooth, wrap};
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+use pixfx_core::{Canvas, Effect, EffectState, Layer, Meta, Options, Painter};
 
-use super::lib::{clip, glow, pass, trips};
+use super::lib::{clip, count, glow, pass, sized, trips};
 
 pub struct Snow;
 
@@ -52,7 +56,7 @@ fn gust(t: f64) -> f64 {
     10.0 * libm::sin((TAU * t) / D + 0.6) + 4.0 * libm::sin((TAU * 2.0 * t) / D + 2.1)
 }
 
-/// One depth of snow: how many, falls a loop, share of a fall spent in the air (the rest lying on the drift),
+/// One depth of snow: how many over the effect's own width, falls a loop, share of a fall spent in the air (the rest lying on the drift),
 /// sway, wind, how much of the gust it takes.
 struct Depth {
     n: usize,
@@ -95,10 +99,14 @@ impl Effect for Snow {
     fn meta(&self) -> &Meta {
         &META
     }
+    fn canvas(&self, opts: &Options) -> Canvas {
+        sized(&META, opts)
+    }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         Box::new(State {
             c: ramp(&opts.palette_or(&PALETTE)),
             s: seed as f64,
+            cv: self.canvas(opts),
         })
     }
 }
@@ -106,35 +114,45 @@ impl Effect for Snow {
 struct State {
     c: [Rgba; 8],
     s: f64,
+    cv: Canvas,
 }
 
 impl EffectState for State {
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
-        clip(p, &META);
-        let (s, c) = (self.s, &self.c);
+        clip(p, self.cv);
         if layer == Layer::Back {
-            // a cold haze, thicker low down, so the sky's stars don't read as snow
-            let haze = mix(c[1], c[2], 0.4);
-            pass(p, &META, -170.0, 9.0, |_, y, out| {
-                out.c = haze;
-                out.a = 0.26 + 0.22 * smooth(-170.0, 0.0, y);
-                out.b = true;
-            });
-            layer_of(p, t, s, c, 0);
-            drift(p, t, s, c);
-            layer_of(p, t, s, c, 1);
+            // a cold haze over the whole canvas, thicker low down, so the sky's stars don't read as snow
+            let haze = mix(self.c[1], self.c[2], 0.4);
+            let top = -f64::from(self.cv.origin.1);
+            pass(
+                p,
+                self.cv,
+                top,
+                top + f64::from(self.cv.size.1) - 1.0,
+                |_, y, out| {
+                    out.c = haze;
+                    out.a = 0.26 + 0.22 * smooth(top, 0.0, y);
+                    out.b = true;
+                },
+            );
+            layer_of(p, self, t, 0);
+            drift(p, self, t);
+            layer_of(p, self, t, 1);
         } else {
-            layer_of(p, t, s, c, 2);
+            layer_of(p, self, t, 2);
         }
     }
 }
 
-fn layer_of(q: &mut Painter, t: f64, s: f64, c: &[Rgba; 8], l: usize) {
+fn layer_of(q: &mut Painter, st: &State, t: f64, l: usize) {
     let Some(ly) = LAYERS.get(l) else {
         return;
     };
+    let (cv, s, c) = (st.cv, st.s, &st.c);
+    let (left, span) = (-f64::from(cv.origin.0), f64::from(cv.size.0));
     let sd = s * 13.0 + l as f64;
-    trips(t, D, ly.n, sd, ly.m.0, ly.m.1, |u, k, m, i| {
+    let n = count(ly.n, span, f64::from(META.size.0));
+    trips(t, D, n, sd, ly.m.0, ly.m.1, |u, k, m, i| {
         let j = wrap(k, m);
         let dur = D / m;
         let r = |n: f64| rand(&[sd, i, j, n]);
@@ -144,14 +162,14 @@ fn layer_of(q: &mut Painter, t: f64, s: f64, c: &[Rgba; 8], l: usize) {
         let f = 0.25 + r(4.0) * 0.35;
         let ph = r(5.0) * TAU;
         let x_at = |a: f64| {
-            -175.0
-                + r(2.0) * 350.0
+            left - 15.0
+                + r(2.0) * (span + 30.0)
                 + ly.wind * a
                 + (gust(t - u * dur + a) - gust(t - u * dur)) * ly.gust
                 + sw * libm::sin(TAU * f * a + ph)
         };
         let (x, xl) = (x_at(age), x_at(tf));
-        let y0 = -176.0;
+        let y0 = -f64::from(cv.origin.1) - 6.0;
         let y1 = if l != 0 {
             bank(xl) - 0.5
         } else {
@@ -202,11 +220,11 @@ fn layer_of(q: &mut Painter, t: f64, s: f64, c: &[Rgba; 8], l: usize) {
             q.dot(xl - 1.0, y1, c[6], fade);
             q.dot(xl, y1, WHITE, fade);
             q.dot(xl + 1.0, y1, c[6], fade);
-            glow(q, &META, xl, y1, 5.0, c[5], 0.25 * fade);
+            glow(q, cv, xl, y1, 5.0, c[5], 0.25 * fade);
             return;
         }
         let turn = libm::floor(age * spin + r(8.0) * 2.0) % 2.0 != 0.0;
-        crystal(q, x, y, rad, turn, c);
+        crystal(q, cv, x, y, rad, turn, c);
     });
 }
 
@@ -216,7 +234,7 @@ const DIAG: Dirs = [(1, 1), (-1, -1), (1, -1), (-1, 1)];
 
 // a near crystal, kept crisp: long arms on one set of four directions, short ones on the other, nubs near the
 // tips; turning means trading which set is long. Plates are a ring round a bright heart.
-fn crystal(q: &mut Painter, x: f64, y: f64, r: i32, turn: bool, c: &[Rgba; 8]) {
+fn crystal(q: &mut Painter, cv: Canvas, x: f64, y: f64, r: i32, turn: bool, c: &[Rgba; 8]) {
     let (xi, yi) = (js_round(x) as i32, js_round(y) as i32);
     let (long, short) = if turn { (DIAG, AXIS) } else { (AXIS, DIAG) };
     let arm = if turn { r - 1 } else { r };
@@ -271,7 +289,7 @@ fn crystal(q: &mut Painter, x: f64, y: f64, r: i32, turn: bool, c: &[Rgba; 8]) {
     // a faint halo, wide enough not to fill the gaps between the arms
     glow(
         q,
-        &META,
+        cv,
         f64::from(xi) + 0.5,
         f64::from(yi) + 0.5,
         f64::from(r) * 2.5 + 5.0,
@@ -282,8 +300,9 @@ fn crystal(q: &mut Painter, x: f64, y: f64, r: i32, turn: bool, c: &[Rgba; 8]) {
 }
 
 // the drift on the floor: a lumpy bank with a white crest, blue shade below, and glints that twinkle
-fn drift(q: &mut Painter, t: f64, s: f64, c: &[Rgba; 8]) {
-    pass(q, &META, -7.0, 9.0, |x, y, out| {
+fn drift(q: &mut Painter, st: &State, t: f64) {
+    let (cv, s, c) = (st.cv, st.s, &st.c);
+    pass(q, cv, -7.0, 9.0, |x, y, out| {
         let d = y - bank(x);
         if d < 0.0 {
             return;
@@ -304,9 +323,10 @@ fn drift(q: &mut Painter, t: f64, s: f64, c: &[Rgba; 8]) {
             out.k = 0.12;
         }
     });
-    for i in 0..18 {
-        let i = f64::from(i);
-        let x = -156.0 + rand(&[s, i, 81.0]) * 312.0;
+    let (left, span) = (-f64::from(cv.origin.0), f64::from(cv.size.0));
+    for i in 0..count(18, span, f64::from(META.size.0)) {
+        let i = i as f64;
+        let x = left + 4.0 + rand(&[s, i, 81.0]) * (span - 8.0);
         let cycles = 1.0 + libm::floor(rand(&[s, i, 82.0]) * 3.0);
         let tw = libm::sin((TAU * cycles * t) / D + rand(&[s, i, 83.0]) * TAU);
         if tw < 0.55 {
@@ -320,6 +340,6 @@ fn drift(q: &mut Painter, t: f64, s: f64, c: &[Rgba; 8]) {
                 q.px(x + dx, y + dy, c[6]);
             }
         }
-        glow(q, &META, x + 0.5, y + 0.5, 6.0, c[6], 0.35 * k);
+        glow(q, cv, x + 0.5, y + 0.5, 6.0, c[6], 0.35 * k);
     }
 }
