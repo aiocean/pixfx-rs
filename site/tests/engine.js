@@ -5,4 +5,4 @@ const dir = new URL("../../target/site-pkg/", import.meta.url);
 const pkg = await import(new URL("pixfx_canvas.js", dir).href);
 await pkg.default({ module_or_path: readFileSync(new URL("pixfx_canvas_bg.wasm", dir)) });
 
-export const { Body } = pkg;
+export const { Body, Fx, effects } = pkg;

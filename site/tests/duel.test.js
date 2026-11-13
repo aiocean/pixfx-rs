@@ -1,7 +1,7 @@
 // The duel's rules and minds, driven the way the hero drives them: step after step, playing what comes back.
 import { describe, expect, test } from "bun:test";
 import { SPELLS, createDuel, step } from "../assets/duel.js";
-import { Body } from "./engine.js";
+import { Body, Fx, effects } from "./engine.js";
 
 const PLAN2 = new Set([
   "fire/candle", "fire/campfire", "fire/brazier", "impacts/parry", "explosions/plasma-explosion", "explosions/implosion",
@@ -85,5 +85,19 @@ describe("duel", () => {
     expect(poses.indexOf("down")).toBeGreaterThan(poses.indexOf("fall"));
     expect(poses.slice(poses.indexOf("down"))).toEqual(["down", "sit", "kneel", "crouch", "land"]);
     expect(lands.length).toBe(2);
+  });
+  test("every effect the duel plays takes the options it is given, with every effect in the engine", () => {
+    // the hero's duel has the whole registry, so spells such as a dive's slam play effects PLAN2 leaves out
+    const all = new Set(effects());
+    const played = new Set();
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const duel = createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body });
+      for (const c of run(duel, 90).commands) {
+        if (c.type !== "play") continue;
+        played.add(c.fx);
+        new Fx(c.fx, c.opts).free();
+      }
+    }
+    expect(played.has("explosions/dirt-explosion")).toBe(true);
   });
 });

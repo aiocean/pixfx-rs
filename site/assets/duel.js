@@ -375,7 +375,7 @@ function release(duel, me, foe, spell) {
       me.fly = false;
       // a dive that ends on the ground cracks it
       if (me.air < 2 && spell.slamFx && duel.has(spell.slamFx)) {
-        cast(duel, me, spell.slamFx, me.x + me.face * 6, g, { size: 0.6 });
+        cast(duel, me, spell.slamFx, me.x + me.face * 6, g);
         emit(duel, { type: "land", x: me.x, strength: 1 });
       }
     }
