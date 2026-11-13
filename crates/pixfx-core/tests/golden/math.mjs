@@ -1,5 +1,5 @@
-// Prints pixelfx's ease curves, fbm/tile noise samples, loopNoise and PAL ramps as Rust literals, the goldens in
-// tests/math.rs. Colours are packed words (R | G << 8 | B << 16 | A << 24).
+// Prints pixelfx's ease curves, fbm/tile noise samples, loopNoise and PAL ramps as Rust literals; the noise
+// samples are the goldens in tests/math.rs. Colours are packed words (R | G << 8 | B << 16 | A << 24).
 // Usage: node math.mjs <path to a pixelfx checkout>   (goldens taken at pixelfx 044e12a)
 import { pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";

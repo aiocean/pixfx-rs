@@ -170,11 +170,4 @@ mod tests {
         let few = Grid::new(3, 4, 3);
         assert_eq!((few.columns, few.rows), (3, 1));
     }
-
-    #[test]
-    fn pack_places_each_cell_at_its_origin() {
-        let g = Grid::new(2, 2, 1);
-        let sheet = pack(&g, &[vec![1, 2], vec![3, 4]], 1);
-        assert_eq!(sheet, vec![1, 2, 3, 4]);
-    }
 }

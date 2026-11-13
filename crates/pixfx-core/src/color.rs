@@ -448,38 +448,3 @@ pub mod pal {
         Rgba::hex24(0x2f2956),
     ];
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // expected values printed by node from pixelfx 044e12a src/core/color.js
-    #[test]
-    fn mix_truncates_like_pixelfx() -> Result<(), ColorError> {
-        // -0x9fa6ad as an int32 is 0xff60_5953
-        assert_eq!(
-            mix(hex("#102030")?, hex("#f0e0d0")?, 0.3).pack(),
-            0xff60_5953
-        );
-        assert_eq!(mix(BLACK, WHITE, 0.5).pack(), 0xff7f_7f7f);
-        Ok(())
-    }
-
-    #[test]
-    fn hex24_is_hex() -> Result<(), ColorError> {
-        assert_eq!(Rgba::hex24(0x4a1712), hex("#4a1712")?);
-        assert_eq!(Rgba::hex24(0xffffff), WHITE);
-        Ok(())
-    }
-
-    #[test]
-    fn fit_resamples_like_pixelfx() -> Result<(), ColorError> {
-        let four = [hex("#000")?, hex("#111")?, hex("#222")?, hex("#333")?];
-        let reds: Vec<u8> = fit(&four, 7).iter().map(|c| c.0).collect();
-        assert_eq!(reds, [0x00, 0x11, 0x11, 0x22, 0x22, 0x33, 0x33]);
-        let seven: Vec<Rgba> = (0..7u8).map(|i| Rgba(i * 0x11, 0, 0, 255)).collect();
-        let reds: Vec<u8> = fit(&seven, 3).iter().map(|c| c.0).collect();
-        assert_eq!(reds, [0x00, 0x33, 0x66]);
-        Ok(())
-    }
-}

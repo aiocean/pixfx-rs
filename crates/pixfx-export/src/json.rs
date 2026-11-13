@@ -81,3 +81,45 @@ pub fn beanfx_json(r: &Rendered, meta: &Meta, grid: &Grid, name: &str, files: &F
         },
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pixfx_core::Frame;
+
+    #[test]
+    fn pivot_is_the_rendered_origin_plus_the_margin_not_the_meta_origin() {
+        // a weather canvas sized 12 x 12 by its options: origin (6, 2), where its own 320 x 180 has (160, 170)
+        let meta = Meta {
+            id: "test/sized",
+            name: "Sized",
+            desc: "A canvas its options size.",
+            tags: &["test"],
+            size: (320, 180),
+            origin: (160, 170),
+            duration: 1.0,
+            looping: true,
+            fps: 30,
+            seed: 1,
+            state: None,
+            options: &[],
+        };
+        let r = Rendered {
+            w: 16,
+            h: 16,
+            fps: 30,
+            origin: (6, 2),
+            margin: 2,
+            frames: vec![Frame::new(16, 16, 0, 0)],
+        };
+        let json = beanfx_json(
+            &r,
+            &meta,
+            &Grid::new(1, 16, 16),
+            "sized",
+            &FileNames::new("sized"),
+        );
+        assert_eq!(json["meta"]["beanfx"]["frameSize"], json!([16, 16]));
+        assert_eq!(json["meta"]["beanfx"]["pivot"], json!([8, 4]));
+    }
+}

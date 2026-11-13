@@ -254,7 +254,6 @@ dependencies = [
  "serde",
  "tsify",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "web-sys",
 ]
 
@@ -294,7 +293,6 @@ version = "0.1.0"
 dependencies = [
  "gif",
  "pixfx-core",
- "pixfx-effects",
  "png",
  "serde_json",
 ]
@@ -335,7 +333,6 @@ dependencies = [
  "serde_path_to_error",
  "tsify",
  "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]

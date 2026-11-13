@@ -23,8 +23,5 @@ wasm-bindgen.workspace = true
 # the build script writes the EffectId union from the registry
 pixfx-effects = { path = "../pixfx-effects" }
 
-[dev-dependencies]
-wasm-bindgen-test = "=0.3.80"
-
 [lints]
 workspace = true

@@ -11,8 +11,5 @@ png = "=0.18.1"
 pixfx-core = { path = "../pixfx-core" }
 serde_json = { version = "=1.0.154", features = ["preserve_order"] }
 
-[dev-dependencies]
-pixfx-effects = { path = "../pixfx-effects" }
-
 [lints]
 workspace = true
