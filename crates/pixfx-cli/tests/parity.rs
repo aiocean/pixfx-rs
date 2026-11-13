@@ -16,6 +16,7 @@ fn flat(color: u32, light: u32) -> Rendered {
         w: 10,
         h: 10,
         fps: 30,
+        origin: (0, 0),
         margin: 0,
         frames: vec![f],
     }
@@ -189,7 +190,7 @@ fn a_reference_written_like_the_script_reads_back_as_the_same_render() -> std::i
     let port = render_frames(&WALK, &Options::default(), 0);
     assert_eq!(port.frames.len(), 6);
     write_like_the_script(&dir, "test/walk", &port)?;
-    let reference = read_reference(&dir, "test/walk")?;
+    let reference = read_reference(&dir, "test/walk", (0, 0))?;
     assert_eq!(
         compare(&reference, &port),
         ParityReport {
@@ -214,7 +215,9 @@ fn a_reference_of_the_wrong_length_is_refused() -> std::io::Result<()> {
     let port = render_frames(&WALK, &Options::default(), 0);
     write_like_the_script(&dir, "test/walk", &port)?;
     fs::write(dir.join("test/walk.light.bin"), [0u8; 12])?;
-    let err = read_reference(&dir, "test/walk").err().map(|e| e.kind());
+    let err = read_reference(&dir, "test/walk", (0, 0))
+        .err()
+        .map(|e| e.kind());
     assert_eq!(err, Some(std::io::ErrorKind::InvalidData));
     Ok(())
 }

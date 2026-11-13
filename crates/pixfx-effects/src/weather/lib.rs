@@ -9,25 +9,22 @@
 //! rotated painter).
 
 use pixfx_core::color::Rgba;
-use pixfx_core::math::{clamp, js_max, js_min, js_round, rand};
+use pixfx_core::math::{js_max, js_min, js_round, rand};
 use pixfx_core::{Canvas, Meta, Options, Painter};
 
 /// The longest side a weather canvas takes from its options: room for any screen at 2 screen pixels per
 /// pixel, and a frame small enough to allocate.
 pub const MAX_SIDE: u32 = 2048;
 
-/// The canvas a weather instance draws on: the `width` and `height` options in whole pixels (1 to
-/// [`MAX_SIDE`]; one unset, not a number or not finite keeps the effect's own), with the origin mid-width and
-/// as far above the bottom as on the effect's own canvas, so the ground stays at the foot and a taller canvas
-/// adds sky. With neither option it is the effect's own canvas, so the default render is pixelfx's.
+/// The canvas a weather instance draws on: the `width` and `height` options held to 1 to [`MAX_SIDE`]
+/// ([`Options::num_in`]) and rounded to whole pixels (one unset or not a number keeps the effect's own), with
+/// the origin mid-width and as far above the bottom as on the effect's own canvas, so the ground stays at the
+/// foot and a taller canvas adds sky. With neither option it is the effect's own canvas, so the default render
+/// is pixelfx's.
 pub fn sized(meta: &Meta, opts: &Options) -> Canvas {
     let side = |key: &str, own: u32| {
-        let v = opts.num_or(key, f64::from(own));
-        if v.is_finite() {
-            clamp(js_round(v), 1.0, f64::from(MAX_SIDE)) as u32
-        } else {
-            own
-        }
+        let v = opts.num_in(key, f64::from(own), 1.0, f64::from(MAX_SIDE));
+        if v.is_nan() { own } else { js_round(v) as u32 }
     };
     let (w, h) = (side("width", meta.size.0), side("height", meta.size.1));
     let below = meta.size.1 as i32 - meta.origin.1;

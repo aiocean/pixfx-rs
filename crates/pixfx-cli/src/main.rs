@@ -150,8 +150,8 @@ fn parity(a: &ParityArgs) -> Result<bool, String> {
     let effect = pixfx_effects::effect(id)
         .ok_or_else(|| format!("no pixfx effect {id} (not ported yet?)"))?;
     reference_render(a)?;
-    let reference =
-        read_reference(&a.out, id).map_err(|e| format!("reading the {id} reference: {e}"))?;
+    let reference = read_reference(&a.out, id, effect.meta().origin)
+        .map_err(|e| format!("reading the {id} reference: {e}"))?;
     let port = render_frames(effect, &Options::default(), 0);
     let report = compare(&reference, &port);
     if (reference.w, reference.h, reference.frames.len()) != (port.w, port.h, port.frames.len()) {

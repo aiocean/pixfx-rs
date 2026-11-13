@@ -4,7 +4,7 @@ use std::fs;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
-use pixfx_core::{Options, render_frames};
+use pixfx_core::{OptValue, Options, render_frames};
 use pixfx_export::write_sheet;
 
 type Test = Result<(), Box<dyn std::error::Error>>;
@@ -74,6 +74,27 @@ fn margin_moves_the_pivot() -> Test {
         json["meta"]["beanfx"]["frameSize"],
         serde_json::json!([68, 88])
     );
+    fs::remove_dir_all(dir)?;
+    Ok(())
+}
+
+#[test]
+fn a_sized_weather_sheet_pivots_on_its_own_canvas() -> Test {
+    // fireflies 12 x 12: origin mid-width and 10 above the foot, (6, 2), not its own canvas's (160, 170)
+    let effect = pixfx_effects::effect("weather/fireflies").ok_or("no fireflies")?;
+    let mut opts = Options::default();
+    for (key, v) in [("width", 12.0), ("height", 12.0)] {
+        opts.extra.insert(key.to_string(), OptValue::Num(v));
+    }
+    let r = render_frames(effect, &opts, 2);
+    let dir = tmp("sized")?;
+    let files = write_sheet(&r, effect.meta(), &dir, "fireflies")?;
+    let json: serde_json::Value = serde_json::from_str(&fs::read_to_string(&files.json)?)?;
+    assert_eq!(
+        json["meta"]["beanfx"]["frameSize"],
+        serde_json::json!([16, 16])
+    );
+    assert_eq!(json["meta"]["beanfx"]["pivot"], serde_json::json!([8, 4]));
     fs::remove_dir_all(dir)?;
     Ok(())
 }

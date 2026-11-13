@@ -12,6 +12,8 @@ pub struct Rendered {
     pub w: u32,
     pub h: u32,
     pub fps: u32,
+    /// Where the effect's origin sits on its canvas (the canvas the options gave it).
+    pub origin: (i32, i32),
     /// Empty pixels added round the effect's canvas on every side; the pivot is `origin + margin`.
     pub margin: u32,
     pub frames: Vec<Frame>,
@@ -57,6 +59,7 @@ pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -
         w,
         h,
         fps,
+        origin: canvas.origin,
         margin,
         frames,
     }

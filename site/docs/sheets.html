@@ -27,7 +27,7 @@
 <p class="lead">What <code>pixfx sheet</code> writes: three PNGs laid out on one grid, and a JSON file that Aseprite-style loaders and beanfx both read.</p>
 
 <h2>Layout</h2>
-<p>Every frame is one cell of the same size, the effect's canvas (<code>meta.size</code> plus twice the margin; the CLI uses margin 0). Cells go left to right, at most 8 per row, then down.</p>
+<p>Every frame is one cell of the same size, the effect's canvas (<code>meta.size</code>, or the size its options give, as weather's <code>width</code> and <code>height</code>, plus twice the margin; the CLI uses margin 0). Cells go left to right, at most 8 per row, then down.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Effect</th><th>Cell</th><th>Frames</th><th>Grid</th><th>Sheet size</th></tr></thead>
@@ -98,7 +98,7 @@
     <tr><td><code>frames[].duration</code></td><td>Milliseconds per frame, <code>round(1000 / fps)</code>.</td></tr>
     <tr><td><code>frames[].frame</code></td><td>The cell on the sheet. Cells are never trimmed or rotated.</td></tr>
     <tr><td><code>meta.frameTags</code></td><td>One tag spanning every frame, named after the effect.</td></tr>
-    <tr><td><code>beanfx.pivot</code></td><td>The effect's origin within a cell, y down from the cell's top-left: <code>meta.origin + margin</code>. Place this point where the effect should stand.</td></tr>
+    <tr><td><code>beanfx.pivot</code></td><td>The effect's origin within a cell, y down from the cell's top-left: the origin on its canvas plus the margin (<code>meta.origin + margin</code> unless its options size the canvas). Place this point where the effect should stand.</td></tr>
     <tr><td><code>beanfx.loop</code>, <code>beanfx.end</code></td><td><code>true</code> and <code>"loop"</code> for loops; <code>false</code> and <code>"remove"</code> for one-shots, which should be removed after the last frame.</td></tr>
     <tr><td><code>beanfx.sheet</code>, <code>color</code>, <code>light</code></td><td>File names of the three images, relative to the JSON.</td></tr>
     <tr><td><code>beanfx.blend_light</code>, <code>light_gain</code></td><td>Draw <code>light</code> with additive blending at gain 1.</td></tr>

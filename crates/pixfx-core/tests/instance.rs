@@ -244,11 +244,9 @@ fn render_sizes_frames_from_the_instances_canvas() {
     // its origin (10, 3) sits 2 px in from the frame's corner
     assert_eq!(r.frames.first().and_then(|f| lit(f, 5)), Some(12));
     assert_eq!(
-        Wide.canvas(&Options::default()),
-        Canvas {
-            size: (8, 4),
-            origin: (4, 3)
-        }
+        r.origin,
+        (10, 3),
+        "the origin on the canvas its options give"
     );
 }
 

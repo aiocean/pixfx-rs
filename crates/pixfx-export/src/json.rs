@@ -32,7 +32,7 @@ fn frame_ms(fps: u32) -> u32 {
     js_round(1000.0 / f64::from(fps.max(1))) as u32
 }
 
-/// The sheet's JSON. `pivot` is `meta.origin + r.margin`, y down from the cell's top-left.
+/// The sheet's JSON. `pivot` is `r.origin + r.margin`, y down from the cell's top-left.
 pub fn beanfx_json(r: &Rendered, meta: &Meta, grid: &Grid, name: &str, files: &FileNames) -> Value {
     let ms = frame_ms(r.fps);
     let frames: Vec<Value> = (0..grid.frames)
@@ -69,7 +69,7 @@ pub fn beanfx_json(r: &Rendered, meta: &Meta, grid: &Grid, name: &str, files: &F
                 "rows": 1,
                 "frameSize": [grid.cell_w, grid.cell_h],
                 "columns": grid.columns,
-                "pivot": [meta.origin.0 + margin, meta.origin.1 + margin],
+                "pivot": [r.origin.0 + margin, r.origin.1 + margin],
                 "loop": meta.looping,
                 "end": if meta.looping { "loop" } else { "remove" },
                 "sheet": files.sheet,

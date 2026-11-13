@@ -18,6 +18,16 @@
 - `pixfx-wasm`: an extra option may be a hex colour string (`{ stone: "#7a6a58" }`), read as `OptValue::Color`.
 - `pixfx-effects`: the number options that size loops (`water-jet` and `laser-bolt` `length`, `small-explosion`
   `size`, `poison-cloud` `spread`) are held to a documented maximum so a huge value cannot hang an effect.
+- `pixfx-core`: `Effect::canvas(&Options) -> Canvas` is the canvas an instance draws on (`Meta::canvas` unless the
+  effect sizes it from its options); `render_frames`, `Rendered.origin`, the wasm `Player` (`Player::canvas`) and
+  `Fx`, the canvas `Stage` and `pixfx-gpui` size and place every instance by it.
+- `pixfx-effects`: `weather/fireflies` and `weather/snow` take `width` and `height` options (whole pixels, 1 to
+  2048) that size their canvas, as densely filled as their own 320×180, which is still the default and renders
+  as pixelfx's. `weather::lib` helpers take a `Canvas`; `sized`, `count` and `MAX_SIDE` are new.
+- `pixfx-export`: a sheet's `pivot` is the origin on the canvas the options give (`Rendered.origin + margin`).
+- `pixfx-cli`: `read_reference` takes the origin the reference was rendered at.
+- `site/`: one fireflies instance the size of the landing scene lights it, so glows no longer stop in straight
+  lines where 320-pixel tiles met.
 
 ## 0.1.0
 

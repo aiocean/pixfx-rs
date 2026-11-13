@@ -56,7 +56,8 @@ fn size_options_are_whole_pixels_from_1_to_2048() {
     assert_eq!(width(-50.0), 1);
     assert_eq!(width(1e9), 2048);
     assert_eq!(width(f64::NAN), 320, "not a number keeps the effect's own");
-    assert_eq!(width(f64::INFINITY), 320);
+    assert_eq!(width(f64::INFINITY), 2048);
+    assert_eq!(width(f64::NEG_INFINITY), 1);
 }
 
 #[test]
@@ -150,14 +151,18 @@ fn one_wide_instance_lights_the_scene_without_the_cuts_tiles_leave() {
     ];
     let mut wide = [place(320.0, sized(f64::from(W), H.into()), 1)];
     let (mut tile_seam, mut wide_seam) = (0, (0, 0));
+    let (mut tile_light, mut wide_light) = (0, 0);
     // a half-second at a time through one loop
     for _ in 0..24 {
         for i in tiles.iter_mut().chain(wide.iter_mut()) {
             i.update(0.25);
             i.update(0.25);
         }
-        tile_seam = tile_seam.max(cut(&levels(&scene(&tiles)), 320));
+        let l = levels(&scene(&tiles));
+        tile_seam = tile_seam.max(cut(&l, 320));
+        tile_light += l.iter().sum::<i32>();
         let l = levels(&scene(&wide));
+        wide_light += l.iter().sum::<i32>();
         for x in 2..W - 1 {
             let run = cut(&l, x);
             if run > wide_seam.0 {
@@ -170,9 +175,90 @@ fn one_wide_instance_lights_the_scene_without_the_cuts_tiles_leave() {
         "the tiles' join shows no cut ({tile_seam} rows), so this test cannot see one"
     );
     assert!(
+        wide_light * 2 >= tile_light,
+        "the wide instance throws {wide_light} light against the tiles' {tile_light}, so it has no glow to cut"
+    );
+    assert!(
         wide_seam.0 < SEAM,
         "the wide instance's light is cut over {} rows at x {}",
         wide_seam.0,
         wide_seam.1
     );
+}
+
+/// The effect's own width, and the width of each band [`bands`] measures.
+const BAND: u32 = 320;
+
+/// What `layer` of a weather draws in each [`BAND`]-pixel band of a canvas `w` x `h`, summed over eight seeds
+/// and three moments of the loop: the light it throws and the pixels it colours.
+fn bands(fx: &'static dyn Effect, w: u32, h: u32, layer: Layer) -> Vec<(f64, f64)> {
+    let opts = sized(f64::from(w), f64::from(h));
+    let cv = fx.canvas(&opts);
+    let mut sums = vec![(0.0, 0.0); (w / BAND) as usize];
+    for seed in 1..=8 {
+        let mut inst = Instance::new(
+            fx,
+            Options {
+                x: f64::from(cv.origin.0),
+                y: f64::from(cv.origin.1),
+                seed: Some(seed),
+                ..opts.clone()
+            },
+        );
+        // 4, 8 and 12 seconds in
+        for _ in 0..3 {
+            for _ in 0..16 {
+                inst.update(0.25);
+            }
+            let mut f = Frame::new(cv.size.0, cv.size.1, 0, 0);
+            inst.draw(&mut f, layer);
+            for (i, (l, c)) in levels(&f).iter().zip(&f.color).enumerate() {
+                if let Some(b) = sums.get_mut((i % w as usize) / BAND as usize) {
+                    b.0 += f64::from(*l);
+                    b.1 += if c >> 24 != 0 { 1.0 } else { 0.0 };
+                }
+            }
+        }
+    }
+    sums
+}
+
+#[test]
+fn a_wider_canvas_is_as_full_across_its_whole_width() {
+    // three times the effect's own width: each third holds about what the effect's own canvas holds. The front
+    // layer has the near flies and the front grass, the near snow crystals; the back is mostly haze, the same
+    // in every band.
+    for fx in weather() {
+        let own = bands(fx, BAND, H, Layer::Front)
+            .into_iter()
+            .next()
+            .unwrap_or_default();
+        for (i, band) in bands(fx, 3 * BAND, H, Layer::Front).iter().enumerate() {
+            for (what, got, want) in [("light", band.0, own.0), ("colour", band.1, own.1)] {
+                let ratio = got / want;
+                assert!(
+                    (0.7..=1.4).contains(&ratio),
+                    "{}: third {i} has {ratio:.2} of the {what} of the effect's own canvas",
+                    fx.meta().id
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn snow_glints_twinkle_across_a_wider_drift() {
+    // the drift and its glints in the back layer, on a strip 16 tall that holds the drift: the glints' light
+    // in each third is about the effect's own (the crest's light is the same in every band)
+    let own = bands(&SNOW, BAND, 16, Layer::Back)
+        .into_iter()
+        .next()
+        .unwrap_or_default();
+    for (i, band) in bands(&SNOW, 3 * BAND, 16, Layer::Back).iter().enumerate() {
+        let ratio = band.0 / own.0;
+        assert!(
+            (0.7..=1.4).contains(&ratio),
+            "third {i} of the drift has {ratio:.2} of the light of the effect's own"
+        );
+    }
 }

@@ -404,6 +404,27 @@ fn a_sized_instance_gets_its_own_canvas_and_rect() -> Res {
     Ok(())
 }
 
+/// A player of `fx` with `opts` at margin `m` shows frames 0, 1 and 45 of [`render_frames`] at that margin.
+fn player_matches_render(fx: &'static dyn Effect, opts: &Options, m: u32) {
+    let fps = f64::from(fx.meta().fps);
+    let want = render_frames(fx, opts, m).frames;
+    let mut live = Player::new(fx, opts.clone(), m);
+    let mut stepped = 0;
+    for n in [0usize, 1, 45] {
+        while stepped < n {
+            live.update(1.0 / fps);
+            stepped += 1;
+        }
+        live.draw(Layer::Both);
+        assert_eq!(
+            Some(live.frame()),
+            want.get(n),
+            "{}, margin {m}, frame {n}",
+            fx.meta().id
+        );
+    }
+}
+
 #[test]
 fn player_frames_equal_render_frames_at_its_margin() -> Res {
     // margin 0 (Fx: edge fade, sprite-sheet frames) and the stage's margin (no fade) both match the render
@@ -412,19 +433,26 @@ fn player_frames_equal_render_frames_at_its_margin() -> Res {
         seed: Some(4),
         ..Options::default()
     };
-    let fps = f64::from(fx.meta().fps);
     for m in [0, fx.meta().glow_margin()] {
-        let want = render_frames(fx, &opts, m).frames;
-        let mut live = Player::new(fx, opts.clone(), m);
-        let mut stepped = 0;
-        for n in [0usize, 1, 45] {
-            while stepped < n {
-                live.update(1.0 / fps);
-                stepped += 1;
-            }
-            live.draw(Layer::Both);
-            assert_eq!(Some(live.frame()), want.get(n), "margin {m}, frame {n}");
-        }
+        player_matches_render(fx, &opts, m);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_sized_player_draws_where_render_frames_does() -> Res {
+    // fireflies 12 x 12: the canvas its options give, not its own 320 x 180
+    let fx = effect("weather/fireflies").ok_or("fireflies not registered")?;
+    let opts = Options {
+        seed: Some(3),
+        extra: BTreeMap::from([
+            ("width".to_string(), OptValue::Num(12.0)),
+            ("height".to_string(), OptValue::Num(12.0)),
+        ]),
+        ..Options::default()
+    };
+    for m in [0, 3] {
+        player_matches_render(fx, &opts, m);
     }
     Ok(())
 }
