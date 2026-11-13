@@ -321,3 +321,44 @@ fn reset_removes_the_clip() {
     p.put(6.0, 6.0, WHITE, 1.0);
     assert_eq!(f.color.iter().filter(|&&c| c != 0).count(), 1);
 }
+
+/// Frame hashes from `tests/golden/unlight.mjs` (pixelfx 044e12a): shadow `unlight` is `each` over a box with
+/// `dim_light` on the pixels its `dark` test accepts.
+#[test]
+fn dim_light_matches_pixelfx_unlight() {
+    use pixfx_core::color::hex;
+    use pixfx_core::frame::frame_hash;
+
+    let violet = hex("#9d5cec").unwrap_or(Rgba::NONE);
+    let yellow = hex("#ffe26b").unwrap_or(Rgba::NONE);
+    let cases = [
+        ("unlight_all", 0.0, false, 0.0, 0x990d_c616_6efd_904e_u64),
+        (
+            "unlight_keep_third",
+            0.35,
+            false,
+            0.0,
+            0x3f1d_9c98_60ee_8778,
+        ),
+        (
+            "unlight_mirrored_rotated",
+            0.0,
+            true,
+            0.6,
+            0x61e5_c93e_9ea0_e405,
+        ),
+    ];
+    for (name, keep, flip, angle, want) in cases {
+        let mut frame = Frame::new(64, 48, 0, 0);
+        let mut p = Painter::new(&mut frame);
+        p.place(32.0, 40.0, flip, angle);
+        p.glow(0.0, -16.0, 18.0, violet, 0.9);
+        p.glow(6.0, -12.0, 9.0, yellow, 0.6);
+        p.each(-10.0, -26.0, 10.0, -6.0, |p, x, y, sx, sy| {
+            if x * x + (y + 16.0) * (y + 16.0) < 49.0 {
+                p.dim_light(sx, sy, keep);
+            }
+        });
+        assert_eq!(frame_hash(&frame), want, "{name}");
+    }
+}

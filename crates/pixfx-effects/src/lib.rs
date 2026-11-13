@@ -15,6 +15,7 @@ pub mod nature;
 pub mod pickups;
 pub mod projectiles;
 pub mod scifi;
+pub mod shadow;
 pub mod spawn;
 pub mod transitions;
 
@@ -40,6 +41,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &pickups::COIN_SPIN,
     &projectiles::LASER_BOLT,
     &transitions::BURN_AWAY,
+    &shadow::VOID_ORB,
 ];
 
 /// The effect with this id (`fire/candle`).

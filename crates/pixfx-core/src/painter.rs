@@ -526,6 +526,24 @@ impl<'a> Painter<'a> {
         self.add(sx, sy, c, k);
     }
 
+    /// Keep only a share `keep` (0..1) of the light already on a screen pixel (zero light stays zero): the pixel
+    /// primitive of pixelfx shadow `unlight`, which writes the light buffer directly (no clip, fade or strength).
+    pub fn dim_light(&mut self, sx: f64, sy: f64, keep: f64) {
+        let Some(px) = self.index(sx, sy).and_then(|i| self.frame.light.get_mut(i)) else {
+            return;
+        };
+        let d = *px;
+        if d == 0 {
+            return;
+        }
+        if keep <= 0.0 {
+            *px = 0;
+            return;
+        }
+        let ch = |s: u32| to_int32(f64::from((d >> s) & 255) * keep) as u32;
+        *px = (255 << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0);
+    }
+
     /// Filled rectangle.
     pub fn rect(&mut self, x: f64, y: f64, w: f64, h: f64, c: Rgba, a: f64) {
         if self.sn == 0.0 {
