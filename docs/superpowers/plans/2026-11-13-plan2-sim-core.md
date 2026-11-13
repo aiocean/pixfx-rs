@@ -418,9 +418,23 @@ No `_lib.js` helpers.
 | id | size | origin | duration | loop | fps | seed |
 |---|---|---|---|---|---|---|
 | `transitions/crt-off` | 320x180 | 0,0 | 2 | one-shot | 30 | 1 |
+| `transitions/burn-away` | 320x180 | 0,0 | 3 | one-shot | 30 | 3 |
 
-`_lib.js` helpers: `W`, `H`, `screenMeta`, `clipTo`, `glint`, `rect`. A full-screen effect (`Meta::is_screen`):
-the render keeps light up to the edge, as pixelfx does.
+`_lib.js` helpers: `W`, `H`, `screenMeta`, `clipTo`, `glint`, `rect`, `field`, `pixels`, `lifeLeft`. Both are
+full-screen effects (`Meta::is_screen`): the render keeps light up to the edge, as pixelfx does.
+
+`burn-away` (the pixfx site's page transition):
+- `color` (default `#0b0a10`) is a single-colour option read with `Options::color_or`.
+- Two extra number options, `holeX` and `holeY` (screen pixels), set where the hole starts. The two `R.range`
+  calls for the hole centre (`burn-away.js:29`) always run, so the random sequence is unchanged. A given `holeX`
+  or `holeY` then replaces its coordinate. Unset, the centre is pixelfx's, and parity holds at defaults.
+- Extra test in `tests/transitions.rs`, `burn_away_hole_follows_hole_options`:
+  - (a) a render with `holeX = 40, holeY = 30` differs from the default render at frame 60;
+  - (b) a render with `holeX`/`holeY` set to pixelfx's own seeded centre for seed 3 equals the default render
+    on every frame. This proves the random sequence is untouched. Get the centre's two numbers from a Node
+    one-off that runs `burn-away.js`'s draws up to line 29 against pixelfx, and paste them as constants with a
+    comment saying how they were produced.
+- The site assumes the screen is fully covered at 1.35 s (pixelfx `COVER`). The port keeps that moment.
 
 ### Task 21: water
 
