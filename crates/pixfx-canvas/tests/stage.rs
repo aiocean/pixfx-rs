@@ -1,12 +1,14 @@
 //! The stage's pure logic, natively: handles, removal of finished instances, draw order, target rects and
 //! the frame-to-pixels conversion the canvas shell blits.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::num::NonZeroU32;
 
 use pixfx_canvas::stage::{Pass, Rect, Scene, StageError, color_rgba, light_rgba, live_player};
 use pixfx_core::{
-    Effect, EffectState, Frame, Layer, Meta, Options, Painter, Rgba, composite_px, render_frames,
+    Canvas, Effect, EffectState, Frame, Layer, Meta, OptValue, Options, Painter, Rgba,
+    composite_px, render_frames,
 };
 use pixfx_effects::effect;
 use pixfx_wasm::Player;
@@ -364,6 +366,43 @@ fn stage_shows_glow_that_spills_past_the_canvas() -> Res {
         }
         assert!(spilled > 0, "{id}: no glow past its canvas in 2 s");
     }
+    Ok(())
+}
+
+#[test]
+fn a_sized_instance_gets_its_own_canvas_and_rect() -> Res {
+    // fireflies 100 x 50: origin mid-width, 10 above the foot; margin still its own canvas's, 160
+    let fx = effect("weather/fireflies").ok_or("fireflies not registered")?;
+    let opts = Options {
+        extra: BTreeMap::from([
+            ("width".to_string(), OptValue::Num(100.0)),
+            ("height".to_string(), OptValue::Num(50.0)),
+        ]),
+        ..Options::default()
+    };
+    let live = live_player(fx, opts);
+    assert_eq!(
+        live.canvas(),
+        Canvas {
+            size: (100, 50),
+            origin: (50, 40)
+        }
+    );
+    assert_eq!(
+        (live.frame().w, live.frame().h),
+        (100 + 2 * 160, 50 + 2 * 160)
+    );
+    let mut scene = Scene::new(scale(2)?);
+    let h = scene.play(live, 200.0, 120.0, ())?;
+    assert_eq!(
+        scene.rect(h),
+        Some(Rect {
+            x: (200 - 50 - 160) * 2,
+            y: (120 - 40 - 160) * 2,
+            w: (100 + 2 * 160) * 2,
+            h: (50 + 2 * 160) * 2,
+        })
+    );
     Ok(())
 }
 

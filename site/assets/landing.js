@@ -81,9 +81,9 @@ function createHero(canvas, signal) {
     const arena = { left: Math.round((w - span) / 2), right: Math.round((w + span) / 2) };
 
     view.stage = new Stage(canvas, scale);
-    if (have.has(DECOR.night)) {
-      for (let x = 160; x - 160 < w; x += 320) view.stage.play(DECOR.night, x, ground, { seed: x });
-    }
+    // the night over the whole scene: one fireflies canvas its size, the meadow on the dais (the effect's ground
+    // is mid-width, 10 pixels above its canvas's foot)
+    if (have.has(DECOR.night)) view.stage.play(DECOR.night, Math.floor(w / 2), ground, { width: w, height: ground + 10 });
     // a brazier at each end of the arena lights it
     if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
     view.feel = new Feel();
