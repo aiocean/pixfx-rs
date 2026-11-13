@@ -7,6 +7,7 @@ pub mod blend;
 pub mod color;
 pub mod cue;
 pub mod effect;
+pub mod feel;
 pub mod frame;
 pub mod math;
 pub mod painter;
@@ -24,6 +25,7 @@ pub use effect::{
     Canvas, ColorOpt, Effect, EffectState, Instance, Layer, Meta, NumOpt, OptKind, OptSpec,
     OptValue, OptionError, Options, Placement, RampOpt, check_options, find, valid_dt,
 };
+pub use feel::{Feel, FeelSpec};
 pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};
 pub use painter::Painter;

@@ -3,17 +3,20 @@
 //! shakes the screen; its damage floats up from where it struck; a body hitting the floor kicks up dust; a knockout
 //! lingers in slow motion; an ultimate darkens the sky as it is cast. All of it is state over the fight's [`Cue`]s
 //! and real time, so the game asks it each frame how fast the fight runs and where the screen sits. The shake
-//! weighs a blow by the share of full life it took (`share`); the numbers show the real amounts.
+//! weighs a blow by the share of full life it took (`share`); the numbers show the real amounts. The screen's
+//! part (trauma, shake, freeze, slow motion, ripples, flash) is the engine's [`pixfx_core::feel::Feel`]; this adds
+//! what only a fight has.
 
 use pixfx_core::color::Rgba;
+use pixfx_core::feel::{Feel as Screen, FeelSpec as ScreenSpec};
 use pixfx_core::frame::Frame;
-use pixfx_core::math::{js_max, js_min, js_round, noise, to_int32};
+use pixfx_core::math::{js_max, js_min, js_round, to_int32};
 use pixfx_core::screen::Ripple;
 
 /// Hit-stop, in frames at 60 a second, the way fighting games and Sakurai's Smash count it: both fighters freeze
 /// together, longer the heavier the blow (Street Fighter 6 gives its mediums 11 frames, its heavies 13); a blow of
 /// `medium_power` or more is a medium; a crit holds longer, a spell that struck from afar shorter, and no blow
-/// freezes the fight past a cap.
+/// freezes the fight past the screen's `freeze_cap`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stop {
     pub light: f64,
@@ -21,7 +24,6 @@ pub struct Stop {
     pub launch: f64,
     pub crit: f64,
     pub ranged: f64,
-    pub cap: f64,
     pub medium_power: f64,
 }
 
@@ -73,12 +75,8 @@ pub struct FeelSpec {
     /// Trauma, 0 to 1, a blow adds: its share of full life over `share_trauma`, plus `crit_trauma` for a crit.
     pub share_trauma: f64,
     pub crit_trauma: f64,
-    /// Trauma drains this fast per second; the shake is trauma squared times `shake` game pixels.
-    pub trauma_drain: f64,
-    pub shake: f64,
-    /// How fast the shake wanders: smooth noise at this many cells a second, so the screen sways from place to
-    /// place instead of jumping to a new random spot each frame.
-    pub shake_rate: f64,
+    /// The screen's answer: shake, its drain, the freeze cap, the flash.
+    pub screen: ScreenSpec,
     /// A fighter refusing to fall, a barrier ringing, two spells meeting.
     pub unyielding: Answer,
     pub block: Answer,
@@ -104,15 +102,12 @@ impl Default for FeelSpec {
                 launch: 11.0,
                 crit: 3.0,
                 ranged: -2.0,
-                cap: 13.0,
                 medium_power: 9.0,
             },
             jolt: 2.0,
             share_trauma: 25.0,
             crit_trauma: 0.2,
-            trauma_drain: 1.6,
-            shake: 3.0,
-            shake_rate: 12.0,
+            screen: ScreenSpec::default(),
             unyielding: Answer {
                 stop: 0.18,
                 trauma: 0.4,
@@ -335,22 +330,16 @@ struct Jolt {
 #[derive(Clone, Debug, Default)]
 pub struct Feel {
     spec: FeelSpec,
-    stop: f64,
-    slow: f64,
-    trauma: f64,
+    screen: Screen,
     dusk: f64,
     numbers: Vec<Floating>,
     streaks: Vec<Qi>,
     dust: Vec<Puff>,
     jolt: Option<Jolt>,
     tick: u64,
-    ripples: Vec<Ripple>,
-    flash: f64,
-    /// Real seconds gone by, for the shake's noise.
-    clock: f64,
 }
 
-fn hit_stop(stop: &Stop, power: f64, launch: bool, crit: bool, ranged: bool) -> f64 {
+fn hit_stop(stop: &Stop, cap: f64, power: f64, launch: bool, crit: bool, ranged: bool) -> f64 {
     let mut frames = if launch {
         stop.launch
     } else if power >= stop.medium_power {
@@ -364,7 +353,7 @@ fn hit_stop(stop: &Stop, power: f64, launch: bool, crit: bool, ranged: bool) -> 
     if ranged {
         frames += stop.ranged;
     }
-    js_min(stop.cap, frames) / 60.0
+    js_min(cap * 60.0, frames) / 60.0
 }
 
 impl Feel {
@@ -377,6 +366,7 @@ impl Feel {
     pub fn with_spec(spec: FeelSpec) -> Self {
         Self {
             spec,
+            screen: Screen::with_spec(spec.screen),
             ..Self::default()
         }
     }
@@ -388,49 +378,23 @@ impl Feel {
 
     /// How shaken the screen is, 0 to 1.
     pub fn trauma(&self) -> f64 {
-        self.trauma
+        self.screen.trauma()
     }
 
     /// The screen ripples alive now, for [`pixfx_core::screen::ripple`].
     pub fn ripples(&self) -> &[Ripple] {
-        &self.ripples
+        self.screen.ripples()
     }
 
     /// How white the screen is lifted, 0 to 1, for [`pixfx_core::screen::flash`].
     pub fn flash(&self) -> f64 {
-        self.flash
+        self.screen.flash()
     }
 
     /// Take in what effects asked of the game: shake adds trauma, a hitstop joins the one freeze the fight's
     /// blows share (under the same cap), ripples and flash go to the screen passes. Sounds are the game's own.
     pub fn take(&mut self, cues: &[pixfx_core::cue::TimedCue]) {
-        use pixfx_core::cue::Cue as Fx;
-        for c in cues {
-            match c.cue {
-                Fx::Shake { trauma } => self.trauma = js_min(1.0, self.trauma + trauma),
-                Fx::Hitstop { dur } => {
-                    self.stop = js_max(self.stop, js_min(self.spec.stop.cap / 60.0, dur))
-                }
-                Fx::Ripple {
-                    x,
-                    y,
-                    r0,
-                    r1,
-                    dur,
-                    amp,
-                } => self.ripples.push(Ripple {
-                    x,
-                    y,
-                    r0,
-                    r1,
-                    dur,
-                    amp,
-                    age: 0.0,
-                }),
-                Fx::Flash { k, .. } => self.flash = js_max(self.flash, k),
-                Fx::Sound { .. } => {}
-            }
-        }
+        self.screen.take(cues);
     }
 
     /// Take in what the fight just did.
@@ -449,8 +413,8 @@ impl Feel {
                     x,
                     y,
                 } => {
-                    let stop = hit_stop(&s.stop, power, launch, crit, ranged);
-                    self.stop = js_max(self.stop, stop);
+                    let stop = hit_stop(&s.stop, s.screen.freeze_cap, power, launch, crit, ranged);
+                    self.screen.freeze(stop);
                     // grounded, it shudders side to side; in the air, up and down (Sakurai)
                     self.jolt = Some(Jolt {
                         who: 1usize.wrapping_sub(by),
@@ -458,11 +422,8 @@ impl Feel {
                         full: stop,
                         air: y > 24.0,
                     });
-                    self.trauma = js_min(
-                        1.0,
-                        self.trauma
-                            + share / s.share_trauma
-                            + if crit { s.crit_trauma } else { 0.0 },
+                    self.screen.add_trauma(
+                        share / s.share_trauma + if crit { s.crit_trauma } else { 0.0 },
                     );
                     let kind = if crit {
                         NumberKind::Crit
@@ -499,7 +460,7 @@ impl Feel {
                 Cue::Block => self.answer(s.block),
                 Cue::Clash => self.answer(s.clash),
                 Cue::Land { x, strength } => {
-                    self.trauma = js_min(1.0, self.trauma + s.land_trauma * strength);
+                    self.screen.add_trauma(s.land_trauma * strength);
                     if strength > s.dust.least {
                         self.dust.push(Puff {
                             x,
@@ -508,13 +469,11 @@ impl Feel {
                         });
                     }
                 }
-                Cue::Bump { strength } => {
-                    self.trauma = js_min(1.0, self.trauma + s.bump_trauma * strength)
-                }
+                Cue::Bump { strength } => self.screen.add_trauma(s.bump_trauma * strength),
                 Cue::Ko => {
-                    self.stop = js_max(self.stop, s.ko.stop);
-                    self.slow = s.ko.slow;
-                    self.trauma = js_min(1.0, self.trauma + s.ko.trauma);
+                    self.screen.freeze(s.ko.stop);
+                    self.screen.slow(s.ko.slow, s.ko.speed);
+                    self.screen.add_trauma(s.ko.trauma);
                 }
                 Cue::Streak { x0, y0, x1, y1, by } => self.streaks.push(Qi {
                     x0,
@@ -525,7 +484,7 @@ impl Feel {
                     t: 0.0,
                 }),
                 Cue::Ultimate => {
-                    self.stop = js_max(self.stop, s.dusk.stop);
+                    self.screen.freeze(s.dusk.stop);
                     self.dusk = s.dusk.time;
                 }
             }
@@ -533,8 +492,8 @@ impl Feel {
     }
 
     fn answer(&mut self, a: Answer) {
-        self.stop = js_max(self.stop, a.stop);
-        self.trauma = js_min(1.0, self.trauma + a.trauma);
+        self.screen.freeze(a.stop);
+        self.screen.add_trauma(a.trauma);
     }
 
     fn number(&mut self, x: f64, y: f64, by: Option<usize>, kind: NumberKind, text: String) {
@@ -558,19 +517,12 @@ impl Feel {
     /// Let `dt` real seconds pass. Returns how many seconds the fight should run for it: none during a hit-stop, a
     /// fraction in a knockout's slow motion.
     pub fn advance(&mut self, dt: f64) -> f64 {
-        self.clock += dt;
-        self.trauma = js_max(0.0, self.trauma - self.spec.trauma_drain * dt);
+        let run = self.screen.advance(dt);
         self.dusk = js_max(0.0, self.dusk - dt);
-        // the screen's own clock: ripples and flash run on through a hit-stop
-        self.flash = js_max(0.0, self.flash - dt * 4.0);
-        for r in &mut self.ripples {
-            r.age += dt;
-        }
-        self.ripples.retain(|r| r.age <= r.dur);
+        let s = self.spec;
         for n in &mut self.numbers {
             n.t += dt;
         }
-        let s = self.spec;
         self.numbers.retain(|n| n.t < s.number.life);
         for k in &mut self.streaks {
             k.t += dt;
@@ -587,32 +539,14 @@ impl Feel {
                 self.jolt = None;
             }
         }
-        if self.stop > 0.0 {
-            // counted in whole frames: what is left after the last one is rounding, not another frame
-            self.stop = if self.stop - dt > 1e-6 {
-                self.stop - dt
-            } else {
-                0.0
-            };
-            return 0.0;
-        }
-        if self.slow > 0.0 {
-            self.slow = js_max(0.0, self.slow - dt);
-            return dt * s.ko.speed;
-        }
-        dt
+        run
     }
 
     /// Where the screen sits this frame, in whole game pixels: trauma squared times smooth noise over real time.
     /// `strength` scales it for the player's setting: 1 as designed, 0 (or anything not above 0) holds the screen
     /// still.
     pub fn shake(&self, strength: f64) -> (i32, i32) {
-        let strength = if strength > 0.0 { strength } else { 0.0 };
-        let a = self.trauma * self.trauma * self.spec.shake * strength;
-        let t = self.clock * self.spec.shake_rate;
-        let x = to_int32(js_round(noise(t, 1.0) * a));
-        let y = to_int32(js_round(noise(t, 2.0) * a));
-        (x, y)
+        self.screen.shake(strength)
     }
 
     /// How far each fighter is jolted off its place this frame, in whole game pixels: (dx, dy) per fighter index.
