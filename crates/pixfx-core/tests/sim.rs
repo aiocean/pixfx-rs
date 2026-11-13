@@ -149,7 +149,7 @@ fn debris_scene_matches_pixelfx() -> Result<(), pixfx_core::ColorError> {
     use pixfx_core::color::hex;
     use pixfx_core::sim::{Bit, BitKind, Bits};
 
-    let mut bits = Bits::new(0.0);
+    let mut bits: Bits = Bits::new(0.0);
     bits.add(Bit {
         vx: 60.0,
         vy: -120.0,

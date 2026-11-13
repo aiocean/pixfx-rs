@@ -158,21 +158,23 @@ impl Default for ParticlesOpts {
     }
 }
 
+/// One live particle (an entry of pixelfx `ps.list`): `life` counts down from `max`, `seed` is its own 0..100
+/// random phase.
 #[derive(Clone, Debug, PartialEq)]
-struct Particle {
-    kind: Kind,
-    x: f64,
-    y: f64,
-    vx: f64,
-    vy: f64,
-    life: f64,
-    max: f64,
+pub struct Particle {
+    pub kind: Kind,
+    pub x: f64,
+    pub y: f64,
+    pub vx: f64,
+    pub vy: f64,
+    pub life: f64,
+    pub max: f64,
     /// `Rgba::NONE` for JS `col` 0.
-    col: Rgba,
-    size: f64,
-    seed: f64,
-    delay: f64,
-    flags: Flags,
+    pub col: Rgba,
+    pub size: f64,
+    pub seed: f64,
+    pub delay: f64,
+    pub flags: Flags,
 }
 
 /// What one update step did to a particle.
@@ -368,6 +370,16 @@ impl Particles {
         self.list.len()
     }
 
+    /// The live particles in spawn order (pixelfx `ps.list`).
+    pub fn list(&self) -> &[Particle] {
+        &self.list
+    }
+
+    /// The live particles, for effects that cull or fade them (pixelfx `ps.list`, spliced or edited in place).
+    pub fn list_mut(&mut self) -> &mut Vec<Particle> {
+        &mut self.list
+    }
+
     /// Advance every particle by `dt` seconds.
     pub fn update(&mut self, rng: &mut Rng, dt: f64) {
         self.update_with(rng, dt, |_, _, _| {});
@@ -406,8 +418,14 @@ impl Particles {
     /// Draw the particles of `layer`: [`Layer::Back`] the soft kinds (vapour, dust, smoke) and those flagged
     /// BACK, [`Layer::Front`] the rest, [`Layer::Both`] all of them.
     pub fn draw(&self, p: &mut Painter, layer: Layer) {
+        self.draw_where(p, layer, |_| true);
+    }
+
+    /// [`Particles::draw`] for the particles `keep` accepts: pixelfx's `ps.list = rest; ps.draw(p, layer)`,
+    /// which effects use to draw some kinds their own way.
+    pub fn draw_where(&self, p: &mut Painter, layer: Layer, keep: impl Fn(&Particle) -> bool) {
         for q in &self.list {
-            if q.delay > 0.0 {
+            if q.delay > 0.0 || !keep(q) {
                 continue;
             }
             let back = q.kind.soft() || q.flags.contains(Flags::BACK);
@@ -808,22 +826,26 @@ impl Bit {
     }
 }
 
+/// One live piece of debris (an entry of pixelfx `bits.list`): the bit, its starting life, whether it has
+/// settled, and `data`, the effect's own per-piece state (the extra fields pixelfx effects set on a bit).
 #[derive(Clone, Debug, PartialEq)]
-struct Piece {
-    bit: Bit,
-    max: f64,
+pub struct Piece<T = ()> {
+    pub bit: Bit,
+    pub max: f64,
     /// Settled on the floor: no more motion.
-    rest: bool,
+    pub rest: bool,
+    pub data: T,
 }
 
-/// Rigid debris that tumbles, bounces and settles (pixelfx `Bits`).
+/// Rigid debris that tumbles, bounces and settles (pixelfx `Bits`). `T` is the per-piece state an effect keeps
+/// on each bit (see [`Piece::data`]).
 #[derive(Clone, Debug, PartialEq)]
-pub struct Bits {
-    list: Vec<Piece>,
+pub struct Bits<T = ()> {
+    list: Vec<Piece<T>>,
     ground: f64,
 }
 
-impl Bits {
+impl<T: Default> Bits<T> {
     /// Debris over a floor at y = `ground` (local px; `f64::INFINITY` for none, pixelfx's default).
     pub fn new(ground: f64) -> Self {
         Self {
@@ -838,11 +860,22 @@ impl Bits {
             bit: b,
             max,
             rest: false,
+            data: T::default(),
         });
     }
 
     pub fn count(&self) -> usize {
         self.list.len()
+    }
+
+    /// The live pieces in the order they were added (pixelfx `bits.list`).
+    pub fn list(&self) -> &[Piece<T>] {
+        &self.list
+    }
+
+    /// The live pieces, for effects that cull or edit them (pixelfx `bits.list`, spliced or edited in place).
+    pub fn list_mut(&mut self) -> &mut Vec<Piece<T>> {
+        &mut self.list
     }
 
     pub fn update(&mut self, dt: f64) {

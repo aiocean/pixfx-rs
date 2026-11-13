@@ -19,6 +19,6 @@ pub use math::{Rng, rand};
 pub use painter::Painter;
 pub use render::{Rendered, edge_fade, render_frames};
 pub use sim::{
-    Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particles, ParticlesOpts, Spawn,
-    band, crystal, flare, sparkle,
+    Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particle, Particles,
+    ParticlesOpts, Piece, Spawn, band, crystal, flare, sparkle,
 };
