@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::num::NonZeroU32;
 
-use pixfx_canvas::stage::{Rect, Scene, StageEvent, color_rgba, live_player};
+use pixfx_canvas::stage::{Pass, Rect, Scene, Shell, StageEvent, color_rgba, live_player};
 use pixfx_core::{
     Canvas, Effect, EffectState, Frame, Layer, Meta, OptValue, Options, Painter, Placement, Rgba,
     render_frames,
@@ -14,6 +14,40 @@ use pixfx_effects::effect;
 use pixfx_wasm::Player;
 
 type Res = Result<(), Box<dyn Error>>;
+
+/// A shell that keeps each drawn layer as a frame and records what it draws and shows.
+#[derive(Default)]
+struct Recorder {
+    /// Layers drawn into a new surface or refilled.
+    made: usize,
+    refilled: usize,
+    shown: Vec<(Pass, Frame)>,
+}
+
+impl Shell for Recorder {
+    type Surface = Frame;
+    type Error = ();
+    fn make(&mut self, frame: &Frame) -> Result<Frame, ()> {
+        self.made += 1;
+        Ok(frame.clone())
+    }
+    fn refill(&mut self, surface: &mut Frame, frame: &Frame) -> Result<(), ()> {
+        self.refilled += 1;
+        surface.clone_from(frame);
+        Ok(())
+    }
+    fn show(&mut self, pass: Pass, surface: &Frame) -> Result<(), ()> {
+        self.shown.push((pass, surface.clone()));
+        Ok(())
+    }
+}
+
+/// What `layer` of every instance shows, oldest first.
+fn shown(scene: &mut Scene<Frame>, layer: Layer) -> Vec<Frame> {
+    let mut r = Recorder::default();
+    assert_eq!(scene.draw_layer(layer, &mut r), Ok(()));
+    r.shown.into_iter().map(|(_, f)| f).collect()
+}
 
 /// A one-shot lasting 0.1 s that draws nothing: the registry has no one-shot yet.
 struct Blip;
@@ -101,9 +135,9 @@ fn scale(n: u32) -> Result<NonZeroU32, Box<dyn Error>> {
 
 #[test]
 fn finished_one_shot_is_removed() -> Res {
-    let mut scene = Scene::new(scale(1)?);
-    let shot = scene.play(live_player(&BLIP, Options::default()), 0.0, 0.0, ())?;
-    let fire = scene.play(player("fire/candle")?, 0.0, 0.0, ())?;
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let shot = scene.play(live_player(&BLIP, Options::default()), 0.0, 0.0)?;
+    let fire = scene.play(player("fire/candle")?, 0.0, 0.0)?;
     scene.update(0.05)?;
     assert_eq!(scene.handles().collect::<Vec<_>>(), vec![shot, fire]);
     scene.update(0.06)?;
@@ -117,8 +151,8 @@ fn finished_one_shot_is_removed() -> Res {
 
 #[test]
 fn a_host_draw_between_the_layers_lands_over_back_and_under_front() -> Res {
-    let mut scene = Scene::new(scale(1)?);
-    scene.play(live_player(&LAYERED, Options::default()), 20.0, 20.0, ())?;
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    scene.play(live_player(&LAYERED, Options::default()), 20.0, 20.0)?;
     scene.update(0.1)?;
     let (red, blue) = (0xff00_00ff_u32, 0xffff_0000_u32);
     // (what happened, red shown, blue shown): the host's draw is the middle event
@@ -130,20 +164,13 @@ fn a_host_draw_between_the_layers_lands_over_back_and_under_front() -> Res {
             frame.color.contains(&blue),
         )
     };
-    let mut got = Vec::new();
-    let ok: Result<(), ()> = scene.draw_layer(Layer::Back, |_, frame, _| {
-        got.push(seen("back", frame));
-        Ok(())
-    });
-    assert_eq!(ok, Ok(()));
-    events.append(&mut got);
+    for f in shown(&mut scene, Layer::Back) {
+        events.push(seen("back", &f));
+    }
     events.push(("host", false, false));
-    let ok: Result<(), ()> = scene.draw_layer(Layer::Front, |_, frame, _| {
-        got.push(seen("front", frame));
-        Ok(())
-    });
-    assert_eq!(ok, Ok(()));
-    events.append(&mut got);
+    for f in shown(&mut scene, Layer::Front) {
+        events.push(seen("front", &f));
+    }
     assert_eq!(
         events,
         vec![
@@ -203,8 +230,8 @@ fn a_sized_instance_gets_its_own_canvas_and_rect() -> Res {
         (live.frame().w, live.frame().h),
         (100 + 2 * 160, 50 + 2 * 160)
     );
-    let mut scene = Scene::new(scale(2)?);
-    let h = scene.play(live, 200.0, 120.0, ())?;
+    let mut scene: Scene<Frame> = Scene::new(scale(2)?);
+    let h = scene.play(live, 200.0, 120.0)?;
     assert_eq!(
         scene.rect(h),
         Some(Rect {
@@ -258,25 +285,22 @@ fn a_sized_player_draws_where_render_frames_does() -> Res {
 }
 
 /// The front frame of every instance, oldest first.
-fn fronts(scene: &mut Scene<()>) -> Vec<Vec<u32>> {
-    let mut seen = Vec::new();
-    let ok: Result<(), ()> = scene.draw_layer(Layer::Front, |_pass, frame, _surface| {
-        seen.push(frame.color.clone());
-        Ok(())
-    });
-    assert_eq!(ok, Ok(()));
-    seen
+fn fronts(scene: &mut Scene<Frame>) -> Vec<Vec<u32>> {
+    shown(scene, Layer::Front)
+        .into_iter()
+        .map(|f| f.color)
+        .collect()
 }
 
 #[test]
 fn setting_flip_mid_play_draws_it_flipped_without_restarting() -> Res {
-    let mut scene = Scene::new(scale(1)?);
-    let plain = scene.play(live_player(&LAYERED, Options::default()), 10.0, 10.0, ())?;
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let plain = scene.play(live_player(&LAYERED, Options::default()), 10.0, 10.0)?;
     let flipped = Options {
         flip: true,
         ..Options::default()
     };
-    scene.play(live_player(&LAYERED, flipped), 10.0, 10.0, ())?;
+    scene.play(live_player(&LAYERED, flipped), 10.0, 10.0)?;
     scene.update(0.25)?;
     let before = fronts(&mut scene);
     assert_ne!(
@@ -296,10 +320,10 @@ fn setting_flip_mid_play_draws_it_flipped_without_restarting() -> Res {
 
 #[test]
 fn ended_effects_are_drained_once_in_order() -> Res {
-    let mut scene = Scene::new(scale(1)?);
-    let blip = scene.play(live_player(&BLIP, Options::default()), 0.0, 0.0, ())?;
-    let held = scene.play(live_player(&LAYERED, Options::default()), 0.0, 0.0, ())?;
-    let kept = scene.play(live_player(&LAYERED, Options::default()), 0.0, 0.0, ())?;
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let blip = scene.play(live_player(&BLIP, Options::default()), 0.0, 0.0)?;
+    let held = scene.play(live_player(&LAYERED, Options::default()), 0.0, 0.0)?;
+    let kept = scene.play(live_player(&LAYERED, Options::default()), 0.0, 0.0)?;
     assert!(scene.remove(held));
     scene.update(0.2)?;
 
@@ -368,9 +392,9 @@ const FRAME: f64 = 1.0 / 60.0;
 
 #[test]
 fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
-    let mut scene = Scene::new(scale(1)?);
-    let hitter = scene.play(live_player(&HITTER, Options::default()), 0.0, 0.0, ())?;
-    let candle = scene.play(player("fire/candle")?, 0.0, 0.0, ())?;
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let hitter = scene.play(live_player(&HITTER, Options::default()), 0.0, 0.0)?;
+    let candle = scene.play(player("fire/candle")?, 0.0, 0.0)?;
     // play until the hit lands
     let mut played = 0.0;
     while !scene.feel().is_some_and(|f| f.frozen()) {
@@ -398,9 +422,9 @@ fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
 
 #[test]
 fn cues_come_out_as_events_where_they_fire_on_the_stage() -> Res {
-    let mut scene = Scene::new(scale(1)?);
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
     scene.set_screen_w(100.0);
-    let mirrored = scene.play(live_player(&HITTER, Options::default()), 50.0, 20.0, ())?;
+    let mirrored = scene.play(live_player(&HITTER, Options::default()), 50.0, 20.0)?;
     scene.set(
         mirrored,
         Placement {
@@ -445,9 +469,9 @@ fn cues_come_out_as_events_where_they_fire_on_the_stage() -> Res {
 
 #[test]
 fn a_host_with_its_own_answer_gets_the_cues_and_every_second() -> Res {
-    let mut scene = Scene::new(scale(1)?);
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
     scene.set_feel(None);
-    scene.play(live_player(&HITTER, Options::default()), 0.0, 0.0, ())?;
+    scene.play(live_player(&HITTER, Options::default()), 0.0, 0.0)?;
     let mut played = 0.0;
     for _ in 0..20 {
         played += scene.update(FRAME)?;
@@ -463,5 +487,106 @@ fn a_host_with_its_own_answer_gets_the_cues_and_every_second() -> Res {
         .count();
     assert_eq!(cues, 3);
     assert!(scene.feel().is_none());
+    Ok(())
+}
+
+/// Draw both layers once with a fresh recorder: what it drew and showed.
+fn draw_once(scene: &mut Scene<Frame>) -> Recorder {
+    let mut r = Recorder::default();
+    assert_eq!(scene.draw(&mut r), Ok(()));
+    r
+}
+
+#[test]
+fn identical_effects_draw_each_frame_once_and_share_it() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    for i in 0..50 {
+        scene.play(player("fire/candle")?, f64::from(i * 3), 40.0)?;
+    }
+    scene.update(0.1)?;
+    let r = draw_once(&mut scene);
+    assert_eq!(
+        r.made, 2,
+        "one frame, back and front, drawn once for fifty effects"
+    );
+    assert_eq!(r.shown.len(), 100, "every effect shows both layers");
+    // every back layer, then every front layer: each half shows one shared frame
+    let (backs, fronts) = r.shown.split_at(50);
+    assert!(backs.iter().all(|(_, f)| *f == backs[0].1));
+    assert!(fronts.iter().all(|(_, f)| *f == fronts[0].1));
+    Ok(())
+}
+
+#[test]
+fn nothing_is_drawn_again_until_the_frame_changes() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    scene.update(0.1)?;
+    assert_eq!(draw_once(&mut scene).made, 2);
+    // display refreshes at 120 Hz: a quarter of a 30 fps frame passes, nothing new to draw
+    scene.update(1.0 / 120.0)?;
+    let r = draw_once(&mut scene);
+    assert_eq!((r.made, r.shown.len()), (0, 2), "shown again, not drawn");
+    scene.update(1.0 / 30.0)?;
+    assert_eq!(draw_once(&mut scene).made, 2, "a new frame is drawn");
+    Ok(())
+}
+
+#[test]
+fn a_fading_effect_redraws_its_own_frame_once_per_clock_frame() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let h = scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    scene.update(0.1)?;
+    scene.stop(h);
+    assert_eq!(
+        draw_once(&mut scene).made,
+        2,
+        "its own fade frame, back and front"
+    );
+    scene.update(1.0 / 120.0)?;
+    let r = draw_once(&mut scene);
+    assert_eq!(
+        (r.made, r.refilled),
+        (0, 0),
+        "same clock frame: shown, not drawn"
+    );
+    scene.update(1.0 / 30.0)?;
+    let r = draw_once(&mut scene);
+    assert_eq!(
+        (r.made, r.refilled),
+        (0, 2),
+        "next clock frame: drawn into its own surfaces"
+    );
+    Ok(())
+}
+
+#[test]
+fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    scene.update(0.1)?;
+    let before = draw_once(&mut scene).shown;
+    let held = scene.frame_bytes();
+    assert!(held > 0);
+    // a budget below one frame keeps only what the current draw shows
+    scene.set_frame_budget(1);
+    scene.update(1.0 / 30.0)?;
+    draw_once(&mut scene);
+    assert!(scene.frame_bytes() <= held, "the older frame went");
+    // come round to the first frame again: one whole loop of the candle
+    let loop_s = effect("fire/candle").ok_or("candle")?.meta().duration;
+    let mut left = loop_s - 1.0 / 30.0;
+    while left > 1e-9 {
+        let dt = left.min(0.2);
+        scene.update(dt)?;
+        left -= dt;
+    }
+    let again = draw_once(&mut scene);
+    assert_eq!(again.made, 2, "the dropped frame is drawn again");
+    assert_eq!(
+        again.shown.iter().map(|(_, f)| f).collect::<Vec<_>>(),
+        before.iter().map(|(_, f)| f).collect::<Vec<_>>(),
+        "byte-equal to the first time"
+    );
     Ok(())
 }

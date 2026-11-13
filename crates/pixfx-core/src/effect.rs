@@ -98,7 +98,7 @@ pub struct Canvas {
 }
 
 /// Which part of an effect to draw: what goes behind a character, what goes in front, or both.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Layer {
     Back,
     Front,

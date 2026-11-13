@@ -31,7 +31,9 @@ use js_sys::{Array, Uint8ClampedArray};
 use pixfx_core::{Feel, Frame, Layer};
 use pixfx_effects::effect;
 use pixfx_wasm::js::{pair, parse, to_js};
-use stage::{Pass, PlacementChange, Scene, color_rgba, light_rgba, live_player, stage_options};
+use stage::{
+    Pass, PlacementChange, Scene, Shell, color_rgba, light_rgba, live_player, stage_options,
+};
 use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 use web_sys::{
@@ -66,6 +68,7 @@ impl Stage {
             renderer: Rc::new(RefCell::new(Renderer {
                 ctx,
                 scene: Scene::new(nonzero_scale(scale)?),
+                scratch: Vec::new(),
                 background: None,
                 shake_strength: 1.0,
             })),
@@ -84,9 +87,8 @@ impl Stage {
     ) -> Result<u32, JsError> {
         let fx = effect(id).ok_or_else(|| JsError::new(&format!("unknown effect {id:?}")))?;
         let player = live_player(fx, stage_options(fx.meta(), &opts)?);
-        let surface = Surface::new(player.frame())?;
         let mut r = self.renderer.borrow_mut();
-        Ok(r.scene.play(player, x, y, surface)?)
+        Ok(r.scene.play(player, x, y)?)
     }
 
     /// Let the effect end: loops fade out, one-shots are cut short; it is removed once done. Unknown handles
@@ -326,7 +328,9 @@ fn nonzero_scale(scale: u32) -> Result<NonZeroU32, JsError> {
 
 struct Renderer {
     ctx: CanvasRenderingContext2d,
-    scene: Scene<Surface>,
+    scene: Scene<Held>,
+    /// RGBA bytes a drawn layer goes through on its way to a scratch canvas, reused across draws.
+    scratch: Vec<u8>,
     background: Option<String>,
     /// How hard the own loop shakes the view (1 as designed).
     shake_strength: f64,
@@ -412,9 +416,11 @@ impl Renderer {
         ctx.save();
         // resizing the canvas resets smoothing, so set it every draw
         ctx.set_image_smoothing_enabled(false);
-        let drawn = self
-            .scene
-            .draw_layer(layer, |pass, frame, surface| surface.blit(ctx, pass, frame));
+        let mut shell = CanvasShell {
+            stage: ctx,
+            bytes: &mut self.scratch,
+        };
+        let drawn = self.scene.draw_layer(layer, &mut shell);
         ctx.restore();
         drawn
     }
@@ -422,6 +428,80 @@ impl Renderer {
 
 /// Frame to RGBA bytes for one half of a layer; true if anything shows.
 type Convert = fn(&Frame, &mut [u8]) -> bool;
+
+/// One drawn layer of one effect on scratch canvases: its colour and its light, each kept only if it shows.
+/// Drawn once, then shown by every effect on that frame.
+struct Held {
+    color: Option<OffscreenCanvas>,
+    light: Option<OffscreenCanvas>,
+}
+
+/// The stage's side of [`Shell`]: drawn layers onto scratch canvases, scratch canvases onto the stage.
+struct CanvasShell<'a> {
+    stage: &'a CanvasRenderingContext2d,
+    bytes: &'a mut Vec<u8>,
+}
+
+impl CanvasShell<'_> {
+    /// `frame` converted by `convert` on a new scratch canvas of its size, or none when nothing shows.
+    fn canvas(
+        &mut self,
+        frame: &Frame,
+        convert: Convert,
+    ) -> Result<Option<OffscreenCanvas>, String> {
+        self.bytes
+            .resize(frame.w as usize * frame.h as usize * 4, 0);
+        if !convert(frame, self.bytes) {
+            return Ok(None);
+        }
+        let canvas = OffscreenCanvas::new(frame.w, frame.h)
+            .map_err(|e| js_message("could not create an OffscreenCanvas", &e))?;
+        let ctx = canvas
+            .get_context("2d")
+            .map_err(|e| js_message("could not get an OffscreenCanvas 2d context", &e))?
+            .ok_or("OffscreenCanvas has no 2d context")?
+            .dyn_into::<OffscreenCanvasRenderingContext2d>()
+            .map_err(|_| "OffscreenCanvas 2d context has an unexpected type".to_string())?;
+        let image =
+            ImageData::new_with_u8_clamped_array_and_sh(Clamped(self.bytes), frame.w, frame.h)
+                .map_err(|e| js_message("could not create ImageData", &e))?;
+        ctx.put_image_data(&image, 0.0, 0.0)
+            .map_err(|e| js_message("putImageData failed", &e))?;
+        Ok(Some(canvas))
+    }
+}
+
+impl Shell for CanvasShell<'_> {
+    type Surface = Held;
+    type Error = String;
+
+    fn make(&mut self, frame: &Frame) -> Result<Held, String> {
+        Ok(Held {
+            color: self.canvas(frame, color_rgba)?,
+            light: self.canvas(frame, light_rgba)?,
+        })
+    }
+
+    fn refill(&mut self, surface: &mut Held, frame: &Frame) -> Result<(), String> {
+        *surface = self.make(frame)?;
+        Ok(())
+    }
+
+    fn show(&mut self, pass: Pass, surface: &Held) -> Result<(), String> {
+        let r = pass.rect;
+        let (x, y, w, h) = (r.x as f64, r.y as f64, r.w as f64, r.h as f64);
+        for (canvas, op) in [(&surface.color, "source-over"), (&surface.light, "lighter")] {
+            let Some(canvas) = canvas else { continue };
+            self.stage
+                .set_global_composite_operation(op)
+                .map_err(|e| js_message("could not set compositing", &e))?;
+            self.stage
+                .draw_image_with_offscreen_canvas_and_dw_and_dh(canvas, x, y, w, h)
+                .map_err(|e| js_message("drawImage failed", &e))?;
+        }
+        Ok(())
+    }
+}
 
 /// One effect's scratch canvas and the pixel buffer each layer goes through on its way to the stage. Built
 /// once per effect, reused every frame: drawing a layer allocates nothing on either side.

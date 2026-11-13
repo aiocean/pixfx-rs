@@ -9,6 +9,7 @@ pub mod cue;
 pub mod effect;
 pub mod feel;
 pub mod frame;
+pub mod frames;
 pub mod hit_flash;
 pub mod key;
 pub mod math;
@@ -33,6 +34,7 @@ pub use effect::{
 };
 pub use feel::{Feel, FeelSpec};
 pub use frame::{Frame, composite, composite_px, frame_hash};
+pub use frames::{FRAME_BUDGET, FrameStore};
 pub use key::{ClipKey, FrameId};
 pub use math::{Rng, rand};
 pub use outline::{Outline, OutlineError, Ring};

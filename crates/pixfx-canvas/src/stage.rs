@@ -9,7 +9,8 @@ use pixfx_core::cue::Cue;
 use pixfx_core::math::clamp;
 use pixfx_core::math::js_round;
 use pixfx_core::{
-    Effect, Feel, Frame, Layer, Meta, Options, Placement, TimedCue, composite_px, valid_dt,
+    Effect, Feel, Frame, FrameStore, Layer, Meta, Options, Placement, TimedCue, composite_px,
+    valid_dt,
 };
 use pixfx_wasm::{Player, parse_options};
 use serde::{Deserialize, Serialize};
@@ -128,23 +129,53 @@ impl fmt::Display for StageError {
 
 impl std::error::Error for StageError {}
 
-struct Entry<T> {
+/// What a host does with drawn frames: keep one drawn layer of one effect in a surface (a scratch canvas), and
+/// draw a surface onto its canvas. The [`Scene`] decides what to draw and when: an effect is drawn only when what
+/// it shows changes, and a frame other effects already show is drawn once and shared.
+pub trait Shell {
+    type Surface;
+    type Error;
+    /// A new surface holding `frame`, one layer of one effect.
+    fn make(&mut self, frame: &Frame) -> Result<Self::Surface, Self::Error>;
+    /// Put `frame` (the size `surface` was made for) in `surface`, replacing what it held.
+    fn refill(&mut self, surface: &mut Self::Surface, frame: &Frame) -> Result<(), Self::Error>;
+    /// Draw `surface` into `pass.rect`: colour normally, then light additively.
+    fn show(&mut self, pass: Pass, surface: &Self::Surface) -> Result<(), Self::Error>;
+}
+
+/// A layer's own frame: the surface an effect fading after `stop()` draws into, and what it last drew there.
+struct Own<S> {
+    surface: S,
+    /// The clock frame and placement it was drawn at: it is drawn again only when either changes.
+    drawn: (u64, Placement),
+}
+
+/// Bytes a surface holding `frame` takes: its colour and light as RGBA.
+fn frame_bytes(frame: &Frame) -> u64 {
+    u64::from(frame.w) * u64::from(frame.h) * 8
+}
+
+struct Entry<S> {
     handle: u32,
     /// Where the effect's origin sits, in whole game pixels.
     at: (i64, i64),
     /// How the player draws the effect on its own frame: `x`/`y` its origin there, the rest as the host sets.
     place: Placement,
     player: Player,
-    /// What the shell keeps per instance (its scratch canvas); `()` in tests.
-    surface: T,
+    /// Its own frames while it fades out (back, front); shared frames live in the scene's store.
+    own: [Option<Own<S>>; 2],
 }
 
-/// The playing instances, in the order they were played, and the game-to-canvas scale.
-pub struct Scene<T> {
+/// The playing instances, in the order they were played, the frames they share and the game-to-canvas scale.
+pub struct Scene<S> {
     scale: NonZeroU32,
     /// The next handle to give out; handles start at 1 and are never reused.
     next: Option<u32>,
-    entries: Vec<Entry<T>>,
+    entries: Vec<Entry<S>>,
+    /// The frames running effects share ([`Player::shown`]).
+    store: FrameStore<S>,
+    /// Counts layer draws, to tell which shared frames were shown when.
+    draws: u64,
     /// Events not yet drained, oldest first.
     events: Vec<StageEvent>,
     /// The answer to the cues the effects fire; `None` when the host answers them with its own.
@@ -153,12 +184,14 @@ pub struct Scene<T> {
     screen_w: f64,
 }
 
-impl<T> Scene<T> {
+impl<S> Scene<S> {
     pub fn new(scale: NonZeroU32) -> Self {
         Self {
             scale,
             next: Some(1),
             entries: Vec::new(),
+            store: FrameStore::default(),
+            draws: 0,
             events: Vec::new(),
             feel: Some(Feel::new()),
             screen_w: 0.0,
@@ -197,7 +230,7 @@ impl<T> Scene<T> {
 
     /// Add `player` with its origin at game pixel (`x`, `y`), rounded as JS `Math.round` does; returns its
     /// handle.
-    pub fn play(&mut self, player: Player, x: f64, y: f64, surface: T) -> Result<u32, StageError> {
+    pub fn play(&mut self, player: Player, x: f64, y: f64) -> Result<u32, StageError> {
         let at = game_pixel(x, y)?;
         let handle = self.next.ok_or(StageError::OutOfHandles)?;
         self.next = handle.checked_add(1);
@@ -206,7 +239,7 @@ impl<T> Scene<T> {
             at,
             place: player.placement(),
             player,
-            surface,
+            own: [None, None],
         });
         Ok(handle)
     }
@@ -294,7 +327,7 @@ impl<T> Scene<T> {
     }
 
     /// The instance's frame (its canvas plus margin) placed so the effect's origin lands on `e.at`.
-    fn rect_of(&self, e: &Entry<T>) -> Rect {
+    fn rect_of(&self, e: &Entry<S>) -> Rect {
         let s = u64::from(self.scale.get());
         let origin = e.player.canvas().origin;
         let pad = i64::from(e.player.margin());
@@ -359,23 +392,36 @@ impl<T> Scene<T> {
         Ok(run)
     }
 
-    /// Draw the back layer of every instance, then the front layer of every instance, oldest first, handing
-    /// each drawn frame to `blit`. Stops at the first error `blit` returns.
-    pub fn draw<E>(
-        &mut self,
-        mut blit: impl FnMut(Pass, &Frame, &mut T) -> Result<(), E>,
-    ) -> Result<(), E> {
-        self.draw_layer(Layer::Back, &mut blit)?;
-        self.draw_layer(Layer::Front, &mut blit)
+    /// How many bytes the shared frames may hold before the least recently shown go
+    /// ([`pixfx_core::FRAME_BUDGET`] unless set). A frame shown in the current draw is never dropped.
+    pub fn set_frame_budget(&mut self, bytes: u64) {
+        self.store.set_budget(bytes);
+        self.store.trim(self.draws);
     }
 
-    /// Draw only `layer` of every instance, oldest first, handing each drawn frame to `blit`. Stops at the
-    /// first error `blit` returns.
-    pub fn draw_layer<E>(
+    /// Bytes the shared frames hold now.
+    pub fn frame_bytes(&self) -> u64 {
+        self.store.bytes()
+    }
+
+    /// Draw the back layer of every instance, then the front layer of every instance, oldest first
+    /// ([`Scene::draw_layer`]).
+    pub fn draw<H: Shell<Surface = S>>(&mut self, shell: &mut H) -> Result<(), H::Error> {
+        self.draw_layer(Layer::Back, shell)?;
+        self.draw_layer(Layer::Front, shell)
+    }
+
+    /// Show `layer` of every instance, oldest first. A running effect shows a shared frame: the first effect to
+    /// reach it draws it into a new surface, the rest show that surface. A fading effect shows its own surface,
+    /// drawn again only when its clock frame or placement changes. Stops at the first error the shell returns.
+    pub fn draw_layer<H: Shell<Surface = S>>(
         &mut self,
         layer: Layer,
-        mut blit: impl FnMut(Pass, &Frame, &mut T) -> Result<(), E>,
-    ) -> Result<(), E> {
+        shell: &mut H,
+    ) -> Result<(), H::Error> {
+        self.draws += 1;
+        let now = self.draws;
+        let own_slot = usize::from(layer != Layer::Back);
         for i in 0..self.entries.len() {
             let Some(e) = self.entries.get(i) else { break };
             let pass = Pass {
@@ -386,16 +432,45 @@ impl<T> Scene<T> {
             let Some(e) = self.entries.get_mut(i) else {
                 break;
             };
-            e.player.draw(layer, e.place);
-            blit(pass, e.player.frame(), &mut e.surface)?;
+            match e.player.shown(e.place) {
+                Some(id) => {
+                    let surface = self.store.show(&id, layer, now, || {
+                        e.player.draw(layer, e.place);
+                        let frame = e.player.frame();
+                        Ok((shell.make(frame)?, frame_bytes(frame)))
+                    })?;
+                    shell.show(pass, surface)?;
+                }
+                None => {
+                    let drawn = (e.player.clock_frame(), e.place);
+                    let slot = &mut e.own[own_slot];
+                    match slot {
+                        Some(own) if own.drawn == drawn => {}
+                        Some(own) => {
+                            e.player.draw(layer, e.place);
+                            shell.refill(&mut own.surface, e.player.frame())?;
+                            own.drawn = drawn;
+                        }
+                        None => {
+                            e.player.draw(layer, e.place);
+                            let surface = shell.make(e.player.frame())?;
+                            *slot = Some(Own { surface, drawn });
+                        }
+                    }
+                    if let Some(own) = slot {
+                        shell.show(pass, &own.surface)?;
+                    }
+                }
+            }
         }
+        self.store.trim(now);
         Ok(())
     }
 }
 
 /// Cue `c` of entry `e`, from its player's frame to the stage: its origin moves to where the entry sits, a flip
 /// the host set since it played mirrors it again (rotation is left out), and its pan follows `screen_w`.
-fn on_stage<T>(e: &Entry<T>, mut c: TimedCue, screen_w: f64) -> TimedCue {
+fn on_stage<S>(e: &Entry<S>, mut c: TimedCue, screen_w: f64) -> TimedCue {
     let origin = e.player.placement();
     let sx = if e.place.flip == origin.flip {
         1.0
