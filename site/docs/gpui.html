@@ -31,28 +31,34 @@
 <pre><code>cargo test --manifest-path crates/pixfx-gpui/Cargo.toml</code></pre>
 
 <h2>Use</h2>
-<p>Keep one <code>FxView</code> per effect, tick it with real elapsed time, and paint it during gpui's paint phase:</p>
+<p>Keep one <code>FxView</code> per effect and one <code>FxFrames</code> per window. Tick each view with real elapsed time, paint the views during gpui's paint phase, then end the frame:</p>
 <pre><code>use pixfx_core::{Layer, Options};
-use pixfx_gpui::{FxView, paint_fx};
+use pixfx_gpui::{FxFrames, FxView, paint_fx};
 
 let campfire = pixfx_effects::effect("fire/campfire").ok_or("missing")?;
 let mut view = FxView::new(campfire, Options::default());
+let mut frames = FxFrames::default();
 
 // each frame
 view.tick(dt_seconds);
 
 // inside a canvas paint callback
-paint_fx(&amp;mut view, Layer::Both, origin, 4, window)?;</code></pre>
+paint_fx(&amp;mut view, &amp;mut frames, Layer::Both, origin, 4, window)?;
+frames.end_frame(window)?;</code></pre>
 <p><code>examples/gpui-web/main.rs</code> is a complete app: a candle and a campfire on a ground, ticked from <code>Instant::now()</code> and repainted every animation frame.</p>
 
 <h2>API</h2>
 <h3><code>FxView::new(effect, opts)</code></h3>
 <p>An instance on a canvas with <code>glow_margin</code> room on every side. <code>opts.x</code> and <code>opts.y</code> are replaced by the effect's pivot.</p>
 <h3><code>FxView::tick(dt)</code></h3>
-<p>Advance by <code>dt</code> seconds and mark the view changed.</p>
-<h3><code>paint_fx(view, layer, origin, scale, window)</code></h3>
+<p>Advance by <code>dt</code> seconds. Its picture changes only when its clock reaches a new frame (1/30 s for most effects).</p>
+<h3><code>FxView::stop()</code>, <code>FxView::done()</code></h3>
+<p>Let it end: loops fade out, one-shots are cut short. <code>done()</code> is true once nothing is left to show.</p>
+<h3><code>FxFrames</code></h3>
+<p>The frames uploaded to one window's sprite atlas, shared by every view painted into that window. <code>end_frame(window)</code> runs once after the views are painted. It drops from the atlas the images replaced this frame and, past the byte budget (<code>set_budget</code>, 64 MiB by default), the frames painted least recently, never one painted this frame. <code>bytes()</code> is what the frames hold. <code>release(view)</code> frees a view removed while it was fading out.</p>
+<h3><code>paint_fx(view, frames, layer, origin, scale, window)</code></h3>
 <p>Paint <code>layer</code> with the effect's origin at <code>origin</code> (logical pixels), each effect pixel <code>scale</code>×<code>scale</code> logical pixels (0 paints as 1). Colour is painted with <code>SpriteBlend::Normal</code>, then light with <code>SpriteBlend::Additive</code>, both with <code>SpriteFilter::Nearest</code>. Call it during the paint phase.</p>
-<p>Images are rebuilt only when the view ticked. Each rebuild uploads only the occupied rectangle of each layer to gpui's sprite atlas, then drops the images it replaces, so the atlas holds one generation per effect and layer. Paint a view into one window only.</p>
+<p>A frame is rasterised and uploaded only when no view has painted it yet. Views of the same effect with the same options on the same frame paint the same images, wherever they stand, so twenty campfires cost one upload. Only the occupied rectangle of each layer is uploaded. A view fading out after <code>stop()</code> paints its own images, redrawn once per frame of its clock. Paint a view into one window only.</p>
 
 <h2>Web demo</h2>
 <pre><code>cd examples/gpui-web

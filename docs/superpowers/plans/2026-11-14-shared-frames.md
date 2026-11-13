@@ -41,8 +41,12 @@ Tests: native `Scene` counts draws (fifty same-key effects, one draw per frame; 
 
 ## 5. gpui shares frames
 
-`pixfx-gpui`: views showing one `(key, k)` paint the same images; redraw only on a new frame. Checked with
-`cargo test --manifest-path crates/pixfx-gpui/Cargo.toml`.
+`pixfx-gpui`: `FxView` plays a core `Player`; one `FxFrames` per window holds the uploaded images in a
+`FrameStore` keyed by `(key, k)`. `paint_fx(view, frames, …)` rasterises and uploads a frame only when the store
+lacks it; a fading view keeps its own images, redrawn once per clock frame. `FxFrames::end_frame(window)` drops
+replaced and over-budget images from the atlas. Tests (`crates/pixfx-gpui/tests/frames.rs`, gpui's headless test
+window): twenty campfires hold the bytes of one; no upload within a frame; budget drops and a fading view's own
+images. `FrameStore` itself: `crates/pixfx-core/tests/frames.rs`.
 
 ## 6. Bake
 

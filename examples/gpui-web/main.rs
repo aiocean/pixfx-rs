@@ -10,7 +10,7 @@ use gpui::{
     point, prelude::*, px, rgb, size,
 };
 use pixfx_core::{Effect, Layer, Options};
-use pixfx_gpui::{FxView, paint_fx};
+use pixfx_gpui::{FxFrames, FxView, paint_fx};
 use web_time::Instant;
 
 /// Logical pixels per effect pixel.
@@ -23,6 +23,8 @@ const FPS_EVERY: f64 = 2.0;
 struct Campsite {
     candle: FxView,
     campfire: FxView,
+    /// The frames both effects paint from.
+    fx_frames: FxFrames,
     last: Option<Instant>,
     frames: u32,
     since: Option<Instant>,
@@ -33,6 +35,7 @@ impl Campsite {
         Self {
             candle: FxView::new(candle, Options::default()),
             campfire: FxView::new(campfire, Options::default()),
+            fx_frames: FxFrames::default(),
             last: None,
             frames: 0,
             since: None,
@@ -84,9 +87,14 @@ impl Campsite {
             )
         };
         for (view, x) in [(&mut self.candle, 0.3), (&mut self.campfire, 0.62)] {
-            if let Err(error) = paint_fx(view, Layer::Both, at(x), SCALE, window) {
+            if let Err(error) =
+                paint_fx(view, &mut self.fx_frames, Layer::Both, at(x), SCALE, window)
+            {
                 log::error!("pixfx: failed to paint an effect: {error:#}");
             }
+        }
+        if let Err(error) = self.fx_frames.end_frame(window) {
+            log::error!("pixfx: failed to drop old effect frames: {error:#}");
         }
     }
 }

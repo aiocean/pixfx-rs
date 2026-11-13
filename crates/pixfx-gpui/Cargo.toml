@@ -24,3 +24,7 @@ unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
 disallowed_methods = "deny"
+
+[dev-dependencies]
+gpui = { path = "../../../zed-gpui/crates/gpui", default-features = false, features = ["test-support"] }
+pixfx-effects = { path = "../pixfx-effects" }

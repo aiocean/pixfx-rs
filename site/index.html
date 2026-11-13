@@ -105,7 +105,8 @@ pixfx_export::write_gif(Path::new("brazier.gif"), &amp;rendered, 4)?;</code></pr
           <p>Paint effects inside a gpui window, light blended additively on the GPU with nearest sampling.</p>
 <pre><code>let mut view = FxView::new(campfire, Options::default());
 view.tick(dt);
-paint_fx(&amp;mut view, Layer::Both, origin, 4, window)?;</code></pre>
+paint_fx(&amp;mut view, &amp;mut frames, Layer::Both, origin, 4, window)?;
+frames.end_frame(window)?;</code></pre>
           <p><a href="docs/gpui.html">gpui reference</a></p>
         </div>
       </div>
