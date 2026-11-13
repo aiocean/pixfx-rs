@@ -1,6 +1,7 @@
 // The duel's rules and minds, driven the way the hero drives them: step after step, playing what comes back.
 import { describe, expect, test } from "bun:test";
 import { SCHOOLS, SPELLS, STATS, createDuel, damageOf, step } from "../assets/duel.js";
+import { Body } from "./engine.js";
 
 const PLAN2 = new Set([
   "fire/candle", "fire/campfire", "fire/brazier", "impacts/parry", "explosions/plasma-explosion", "explosions/implosion",
@@ -9,7 +10,7 @@ const PLAN2 = new Set([
 ]);
 const MAIN = new Set(["fire/candle", "fire/campfire", "fire/brazier"]);
 
-const arena = (seed, have = PLAN2) => createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => have.has(id) });
+const arena = (seed, have = PLAN2) => createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => have.has(id), Body });
 
 /** Run a duel for `seconds` at 60 fps; returns every command and what happened in each round. */
 function run(duel, seconds) {
@@ -177,7 +178,8 @@ describe("duel", () => {
     shooter.face = Math.sign(target.x - shooter.x);
     target.stats = { ...target.stats, dodge: 0 };
     // standing on the ground, steady, wherever an earlier bolt threw it
-    Object.assign(target, { air: 0, vy: 0, vx: 0, stun: 0, fly: false, down: null, wake: 0 });
+    target.body.startRound(target.x);
+    target.fly = false;
     setup?.(target);
     shooter.act = { spell: "bolt", phase: "windup", t: SPELLS.bolt.windup - 1 / 60 };
     const hits = [];
@@ -378,11 +380,11 @@ describe("duel", () => {
     thunder.act = { spell: "palm", phase: "windup", t: SPELLS.palm.windup - 1 / 60 };
     step(duel, 1 / 60);
     expect(frost.down?.phase).toBe("air");
-    frost.down.quick = false;
+    // it gets up the slow way: sit, kneel, stand (a quick rise rolls when the duel's dice fall under its chance)
+    duel.rng = () => 0.99;
     const lands = [];
     const { poses } = watch(duel, frost, () => {
       for (const c of duel.out) if (c.type === "land") lands.push(c);
-      if (frost.down?.phase === "down") frost.down.quick = false;
       return frost.down === null;
     });
     // up it goes, comes down, bounces off the floor once, lies there, sits up, kneels, and stands

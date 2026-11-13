@@ -36,10 +36,12 @@ Randomness comes in from the caller (`roll: &mut dyn FnMut() -> f64`) so the due
 
 ## Browser
 
-`pixfx-canvas` gains `Fighter` (a `Body` with getters/setters for its fields and `hit`, `step`, `pose`, …),
-`Feel`, and `Stage.drawFighter(look, appearance, …)` that draws through the same colour-then-light blit as effects.
-The site's `duel.js` keeps its rule fields on the plain fighter object and reads and writes body fields through
-the wasm `Body`; `duel-art.js` keeps only the HUD; `duel-feel.js` is removed.
+`pixfx-canvas` binds the crate for JS: `Body` (its fields as properties; `tick`, `step`, `hit`, `knockOut`,
+`settle`, `updatePose`, `Body.separate`, `Body.heavy`), `Feel` (takes the duel's event objects as they are) and
+`Sprites` (fighters with their marks and status layers, dust and portraits, drawn colour then light like a Stage's
+effects, between `begin()` and `end()`). The site's `duel.js` is given `Body` by `createDuel` and keeps only its
+rules on the fighter object, the body's fields being accessors onto the wasm `Body`; `duel-art.js` keeps the HUD and
+tells `Sprites` what each fighter is doing.
 
 ## Verification
 
