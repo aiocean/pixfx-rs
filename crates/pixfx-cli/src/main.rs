@@ -1,6 +1,6 @@
 //! `pixfx`: tools for pixfx effects.
 //!
-//!   pixfx parity <id> [--pixelfx DIR] [--out DIR]
+//!   pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
 //!
 //!   pixfx sheet <id> [--out DIR]
 //!   pixfx render <id> --gif [--scale N] [--out DIR]
@@ -11,18 +11,20 @@
 //!
 //! `parity` renders `<id>` with pixelfx (through `tools/pixelfx-ref.mjs`, under node) and with its pixfx port, prints
 //! how many pixels differ and whether that passes, and writes `<out>/<id>.side.gif` (pixelfx left, pixfx
-//! right). The pixelfx dir is `--pixelfx`, else `$PIXELFX`, else `./pixelfx`; `--out` defaults to
+//! right). Each `--opt key=value` sets an option on both sides: `seed` (a whole number), `flip` (0 or 1), or a
+//! numeric option of the effect (`hits=2`). The pixelfx dir is `--pixelfx`, else `$PIXELFX`, else `./pixelfx`; `--out` defaults to
 //! `target/parity`. Exits 0 on PASS, 1 on FAIL, 2 when the check could not run.
 #![forbid(unsafe_code)]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
+use pixfx_cli::opts::CliOpts;
 use pixfx_cli::parity::{compare, read_reference, write_side_gif};
 use pixfx_core::{Options, render_frames};
 use pixfx_export::{write_gif, write_sheet};
 
-const USAGE: &str = "usage: pixfx parity <id> [--pixelfx DIR] [--out DIR]
+const USAGE: &str = "usage: pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
        pixfx sheet <id> [--out DIR]
        pixfx render <id> --gif [--scale N] [--out DIR]";
 
@@ -45,6 +47,7 @@ struct ParityArgs {
     id: String,
     pixelfx: PathBuf,
     out: PathBuf,
+    opts: CliOpts,
 }
 
 fn main() -> ExitCode {
@@ -71,11 +74,13 @@ fn parse_parity(args: &[String]) -> Result<ParityArgs, String> {
     let mut pixelfx =
         std::env::var_os("PIXELFX").map_or_else(|| PathBuf::from("pixelfx"), PathBuf::from);
     let mut out = PathBuf::from("target/parity");
+    let mut opt_words = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--pixelfx" => pixelfx = it.next().ok_or(USAGE)?.into(),
             "--out" => out = it.next().ok_or(USAGE)?.into(),
+            "--opt" => opt_words.push(it.next().ok_or(USAGE)?.clone()),
             flag if flag.starts_with("--") => return Err(format!("unknown flag {flag}\n{USAGE}")),
             _ if id.is_none() => id = Some(a.clone()),
             _ => return Err(USAGE.to_string()),
@@ -85,6 +90,7 @@ fn parse_parity(args: &[String]) -> Result<ParityArgs, String> {
         id: id.ok_or(USAGE)?,
         pixelfx,
         out,
+        opts: CliOpts::parse(&opt_words)?,
     })
 }
 
@@ -152,7 +158,7 @@ fn parity(a: &ParityArgs) -> Result<bool, String> {
     reference_render(a)?;
     let reference =
         read_reference(&a.out, id).map_err(|e| format!("reading the {id} reference: {e}"))?;
-    let port = render_frames(effect, &Options::default(), 0);
+    let port = render_frames(effect, &a.opts.options(), 0);
     let report = compare(&reference, &port);
     if (reference.w, reference.h, reference.frames.len()) != (port.w, port.h, port.frames.len()) {
         eprintln!(
@@ -186,6 +192,8 @@ fn reference_render(a: &ParityArgs) -> Result<(), String> {
         .arg(&a.pixelfx)
         .arg("--out")
         .arg(&a.out)
+        .arg("--opts")
+        .arg(a.opts.to_json())
         .output()
         .map_err(|e| format!("running node: {e}"))?;
     if run.status.success() {
