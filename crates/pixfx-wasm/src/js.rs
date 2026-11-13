@@ -36,6 +36,11 @@ pub fn to_js<T: Serialize + ?Sized>(v: &T) -> Result<JsValue, JsError> {
         .map_err(|e| JsError::new(&format!("could not build a JS value: {e}")))
 }
 
+/// `[a, b]` as a plain JS array, for methods typed `[number, number]` (a `Vec` would arrive as a typed array).
+pub fn pair(a: f64, b: f64) -> Array {
+    Array::of2(&JsValue::from_f64(a), &JsValue::from_f64(b))
+}
+
 /// A JS value as plain data, `path` growing as it descends (`.motion.fly`, `[2]`) so an error says where.
 /// Whole numbers JS holds exactly become integers (so they read as `u32` as well as `f64`); `-0` and fractions stay
 /// `f64`, bit for bit.

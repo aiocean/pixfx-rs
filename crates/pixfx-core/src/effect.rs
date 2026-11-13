@@ -456,14 +456,16 @@ impl Instance {
     pub fn update(&mut self, dt: f64) {
         if valid_dt(dt) {
             let dt = js_min(dt, MAX_DT);
-            if self.stop_at.is_none() {
+            // a step that passes no time (a host's hit-stop) fires nothing: a cue at time 0 would fire again
+            if self.stop_at.is_none() && dt > 0.0 {
                 self.fire_cues(self.t, self.t + dt);
             }
             self.advance(dt);
         }
     }
 
-    /// Record the cues in `(t0, t1]`; a cue at time 0 fires on the first update (pixelfx `fire`).
+    /// Record the cues in `(t0, t1]`; a cue at time 0 fires on the first update that passes time (pixelfx
+    /// `fire`).
     fn fire_cues(&mut self, t0: f64, t1: f64) {
         let from = if t0 == 0.0 { -1e-9 } else { t0 };
         let meta = self.effect.meta();

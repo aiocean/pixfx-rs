@@ -4,7 +4,8 @@
 use pixfx_core::squash::{self, SquashSpec};
 use wasm_bindgen::prelude::*;
 
-use crate::js::parse;
+use crate::js::{pair, parse};
+use js_sys::Array;
 
 fn spec_of(v: &JsValue) -> Result<SquashSpec, JsError> {
     if v.is_undefined() || v.is_null() {
@@ -46,9 +47,9 @@ impl Squash {
 
     /// The sprite's scale this frame, `[sx, sy]`, moving up or down at `vy` pixels a second.
     #[wasm_bindgen(unchecked_return_type = "[number, number]")]
-    pub fn scale(&self, vy: f64) -> Vec<f64> {
+    pub fn scale(&self, vy: f64) -> Array {
         let (sx, sy) = squash::scale(self.inner.tall(vy));
-        vec![sx, sy]
+        pair(sx, sy)
     }
 }
 

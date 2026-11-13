@@ -126,6 +126,18 @@ fn cue_at_zero_fires_on_first_update() {
 }
 
 #[test]
+fn a_cue_at_zero_fires_once_through_steps_that_pass_no_time() {
+    // a host frozen by a hit-stop steps its effects by 0; the cue that froze it must not fire again
+    let mut inst = Instance::new(&AT_ZERO, Options::default());
+    let mut fired = 0;
+    for dt in [0.0, 0.0, 0.1, 0.0, 0.0, 0.1] {
+        inst.update(dt);
+        fired += inst.take_cues().len();
+    }
+    assert_eq!(fired, 1);
+}
+
+#[test]
 fn loop_repeats_cues_each_period() {
     let got = play(&LOOPED, Options::default(), 0.0, 26);
     let times: Vec<f64> = got.iter().map(|c| c.t).collect();

@@ -7,7 +7,8 @@ use pixfx_core::feel::{self, FeelSpec};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
-use crate::js::{parse, to_js};
+use crate::js::{pair, parse, to_js};
+use js_sys::Array;
 
 /// A cue as JS hands it back: what [`crate::Fx::take_cues`] gives (a sound's name is the host's, so it is read
 /// and let be).
@@ -157,9 +158,9 @@ impl Feel {
     /// Where the view sits this frame, `[dx, dy]` in game pixels. `strength` is the player's setting: 1 as
     /// designed, 0 holds the view still.
     #[wasm_bindgen(unchecked_return_type = "[number, number]")]
-    pub fn shake(&self, strength: f64) -> Vec<i32> {
+    pub fn shake(&self, strength: f64) -> Array {
         let (x, y) = self.inner.shake(strength);
-        vec![x, y]
+        pair(x.into(), y.into())
     }
 
     /// How shaken the view is, 0 to 1.

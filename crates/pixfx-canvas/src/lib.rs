@@ -27,10 +27,10 @@ use std::cell::{Cell, RefCell};
 use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
-use js_sys::Uint8ClampedArray;
+use js_sys::{Array, Uint8ClampedArray};
 use pixfx_core::{Feel, Frame, Layer};
 use pixfx_effects::effect;
-use pixfx_wasm::js::{parse, to_js};
+use pixfx_wasm::js::{pair, parse, to_js};
 use stage::{Pass, PlacementChange, Scene, color_rgba, light_rgba, live_player, stage_options};
 use wasm_bindgen::prelude::*;
 use web_sys::{
@@ -191,14 +191,14 @@ impl Stage {
     /// Where the view sits this frame, `[dx, dy]` in game pixels: the shake from the trauma the cues and
     /// `addTrauma` built up. `strength` is the player's setting: 1 as designed, 0 holds the view still.
     #[wasm_bindgen(unchecked_return_type = "[number, number]")]
-    pub fn shake(&self, strength: f64) -> Vec<i32> {
+    pub fn shake(&self, strength: f64) -> Array {
         let (x, y) = self
             .renderer
             .borrow()
             .scene
             .feel()
             .map_or((0, 0), |f| f.shake(strength));
-        vec![x, y]
+        pair(x.into(), y.into())
     }
 
     /// How hard the stage's own loop (`start`, `tick`) shakes the view: 1 as designed (the default), 0 not at

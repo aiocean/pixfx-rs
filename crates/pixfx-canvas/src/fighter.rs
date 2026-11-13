@@ -4,7 +4,7 @@
 
 use js_sys::{Array, Function, Object};
 use pixfx_fighter::feel::{self, Cue};
-use pixfx_wasm::js::{parse, to_js};
+use pixfx_wasm::js::{pair, parse, to_js};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -58,9 +58,9 @@ impl Feel {
     /// Where the screen sits this frame, `[dx, dy]` in game pixels. `strength` is the player's shake setting: 1 as
     /// designed, 0 holds the screen still.
     #[wasm_bindgen(unchecked_return_type = "[number, number]")]
-    pub fn shake(&self, strength: f64) -> Vec<i32> {
+    pub fn shake(&self, strength: f64) -> Array {
         let (x, y) = self.inner.shake(strength);
-        vec![x, y]
+        pair(x.into(), y.into())
     }
 
     /// How far each fighter is jolted off its place: `[[dx, dy], [dx, dy]]`.
