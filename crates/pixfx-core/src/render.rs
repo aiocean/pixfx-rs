@@ -47,7 +47,7 @@ pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -
             inst.advance(1.0 / f64::from(fps));
         }
         let mut frame = Frame::new(w, h, corner, corner);
-        inst.draw(&mut frame, Layer::Both);
+        inst.draw(&mut frame, Layer::Both, inst.placement());
         if fade {
             edge_fade(&mut frame);
         }

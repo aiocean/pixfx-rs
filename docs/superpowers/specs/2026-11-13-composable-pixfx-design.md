@@ -45,8 +45,9 @@ The Unix and FP ideas, made concrete for this codebase:
 - `blend`: the one canvas-exact source-over (8-bit alpha, premultiplied rounding as Chrome's raster does), with
   `fill_rect(frame, x, y, w, h, color, alpha)`. paint, status and dust use it.
 - `math`: `js_max`/`js_min` give JS's signed-zero results. Effect goldens and parity must stay as they are.
-- `Instance::set(Placement { x, y, flip, angle, light })`: change where and how a playing effect is drawn without
-  restarting it. (A palette is resolved at spawn; changing it means playing anew.)
+- `Instance::draw(&self, frame, layer, Placement { x, y, flip, angle, light })`: where and how an effect is drawn is
+  a draw argument the host keeps as data, so it changes while the effect plays without restarting it, and
+  anything drawing from `&self` can place it. (A palette is resolved at spawn; changing it means playing anew.)
 
 ### pixfx-canvas Stage
 - `stage.set(handle, {x?, y?, flip?, angle?, light?})` (keeps `move` as is).

@@ -196,9 +196,9 @@ impl Options {
     }
 }
 
-/// Where and how an instance is drawn: the part of its [`Options`] it reads at draw time, so it can change
-/// while the effect plays ([`Instance::set`]). Change some fields and keep the rest with struct update:
-/// `inst.set(Placement { flip: true, ..inst.placement() })`.
+/// Where and how an instance is drawn: the part of its [`Options`] read only at draw time, passed to
+/// [`Instance::draw`] each frame. The host keeps it as data and may change it while the effect plays; start from
+/// [`Instance::placement`] and change fields with struct update: `Placement { flip: true, ..inst.placement() }`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placement {
     /// Where the effect's origin goes, in frame space.
@@ -253,16 +253,17 @@ impl Instance {
         }
     }
 
-    /// Draw into `frame` at the current time: loops wrap, one-shots hold their last moment.
-    pub fn draw(&self, frame: &mut Frame, layer: Layer) {
+    /// Draw into `frame` at the current time, placed as `place` says: loops wrap, one-shots hold their last
+    /// moment.
+    pub fn draw(&self, frame: &mut Frame, layer: Layer, place: Placement) {
         let meta = self.effect.meta();
         let mut p = Painter::new(frame);
-        p.place(self.opts.x, self.opts.y, self.opts.flip, self.opts.angle);
+        p.place(place.x, place.y, place.flip, place.angle);
         p.fade = match self.stop_at {
             None => 1.0,
             Some(s) => clamp(1.0 - (self.t - s) / FADE, 0.0, 1.0),
         };
-        p.light_k = self.opts.light;
+        p.light_k = place.light;
         let t = if meta.looping {
             self.t % meta.duration
         } else {
@@ -294,7 +295,7 @@ impl Instance {
         self.t
     }
 
-    /// Where and how it is drawn now.
+    /// Where and how its options place it.
     pub fn placement(&self) -> Placement {
         let o = &self.opts;
         Placement {
@@ -304,12 +305,6 @@ impl Instance {
             angle: o.angle,
             light: o.light,
         }
-    }
-
-    /// Draw it from now on as `p` says, keeping its time and state: nothing restarts.
-    pub fn set(&mut self, p: Placement) {
-        let o = &mut self.opts;
-        (o.x, o.y, o.flip, o.angle, o.light) = (p.x, p.y, p.flip, p.angle, p.light);
     }
 }
 

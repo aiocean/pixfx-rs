@@ -165,7 +165,7 @@ impl Fx {
                 )));
             }
         };
-        self.player.draw(layer);
+        self.player.draw(layer, self.player.placement());
         Ok(())
     }
 

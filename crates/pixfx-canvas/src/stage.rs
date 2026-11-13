@@ -118,6 +118,8 @@ struct Entry<T> {
     handle: u32,
     /// Where the effect's origin sits, in whole game pixels.
     at: (i64, i64),
+    /// How the player draws the effect on its own frame: `x`/`y` its origin there, the rest as the host sets.
+    place: Placement,
     player: Player,
     /// What the shell keeps per instance (its scratch canvas); `()` in tests.
     surface: T,
@@ -160,6 +162,7 @@ impl<T> Scene<T> {
         self.entries.push(Entry {
             handle,
             at,
+            place: player.placement(),
             player,
             surface,
         });
@@ -182,7 +185,7 @@ impl<T> Scene<T> {
     /// reads them.
     pub fn placement(&self, handle: u32) -> Option<Placement> {
         self.entries.iter().find(|e| e.handle == handle).map(|e| {
-            let p = e.player.placement();
+            let p = e.place;
             // a game pixel past 2^53 loses precision as f64; no canvas reaches it
             Placement {
                 x: e.at.0 as f64,
@@ -202,12 +205,11 @@ impl<T> Scene<T> {
         };
         e.at = at;
         // the player's own x/y keep the origin on its frame; the stage places the frame
-        let own = e.player.placement();
-        e.player.set(Placement {
-            x: own.x,
-            y: own.y,
+        e.place = Placement {
+            x: e.place.x,
+            y: e.place.y,
             ..p
-        });
+        };
         Ok(true)
     }
 
@@ -324,7 +326,7 @@ impl<T> Scene<T> {
             let Some(e) = self.entries.get_mut(i) else {
                 break;
             };
-            e.player.draw(layer);
+            e.player.draw(layer, e.place);
             blit(pass, e.player.frame(), &mut e.surface)?;
         }
         Ok(())

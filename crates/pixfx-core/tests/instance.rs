@@ -71,7 +71,7 @@ fn lit(frame: &Frame, row: u32) -> Option<u32> {
 
 fn drawn(inst: &Instance) -> Frame {
     let mut frame = Frame::new(64, 4, 0, 0);
-    inst.draw(&mut frame, Layer::Both);
+    inst.draw(&mut frame, Layer::Both, inst.placement());
     frame
 }
 
@@ -166,10 +166,10 @@ fn layers_split_back_and_front() {
     let mut inst = Instance::new(&DOT, Options::default());
     inst.update(0.25);
     let mut back = Frame::new(64, 4, 0, 0);
-    inst.draw(&mut back, Layer::Back);
+    inst.draw(&mut back, Layer::Back, inst.placement());
     assert_eq!(lit(&back, 0), None, "the dot draws only in front");
     let mut front = Frame::new(64, 4, 0, 0);
-    inst.draw(&mut front, Layer::Front);
+    inst.draw(&mut front, Layer::Front, inst.placement());
     assert_eq!(front, drawn(&inst));
 }
 

@@ -38,7 +38,7 @@ fn huge_campfire_height_draws_in_bounded_time() -> Result<(), &'static str> {
     inst.update(0.2);
     let mut frame = Frame::new(w, h, 0, 0);
     let start = Instant::now();
-    inst.draw(&mut frame, Layer::Both);
+    inst.draw(&mut frame, Layer::Both, inst.placement());
     let took = start.elapsed();
     assert!(took < Duration::from_secs(1), "one draw took {took:?}");
     assert!(frame.color.iter().any(|&c| c != 0), "the fire still draws");

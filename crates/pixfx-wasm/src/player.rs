@@ -77,22 +77,18 @@ impl Player {
         self.inst.t()
     }
 
-    /// Where and how the instance is drawn on this player's frame ([`Instance::placement`]).
+    /// Where its options place the instance on this player's frame: `x`/`y` where [`Player::new`] put the
+    /// effect's origin ([`Instance::placement`]).
     pub fn placement(&self) -> Placement {
         self.inst.placement()
     }
 
-    /// Draw the instance from now on as `p` says, keeping its time ([`Instance::set`]). `x`/`y` are in this
-    /// player's frame, where [`Player::new`] put the effect's origin.
-    pub fn set(&mut self, p: Placement) {
-        self.inst.set(p);
-    }
-
-    /// Clear the frame and draw `layer` at the current time. With margin 0, light is eased out at the canvas
-    /// edge unless the effect is full-screen (as [`pixfx_core::render_frames`] does).
-    pub fn draw(&mut self, layer: Layer) {
+    /// Clear the frame and draw `layer` at the current time, placed as `place` says (`x`/`y` in this player's
+    /// frame). With margin 0, light is eased out at the canvas edge unless the effect is full-screen (as
+    /// [`pixfx_core::render_frames`] does).
+    pub fn draw(&mut self, layer: Layer, place: Placement) {
         self.frame.clear();
-        self.inst.draw(&mut self.frame, layer);
+        self.inst.draw(&mut self.frame, layer, place);
         if self.margin == 0 && !self.meta.is_screen() {
             edge_fade(&mut self.frame);
         }
@@ -151,7 +147,8 @@ mod tests {
         let fx = effect("fire/campfire").ok_or("campfire is not registered")?;
         let mut p = Player::new(fx, Options::default(), fx.meta().glow_margin());
         p.update(0.2);
-        p.draw(Layer::Both);
+        let place = p.placement();
+        p.draw(Layer::Both, place);
         Ok(p)
     }
 

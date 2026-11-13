@@ -284,7 +284,8 @@ fn passes_carry_the_drawn_layer() -> Res {
     let want: Vec<(Layer, usize)> = [Layer::Back, Layer::Front]
         .into_iter()
         .map(|layer| {
-            fresh.draw(layer);
+            let place = fresh.placement();
+            fresh.draw(layer, place);
             (
                 layer,
                 fresh.frame().light.iter().filter(|&&l| l != 0).count(),
@@ -356,7 +357,8 @@ fn stage_shows_glow_that_spills_past_the_canvas() -> Res {
         let mut spilled = 0;
         for _ in 0..60 {
             live.update(1.0 / 30.0);
-            live.draw(Layer::Both);
+            let place = live.placement();
+            live.draw(Layer::Both, place);
             let f = live.frame();
             spilled += (0..f.h)
                 .flat_map(|y| (0..f.w).map(move |x| (x, y)))
@@ -424,7 +426,8 @@ fn player_frames_equal_render_frames_at_its_margin() -> Res {
                 live.update(1.0 / fps);
                 stepped += 1;
             }
-            live.draw(Layer::Both);
+            let place = live.placement();
+            live.draw(Layer::Both, place);
             assert_eq!(Some(live.frame()), want.get(n), "margin {m}, frame {n}");
         }
     }

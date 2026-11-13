@@ -34,7 +34,7 @@ fn long_play_stays_bounded() -> Result<(), &'static str> {
     }
     let mut frame = Frame::new(w, h, 0, 0);
     let start = Instant::now();
-    inst.draw(&mut frame, Layer::Both);
+    inst.draw(&mut frame, Layer::Both, inst.placement());
     let took = start.elapsed();
     eprintln!("long_play_stays_bounded: one draw after 18000 updates took {took:?}");
     assert!(took < Duration::from_millis(50), "one draw took {took:?}");

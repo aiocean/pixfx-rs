@@ -170,7 +170,8 @@ fn margin_frames_match_player() -> Result<(), JsValue> {
         want.update(1.0 / 30.0);
         live.update(1.0 / 30.0).map_err(JsValue::from)?;
     }
-    want.draw(Layer::Both);
+    let place = want.placement();
+    want.draw(Layer::Both, place);
     live.draw("both").map_err(JsValue::from)?;
     assert_eq!(live.color().to_vec(), want.frame().color);
     assert_eq!(live.light().to_vec(), want.frame().light);
@@ -207,7 +208,8 @@ fn default_margin_unchanged() -> Result<(), JsValue> {
     assert_eq!(live.origin_x(), fx.meta().origin.0);
     want.update(0.1);
     live.update(0.1).map_err(JsValue::from)?;
-    want.draw(Layer::Both);
+    let place = want.placement();
+    want.draw(Layer::Both, place);
     live.draw("both").map_err(JsValue::from)?;
     assert_eq!(live.color().to_vec(), want.frame().color);
     assert_eq!(live.light().to_vec(), want.frame().light);
@@ -262,8 +264,10 @@ fn hex_string_option_is_a_colour() -> Result<(), JsValue> {
         plain.update(1.0 / 30.0);
         live.update(1.0 / 30.0).map_err(JsValue::from)?;
     }
-    want.draw(Layer::Both);
-    plain.draw(Layer::Both);
+    let place = want.placement();
+    want.draw(Layer::Both, place);
+    let place = plain.placement();
+    plain.draw(Layer::Both, place);
     live.draw("both").map_err(JsValue::from)?;
     assert_eq!(live.color().to_vec(), want.frame().color);
     assert_ne!(
