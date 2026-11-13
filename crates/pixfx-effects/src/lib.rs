@@ -7,6 +7,7 @@ pub mod arcane;
 pub mod explosions;
 pub mod fire;
 pub mod impacts;
+pub mod transitions;
 
 /// Every effect in this crate.
 pub static EFFECTS: &[&'static dyn Effect] = &[
@@ -19,6 +20,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &explosions::IMPLOSION,
     &explosions::PLASMA_EXPLOSION,
     &arcane::RUNE_CIRCLE,
+    &transitions::BURN_AWAY,
 ];
 
 /// The effect with this id (`fire/candle`).
