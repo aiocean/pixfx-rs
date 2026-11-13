@@ -5,9 +5,9 @@
 use std::fmt;
 use std::num::NonZeroU32;
 
-use js_sys::Reflect;
+use js_sys::{Array, Object, Reflect};
 use pixfx_core::math::js_round;
-use pixfx_core::{Effect, Frame, Layer, Options, composite_px, valid_dt};
+use pixfx_core::{Effect, Frame, Layer, Options, Placement, composite_px, valid_dt};
 use pixfx_wasm::{Player, parse_options};
 use wasm_bindgen::{JsError, JsValue};
 
@@ -24,6 +24,47 @@ pub fn stage_options(v: &JsValue) -> Result<Options, JsError> {
         ));
     }
     Ok(parse_options(v)?.0)
+}
+
+/// `base` with the fields of the JS object `v` (`{x?, y?, flip?, angle?, light?}`) put over it, for
+/// [`crate::Stage::set`]. Any other key, or a value of the wrong type, is an error naming the key.
+pub fn placement_patch(base: Placement, v: &JsValue) -> Result<Placement, JsError> {
+    if !v.is_object() || Array::is_array(v) {
+        return Err(JsError::new(
+            "set takes an object {x?, y?, flip?, angle?, light?}",
+        ));
+    }
+    let mut p = base;
+    for entry in Object::entries(&Object::from(v.clone())).iter() {
+        let pair = Array::from(&entry);
+        let key = pair.get(0).as_string().unwrap_or_default();
+        let val = pair.get(1);
+        if val.is_undefined() {
+            continue;
+        }
+        let number = || {
+            val.as_f64()
+                .filter(|n| n.is_finite())
+                .ok_or_else(|| JsError::new(&format!("{key} must be a finite number")))
+        };
+        match key.as_str() {
+            "x" => p.x = number()?,
+            "y" => p.y = number()?,
+            "angle" => p.angle = number()?,
+            "light" => p.light = number()?,
+            "flip" => {
+                p.flip = val
+                    .as_bool()
+                    .ok_or_else(|| JsError::new("flip must be a boolean"))?;
+            }
+            _ => {
+                return Err(JsError::new(&format!(
+                    "unknown key {key:?}: set takes x, y, flip, angle and light"
+                )));
+            }
+        }
+    }
+    Ok(p)
 }
 
 /// `effect` with `opts` as the stage plays it: on its canvas plus [`Meta::glow_margin`], so nothing at the
@@ -47,6 +88,13 @@ pub struct Pass {
     pub handle: u32,
     pub layer: Layer,
     pub rect: Rect,
+}
+
+/// Something that happened on the stage, queued in order until the host drains it ([`Scene::drain_events`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StageEvent {
+    /// The instance is gone: it finished, faded out after a stop, or was removed.
+    End { handle: u32 },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,6 +134,8 @@ pub struct Scene<T> {
     /// The next handle to give out; handles start at 1 and are never reused.
     next: Option<u32>,
     entries: Vec<Entry<T>>,
+    /// Events not yet drained, oldest first.
+    events: Vec<StageEvent>,
 }
 
 impl<T> Scene<T> {
@@ -94,6 +144,7 @@ impl<T> Scene<T> {
             scale,
             next: Some(1),
             entries: Vec::new(),
+            events: Vec::new(),
         }
     }
 
@@ -108,13 +159,9 @@ impl<T> Scene<T> {
     /// Add `player` with its origin at game pixel (`x`, `y`), rounded as JS `Math.round` does; returns its
     /// handle.
     pub fn play(&mut self, player: Player, x: f64, y: f64, surface: T) -> Result<u32, StageError> {
-        if !x.is_finite() || !y.is_finite() {
-            return Err(StageError::NotFinite);
-        }
+        let at = game_pixel(x, y)?;
         let handle = self.next.ok_or(StageError::OutOfHandles)?;
         self.next = handle.checked_add(1);
-        // `as` saturates; a position past i64 is off any canvas anyway
-        let at = (js_round(x) as i64, js_round(y) as i64);
         self.entries.push(Entry {
             handle,
             at,
@@ -127,16 +174,46 @@ impl<T> Scene<T> {
     /// Put the instance's origin at game pixel (`x`, `y`), rounded as [`Scene::play`] does, keeping its time:
     /// an effect that follows something moves without restarting. `Ok(false)` if no instance has this handle.
     pub fn move_to(&mut self, handle: u32, x: f64, y: f64) -> Result<bool, StageError> {
-        if !x.is_finite() || !y.is_finite() {
-            return Err(StageError::NotFinite);
-        }
-        let at = (js_round(x) as i64, js_round(y) as i64);
+        let at = game_pixel(x, y)?;
         Ok(self
             .entries
             .iter_mut()
             .find(|e| e.handle == handle)
             .map(|e| e.at = at)
             .is_some())
+    }
+
+    /// Where and how the instance is drawn: `x`/`y` its origin in whole game pixels, the rest as its effect
+    /// reads them.
+    pub fn placement(&self, handle: u32) -> Option<Placement> {
+        self.entries.iter().find(|e| e.handle == handle).map(|e| {
+            let p = e.player.placement();
+            // a game pixel past 2^53 loses precision as f64; no canvas reaches it
+            Placement {
+                x: e.at.0 as f64,
+                y: e.at.1 as f64,
+                ..p
+            }
+        })
+    }
+
+    /// Draw the instance as `p` says from now on, keeping its time: `x`/`y` move its origin as
+    /// [`Scene::move_to`] does, `flip`/`angle`/`light` change how it draws. `Ok(false)` if no instance has this
+    /// handle.
+    pub fn set(&mut self, handle: u32, p: Placement) -> Result<bool, StageError> {
+        let at = game_pixel(p.x, p.y)?;
+        let Some(e) = self.entries.iter_mut().find(|e| e.handle == handle) else {
+            return Ok(false);
+        };
+        e.at = at;
+        // the player's own x/y keep the origin on its frame; the stage places the frame
+        let own = e.player.placement();
+        e.player.set(Placement {
+            x: own.x,
+            y: own.y,
+            ..p
+        });
+        Ok(true)
     }
 
     /// Let the instance end (loops fade out); false if no instance has this handle.
@@ -148,11 +225,20 @@ impl<T> Scene<T> {
             .is_some()
     }
 
-    /// Drop the instance now; false if no instance has this handle.
+    /// Drop the instance now, queueing its end; false if no instance has this handle.
     pub fn remove(&mut self, handle: u32) -> bool {
         let before = self.entries.len();
         self.entries.retain(|e| e.handle != handle);
-        self.entries.len() != before
+        let removed = self.entries.len() != before;
+        if removed {
+            self.events.push(StageEvent::End { handle });
+        }
+        removed
+    }
+
+    /// The events since the last drain, oldest first; the queue is empty afterwards.
+    pub fn drain_events(&mut self) -> Vec<StageEvent> {
+        std::mem::take(&mut self.events)
     }
 
     /// The playing handles, oldest first.
@@ -195,7 +281,8 @@ impl<T> Scene<T> {
             .map(|e| e.player.t())
     }
 
-    /// Advance every instance by `dt` seconds, then drop the ones that are done. A `dt` that fails
+    /// Advance every instance by `dt` seconds, then drop the ones that are done, queueing their ends oldest
+    /// first. A `dt` that fails
     /// [`valid_dt`] (NaN, infinite or negative) is an error and changes nothing.
     pub fn update(&mut self, dt: f64) -> Result<(), StageError> {
         if !valid_dt(dt) {
@@ -204,7 +291,14 @@ impl<T> Scene<T> {
         for e in &mut self.entries {
             e.player.update(dt);
         }
-        self.entries.retain(|e| !e.player.done());
+        let events = &mut self.events;
+        self.entries.retain(|e| {
+            let done = e.player.done();
+            if done {
+                events.push(StageEvent::End { handle: e.handle });
+            }
+            !done
+        });
         Ok(())
     }
 
@@ -240,6 +334,15 @@ impl<T> Scene<T> {
         }
         Ok(())
     }
+}
+
+/// (`x`, `y`) as a whole game pixel, rounded as JS `Math.round` does; NaN or infinite is an error.
+fn game_pixel(x: f64, y: f64) -> Result<(i64, i64), StageError> {
+    if !x.is_finite() || !y.is_finite() {
+        return Err(StageError::NotFinite);
+    }
+    // `as` saturates; a position past i64 is off any canvas anyway
+    Ok((js_round(x) as i64, js_round(y) as i64))
 }
 
 /// Colour words (ABGR) as straight-alpha RGBA bytes into `out` (`w * h * 4`); true if any pixel is visible.

@@ -1,7 +1,7 @@
 //! One effect playing on its own canvas, in plain Rust: what [`crate::Fx`] wraps for JS and what other Rust
 //! crates (a canvas renderer) use directly.
 
-use pixfx_core::{Effect, Frame, Instance, Layer, Meta, Options, composite, edge_fade};
+use pixfx_core::{Effect, Frame, Instance, Layer, Meta, Options, Placement, composite, edge_fade};
 
 /// An effect instance and the canvas it draws into: the effect's `meta.size` plus `margin` empty pixels on
 /// every side, with the effect's origin at `meta.origin + margin`. After the n-th `update(1 / fps)`,
@@ -64,6 +64,17 @@ impl Player {
     /// Seconds since the instance started.
     pub fn t(&self) -> f64 {
         self.inst.t()
+    }
+
+    /// Where and how the instance is drawn on this player's frame ([`Instance::placement`]).
+    pub fn placement(&self) -> Placement {
+        self.inst.placement()
+    }
+
+    /// Draw the instance from now on as `p` says, keeping its time ([`Instance::set`]). `x`/`y` are in this
+    /// player's frame, where [`Player::new`] put the effect's origin.
+    pub fn set(&mut self, p: Placement) {
+        self.inst.set(p);
     }
 
     /// Clear the frame and draw `layer` at the current time. With margin 0, light is eased out at the canvas

@@ -170,6 +170,22 @@ impl Options {
     }
 }
 
+/// Where and how an instance is drawn: the part of its [`Options`] it reads at draw time, so it can change
+/// while the effect plays ([`Instance::set`]). Change some fields and keep the rest with struct update:
+/// `inst.set(Placement { flip: true, ..inst.placement() })`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Placement {
+    /// Where the effect's origin goes, in frame space.
+    pub x: f64,
+    pub y: f64,
+    /// Mirror left-right.
+    pub flip: bool,
+    /// Rotation, radians.
+    pub angle: f64,
+    /// Glow strength.
+    pub light: f64,
+}
+
 /// A live effect: pixelfx `createFx`.
 pub struct Instance {
     effect: &'static dyn Effect,
@@ -250,6 +266,24 @@ impl Instance {
     /// Seconds since the instance started.
     pub fn t(&self) -> f64 {
         self.t
+    }
+
+    /// Where and how it is drawn now.
+    pub fn placement(&self) -> Placement {
+        let o = &self.opts;
+        Placement {
+            x: o.x,
+            y: o.y,
+            flip: o.flip,
+            angle: o.angle,
+            light: o.light,
+        }
+    }
+
+    /// Draw it from now on as `p` says, keeping its time and state: nothing restarts.
+    pub fn set(&mut self, p: Placement) {
+        let o = &mut self.opts;
+        (o.x, o.y, o.flip, o.angle, o.light) = (p.x, p.y, p.flip, p.angle, p.light);
     }
 }
 

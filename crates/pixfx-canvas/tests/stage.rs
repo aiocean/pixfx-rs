@@ -4,9 +4,12 @@
 use std::error::Error;
 use std::num::NonZeroU32;
 
-use pixfx_canvas::stage::{Pass, Rect, Scene, StageError, color_rgba, light_rgba, live_player};
+use pixfx_canvas::stage::{
+    Pass, Rect, Scene, StageError, StageEvent, color_rgba, light_rgba, live_player,
+};
 use pixfx_core::{
-    Effect, EffectState, Frame, Layer, Meta, Options, Painter, Rgba, composite_px, render_frames,
+    Effect, EffectState, Frame, Layer, Meta, Options, Painter, Placement, Rgba, composite_px,
+    render_frames,
 };
 use pixfx_effects::effect;
 use pixfx_wasm::Player;
@@ -562,5 +565,63 @@ fn far_off_positions_saturate_instead_of_overflowing() -> Res {
         scene.rect(h).map(|r| (r.x, r.y)),
         Some((i64::MAX, i64::MIN))
     );
+    Ok(())
+}
+
+/// The front frame of every instance, oldest first.
+fn fronts(scene: &mut Scene<()>) -> Vec<Vec<u32>> {
+    let mut seen = Vec::new();
+    let ok: Result<(), ()> = scene.draw_layer(Layer::Front, |_pass, frame, _surface| {
+        seen.push(frame.color.clone());
+        Ok(())
+    });
+    assert_eq!(ok, Ok(()));
+    seen
+}
+
+#[test]
+fn setting_flip_mid_play_draws_it_flipped_without_restarting() -> Res {
+    let mut scene = Scene::new(scale(1)?);
+    let plain = scene.play(live_player(&LAYERED, Options::default()), 10.0, 10.0, ())?;
+    let flipped = Options {
+        flip: true,
+        ..Options::default()
+    };
+    scene.play(live_player(&LAYERED, flipped), 10.0, 10.0, ())?;
+    scene.update(0.25)?;
+    let before = fronts(&mut scene);
+    assert_ne!(
+        before[0], before[1],
+        "the test effect must look different flipped"
+    );
+
+    let p = scene.placement(plain).ok_or("no placement")?;
+    assert!(scene.set(plain, Placement { flip: true, ..p })?);
+
+    assert_eq!(scene.t(plain), Some(0.25), "set keeps the time");
+    let after = fronts(&mut scene);
+    assert_eq!(after[0], after[1], "drawn as one played flipped");
+    assert_eq!(scene.placement(plain), Some(Placement { flip: true, ..p }));
+    Ok(())
+}
+
+#[test]
+fn ended_effects_are_drained_once_in_order() -> Res {
+    let mut scene = Scene::new(scale(1)?);
+    let blip = scene.play(live_player(&BLIP, Options::default()), 0.0, 0.0, ())?;
+    let held = scene.play(live_player(&LAYERED, Options::default()), 0.0, 0.0, ())?;
+    let kept = scene.play(live_player(&LAYERED, Options::default()), 0.0, 0.0, ())?;
+    assert!(scene.remove(held));
+    scene.update(0.2)?;
+
+    assert_eq!(
+        scene.drain_events(),
+        vec![
+            StageEvent::End { handle: held },
+            StageEvent::End { handle: blip }
+        ]
+    );
+    assert_eq!(scene.drain_events(), vec![]);
+    assert_eq!(scene.handles().collect::<Vec<_>>(), vec![kept]);
     Ok(())
 }

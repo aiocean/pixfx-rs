@@ -19,10 +19,12 @@ use std::cell::{Cell, RefCell};
 use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
-use js_sys::Uint8ClampedArray;
+use js_sys::{Array, Object, Reflect, Uint8ClampedArray};
 use pixfx_core::{Frame, Layer};
 use pixfx_effects::effect;
-use stage::{Pass, Scene, color_rgba, light_rgba, live_player, stage_options};
+use stage::{
+    Pass, Scene, StageEvent, color_rgba, light_rgba, live_player, placement_patch, stage_options,
+};
 use wasm_bindgen::prelude::*;
 use web_sys::{
     CanvasRenderingContext2d, HtmlCanvasElement, ImageData, OffscreenCanvas,
@@ -88,6 +90,40 @@ impl Stage {
             .move_to(handle, x, y)
             .map(|_| ())
             .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Change where and how the effect draws without restarting it: `{x?, y?, flip?, angle?, light?}`, each
+    /// key left out keeps its value (`x`/`y` in game pixels, rounded as `move` does). An unknown key, a wrong
+    /// type or a non-finite number throws; unknown handles are ignored.
+    pub fn set(&mut self, handle: u32, change: JsValue) -> Result<(), JsError> {
+        let mut r = self.renderer.borrow_mut();
+        let Some(base) = r.scene.placement(handle) else {
+            return Ok(());
+        };
+        let p = placement_patch(base, &change)?;
+        r.scene
+            .set(handle, p)
+            .map(|_| ())
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// What happened since the last call, oldest first, and empties the queue: `{type: "end", handle}` for
+    /// each effect that finished, faded out after `stop`, or was removed.
+    pub fn events(&mut self) -> Result<Array, JsError> {
+        let drained = self.renderer.borrow_mut().scene.drain_events();
+        let out = Array::new();
+        for ev in drained {
+            let StageEvent::End { handle } = ev;
+            let o = Object::new();
+            let put = |k: &str, v: JsValue| {
+                Reflect::set(&o, &JsValue::from_str(k), &v)
+                    .map_err(|_| JsError::new("could not build an event"))
+            };
+            put("type", JsValue::from_str("end"))?;
+            put("handle", JsValue::from(handle))?;
+            out.push(&o);
+        }
+        Ok(out)
     }
 
     /// Drop the effect now. Unknown handles are ignored.
