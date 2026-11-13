@@ -3,7 +3,8 @@
 // draws its own sprites, then the front layers.
 import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
 import { DECOR, createDuel, step } from "./duel.js";
-import { drawBars, drawFighter } from "./duel-art.js";
+import { drawBars, drawFighter, drawNumbers } from "./duel-art.js";
+import { advance, createFeel, dusk, numbers, react, shake } from "./duel-feel.js";
 
 /** The two cultivators, by school, as the bars name them. */
 const NAMES = ["Thunder", "Frost"];
@@ -89,7 +90,7 @@ export async function mount() {
 // ---------- hero ----------
 
 function createHero(canvas, signal) {
-  const view = { canvas, stage: null, duel: null, layout: null, handles: new Map() };
+  const view = { canvas, stage: null, duel: null, feel: createFeel(), layout: null, handles: new Map() };
   const copy = document.querySelector(".hero-copy");
   const have = new Set(effects());
   let seed = 1 + Math.floor(Math.random() * 1e6);
@@ -116,6 +117,7 @@ function createHero(canvas, signal) {
     }
     // a brazier at each end of the arena lights it
     if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
+    view.feel = createFeel();
     view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id) });
     view.layout = { scale, w, h, ground, stars: stars(w, ground) };
     // a still frame shows the fight under way
@@ -139,24 +141,40 @@ function createHero(canvas, signal) {
 
   view.step = (dt) => {
     const { scale, w, h, ground, stars: dots } = view.layout;
-    play(step(view.duel, dt));
-    view.stage.update(reduceMotion ? 0 : dt);
+    // a blow stops the fight and its effects together for a few frames; a knockout plays out slowed
+    const run = advance(view.feel, dt);
+    const commands = step(view.duel, run);
+    play(commands);
+    react(view.feel, commands);
+    view.stage.update(reduceMotion ? 0 : run);
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = COLORS.sky;
     ctx.fillRect(0, 0, w * scale, h * scale);
+    ctx.save();
+    const [sx, sy] = shake(view.feel, Math.random);
+    ctx.translate(sx * scale, sy * scale);
     ctx.fillStyle = COLORS.star;
     for (const [x, y, a] of dots) {
       ctx.globalAlpha = a;
       ctx.fillRect(x * scale, y * scale, scale, scale);
     }
     ctx.globalAlpha = 1;
+    // wider and deeper than the canvas by the most the screen shakes
     ctx.fillStyle = COLORS.ground;
-    ctx.fillRect(0, ground * scale, w * scale, (h - ground) * scale);
+    ctx.fillRect(-4 * scale, ground * scale, (w + 8) * scale, (h - ground + 4) * scale);
     ctx.fillStyle = COLORS.edge;
-    ctx.fillRect(0, ground * scale, w * scale, scale);
+    ctx.fillRect(-4 * scale, ground * scale, (w + 8) * scale, scale);
     view.stage.drawLayer("back");
+    // an ultimate darkens the world behind the fighters and the magic
+    const dark = dusk(view.feel);
+    if (dark > 0) {
+      ctx.fillStyle = `rgba(4, 2, 10, ${dark})`;
+      ctx.fillRect(-scale * 4, -scale * 4, (w + 8) * scale, (h + 8) * scale);
+    }
     for (const f of view.duel.fighters) drawFighter(ctx, f, ground, scale);
     view.stage.drawLayer("front");
+    drawNumbers(ctx, numbers(view.feel), view.duel, scale);
+    ctx.restore();
     drawBars(ctx, view.duel, scale, NAMES);
   };
 

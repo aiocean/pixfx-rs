@@ -54,7 +54,8 @@ describe("duel", () => {
 
   test("with only the fire effects, they fight with swords and play nothing that is missing", () => {
     const duel = arena(3, MAIN);
-    expect(duel.fighters.map((f) => f.spells)).toEqual([["slash"], ["slash"]]);
+    // the blade needs no effect: a slash, and a dive from the air
+    expect(duel.fighters.map((f) => f.spells)).toEqual([["slash", "dive"], ["slash", "dive"]]);
     const { commands, rounds } = run(duel, 120);
     for (const c of commands) if (c.type === "play") expect(MAIN.has(c.fx)).toBe(true);
     expect(rounds.length).toBeGreaterThanOrEqual(1);
@@ -112,5 +113,44 @@ describe("duel", () => {
     step(duel, 1 / 60);
     expect(caster.act?.spell).toBe("icicle");
     expect(caster.act.target).toBeGreaterThan(foe.x + 20);
+  });
+  test("an ultimate waits for full rage, and blows landed or taken fill it", () => {
+    const duel = arena(4);
+    const [me] = duel.fighters;
+    me.spells = ["tribulation"];
+    me.qi = 100;
+    me.think = 0;
+    step(duel, 1 / 60);
+    expect(me.act).toBeNull();
+    const { commands } = run(duel, 60);
+    expect(commands.filter((c) => c.type === "ultimate").length).toBeGreaterThan(0);
+  });
+
+  test("a fighter caught in a prison's pull cannot blink out of it", () => {
+    let escaped = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const duel = arena(seed);
+      const [caster, target] = duel.fighters;
+      caster.think = 1e9;
+      caster.x = 60;
+      target.x = 120;
+      target.qi = 100;
+      target.think = 0.2;
+      caster.rage = 8;
+      caster.act = { spell: "prison", phase: "windup", t: SPELLS.prison.windup - 1 / 60, target: 120 };
+      const commands = run(duel, 1.3).commands;
+      if (commands.some((c) => c.type === "play" && c.fx === SPELLS.blink.fx)) escaped++;
+    }
+    expect(escaped).toBe(0);
+  });
+
+  test("a frozen fighter stays where it is", () => {
+    const duel = arena(6);
+    const [, target] = duel.fighters;
+    target.frozen = 0.8;
+    target.intent = { move: 1 };
+    const x = target.x;
+    for (let i = 0; i < 30; i++) step(duel, 1 / 60);
+    expect(target.x).toBe(x);
   });
 });

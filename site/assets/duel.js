@@ -1,6 +1,8 @@
-// The hero's duel: two cultivators fight with spells, and every spell is a pixfx effect. This module is the game
-// only: rules, spells, and each fighter's mind. It draws nothing and never touches the engine. `step` returns what
-// the engine should show (play, move or stop an effect); landing.js plays that and draws the fighters.
+// The hero's duel: two cultivators fight on the ground and in the air, with spells that are pixfx effects. This
+// module is the game only: rules, spells, and each fighter's mind. It draws nothing and never touches the engine.
+// `step` returns what the engine should show (play, move or stop an effect) and what just happened that the screen
+// should feel (`hit`, `clash`, `land`, `bump`, `ko`, `ultimate`, each with where and how hard); landing.js plays the effects and
+// gives the impacts their weight (hit-stop, shake, numbers).
 //
 // Units are game pixels and seconds. x grows to the right; heights (`air`, effect y) are measured up from the ground.
 
@@ -15,6 +17,21 @@ const HALF_WIDTH = 6;
 const WALK = 52;
 const JUMP_SPEED = 200;
 const GRAVITY = 520;
+/** Near the top of an arc gravity eases, so a jump hangs a moment before it falls (the apex hang). */
+const APEX = { speed: 45, gravity: 0.45 };
+/** Flying: how fast a fighter climbs or sinks toward the height it wants, the highest it goes, and its qi cost. */
+const FLY = { rate: 7, max: 140, top: 64, cost: 5 };
+/** A blow this strong or stronger throws the target up into the air. */
+const LAUNCH = { damage: 12, speed: 130, perDamage: 5 };
+/** Rage: a point for each blow landed or taken; when full, the school's ultimate. */
+export const RAGE = 8;
+/** Status effects: frozen (no moving, no acting) and shocked (a short paralysis), in seconds. */
+const FREEZE = 0.9;
+const SHOCK = { time: 0.4, chance: 0.3 };
+/** Knocked into the arena's edge faster than this, a fighter bounces off it. */
+const BOUNCE = 80;
+/** Falling faster than this when it lands, a fighter's landing is felt. */
+const HARD_LANDING = 140;
 const QI_REGEN = 7;
 const MEDITATE_REGEN = 24;
 /** How long a fighter takes to notice something new, and how often it thinks. */
@@ -38,21 +55,33 @@ const CLASH = "impacts/parry";
  */
 export const SPELLS = {
   slash: { kind: "melee", cost: 0, windup: 0.2, recover: 0.32, cooldown: 0.55, range: 20, damage: 8 },
-  bolt: { kind: "bolt", fx: "projectiles/laser-bolt", cost: 12, windup: 0.28, recover: 0.22, cooldown: 1.3, speed: 230, damage: 9 },
+  // from above: drop onto the foe sword first, and crack the ground if it lands there
+  dive: { kind: "melee", dive: true, cost: 8, windup: 0.22, recover: 0.4, cooldown: 1.6, range: 22, damage: 13, speed: 260, slamFx: "explosions/dirt-explosion" },
+  bolt: { kind: "bolt", fx: "projectiles/laser-bolt", cost: 12, windup: 0.28, recover: 0.22, cooldown: 1.3, speed: 230, damage: 9, shock: true },
   orb: {
     kind: "orb", fx: "lightning/ball-lightning", hitFx: "explosions/plasma-explosion",
     cost: 30, windup: 0.6, recover: 0.3, cooldown: 4.5, speed: 26, life: 5.5, damage: 12, radius: 10,
   },
   // icicle-fall drops its icicle at FREE + fall time: 0.64 + sqrt(2 * (80 - 36) / 950) s, and only starts to tremble,
   // which is when a fighter notices it overhead, at 0.3 s (pixelfx ice/icicle-fall.js TREMBLE)
-  icicle: { kind: "zone", fx: "ice/icicle-fall", cost: 22, windup: 0.42, recover: 0.28, cooldown: 2.2, impact: 0.944, radius: 16, damage: 20, notice: 0.3, height: 0, grounded: true },
+  icicle: { kind: "zone", fx: "ice/icicle-fall", cost: 22, windup: 0.42, recover: 0.28, cooldown: 2.2, impact: 0.944, radius: 16, damage: 20, notice: 0.3, height: 0, grounded: true, freeze: FREEZE },
   // implosion sucks in until 0.8 s and pops at 1.02 s (pixelfx explosions/implosion.js SUCK, STILL)
   collapse: {
     kind: "zone", fx: "explosions/implosion", cost: 26, windup: 0.5, recover: 0.3, cooldown: 2.4,
     impact: 1.02, radius: 18, damage: 18, notice: 0.15, height: CHEST, pull: 30, reach: 46, pullUntil: 0.8,
   },
   // a thunderclap from the open palm, at arm's length
-  palm: { kind: "blast", fx: "explosions/plasma-explosion", cost: 18, windup: 0.32, recover: 0.35, cooldown: 2.8, range: 30, damage: 14 },
+  palm: { kind: "blast", fx: "explosions/plasma-explosion", cost: 18, windup: 0.32, recover: 0.35, cooldown: 2.8, range: 30, damage: 14, shock: true },
+  // ultimates, cast with full rage. Thunder: three thunderclaps fall one after another where the foe will be.
+  tribulation: {
+    kind: "zone", fx: "explosions/plasma-explosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
+    impact: 0.08, radius: 12, damage: 11, notice: 0, height: CHEST, strikes: 3, every: 0.7, aimAhead: 0.5,
+  },
+  // Frost: a great collapse that drags the foe in from far off and freezes it where it pops.
+  prison: {
+    kind: "zone", fx: "explosions/implosion", ultimate: true, cost: 0, windup: 0.7, recover: 0.5, cooldown: 0,
+    impact: 1.02, radius: 26, damage: 22, notice: 0.1, height: CHEST, pull: 70, reach: 110, pullUntil: 0.9, seals: true, freeze: FREEZE * 1.4,
+  },
   // void-orb hangs 62 px over its origin (pixelfx shadow/void-orb.js Y) and loops every 3.2 s
   void: {
     kind: "void", fx: "shadow/void-orb", endFx: "explosions/implosion",
@@ -62,15 +91,18 @@ export const SPELLS = {
   blink: { kind: "blink", fx: "spawn/poof", cost: 20, windup: 0.06, recover: 0.12, cooldown: 1.8, distance: 56 },
 };
 
-/** The two schools: their spells, the distance each likes to fight at, how eager it is, and its colours. */
+/**
+ * The two schools: their spells, the distance each likes to fight at, how eager it is, the height it likes to hover
+ * at while it has the qi (`sky`; Frost casts from the air, Thunder fights on the ground), and its colours.
+ */
 export const SCHOOLS = {
   thunder: {
-    name: "Thunder", spells: ["slash", "palm", "bolt", "orb", "blink", "heal"], range: 52, aggression: 1.15,
+    name: "Thunder", spells: ["slash", "dive", "palm", "bolt", "orb", "blink", "heal", "tribulation"], range: 52, aggression: 1.15, sky: 0,
     bolt: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#ffe98a", "#fff6c4", "#ffffff"],
     circle: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"],
   },
   frost: {
-    name: "Frost", spells: ["slash", "bolt", "icicle", "collapse", "void", "blink", "heal"], range: 84, aggression: 1.1,
+    name: "Frost", spells: ["slash", "dive", "bolt", "icicle", "collapse", "void", "blink", "heal", "prison"], range: 84, aggression: 1.1, sky: 26,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
   },
@@ -114,7 +146,7 @@ export function createDuel({ seed = 1, left, right, ground, has }) {
 }
 
 function fighter(index, school, spells) {
-  return { index, school, spells, x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0 };
+  return { index, school, spells, x: 0, air: 0, vy: 0, vx: 0, face: 1, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, cool: {}, think: 0, intent: { move: 0 }, aura: null, pose: "idle", poseT: 0, flash: 0 };
 }
 
 function startRound(duel) {
@@ -125,7 +157,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0 });
+    Object.assign(f, { air: 0, vy: 0, vx: 0, hp: 100, qi: 100, act: null, stun: 0, guard: 0, medit: false, fly: false, hover: 0, land: 0, rage: 0, frozen: 0, shocked: 0, sealed: 0, cool: {}, think: 0.4 + duel.rng() * 0.3, intent: { move: 0 }, flash: 0 });
     f.x = duel.left + span * (f.index === 0 ? 0.22 : 0.78);
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
@@ -168,20 +200,49 @@ function body(duel, me, foe, dt) {
   me.flash = Math.max(0, me.flash - dt);
   me.poseT += dt;
   me.stun = Math.max(0, me.stun - dt);
+  me.frozen = Math.max(0, me.frozen - dt);
+  me.shocked = Math.max(0, me.shocked - dt);
+  me.sealed = Math.max(0, me.sealed - dt);
   me.guard = Math.max(0, me.guard - dt);
   for (const k of Object.keys(me.cool)) me.cool[k] = Math.max(0, me.cool[k] - dt);
-  me.qi = Math.min(100, me.qi + (me.medit ? MEDITATE_REGEN : QI_REGEN) * dt);
+  me.qi = Math.min(100, me.qi + (me.medit ? MEDITATE_REGEN : me.fly ? -FLY.cost : QI_REGEN) * dt);
+  me.land = Math.max(0, me.land - dt);
   if (!me.act && me.stun === 0) me.face = foe.x >= me.x ? 1 : -1;
+  // out of qi, or knocked out of the sky: flight ends and it falls
+  if (me.fly && (me.qi <= 1 || me.stun > 0)) me.fly = false;
 
-  // feet: walking (only when free), knockback, the jump arc
-  const free = !me.act && me.stun === 0 && !me.medit;
+  // feet: walking or flying across (only when free), knockback, then up and down
+  const free = !me.act && me.stun === 0 && !me.medit && me.frozen === 0 && me.shocked === 0;
   const walk = free && me.guard === 0 ? me.intent.move * WALK : 0;
   me.vx *= Math.exp(-6 * dt);
-  me.x = clamp(me.x + (walk + me.vx) * dt, duel.left + HALF_WIDTH, duel.right - HALF_WIDTH);
-  if (me.air > 0 || me.vy > 0) {
-    me.vy -= GRAVITY * dt;
+  const x = me.x + (walk + me.vx) * dt;
+  const lo = duel.left + HALF_WIDTH, hi = duel.right - HALF_WIDTH;
+  if ((x < lo || x > hi) && Math.abs(me.vx) > BOUNCE) {
+    // thrown into the edge of the arena: bounce off it
+    me.vx = -me.vx * 0.5;
+    emit(duel, { type: "bump", x: x < lo ? lo : hi, y: me.air + CHEST, strength: Math.min(1, Math.abs(me.vx) / 120) });
+  }
+  me.x = clamp(x, lo, hi);
+  const diving = me.act?.phase === "windup" && SPELLS[me.act.spell].dive;
+  if (diving) {
+    // a dive drops straight at the foe's height
+    me.air = Math.max(foe.air, me.air - SPELLS.dive.speed * dt);
+    me.vy = -SPELLS.dive.speed;
+  } else if (me.fly) {
+    me.vy = clamp((me.hover - me.air) * FLY.rate, -FLY.max, FLY.max);
+    me.air = clamp(me.air + me.vy * dt, 0, FLY.top);
+  } else if (me.air > 0 || me.vy > 0) {
+    const g = Math.abs(me.vy) < APEX.speed ? GRAVITY * APEX.gravity : GRAVITY;
+    const falling = -me.vy;
+    me.vy -= g * dt;
     me.air = Math.max(0, me.air + me.vy * dt);
-    if (me.air === 0) me.vy = 0;
+    if (me.air === 0) {
+      if (falling > HARD_LANDING) {
+        me.land = 0.14;
+        emit(duel, { type: "land", x: me.x, strength: Math.min(1, falling / 300) });
+      }
+      me.vy = 0;
+    }
   }
 
   if (me.act) {
@@ -199,8 +260,10 @@ function body(duel, me, foe, dt) {
 }
 
 function poseOf(f) {
-  if (f.hp <= 0) return "down";
-  if (f.stun > 0) return "hurt";
+  if (f.hp <= 0) return f.air > 2 ? "tumble" : "down";
+  if (f.frozen > 0) return "frozen";
+  if (f.shocked > 0) return "shocked";
+  if (f.stun > 0) return f.air > 4 ? "tumble" : "hurt";
   if (f.act) {
     const k = SPELLS[f.act.spell].kind;
     if (k === "melee") return f.act.phase === "windup" ? "draw" : "slash";
@@ -208,6 +271,8 @@ function poseOf(f) {
   }
   if (f.guard > 0) return "guard";
   if (f.medit) return "meditate";
+  if (f.land > 0) return "land";
+  if (f.fly) return "fly";
   if (f.air > 0) return "jump";
   if (f.intent.move !== 0) return "walk";
   return "idle";
@@ -216,6 +281,10 @@ function poseOf(f) {
 function begin(duel, me, name, target) {
   const spell = SPELLS[name];
   me.qi -= spell.cost;
+  if (spell.ultimate) {
+    me.rage = 0;
+    emit(duel, { type: "ultimate", by: me.index, x: me.x, y: me.air + CHEST });
+  }
   me.cool[name] = spell.cooldown + spell.windup;
   me.act = { spell: name, phase: "windup", t: 0, target };
   setMeditating(duel, me, false);
@@ -230,8 +299,16 @@ function release(duel, me, foe, spell) {
   const g = duel.ground;
   if (spell.kind === "melee") {
     me.vx += me.face * 90;
+    if (spell.dive) {
+      me.fly = false;
+      // a dive that ends on the ground cracks it
+      if (me.air < 2 && spell.slamFx && duel.has(spell.slamFx)) {
+        play(duel, spell.slamFx, me.x + me.face * 6, g, { size: 0.6, seed: Math.floor(duel.rng() * 1e6) });
+        emit(duel, { type: "land", x: me.x, strength: 1 });
+      }
+    }
     const dx = Math.abs(foe.x - me.x);
-    if (dx <= spell.range + HALF_WIDTH && Math.abs(foe.air - me.air) < CHEST && foe.hp > 0) {
+    if (dx <= spell.range + HALF_WIDTH && Math.abs(foe.air - me.air) < CHEST + 4 && foe.hp > 0) {
       if (blocks(foe, me.x, spell.damage)) clash(duel, (me.x + foe.x) / 2, g - CHEST - me.air, [me, foe]);
       else if (foe.act?.spell === "slash" && foe.act.phase === "windup" && foe.act.t > SPELLS.slash.windup * 0.6) {
         // both blades swing at once: they meet
@@ -249,14 +326,21 @@ function release(duel, me, foe, spell) {
     duel.shots.push({ kind: "orb", owner: me.index, x, t: 0, key, spell });
   } else if (spell.kind === "zone") {
     const x = clamp(me.act.target, duel.left + 6, duel.right - 6);
-    play(duel, spell.fx, x, g - spell.height, { seed: Math.floor(duel.rng() * 1e6) });
-    duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, t: 0, key: null, spell });
+    // what hangs in the air (a collapse) gathers at the foe's height; what falls (an icicle) hits the floor
+    const air = spell.grounded ? 0 : foe.air;
+    // a barrage falls strike after strike, each where the foe will be when it lands
+    for (let k = 0; k < (spell.strikes ?? 1); k++) {
+      duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, air, t: -k * (spell.every ?? 0), key: null, spell, follow: k > 0 });
+    }
   } else if (spell.kind === "blast") {
     const x = me.x + me.face * spell.range * 0.7;
     play(duel, spell.fx, x, g - CHEST - me.air, { seed: Math.floor(duel.rng() * 1e6) });
     if (Math.abs(foe.x - me.x) <= spell.range + HALF_WIDTH && Math.abs(foe.air - me.air) < BODY && foe.hp > 0) {
       if (blocks(foe, me.x, spell.damage)) clash(duel, foe.x - me.face * 4, g - CHEST - foe.air, [foe]);
-      else hurt(duel, foe, spell.damage, me.face, me.act.spell);
+      else {
+        hurt(duel, foe, spell.damage, me.face, me.act.spell);
+        if (spell.shock) shock(duel, foe, SHOCK.chance);
+      }
     }
   } else if (spell.kind === "void") {
     const x = clamp(foe.x, duel.left + 10, duel.right - 10);
@@ -268,9 +352,7 @@ function release(duel, me, foe, spell) {
   } else if (spell.kind === "blink") {
     play(duel, spell.fx, me.x, g - me.air, { seed: Math.floor(duel.rng() * 1e6) });
     me.x = clamp(me.act.target, duel.left + HALF_WIDTH, duel.right - HALF_WIDTH);
-    me.air = 0;
-    me.vy = 0;
-    play(duel, spell.fx, me.x, g, { seed: Math.floor(duel.rng() * 1e6) });
+    play(duel, spell.fx, me.x, g - me.air, { seed: Math.floor(duel.rng() * 1e6) });
   }
 }
 
@@ -292,11 +374,16 @@ function blocks(f, fromX, damage = 0) {
 /** f takes `damage` from `spell`, pushed toward `dir`; the step reports it as a `hit` command. */
 function hurt(duel, f, damage, dir, spell) {
   if (f.hp <= 0) return;
-  emit(duel, { type: "hit", by: 1 - f.index, spell, damage });
+  emit(duel, { type: "hit", by: 1 - f.index, spell, damage, x: f.x, y: f.air + CHEST });
+  gainRage(f, 1);
+  gainRage(duel.fighters[1 - f.index], 1);
   f.hp = Math.max(0, f.hp - damage);
   f.flash = 0.18;
   f.stun = STAGGER;
-  f.vx += dir * KNOCKBACK;
+  f.vx += dir * KNOCKBACK * (damage >= LAUNCH.damage ? 1.6 : 1);
+  f.fly = false;
+  // a heavy blow throws it up, where it can be hit again before it lands
+  if (damage >= LAUNCH.damage) f.vy = Math.max(f.vy, LAUNCH.speed + damage * LAUNCH.perDamage);
   // a hit breaks a cast: what was gathering is lost
   if (f.act?.circle !== undefined && f.act.phase === "windup") emit(duel, { type: "stop", key: f.act.circle });
   f.act = null;
@@ -304,13 +391,26 @@ function hurt(duel, f, damage, dir, spell) {
   setMeditating(duel, f, false);
 }
 
+function gainRage(f, n) {
+  f.rage = Math.min(RAGE, f.rage + n);
+}
+
+/** With `chance`, a shock paralyses f for a moment. */
+function shock(duel, f, chance) {
+  if (f.hp > 0 && duel.rng() < chance) f.shocked = SHOCK.time;
+}
+
 function clash(duel, x, y, fighters) {
+  emit(duel, { type: "clash", x, y: duel.ground - y });
   if (duel.has(CLASH)) play(duel, CLASH, x, y + 30, { height: 30, seed: Math.floor(duel.rng() * 1e6) });
   for (const f of fighters) f.vx += Math.sign(f.x - x || 1) * KNOCKBACK;
 }
 
 function knockOut(duel, f) {
   const other = duel.fighters[1 - f.index];
+  emit(duel, { type: "ko", x: f.x, y: f.air + CHEST });
+  f.fly = false;
+  other.fly = false;
   duel.winner = other.index;
   duel.wins[other.index]++;
   f.act = null;
@@ -370,7 +470,10 @@ function shot(duel, s, dt) {
     }
     if (overlaps(foe, s.x, s.y, 3)) {
       if (blocks(foe, s.x - s.vx, spell.damage)) clash(duel, s.x, g - s.y, []);
-      else hurt(duel, foe, spell.damage, Math.sign(s.vx), "bolt");
+      else {
+        hurt(duel, foe, spell.damage, Math.sign(s.vx), "bolt");
+        shock(duel, foe, SHOCK.chance);
+      }
       return endShot(duel, s);
     }
     if (s.x < duel.left - 40 || s.x > duel.right + 40) endShot(duel, s);
@@ -387,15 +490,32 @@ function shot(duel, s, dt) {
     }
     if (s.t >= spell.life) endShot(duel, s);
   } else if (s.kind === "zone") {
+    // a strike of a barrage aims where the foe was a moment before it falls, so a foe on the move gets out from under it
+    if (s.follow && !s.aimed && s.t >= -spell.aimAhead) {
+      s.aimed = true;
+      s.x = clamp(foe.x, duel.left + 6, duel.right - 6);
+      s.air = spell.grounded ? 0 : foe.air;
+    }
+    if (!s.shown && s.t >= 0) {
+      s.shown = true;
+      play(duel, spell.fx, s.x, g - spell.height - s.air, { seed: Math.floor(duel.rng() * 1e6) });
+    }
+    if (s.t < 0) return;
     // a collapse drags the foe toward its heart while it sucks in
     if (spell.pull && s.t < spell.pullUntil && Math.abs(s.x - foe.x) < spell.reach && foe.hp > 0) {
       const dx = s.x - foe.x;
       foe.x += Math.sign(dx) * Math.min(Math.abs(dx), spell.pull * dt);
     }
+    // a prison locks the space round it until it falls: no blinking out
+    if (spell.seals && !s.fell && Math.abs(s.x - foe.x) < spell.reach) foe.sealed = 2 * dt;
     if (!s.fell && s.t >= spell.impact) {
       s.fell = true;
-      const reaches = Math.abs(foe.x - s.x) < spell.radius + HALF_WIDTH && (!spell.grounded || foe.air < 10);
-      if (reaches) hurt(duel, foe, spell.damage, Math.sign(foe.x - s.x) || 1, s.name);
+      const reaches = Math.abs(foe.x - s.x) < spell.radius + HALF_WIDTH && (spell.grounded ? foe.air < 10 : Math.abs(foe.air - s.air) < 22);
+      if (reaches) {
+        hurt(duel, foe, spell.damage, Math.sign(foe.x - s.x) || 1, s.name);
+        if (spell.freeze) foe.frozen = spell.freeze;
+        if (spell.shock) shock(duel, foe, spell.ultimate ? 1 : SHOCK.chance);
+      }
     }
     if (s.t >= spell.impact + 0.2) duel.shots.splice(duel.shots.indexOf(s), 1);
   } else if (s.kind === "void") {
@@ -411,6 +531,11 @@ function shot(duel, s, dt) {
       endShot(duel, s);
     }
   }
+}
+
+/** Pressed against either edge of the arena. */
+function atWall(duel, f) {
+  return f.x <= duel.left + HALF_WIDTH + 2 || f.x >= duel.right - HALF_WIDTH - 2;
 }
 
 function orbAt(s) {
@@ -445,7 +570,7 @@ function stopShot(duel, s) {
  */
 function mind(duel, me, foe, dt) {
   me.think -= dt;
-  if (me.think > 0 || me.act || me.stun > 0 || me.hp <= 0) return;
+  if (me.think > 0 || me.act || me.stun > 0 || me.frozen > 0 || me.shocked > 0 || me.hp <= 0) return;
   me.think = THINK * (0.8 + duel.rng() * 0.4);
   const options = [...dangers(duel, me), ...blows(duel, me, foe), ...attacks(duel, me, foe), ...positions(duel, me, foe)];
   let best = null;
@@ -459,11 +584,18 @@ function mind(duel, me, foe, dt) {
   else if (best.spell === "jump") {
     if (me.air === 0) me.vy = JUMP_SPEED;
   } else if (best.spell === "guard") me.guard = best.hold;
+  else if (best.spell === "fly") {
+    me.fly = best.hover > 0;
+    me.hover = best.hover;
+    if (me.fly && me.air === 0) me.vy = JUMP_SPEED * 0.6;
+  }
   else if (best.spell === "meditate") setMeditating(duel, me, true);
   else if (best.spell !== "wait") begin(duel, me, best.spell, best.target);
 }
 
-const ready = (me, name) => me.spells.includes(name) && !(me.cool[name] > 0) && me.qi >= SPELLS[name].cost;
+const ready = (me, name) =>
+  me.spells.includes(name) && !(me.cool[name] > 0) && me.qi >= SPELLS[name].cost && (!SPELLS[name].ultimate || me.rage >= RAGE) &&
+  !(name === "blink" && me.sealed > 0);
 
 /** What is coming at me, and the ways out of each. */
 function dangers(duel, me) {
@@ -478,14 +610,27 @@ function dangers(duel, me) {
     return out[out.length - 1];
   };
   for (const s of duel.shots) {
-    if (s.owner === me.index || s.t < REACTION) continue;
+    if (s.owner === me.index) continue;
+    // a barrage still falling: its next strike aims where I stand, so keep on the move, toward the open side
+    if (s.follow && s.t < 0 && s.t > -s.spell.every - s.spell.aimAhead + REACTION) {
+      const way = me.x - duel.left > duel.right - me.x ? -1 : 1;
+      out.push({ spell: "move", move: me.vx !== 0 ? Math.sign(me.vx) * (atWall(duel, me) ? -1 : 1) : way, score: s.spell.damage * 1.4 });
+      continue;
+    }
+    if (s.t < REACTION) continue;
     if (s.kind === "bolt") {
       const toward = Math.sign(me.x - s.x) === Math.sign(s.vx);
       const tti = Math.abs(me.x - s.x) / Math.abs(s.vx);
       if (!toward || tti > 0.6 || s.y < me.air - 3 || s.y > me.air + BODY + 3) continue;
       const urgency = s.spell.damage * (1.2 - tti);
       if (Math.sign(s.x - me.x) === me.face) out.push({ spell: "guard", hold: tti + 0.15, score: urgency * 1.1 });
-      if (me.air === 0 && tti < 0.24 && tti > 0.08) out.push({ spell: "jump", score: urgency * 1.25 });
+      if (me.air === 0 && !me.fly && tti < 0.24 && tti > 0.08) out.push({ spell: "jump", score: urgency * 1.25 });
+      // on the sword: rise over it, or sink under it
+      if (me.qi > 12 && tti > 0.15) {
+        const over = s.y + 4;
+        if (over < FLY.top) out.push({ spell: "fly", hover: over, score: urgency * 1.15 });
+        if (me.fly && s.y > BODY + 2) out.push({ spell: "fly", hover: 0, score: urgency * 1.1 });
+      }
       if (ready(me, "bolt") && tti > 0.3) out.push({ spell: "bolt", target: null, score: urgency * 0.9 });
       const b = blink(s.x);
       if (b) b.score = urgency * 0.7;
@@ -505,6 +650,7 @@ function dangers(duel, me) {
       const urgency = s.spell.damage * (1.5 - left);
       const way = Math.abs(dx) < 1 ? (s.x - duel.left > duel.right - s.x ? -1 : 1) : Math.sign(dx);
       out.push({ spell: "move", move: way, score: urgency * 1.3 });
+      if (s.spell.grounded && me.qi > 12) out.push({ spell: "fly", hover: 24, score: urgency * 1.35 });
       const b = blink(s.x);
       if (b) b.score = urgency * (left < 0.3 ? 1.4 : 0.6);
     } else if (s.kind === "void") {
@@ -558,10 +704,15 @@ function attacks(duel, me, foe) {
     const s = SPELLS[name];
     return ((s.damage ?? 0) * chance * school.aggression) / (0.5 + s.windup + s.cost / 40);
   };
+  if (ready(me, "dive") && me.air - foe.air > 14 && d < 44) {
+    out.push({ spell: "dive", score: value("dive", busy > SPELLS.dive.windup ? 0.9 : foe.guard > 0 ? 0.25 : 0.6) });
+  }
   if (ready(me, "slash") && d < SPELLS.slash.range + 8 && Math.abs(foe.air - me.air) < CHEST) {
     out.push({ spell: "slash", score: value("slash", busy > SPELLS.slash.windup ? 0.95 : foe.guard > 0 ? 0.15 : 0.55) });
   }
-  if (ready(me, "bolt") && d > 24) {
+  // a bolt flies level from my chest: it must cross the foe's body
+  const level = me.air + CHEST > foe.air - 2 && me.air + CHEST < foe.air + BODY;
+  if (ready(me, "bolt") && d > 24 && level) {
     const travel = d / SPELLS.bolt.speed + SPELLS.bolt.windup;
     // a bolt into a bolt the foe is gathering only cancels it
     const trade = foe.act?.spell === "bolt" && foe.act.phase === "windup";
@@ -571,13 +722,21 @@ function attacks(duel, me, foe) {
   if (ready(me, "orb") && d > 40 && !duel.shots.some((s) => s.kind === "orb" && s.owner === me.index)) {
     out.push({ spell: "orb", score: value("orb", 0.5) });
   }
+  for (const name of ["tribulation", "prison"]) {
+    if (!ready(me, name)) continue;
+    const lead = SPELLS[name].windup + SPELLS[name].impact;
+    const pace = foe.act || foe.stun > 0 || foe.medit ? 0 : foe.intent.move * WALK;
+    out.push({ spell: name, target: foe.x + pace * lead * 0.8, score: value(name, 0.8) * (SPELLS[name].strikes ?? 1) + 3 });
+  }
   for (const name of ["icicle", "collapse"]) {
     if (!ready(me, name)) continue;
     // aim where the foe will be when it lands
     const lead = SPELLS[name].windup + SPELLS[name].impact;
     const pace = foe.act || foe.stun > 0 || foe.medit ? 0 : foe.intent.move * WALK;
     const target = foe.x + pace * lead * 0.8;
-    out.push({ spell: name, target, score: value(name, busy > lead * 0.6 ? 0.85 : SPELLS[name].pull ? 0.5 : 0.4) });
+    // an icicle only finds a foe standing on the floor
+    const grounded = SPELLS[name].grounded ? (foe.air < 10 && !foe.fly ? 1 : 0.1) : 1;
+    out.push({ spell: name, target, score: value(name, (busy > lead * 0.6 ? 0.85 : SPELLS[name].pull ? 0.5 : 0.4) * grounded) });
   }
   if (ready(me, "palm") && d < SPELLS.palm.range + 4) {
     out.push({ spell: "palm", score: value("palm", busy > SPELLS.palm.windup ? 0.9 : foe.guard > 0 ? 0.2 : 0.55) });
@@ -615,8 +774,13 @@ function positions(duel, me, foe) {
     const behind = foe.x + Math.sign(foe.x - me.x) * 30;
     if (behind > duel.left + 10 && behind < duel.right - 10) out.push({ spell: "blink", target: behind, score: 2.5 });
   }
+  // the height I want: my school's while I have the qi, the foe's when I must close in with a blade
+  let want = me.qi > 40 && has("bolt", "orb", "zone", "void") ? SCHOOLS[me.school].sky : 0;
+  if (!casting || Math.abs(d) < 40) want = foe.air > 16 && me.qi > 20 ? Math.min(FLY.top, foe.air) : want;
+  const flying = me.fly ? me.hover : 0;
+  if (Math.abs(flying - want) > 8) out.push({ spell: "fly", hover: want, score: 0.9 });
   const threatened = duel.shots.some((s) => s.owner !== me.index);
-  if (me.qi < 45 && Math.abs(d) > 70 && !threatened && !foe.act) out.push({ spell: "meditate", score: 2.2 - me.qi / 40 });
+  if (me.qi < 45 && Math.abs(d) > 70 && !threatened && !foe.act && me.air === 0 && !me.fly) out.push({ spell: "meditate", score: 2.2 - me.qi / 40 });
   return out;
 }
 
