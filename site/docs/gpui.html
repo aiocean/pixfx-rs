@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gpui · pixfx docs</title>
+  <meta name="description" content="pixfx-gpui paints live effects into a gpui window: colour with normal blending, light with additive blending, enlarged on the GPU with nearest-neighbour sampling so the pixel art stays crisp.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>gpui</h1>
+<p class="lead"><code>pixfx-gpui</code> paints live effects into a gpui window: colour with normal blending, light with additive blending, enlarged on the GPU with nearest-neighbour sampling so the pixel art stays crisp.</p>
+
+<h2>Requirements</h2>
+<p>Additive sprites and nearest sampling need a gpui fork. Check it out next to this repository at <code>../zed-gpui</code>, branch <code>pixfx/additive-sprites</code>. Without it, <code>crates/pixfx-gpui</code> and <code>examples/gpui-web</code> do not build; everything else does, because both are separate cargo workspaces.</p>
+<pre><code>cargo test --manifest-path crates/pixfx-gpui/Cargo.toml</code></pre>
+
+<h2>Use</h2>
+<p>Keep one <code>FxView</code> per effect, tick it with real elapsed time, and paint it during gpui's paint phase:</p>
+<pre><code>use pixfx_core::{Layer, Options};
+use pixfx_gpui::{FxView, paint_fx};
+
+let campfire = pixfx_effects::effect("fire/campfire").ok_or("missing")?;
+let mut view = FxView::new(campfire, Options::default());
+
+// each frame
+view.tick(dt_seconds);
+
+// inside a canvas paint callback
+paint_fx(&amp;mut view, Layer::Both, origin, 4, window)?;</code></pre>
+<p><code>examples/gpui-web/main.rs</code> is a complete app: a candle and a campfire on a ground, ticked from <code>Instant::now()</code> and repainted every animation frame.</p>
+
+<h2>API</h2>
+<h3><code>FxView::new(effect, opts)</code></h3>
+<p>An instance on a canvas with <code>glow_margin</code> room on every side. <code>opts.x</code> and <code>opts.y</code> are replaced by the effect's pivot.</p>
+<h3><code>FxView::tick(dt)</code></h3>
+<p>Advance by <code>dt</code> seconds and mark the view changed.</p>
+<h3><code>paint_fx(view, layer, origin, scale, window)</code></h3>
+<p>Paint <code>layer</code> with the effect's origin at <code>origin</code> (logical pixels), each effect pixel <code>scale</code>×<code>scale</code> logical pixels (0 paints as 1). Colour is painted with <code>SpriteBlend::Normal</code>, then light with <code>SpriteBlend::Additive</code>, both with <code>SpriteFilter::Nearest</code>. Call it during the paint phase.</p>
+<p>Images are rebuilt only when the view ticked. Each rebuild uploads only the occupied rectangle of each layer to gpui's sprite atlas, then drops the images it replaces, so the atlas holds one generation per effect and layer. Paint a view into one window only.</p>
+
+<h2>Web demo</h2>
+<pre><code>cd examples/gpui-web
+trunk serve --release</code></pre>
+<p>Open <code>http://127.0.0.1:8090/</code> and click the page once: gpui throttles a page that does not have focus, so effects run slowly until it is focused. Add <code>?backend=webgl</code> or <code>?backend=webgpu</code> to force a renderer. The console logs the frame rate every two seconds. The first build takes about 5 minutes; later builds take seconds.</p>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

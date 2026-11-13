@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Credits and license · pixfx docs</title>
+  <meta name="description" content="pixfx-rs is MIT licensed. It ports pixelfx to Rust, and its sprite sheets use the beanfx layout.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Credits and license</h1>
+<p class="lead">pixfx-rs is MIT licensed. It ports pixelfx to Rust, and its sprite sheets use the beanfx layout.</p>
+
+<h2>License</h2>
+<p>MIT. See <code>LICENSE</code> in the repository.</p>
+
+<h2>Projects it builds on</h2>
+<ul>
+  <li><strong>pixelfx</strong>, Copyright (c) 2026 Patch, Copyright (c) 2026 Hugo Duprez, MIT License (<a href="https://github.com/patch-gg/pixelfx">github.com/patch-gg/pixelfx</a>, commit <code>044e12a</code>). The effects and the engine they run on are ports of pixelfx.</li>
+  <li><strong>beanfx</strong>, Copyright (c) 2026 bien, MIT License (<a href="https://github.com/baenv/beanfx">github.com/baenv/beanfx</a>). The sprite sheets use the beanfx layout (three PNGs and Aseprite-style JSON with a <code>meta.beanfx</code> block) and its rule for compositing light over transparency.</li>
+</ul>
+
+<h2>pixelfx notices</h2>
+<p><strong>Hugo Duprez.</strong> pixelfx's <code>src/core/sim.js</code> and the effects that say so at the top of their file adapt Sprite Fusion's open-source pixel art VFX (<a href="https://www.spritefusion.com/pixel-art-vfx">spritefusion.com/pixel-art-vfx</a>), Copyright (c) 2026 Hugo Duprez, MIT License. In pixfx-rs, the fire effects' flame tongues, licks, flame puffs, smoke, embers and sparks come from this work.</p>
+<p><strong>Hollow Crown.</strong> pixelfx's <code>src/core/act.js</code> adapts how Hollow Crown plays its skills, from <a href="https://github.com/rehan-remade/hollow-crown">github.com/rehan-remade/hollow-crown</a>, Copyright (c) 2026 rehan-remade, MIT License.</p>
+<p><strong>Patch Pixel.</strong> The font in pixelfx's <code>gallery/fonts</code> is Patch's own and is not covered by pixelfx's MIT license. pixfx-rs does not include it.</p>
+<p>The full text is in <code>NOTICE.md</code>.</p>
+
+<h2>This site</h2>
+<p>Static HTML in <code>site/</code>. Type is set in Pixelify Sans and IBM Plex, served by Google Fonts. The effects on the home page run in the pixfx engine compiled to WebAssembly.</p>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

@@ -22,7 +22,7 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 | `crates/pixfx-cli` | The `pixfx` binary: `parity`, `sheet`, `render`. |
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`. Demo in `crates/pixfx-wasm/demo/`. |
-| `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick`; for a host-owned loop `update(dt)` then `drawLayer("back")` / `drawLayer("front")` around its own sprites. Demo in `crates/pixfx-canvas/demo/`. |
+| `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `move`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick`; for a host-owned loop `update(dt)` then `drawLayer("back")` / `drawLayer("front")` around its own sprites. Demo in `crates/pixfx-canvas/demo/`. |
 | `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, and scene-wide layers. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
 | `crates/pixfx-gpui` | Live playback inside gpui. Needs the gpui fork (see [gpui](#gpui)). |
 | `examples/gpui-web` | A gpui web app that plays the candle and campfire. Needs the gpui fork. |
@@ -125,6 +125,15 @@ trunk serve --release
 Open http://127.0.0.1:8090/ and click the page once: gpui throttles a page that does not have focus, so the
 effects run slowly until the page is focused. Add `?backend=webgl` or `?backend=webgpu` to force a renderer.
 The first build takes about 5 minutes; later builds take seconds.
+
+## Site
+
+The landing page and docs are static HTML in `site/`, live at https://pixfx.pages.dev.
+
+```sh
+site/build.sh --serve        # build site/dist (pages + pixfx-canvas wasm), serve on http://127.0.0.1:8770/
+wrangler pages deploy site/dist --project-name pixfx --branch main
+```
 
 ## Credits
 

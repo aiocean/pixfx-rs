@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sprite sheet format · pixfx docs</title>
+  <meta name="description" content="What pixfx sheet writes: three PNGs laid out on one grid, and a JSON file that Aseprite-style loaders and beanfx both read.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Sprite sheet format</h1>
+<p class="lead">What <code>pixfx sheet</code> writes: three PNGs laid out on one grid, and a JSON file that Aseprite-style loaders and beanfx both read.</p>
+
+<h2>Layout</h2>
+<p>Every frame is one cell of the same size, the effect's canvas (<code>meta.size</code> plus twice the margin; the CLI uses margin 0). Cells go left to right, at most 8 per row, then down.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Effect</th><th>Cell</th><th>Frames</th><th>Grid</th><th>Sheet size</th></tr></thead>
+  <tbody>
+    <tr><td><code>fire/candle</code></td><td>56×76</td><td>120</td><td>8×15</td><td>448×1140</td></tr>
+    <tr><td><code>fire/campfire</code></td><td>128×128</td><td>90</td><td>8×12</td><td>1024×1536</td></tr>
+    <tr><td><code>fire/brazier</code></td><td>112×148</td><td>90</td><td>8×12</td><td>896×1776</td></tr>
+  </tbody>
+</table>
+</div>
+<p>A loop has <code>round(duration × fps)</code> frames; frame <em>i</em> is the effect after <em>i</em> steps of <code>1/fps</code>, so the last frame leads back into the first. A one-shot has one more frame, its last moment.</p>
+
+<h2>The three images</h2>
+<ul>
+  <li><strong><code>&lt;name&gt;.png</code></strong> (RGBA): colour with light added, over transparency, as <code>composite</code> makes it. Draw it normally when your engine cannot blend additively. It reads correctly over dark backgrounds.</li>
+  <li><strong><code>&lt;name&gt;_color.png</code></strong> (RGBA, straight alpha): the colour layer only. Draw it normally.</li>
+  <li><strong><code>&lt;name&gt;_light.png</code></strong> (RGB): the light layer only. Draw it over the colour with additive blending (<code>src + dst</code>). Black adds nothing.</li>
+</ul>
+<p>Drawing <code>_color</code> then <code>_light</code> additively gives the effect exactly as the live renderers show it, lighting whatever is under it.</p>
+
+<h2>JSON</h2>
+<p>The JSON follows Aseprite's "array" export, so Aseprite loaders (Phaser's <code>load.aseprite</code>, many others) read it, with beanfx's own fields under <code>meta.beanfx</code>. Abridged output for <code>fire/candle</code>:</p>
+<pre><code>{
+  "frames": [
+    {
+      "filename": "fire_candle 0",
+      "frame": { "x": 0, "y": 0, "w": 56, "h": 76 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 56, "h": 76 },
+      "sourceSize": { "w": 56, "h": 76 },
+      "duration": 33
+    }
+    // ... one entry per frame
+  ],
+  "meta": {
+    "app": "pixfx",
+    "version": "1",
+    "image": "fire_candle.png",
+    "format": "RGBA8888",
+    "size": { "w": 448, "h": 1140 },
+    "scale": "1",
+    "frameTags": [{ "name": "fire_candle", "from": 0, "to": 119, "direction": "forward" }],
+    "beanfx": {
+      "name": "fire_candle",
+      "fps": 30,
+      "frames": 120,
+      "rows": 1,
+      "frameSize": [56, 76],
+      "columns": 8,
+      "pivot": [28, 64],
+      "loop": true,
+      "end": "loop",
+      "sheet": "fire_candle.png",
+      "color": "fire_candle_color.png",
+      "light": "fire_candle_light.png",
+      "blend_light": "add",
+      "light_gain": 1.0
+    }
+  }
+}</code></pre>
+
+<h3>Fields</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>frames[].duration</code></td><td>Milliseconds per frame, <code>round(1000 / fps)</code>.</td></tr>
+    <tr><td><code>frames[].frame</code></td><td>The cell on the sheet. Cells are never trimmed or rotated.</td></tr>
+    <tr><td><code>meta.frameTags</code></td><td>One tag spanning every frame, named after the effect.</td></tr>
+    <tr><td><code>beanfx.pivot</code></td><td>The effect's origin within a cell, y down from the cell's top-left: <code>meta.origin + margin</code>. Place this point where the effect should stand.</td></tr>
+    <tr><td><code>beanfx.loop</code>, <code>beanfx.end</code></td><td><code>true</code> and <code>"loop"</code> for loops; <code>false</code> and <code>"remove"</code> for one-shots, which should be removed after the last frame.</td></tr>
+    <tr><td><code>beanfx.sheet</code>, <code>color</code>, <code>light</code></td><td>File names of the three images, relative to the JSON.</td></tr>
+    <tr><td><code>beanfx.blend_light</code>, <code>light_gain</code></td><td>Draw <code>light</code> with additive blending at gain 1.</td></tr>
+    <tr><td><code>beanfx.rows</code></td><td>Always <code>1</code>: pixfx writes one animation per sheet. The grid's own row count is <code>ceil(frames / columns)</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

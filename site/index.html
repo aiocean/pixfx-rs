@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pixfx: pixel-art effects in Rust, native and in the browser</title>
+  <meta name="description" content="Pixel-art effects written once in Rust. Render sprite sheets and GIFs natively, or play the same effects live in the browser, Phaser 4 or gpui, pixel for pixel.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body class="landing">
+  <header class="topbar">
+    <a class="brand" href="./">pixfx</a>
+    <nav aria-label="Site">
+      <a href="docs/">Docs</a>
+      <a href="docs/effects.html">Effects</a>
+      <a href="docs/getting-started.html">Get started</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <canvas id="scene" aria-label="A live night scene: a candle, a campfire with a traveller standing by it, and a brazier, all drawn by the pixfx engine in WebAssembly."></canvas>
+      <div class="hero-copy">
+        <h1 id="hero-title">pixfx</h1>
+        <p class="lede">Pixel-art effects written once in Rust. Render them to sprite sheets, or play the same effects live in the browser, Phaser and gpui.</p>
+        <div class="actions">
+          <a class="button" href="docs/getting-started.html">Get started</a>
+          <a class="button quiet" href="docs/">Read the docs</a>
+        </div>
+      </div>
+      <p class="hint" id="hint">Click the ground to light a candle.</p>
+    </section>
+
+    <section class="section" aria-labelledby="effects-title">
+      <h2 id="effects-title">Effects</h2>
+      <p class="intro">Every effect takes the same options: a seed, a glow strength, a palette, and options of its own. Change them here; the call below each effect updates to match.</p>
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+    <section class="section" aria-labelledby="targets-title">
+      <h2 id="targets-title">Where it runs</h2>
+      <p class="intro">Pick the layer that fits your project. All of them share one engine and one effect registry.</p>
+      <div class="tabs" id="targets">
+        <div role="tablist" aria-label="Targets">
+          <button role="tab" id="tab-cli" aria-controls="panel-cli" aria-selected="true">Command line</button>
+          <button role="tab" id="tab-canvas" aria-controls="panel-canvas" aria-selected="false" tabindex="-1">Canvas 2D</button>
+          <button role="tab" id="tab-phaser" aria-controls="panel-phaser" aria-selected="false" tabindex="-1">Phaser 4</button>
+          <button role="tab" id="tab-js" aria-controls="panel-js" aria-selected="false" tabindex="-1">JS engine</button>
+          <button role="tab" id="tab-rust" aria-controls="panel-rust" aria-selected="false" tabindex="-1">Rust</button>
+          <button role="tab" id="tab-gpui" aria-controls="panel-gpui" aria-selected="false" tabindex="-1">gpui</button>
+        </div>
+
+        <div role="tabpanel" id="panel-cli" aria-labelledby="tab-cli">
+          <p>Write a sprite sheet (composite, colour and light PNGs plus beanfx-layout JSON), or a looping GIF.</p>
+<pre><code>cargo run -p pixfx-cli -- sheet fire/campfire --out out
+cargo run -p pixfx-cli -- render fire/campfire --gif --scale 4 --out out</code></pre>
+          <p><a href="docs/cli.html">Command line reference</a> · <a href="docs/sheets.html">Sprite sheet format</a></p>
+        </div>
+
+        <div role="tabpanel" id="panel-canvas" aria-labelledby="tab-canvas" hidden>
+          <p>A <code>Stage</code> on a canvas runs its own loop and draws every effect, upscaled by a whole number with no smoothing.</p>
+<pre><code>import init, { Stage } from "./pkg/pixfx_canvas.js";
+
+await init();
+const stage = new Stage(document.querySelector("canvas"), 4);
+stage.play("fire/campfire", 64, 112, { seed: 3 });
+stage.start();</code></pre>
+          <p><a href="docs/canvas.html">Canvas renderer reference</a></p>
+        </div>
+
+        <div role="tabpanel" id="panel-phaser" aria-labelledby="tab-phaser" hidden>
+          <p>A scene plugin. Effects show up as ordinary Phaser images, a back pair and a front pair, so sprites can stand inside the fire.</p>
+<pre><code>import { PixfxPlugin, loadPixfx } from "pixfx-phaser";
+
+await loadPixfx();
+// plugins: { scene: [{ key: "pixfx", plugin: PixfxPlugin, mapping: "pixfx" }] }
+const fire = this.pixfx.play("fire/campfire", 150, 170);
+fire.follow(player, 0, -4);</code></pre>
+          <p><a href="docs/phaser.html">Phaser plugin reference</a></p>
+        </div>
+
+        <div role="tabpanel" id="panel-js" aria-labelledby="tab-js" hidden>
+          <p>Drive an effect yourself and read its pixels: RGBA bytes, or the colour and light layers separately.</p>
+<pre><code>import init, { Fx } from "./pkg/pixfx_wasm.js";
+
+await init();
+const fx = new Fx("fire/candle", { seed: 1 });
+fx.update(1 / 60);
+fx.draw("both");
+ctx.putImageData(new ImageData(fx.rgba(), fx.width(), fx.height()), 0, 0);</code></pre>
+          <p><a href="docs/js-engine.html">JS engine reference</a></p>
+        </div>
+
+        <div role="tabpanel" id="panel-rust" aria-labelledby="tab-rust" hidden>
+          <p>Render frames in Rust, hash them, composite them or export them.</p>
+<pre><code>use pixfx_core::{Options, render_frames};
+
+let fx = pixfx_effects::effect("fire/brazier").ok_or("not registered")?;
+let rendered = render_frames(fx, &amp;Options::default(), 0);
+pixfx_export::write_gif(Path::new("brazier.gif"), &amp;rendered, 4)?;</code></pre>
+          <p><a href="docs/rust.html">Rust API reference</a></p>
+        </div>
+
+        <div role="tabpanel" id="panel-gpui" aria-labelledby="tab-gpui" hidden>
+          <p>Paint effects inside a gpui window, light blended additively on the GPU with nearest sampling.</p>
+<pre><code>let mut view = FxView::new(campfire, Options::default());
+view.tick(dt);
+paint_fx(&amp;mut view, Layer::Both, origin, 4, window)?;</code></pre>
+          <p><a href="docs/gpui.html">gpui reference</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="start-title">
+      <h2 id="start-title">Try it in a minute</h2>
+      <ol class="steps">
+        <li>
+          <p>Clone the repository. <code>rust-toolchain.toml</code> pins the nightly and the wasm target, so rustup fetches them on first build.</p>
+        </li>
+        <li>
+          <p>Render the campfire to a GIF:</p>
+<pre><code>cargo run -p pixfx-cli -- render fire/campfire --gif --out out</code></pre>
+        </li>
+        <li>
+          <p>Or play it in the browser through the canvas demo:</p>
+<pre><code>wasm-pack build crates/pixfx-canvas --target web --out-dir demo/pkg
+cd crates/pixfx-canvas/demo &amp;&amp; python3 -m http.server 8766 --bind 127.0.0.1</code></pre>
+        </li>
+      </ol>
+      <p><a href="docs/getting-started.html">Full getting-started guide</a></p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>MIT licensed. Effects are ports of <a href="https://github.com/patch-gg/pixelfx">pixelfx</a> by Patch and Hugo Duprez (Sprite Fusion), and sheets use the <a href="https://github.com/baenv/beanfx">beanfx</a> layout by bien. See <a href="docs/credits.html">credits</a>.</p>
+  </footer>
+
+  <script type="module" src="assets/site.js"></script>
+</body>
+</html>

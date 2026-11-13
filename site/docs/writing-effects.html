@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Write an effect · pixfx docs</title>
+  <meta name="description" content="An effect is a Rust static with metadata and a spawn function. This page shows its parts, the drawing API, the rules that keep it deterministic, and how to register and test it.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Write an effect</h1>
+<p class="lead">An effect is a Rust static with metadata and a <code>spawn</code> function. This page shows its parts, the drawing API, the rules that keep it deterministic, and how to register and test it.</p>
+
+<h2>Anatomy</h2>
+<p>Effects live in <code>crates/pixfx-effects/src/&lt;category&gt;/&lt;name&gt;.rs</code>. The skeleton below follows <code>fire/candle.rs</code>:</p>
+<pre><code>use pixfx_core::color::Rgba;
+use pixfx_core::{Effect, EffectState, Layer, Meta, Options, Painter};
+
+pub struct Ember;
+pub static EMBER: Ember = Ember;
+
+const META: Meta = Meta {
+    id: "fire/ember",
+    name: "Ember",
+    desc: "A single coal glowing and dimming.",
+    tags: &amp;["fire", "prop", "light", "loop"],
+    size: (24, 24),
+    origin: (12, 20),   // the point that lands where the caller plays it
+    duration: 2.0,      // seconds per loop
+    looping: true,
+    fps: 30,            // sheet frame rate
+    seed: 1,
+};
+
+// the default ramp, dark to bright; callers replace it with `palette`
+const PALETTE: [Rgba; 3] = [Rgba::hex24(0x4a1712), Rgba::hex24(0xf2561d), Rgba::hex24(0xffc23d)];
+
+impl Effect for Ember {
+    fn meta(&amp;self) -&gt; &amp;Meta {
+        &amp;META
+    }
+    fn spawn(&amp;self, opts: &amp;Options, seed: u64) -&gt; Box&lt;dyn EffectState&gt; {
+        Box::new(State {
+            ramp: opts.palette_or(&amp;PALETTE),
+            size: opts.num_or("size", 3.0), // an option of its own
+            seed: seed as f64,
+        })
+    }
+}
+
+struct State {
+    ramp: Vec&lt;Rgba&gt;,
+    size: f64,
+    seed: f64,
+}
+
+impl EffectState for State {
+    fn draw(&amp;self, p: &amp;mut Painter, t: f64, layer: Layer) {
+        if layer == Layer::Back {
+            return; // nothing behind a character
+        }
+        let k = 0.5 + 0.5 * libm::sin(t * core::f64::consts::PI + self.seed); // the seed shifts the phase
+        let Some(&amp;hot) = self.ramp.last() else { return };
+        p.rect(-self.size, -self.size, self.size * 2.0, self.size * 2.0, hot, 1.0);
+        p.glow(0.0, -1.0, 10.0, hot, 0.6 * k);
+    }
+}</code></pre>
+<p>Draw in local space: (0, 0) is the effect's origin, y grows downward. The instance places, mirrors and rotates the painter before calling <code>draw</code>, and applies fade-out and the <code>light</code> option, so the effect never handles them.</p>
+
+<h3>Draw from time, or simulate</h3>
+<p>Most effects draw purely from <code>t</code> (seconds into the loop) and the seed, so any frame can be drawn on its own and loops close exactly. Effects with real physics (sparks that bounce, debris that settles) keep state and override <code>EffectState::update(dt)</code>, which the instance calls once per sub-step of at most 1/120 s.</p>
+
+<h2>The painter</h2>
+<p><code>Painter</code> (<code>crates/pixfx-core/src/painter.rs</code>) draws into the frame's two layers. All coordinates are local and may be fractional; shapes snap to whole pixels.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Draws</th></tr></thead>
+  <tbody>
+    <tr><td><code>px</code>, <code>dot</code>, <code>blend</code></td><td>One pixel: opaque; at an alpha faded by ordered dither; or translucent.</td></tr>
+    <tr><td><code>line</code>, <code>rect</code>, <code>ellipse</code>, <code>tri</code>, <code>poly</code></td><td>Filled shapes and 1 px lines. Colour and alpha can be constants or functions of the shape's own coordinates.</td></tr>
+    <tr><td><code>each</code>, <code>shade</code></td><td>Visit every pixel in a local box and decide its colour and light yourself. Every filled shape is built on <code>each</code>, so shapes mirror and rotate exactly.</td></tr>
+    <tr><td><code>glow</code>, <code>glow_line</code>, <code>glow_ring</code></td><td>Light only: radial glow falling as (1 − d)² to 0 at radius <code>r</code>, along a line, or round a ring.</td></tr>
+    <tr><td><code>put</code>, <code>add</code>, <code>blend_px</code></td><td>Write colour or add light at a screen pixel.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Shared building blocks for fire (flame tongues, licks, sparks, embers, smoke puffs, floor light) are in <code>crates/pixfx-effects/src/fire/lib.rs</code>.</p>
+
+<h2>Rules</h2>
+<p>These keep native and wasm builds bit-identical and are enforced by the compiler and clippy:</p>
+<ul>
+  <li><strong>No platform float math.</strong> <code>clippy.toml</code> disallows <code>f64::sin</code>, <code>sqrt</code>, <code>floor</code>, <code>round</code> and every other transcendental, rounding or fused method. Use <code>libm::*</code>, and <code>pixfx_core::math::js_round</code> where JavaScript would call <code>Math.round</code>.</li>
+  <li><strong>Randomness comes from the seed.</strong> Use <code>math::rand</code>, <code>hash</code>, <code>noise</code> or a seeded <code>Rng</code>, never a system random source or the clock.</li>
+  <li><strong>No panics.</strong> <code>unwrap</code>, <code>expect</code> and <code>panic</code> are denied; handle a missing value (<code>let Some(..) else { return }</code>).</li>
+  <li><strong>No <code>unsafe</code>.</strong> Every crate has <code>#![forbid(unsafe_code)]</code>.</li>
+  <li><strong>Ports keep pixelfx's semantics.</strong> Where JavaScript behaves differently from Rust (NaN in <code>Math.min</code>, <code>| 0</code> truncation, <code>Uint8ClampedArray</code> rounding), use the <code>math::js_*</code> and <code>to_int32</code>/<code>to_uint32</code> helpers.</li>
+</ul>
+
+<h2>Register it</h2>
+<ol>
+  <li>Add <code>mod ember;</code> and <code>pub use ember::EMBER;</code> to the category's <code>mod.rs</code> (for example <code>src/fire/mod.rs</code>).</li>
+  <li>Add <code>&amp;fire::EMBER</code> to <code>EFFECTS</code> in <code>crates/pixfx-effects/src/lib.rs</code>. The order there is the order <code>effects()</code> returns.</li>
+</ol>
+<p>Every renderer, the CLI and the Phaser plugin pick it up from the registry; nothing else needs changing.</p>
+
+<h2>Test it</h2>
+<ol>
+  <li>Add the id to <code>IDS</code> in <code>crates/pixfx-effects/tests/determinism.rs</code> and record its goldens on a native target:
+<pre><code>PIXFX_BLESS=1 cargo test -p pixfx-effects --test determinism</code></pre></li>
+  <li>Check that the wasm build matches the same goldens:
+<pre><code>wasm-pack test --node crates/pixfx-effects --test determinism</code></pre></li>
+  <li>For a port of a pixelfx effect, run <a href="parity.html">parity</a> against pixelfx.</li>
+  <li>Look at it: <code>pixfx render &lt;id&gt; --gif</code>, or play it in the canvas demo.</li>
+  <li>Run the <a href="getting-started.html#whole-repo-check">whole-repo check</a>.</li>
+</ol>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

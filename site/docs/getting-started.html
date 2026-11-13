@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Getting started · pixfx docs</title>
+  <meta name="description" content="Build the repository, render an effect to a file, then play it live in a browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="effects.html">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Getting started</h1>
+<p class="lead">Build the repository, render an effect to a file, then play it live in a browser.</p>
+
+<h2>Requirements</h2>
+<ul>
+  <li><strong>Rust via rustup.</strong> <code>rust-toolchain.toml</code> pins the nightly toolchain and the <code>wasm32-unknown-unknown</code> target; rustup installs both on first build.</li>
+  <li><strong>wasm-pack</strong> for any browser build (<code>cargo install wasm-pack</code>).</li>
+  <li><strong>Node</strong> and a pixelfx checkout, only for <a href="parity.html">parity checks</a>.</li>
+  <li><strong>bun</strong>, only for the <a href="phaser.html">Phaser plugin</a>.</li>
+  <li><strong>trunk</strong> and a local gpui fork, only for <a href="gpui.html">gpui</a>.</li>
+</ul>
+<p>Commands on this site run from the repository root.</p>
+
+<h2>Build and test</h2>
+<p>The root workspace holds every crate except <code>crates/pixfx-gpui</code>, so a fresh clone builds and tests with nothing else installed.</p>
+<pre><code>cargo test --workspace</code></pre>
+<p>Optional: cargo's intermediate build files can go in one shared directory with <code>export CARGO_BUILD_BUILD_DIR=$PWD/target/build-dir</code>. Nothing needs it.</p>
+
+<h2>Render an effect to files</h2>
+<pre><code>cargo run -p pixfx-cli -- sheet fire/campfire --out out
+cargo run -p pixfx-cli -- render fire/campfire --gif --scale 4 --out out</code></pre>
+<p><code>sheet</code> writes <code>fire_campfire.png</code>, <code>fire_campfire_color.png</code>, <code>fire_campfire_light.png</code> and <code>fire_campfire.json</code> into <code>out/</code>. <code>render --gif</code> writes <code>fire_campfire.gif</code>, each pixel enlarged 4 times. See <a href="cli.html">Command line</a> and <a href="sheets.html">Sprite sheet format</a>.</p>
+
+<h2>Play it in a browser</h2>
+<p>The canvas demo shows the candle, campfire and brazier on a ground, with a figure standing between the campfire's back and front layers:</p>
+<pre><code>wasm-pack build crates/pixfx-canvas --target web --out-dir demo/pkg
+cd crates/pixfx-canvas/demo &amp;&amp; python3 -m http.server 8766 --bind 127.0.0.1</code></pre>
+<p>Open <code>http://127.0.0.1:8766/</code>. Click the canvas to restart the nearest effect.</p>
+<p>The JS engine demo plays the campfire by reading its pixels each frame:</p>
+<pre><code>wasm-pack build crates/pixfx-wasm --target web --out-dir demo/pkg
+cd crates/pixfx-wasm/demo &amp;&amp; python3 -m http.server 8765 --bind 127.0.0.1</code></pre>
+<p>Open <code>http://127.0.0.1:8765/</code>. Both demos must be served over HTTP: browsers do not load WebAssembly modules from <code>file://</code>.</p>
+
+<h2>Use it in your page</h2>
+<p>Copy the files <code>wasm-pack</code> wrote (<code>pixfx_canvas.js</code> and <code>pixfx_canvas_bg.wasm</code>) next to your page and import them:</p>
+<pre><code>&lt;canvas id="fx" width="512" height="512" style="image-rendering: pixelated"&gt;&lt;/canvas&gt;
+&lt;script type="module"&gt;
+  import init, { Stage } from "./pkg/pixfx_canvas.js";
+
+  await init();
+  const stage = new Stage(document.getElementById("fx"), 4); // one game pixel = 4×4 canvas pixels
+  stage.background("#13101b");                                // light only shows over a dark ground
+  stage.play("fire/campfire", 64, 112, { seed: 3 });           // origin at game pixel (64, 112)
+  stage.start();
+&lt;/script&gt;</code></pre>
+<p>That is the whole integration for a page that only shows effects. Games that draw sprites between an effect's layers own the loop instead; see <a href="canvas.html#host-owned-loop">Canvas renderer</a>.</p>
+
+<h2>Whole-repo check</h2>
+<p>What to run before a commit:</p>
+<pre><code>cargo fmt --check &amp;&amp; cargo clippy --workspace --all-targets -- -D warnings &amp;&amp; cargo test --workspace
+wasm-pack test --node crates/pixfx-wasm
+wasm-pack test --node crates/pixfx-canvas</code></pre>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>

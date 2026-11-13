@@ -1,0 +1,234 @@
+/* pixfx site: one stylesheet for the landing page and the docs.
+   Colours come from the effects' own ramps: night ground, wax text, flame and ember, the candle's blue root. */
+
+:root {
+  --night: #13101b;
+  --ground: #1e1a24;
+  --soot: #2f2a38;
+  --wax: #f0dcc0;
+  --ash: #b8a48e;
+  --flame: #ffc23d;
+  --ember: #f2561d;
+  --root: #7fb4ff;
+  --display: "Pixelify Sans", ui-monospace, monospace;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --measure: 72ch;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--night); color: var(--wax); }
+
+body {
+  margin: 0;
+  font: 400 1rem/1.6 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--flame); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { color: #ffe26b; }
+
+:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px; }
+
+h1, h2 { font-family: var(--display); font-weight: 500; line-height: 1.15; letter-spacing: 0.01em; }
+h3, h4 { font-family: var(--body); font-weight: 600; line-height: 1.3; }
+h1 { font-size: 2.44rem; margin: 0 0 1rem; }
+h2 { font-size: 1.95rem; margin: 2.5rem 0 0.75rem; }
+h3 { font-size: 1.25rem; margin: 2rem 0 0.5rem; }
+h4 { font-size: 1rem; margin: 1.5rem 0 0.25rem; }
+p, ul, ol { margin: 0 0 1rem; }
+li { margin: 0.25rem 0; }
+
+code, pre, kbd { font-family: var(--mono); font-size: 0.9em; }
+:not(pre) > code { color: var(--root); background: var(--ground); padding: 0.1em 0.35em; border-radius: 2px; }
+
+pre {
+  position: relative;
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  background: var(--ground);
+  border-left: 3px solid var(--ember);
+  line-height: 1.5;
+  tab-size: 2;
+}
+pre code { color: var(--wax); }
+
+.copy {
+  position: absolute; top: 0.4rem; right: 0.4rem;
+  font: 500 0.75rem var(--body); color: var(--ash);
+  background: var(--night); border: 1px solid var(--soot); padding: 0.15rem 0.5rem; cursor: pointer;
+}
+.copy:hover { color: var(--wax); }
+
+table { border-collapse: collapse; width: 100%; margin: 0 0 1.25rem; font-size: 0.95rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.5rem 0.75rem 0.5rem 0; border-bottom: 1px solid var(--soot); }
+th { font-weight: 600; color: var(--ash); }
+.table-wrap { overflow-x: auto; }
+
+.muted { color: var(--ash); }
+
+.button {
+  display: inline-block; padding: 0.65rem 1.1rem;
+  font: 600 1rem var(--body); text-decoration: none;
+  color: var(--night); background: var(--flame); border: 2px solid var(--flame);
+}
+.button:hover { color: var(--night); background: #ffe26b; border-color: #ffe26b; }
+.button.quiet { color: var(--wax); background: transparent; border-color: var(--soot); }
+.button.quiet:hover { border-color: var(--wax); }
+
+.swatches { display: inline-flex; vertical-align: middle; }
+.swatches span { width: 14px; height: 14px; display: inline-block; }
+
+/* ---------- site header ---------- */
+
+.topbar {
+  display: flex; align-items: center; gap: 1.5rem;
+  padding: 0.75rem clamp(1rem, 4vw, 2.5rem);
+  border-bottom: 1px solid var(--soot);
+}
+.topbar .brand { font: 500 1.4rem var(--display); color: var(--wax); text-decoration: none; }
+.topbar nav { display: flex; gap: 1.25rem; margin-left: auto; }
+.topbar nav a { color: var(--ash); text-decoration: none; }
+.topbar nav a:hover, .topbar nav a[aria-current] { color: var(--wax); }
+.landing .topbar { position: absolute; inset: 0 0 auto; z-index: 2; border-bottom: 0; padding-left: var(--edge); padding-right: var(--edge); }
+/* the left edge of the centred sections, so full-bleed parts line up with them */
+.landing { --edge: max(clamp(1rem, 4vw, 2.5rem), calc((100vw - 76rem) / 2 + clamp(1rem, 4vw, 2.5rem))); }
+
+/* ---------- landing ---------- */
+
+.hero { position: relative; min-height: min(78vh, 640px); overflow: hidden; }
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: crosshair; }
+.hero-copy {
+  position: relative; z-index: 1; pointer-events: none;
+  max-width: calc(34rem + var(--edge)); padding: clamp(6rem, 14vh, 9rem) 2.5rem 2rem var(--edge);
+}
+.hero-copy > * { pointer-events: auto; }
+.hero h1 { font-size: clamp(3rem, 8vw, 5.5rem); margin: 0 0 0.5rem; line-height: 1; }
+.hero .lede { font-size: 1.25rem; line-height: 1.5; margin: 0 0 1.5rem; }
+.hero .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.hero .hint { position: absolute; z-index: 1; right: clamp(1rem, 4vw, 2.5rem); bottom: 0.75rem; margin: 0; font-size: 0.85rem; color: var(--ash); }
+
+.section { padding: 4rem clamp(1rem, 4vw, 2.5rem); max-width: 76rem; margin: 0 auto; }
+.section > h2 { margin-top: 0; }
+.section > .intro { max-width: 60ch; color: var(--ash); font-size: 1.1rem; }
+
+
+
+.gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+.tile { background: var(--ground); display: flex; flex-direction: column; }
+.tile canvas { width: 100%; height: auto; image-rendering: pixelated; background: var(--ground); display: block; }
+.tile-body { padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: 0.75rem; flex: 1; }
+.tile h3 { margin: 0; }
+.tile .facts { margin: 0; font-size: 0.85rem; color: var(--ash); }
+.tile .desc { margin: 0; font-size: 0.95rem; }
+.controls { display: grid; grid-template-columns: auto 1fr auto; gap: 0.4rem 0.75rem; align-items: center; font-size: 0.9rem; }
+.controls label { color: var(--ash); }
+.controls output { font-family: var(--mono); font-size: 0.85rem; min-width: 3ch; text-align: right; }
+.controls select, .controls button {
+  grid-column: 2 / 4; font: inherit; color: var(--wax); background: var(--night);
+  border: 1px solid var(--soot); padding: 0.3rem 0.5rem;
+}
+.controls button { cursor: pointer; }
+.controls button:hover { border-color: var(--wax); }
+input[type="range"] { accent-color: var(--flame); width: 100%; }
+.tile pre { margin: auto 0 0; font-size: 0.8rem; border-left-color: var(--soot); background: var(--night); }
+
+.tabs [role="tablist"] { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 1px solid var(--soot); margin-bottom: 1.25rem; }
+.tabs [role="tab"] {
+  font: 500 0.95rem var(--body); color: var(--ash); background: none; border: 0;
+  border-bottom: 3px solid transparent; padding: 0.6rem 0.9rem; cursor: pointer;
+}
+.tabs [role="tab"]:hover { color: var(--wax); }
+.tabs [role="tab"][aria-selected="true"] { color: var(--wax); border-bottom-color: var(--flame); }
+.tabs [role="tabpanel"] { max-width: var(--measure); }
+
+.steps { counter-reset: step; list-style: none; padding: 0; max-width: var(--measure); }
+.steps > li { counter-increment: step; position: relative; padding-left: 2.75rem; margin-bottom: 1.5rem; }
+.steps > li::before {
+  content: counter(step); position: absolute; left: 0; top: 0;
+  font: 500 1.4rem/1 var(--display); color: var(--flame);
+}
+
+.footer { border-top: 1px solid var(--soot); padding: 2rem clamp(1rem, 4vw, 2.5rem); color: var(--ash); font-size: 0.9rem; }
+.footer p { max-width: var(--measure); }
+
+/* ---------- docs ---------- */
+
+.docs-shell {
+  display: grid; grid-template-columns: 15rem minmax(0, 1fr) 13rem; gap: 2.5rem;
+  max-width: 82rem; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.5rem);
+}
+.sidebar { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 2rem 0; font-size: 0.95rem; }
+.sidebar h4 { margin: 1.25rem 0 0.35rem; color: var(--ash); font-size: 0.85rem; font-weight: 500; }
+.sidebar h4:first-child { margin-top: 0; }
+.sidebar ul { list-style: none; padding: 0; margin: 0; }
+.sidebar a { display: block; padding: 0.2rem 0 0.2rem 0.75rem; color: var(--wax); text-decoration: none; border-left: 2px solid var(--soot); }
+.sidebar a:hover { border-left-color: var(--ash); }
+.sidebar a[aria-current="page"] { color: var(--flame); border-left-color: var(--flame); }
+
+.doc { padding: 2rem 0 4rem; max-width: var(--measure); }
+.doc h2 { scroll-margin-top: 1rem; }
+.doc h3 { scroll-margin-top: 1rem; }
+.doc .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--soot); }
+.doc .pager a { text-decoration: none; }
+.doc .pager small { display: block; color: var(--ash); }
+.doc .note { border-left: 3px solid var(--root); padding: 0.5rem 1rem; background: var(--ground); margin: 0 0 1.25rem; }
+.doc .note > :last-child { margin-bottom: 0; }
+
+.toc { position: sticky; top: 0; align-self: start; padding: 2rem 0; font-size: 0.85rem; }
+.toc h4 { margin: 0 0 0.5rem; color: var(--ash); font-weight: 500; }
+.toc ul { list-style: none; padding: 0; margin: 0; }
+.toc a { display: block; padding: 0.15rem 0; color: var(--ash); text-decoration: none; }
+.toc a:hover { color: var(--wax); }
+
+.menu-toggle { display: none; }
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 1100px) {
+  .docs-shell { grid-template-columns: 14rem minmax(0, 1fr); }
+  .toc { display: none; }
+}
+
+@media (max-width: 900px) {
+  .gallery { grid-template-columns: minmax(0, 1fr); max-width: 30rem; }
+}
+
+@media (max-width: 760px) {
+  .docs-shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .sidebar { position: static; max-height: none; padding: 1rem 0 0; display: none; }
+  .sidebar.open { display: block; }
+  .menu-toggle {
+    display: inline-block; margin-left: auto; font: 500 0.95rem var(--body);
+    color: var(--wax); background: none; border: 1px solid var(--soot); padding: 0.3rem 0.7rem;
+  }
+  .docs-page .topbar nav { display: none; }
+  .hero { min-height: 0; display: flex; flex-direction: column; }
+  .hero canvas { position: relative; inset: auto; height: 260px; order: 2; }
+  .hero-copy { padding: 5.5rem var(--edge) 1.5rem; }
+  .hero .hint { position: static; order: 3; padding: 0.5rem 1rem 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
+
+/* ---------- fx layer (assets/fx.js) ---------- */
+
+.fx-overlay, .fx-screen { position: fixed; left: 0; top: 0; pointer-events: none; image-rendering: pixelated; }
+.fx-overlay { z-index: 900; }
+/* the burn between pages: its edge and smoke over the leaving page, its light added on top */
+.fx-screen { z-index: 1000; }
+.fx-light { mix-blend-mode: plus-lighter; }
+/* the page being left, kept on top of the new one (scrolled as it was) while the burn takes it away */
+.page-leaving { position: fixed; inset: 0; z-index: 800; overflow: hidden; background: var(--night); mask-repeat: no-repeat; }
+
+.fx-switch {
+  font: 500 0.85rem var(--body); color: var(--ash); background: none;
+  border: 1px solid var(--soot); padding: 0.2rem 0.6rem; cursor: pointer;
+}
+.fx-switch:hover { color: var(--wax); border-color: var(--wax); }
+.fx-switch[aria-pressed="true"] { color: var(--flame); }
