@@ -381,6 +381,11 @@ impl<S> Scene<S> {
             .map(|e| self.rect_of(e))
     }
 
+    /// Whether a frame at `rect` is seen: it overlaps the view, or there is no view.
+    fn in_view(&self, rect: Rect) -> bool {
+        self.view.is_none_or(|v| v.overlaps(rect, self.scale))
+    }
+
     /// The instance's frame (its canvas plus margin) placed so the effect's origin lands on `e.at`.
     fn rect_of(&self, e: &Entry<S>) -> Rect {
         let s = u64::from(self.scale.get());
@@ -518,6 +523,10 @@ impl<S> Scene<S> {
         let slot = own_slot(layer);
         let mut due: Vec<(u64, usize)> = Vec::new();
         for (i, e) in self.entries.iter().enumerate() {
+            // an effect the host cannot see is not shown, so it takes no turn from one it can
+            if !self.in_view(self.rect_of(e)) {
+                continue;
+            }
             let needs = match e.player.shown(e.place) {
                 // a held frame is marked shown at `now`, which this host frame does anyway
                 Some(id) => self
@@ -586,9 +595,7 @@ impl<S> Scene<S> {
             layer,
             rect: self.rect_of(e),
         };
-        if let Some(view) = self.view
-            && !view.overlaps(pass.rect, self.scale)
-        {
+        if !self.in_view(pass.rect) {
             return Ok(());
         }
         let Some(e) = self.entries.get_mut(i) else {

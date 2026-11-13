@@ -243,3 +243,34 @@ fn a_view_that_is_not_finite_is_refused_and_changes_nothing() -> Res {
     assert_eq!(draw_once(&mut scene).shown.len(), 2, "still no view: drawn");
     Ok(())
 }
+
+fn seeded_candle(seed: u64) -> Result<Player, Box<dyn Error>> {
+    let fx = effect("fire/candle").ok_or("fire/candle not registered")?;
+    let opts = Options {
+        seed: Some(seed),
+        ..Options::default()
+    };
+    Ok(Player::live(fx, opts))
+}
+
+#[test]
+fn under_a_draw_budget_effects_outside_the_view_take_no_turn() -> Res {
+    let mut scene: Scene<Frame> = Scene::new(one()?);
+    scene.set_view(Some(VIEW))?;
+    scene.set_draw_budget(NonZeroU32::new(1));
+    // played first, so they have waited longest: without the view they would take the turns
+    scene.play(seeded_candle(1)?, 1000.0, 1000.0)?;
+    scene.play(seeded_candle(2)?, 2000.0, 2000.0)?;
+    let inside = scene.play(seeded_candle(3)?, 50.0, 50.0)?;
+    scene.update(0.1)?;
+    let mut r = Recorder::default();
+    scene
+        .draw_layer(Layer::Front, &mut r)
+        .map_err(|()| "draw")?;
+    assert_eq!(r.made, 1, "the one turn goes to the effect in view");
+    assert_eq!(
+        r.shown.iter().map(|(p, _)| p.handle).collect::<Vec<_>>(),
+        [inside]
+    );
+    Ok(())
+}
