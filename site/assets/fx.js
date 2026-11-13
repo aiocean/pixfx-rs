@@ -16,6 +16,8 @@ const FX = {
 const SCALE = 2;
 /** Where the wisp floats relative to the pointer, in game pixels, so it never hides what is pointed at. */
 const WISP_OFFSET = { x: 10, y: 14 };
+/** How far above its origin parry's blades clash, in game pixels (its `height` option). */
+const CLASH_HEIGHT = 30;
 /** burn-away's screen, and when its cover starts to smoulder and burn open from the hole (pixelfx
  *  src/fx/transitions/burn-away.js, SMOULDER). The page change plays only that part: the cover is the old page. */
 const SCREEN = { w: 320, h: 180 };
@@ -103,7 +105,9 @@ function burstOnClick({ stage, at }) {
     // keyboard activation has no pointer position (detail 0): the press fx covers it on buttons
     if (e.detail === 0) return;
     const [x, y] = at(e.clientX, e.clientY);
-    stage.play(FX.click, x, y, { seed: Math.floor(Math.random() * 1e6) });
+    // parry's origin is where a fighter stands; the blades clash `height` above it. Play it that far below the
+    // pointer so the clash is on the pointer.
+    stage.play(FX.click, x, y + CLASH_HEIGHT, { seed: Math.floor(Math.random() * 1e6), height: CLASH_HEIGHT });
   });
 }
 
