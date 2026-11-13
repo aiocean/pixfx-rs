@@ -18,6 +18,7 @@ pub mod scifi;
 pub mod shadow;
 pub mod spawn;
 pub mod transitions;
+pub mod water;
 
 /// Every effect in this crate.
 pub static EFFECTS: &[&'static dyn Effect] = &[
@@ -42,6 +43,7 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &projectiles::LASER_BOLT,
     &transitions::BURN_AWAY,
     &shadow::VOID_ORB,
+    &water::WATER_JET,
 ];
 
 /// The effect with this id (`fire/candle`).
