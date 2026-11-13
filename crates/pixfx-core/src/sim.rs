@@ -845,23 +845,13 @@ pub struct Bits<T = ()> {
     ground: f64,
 }
 
-impl<T: Default> Bits<T> {
+impl<T> Bits<T> {
     /// Debris over a floor at y = `ground` (local px; `f64::INFINITY` for none, pixelfx's default).
     pub fn new(ground: f64) -> Self {
         Self {
             list: Vec::new(),
             ground,
         }
-    }
-
-    pub fn add(&mut self, b: Bit) {
-        let max = b.life;
-        self.list.push(Piece {
-            bit: b,
-            max,
-            rest: false,
-            data: T::default(),
-        });
     }
 
     pub fn count(&self) -> usize {
@@ -969,6 +959,18 @@ impl<T: Default> Bits<T> {
                 }
             }
         }
+    }
+}
+
+impl<T: Default> Bits<T> {
+    pub fn add(&mut self, b: Bit) {
+        let max = b.life;
+        self.list.push(Piece {
+            bit: b,
+            max,
+            rest: false,
+            data: T::default(),
+        });
     }
 }
 

@@ -233,3 +233,57 @@ fn sim_shapes_match_pixelfx() -> Result<(), pixfx_core::ColorError> {
     assert_eq!(hash, PIXELFX_SHAPES);
     Ok(())
 }
+
+#[test]
+fn draw_where_draws_the_system_minus_the_dropped_particles() {
+    use pixfx_core::Layer;
+    use pixfx_core::Rng;
+    use pixfx_core::color::WHITE;
+    use pixfx_core::sim::{Kind, Particles, ParticlesOpts, Spawn};
+
+    // a mix of front kinds (spark, grit, mote) and a back kind (smoke), some overlapping
+    let mut rng = Rng::new(3);
+    let mut ps = Particles::new(ParticlesOpts {
+        ground: 0.0,
+        ..ParticlesOpts::default()
+    });
+    for i in 0..24 {
+        let kind = [Kind::Spark, Kind::Grit, Kind::Smoke, Kind::Mote][i % 4];
+        let (x, y) = (rng.range(-40.0, 40.0), rng.range(-60.0, -5.0));
+        let (vx, vy) = (rng.range(-90.0, 90.0), rng.range(-120.0, 20.0));
+        let size = rng.range(1.0, 6.0);
+        ps.spawn(
+            &mut rng,
+            Spawn {
+                size,
+                col: if kind == Kind::Smoke {
+                    None
+                } else {
+                    Some(WHITE)
+                },
+                ..Spawn::new(kind, x, y, vx, vy, 1.5)
+            },
+        );
+    }
+    for _ in 0..20 {
+        ps.update(&mut rng, 1.0 / 120.0);
+    }
+
+    for (layer, dropped) in [
+        (Layer::Front, Kind::Grit),
+        (Layer::Both, Kind::Spark),
+        (Layer::Back, Kind::Smoke),
+    ] {
+        let mut rest = ps.clone();
+        rest.list_mut().retain(|q| q.kind != dropped);
+        assert!(rest.count() < ps.count(), "{dropped:?} not in the scene");
+        let filtered = draw(|p| ps.draw_where(p, layer, |q| q.kind != dropped));
+        let expected = draw(|p| rest.draw(p, layer));
+        let everything = draw(|p| ps.draw(p, layer));
+        assert_eq!(filtered, expected, "{layer:?} without {dropped:?}");
+        assert_ne!(
+            filtered, everything,
+            "dropping {dropped:?} changed nothing on {layer:?}"
+        );
+    }
+}
