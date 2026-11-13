@@ -8,6 +8,7 @@
 use pixfx_core::color::Rgba;
 use pixfx_core::frame::Frame;
 use pixfx_core::math::{js_max, js_min, js_round, to_int32};
+use pixfx_core::screen::Ripple;
 
 /// Hit-stop, in frames at 60 a second, the way fighting games and Sakurai's Smash count it: both fighters freeze
 /// together, longer the heavier the blow (Street Fighter 6 gives its mediums 11 frames, its heavies 13); a crit
@@ -243,6 +244,8 @@ pub struct Feel {
     dust: Vec<Puff>,
     jolt: Option<Jolt>,
     tick: u64,
+    ripples: Vec<Ripple>,
+    flash: f64,
 }
 
 fn hit_stop(power: f64, launch: bool, crit: bool, ranged: bool) -> f64 {
@@ -270,6 +273,46 @@ impl Feel {
     /// How shaken the screen is, 0 to 1.
     pub fn trauma(&self) -> f64 {
         self.trauma
+    }
+
+    /// The screen ripples alive now, for [`pixfx_core::screen::ripple`].
+    pub fn ripples(&self) -> &[Ripple] {
+        &self.ripples
+    }
+
+    /// How white the screen is lifted, 0 to 1, for [`pixfx_core::screen::flash`].
+    pub fn flash(&self) -> f64 {
+        self.flash
+    }
+
+    /// Take in what effects asked of the game: shake adds trauma, a hitstop joins the one freeze the fight's
+    /// blows share (under the same cap), ripples and flash go to the screen passes. Sounds are the game's own.
+    pub fn take(&mut self, cues: &[pixfx_core::cue::TimedCue]) {
+        use pixfx_core::cue::Cue as Fx;
+        for c in cues {
+            match c.cue {
+                Fx::Shake { trauma } => self.trauma = js_min(1.0, self.trauma + trauma),
+                Fx::Hitstop { dur } => self.stop = js_max(self.stop, js_min(STOP.cap / 60.0, dur)),
+                Fx::Ripple {
+                    x,
+                    y,
+                    r0,
+                    r1,
+                    dur,
+                    amp,
+                } => self.ripples.push(Ripple {
+                    x,
+                    y,
+                    r0,
+                    r1,
+                    dur,
+                    amp,
+                    age: 0.0,
+                }),
+                Fx::Flash { k, .. } => self.flash = js_max(self.flash, k),
+                Fx::Sound { .. } => {}
+            }
+        }
     }
 
     /// Take in what the fight just did.
@@ -398,6 +441,12 @@ impl Feel {
     pub fn advance(&mut self, dt: f64) -> f64 {
         self.trauma = js_max(0.0, self.trauma - TRAUMA_DRAIN * dt);
         self.dusk = js_max(0.0, self.dusk - dt);
+        // the screen's own clock: ripples and flash run on through a hit-stop
+        self.flash = js_max(0.0, self.flash - dt * 4.0);
+        for r in &mut self.ripples {
+            r.age += dt;
+        }
+        self.ripples.retain(|r| r.age <= r.dur);
         for n in &mut self.numbers {
             n.t += dt;
         }

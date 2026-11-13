@@ -84,7 +84,7 @@ fn light_differs(x: u32, y: u32) -> bool {
 
 /// Read a reference render written by `tools/pixelfx-ref.mjs`: `<dir>/<id>.json` `{w, h, n, fps}` and the
 /// little-endian colour and light words of every frame in `<dir>/<id>.color.bin` and `<dir>/<id>.light.bin`.
-/// pixelfx renders at the effect's own canvas, so its origin is `origin` (the effect's `meta.origin`).
+/// pixelfx renders on the canvas the options give, so its origin is `origin` (the port's `Rendered.origin`).
 pub fn read_reference(dir: &Path, id: &str, origin: (i32, i32)) -> io::Result<Rendered> {
     let file = |ext: &str| dir.join(format!("{id}.{ext}"));
     let json = fs::read_to_string(file("json"))?;

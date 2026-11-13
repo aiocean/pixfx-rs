@@ -30,6 +30,7 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 8,
+    state: None,
 };
 
 // meta.options

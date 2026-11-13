@@ -34,6 +34,7 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 9,
+    state: None,
 };
 
 const FPS: f64 = 30.0;

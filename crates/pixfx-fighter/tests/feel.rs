@@ -105,3 +105,87 @@ fn damage_floats_up_from_the_blow_and_fades_away() {
     fight_time(&mut feel, 1.0);
     assert_eq!(feel.numbers(), vec![]);
 }
+
+mod effect_cues {
+    use super::*;
+    use pixfx_core::cue::{Cue as Fx, TimedCue};
+
+    fn at(cue: Fx) -> TimedCue {
+        TimedCue {
+            t: 0.0,
+            cue,
+            pan: None,
+        }
+    }
+
+    #[test]
+    fn take_shake_caps_trauma_at_one() {
+        let mut feel = Feel::new();
+        feel.take(&[at(Fx::Shake { trauma: 0.7 }), at(Fx::Shake { trauma: 0.7 })]);
+        assert_eq!(feel.trauma(), 1.0);
+    }
+
+    #[test]
+    fn fight_and_effect_cues_share_one_freeze() {
+        let mut feel = Feel::new();
+        feel.react(&[hit(0, (5.0, false, false), 10.0, 5.0, (50.0, 10.0))]);
+        feel.take(&[at(Fx::Hitstop { dur: 0.2 })]);
+        // one freeze of min(0.2, cap / 60), not the two added together
+        let want = 0.2_f64.min(pixfx_fighter::feel::STOP.cap / 60.0);
+        let mut frozen = 0.0;
+        while feel.advance(FRAME) == 0.0 {
+            frozen += FRAME;
+            assert!(frozen < 1.0);
+        }
+        assert!((frozen - want).abs() < FRAME, "froze {frozen}, want {want}");
+    }
+
+    #[test]
+    fn ripple_and_flash_age_during_hitstop() {
+        let mut feel = Feel::new();
+        feel.take(&[
+            at(Fx::Ripple {
+                x: 5.0,
+                y: 5.0,
+                r0: 0.0,
+                r1: 20.0,
+                dur: 0.05,
+                amp: 1.0,
+            }),
+            at(Fx::Flash { k: 0.5, dur: 0.1 }),
+            at(Fx::Hitstop { dur: 0.2 }),
+        ]);
+        assert_eq!(feel.ripples().len(), 1);
+        assert_eq!(feel.advance(FRAME), 0.0);
+        assert!(feel.ripples()[0].age > 0.0);
+        assert!(feel.flash() < 0.5);
+        for _ in 0..4 {
+            assert_eq!(feel.advance(FRAME), 0.0);
+        }
+        assert!(feel.ripples().is_empty());
+    }
+
+    #[test]
+    fn flash_keeps_the_strongest() {
+        let mut feel = Feel::new();
+        feel.take(&[
+            at(Fx::Flash { k: 0.6, dur: 0.1 }),
+            at(Fx::Flash { k: 0.3, dur: 0.1 }),
+        ]);
+        assert_eq!(feel.flash(), 0.6);
+    }
+
+    #[test]
+    fn sound_is_ignored() {
+        let mut feel = Feel::new();
+        feel.take(&[at(Fx::Sound {
+            name: "x",
+            gain: 1.0,
+            pitch: 1.0,
+            len: None,
+            x: None,
+        })]);
+        assert_eq!(feel.trauma(), 0.0);
+        assert_eq!(feel.advance(FRAME), FRAME);
+    }
+}

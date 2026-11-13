@@ -2,17 +2,23 @@
 //! that reproduces its JavaScript number semantics, so an effect renders the same pixels here as there.
 #![forbid(unsafe_code)]
 
+pub mod act;
 pub mod color;
+pub mod cue;
 pub mod effect;
 pub mod frame;
 pub mod math;
 pub mod painter;
 pub mod particles;
 pub mod render;
+pub mod screen;
 pub mod shapes;
 pub mod sim;
+pub mod state;
 
+pub use act::{Act, ActEvent, Contact, Performance, Phase, Puff};
 pub use color::{ColorError, Rgba, hex};
+pub use cue::{Cue, TimedCue, cues_between, cues_of};
 pub use effect::{
     Canvas, Effect, EffectState, Instance, Layer, Meta, OptValue, Options, find, valid_dt,
 };
@@ -20,7 +26,9 @@ pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};
 pub use painter::Painter;
 pub use render::{Rendered, edge_fade, render_frames};
+pub use screen::{Ripple, flash, ripple};
 pub use sim::{
     Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particle, Particles,
     ParticlesOpts, Piece, Spawn, band, crystal, flare, sparkle,
 };
+pub use state::{Creature, StateError, StateMeta};

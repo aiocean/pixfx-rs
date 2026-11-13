@@ -28,6 +28,7 @@ const META: Meta = Meta {
     looping: true,
     fps: 30,
     seed: 8,
+    state: None,
 };
 
 // turning a quarter a loop keeps every part seamless: 16 ticks, a square, and 12 runes in a pattern of three
