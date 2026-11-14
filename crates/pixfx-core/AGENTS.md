@@ -11,7 +11,7 @@ The effect model and game feel, painted with `pixfx-draw`:
   (`render_frames`, `edge_fade`), `player` (`Player`: one effect on its own canvas), `key` (`ClipKey`, `FrameId`),
   `frames` (`FrameStore`, `FRAME_BUDGET`), `state` (`Creature`).
 - Game feel: `cue` (`Cue`, `TimedCue`, `impact`), `feel` (`Feel`: shake, hit-stop, slow motion, flash, ripples),
-  `act`, `squash` (`Squash`, `Blink`), `hit_flash`, `screen` (shake, ripple and flash passes).
+  `squash` (`Squash`, `Blink`), `hit_flash`, `screen` (shake, ripple and flash passes).
 
 ## Belongs here
 

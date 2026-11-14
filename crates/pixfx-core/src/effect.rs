@@ -9,7 +9,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use crate::act::Act;
 use crate::cue::{TimedCue, cues_between, cues_of};
 use crate::state::StateMeta;
 use pixfx_draw::color::{Rgba, fit};
@@ -119,10 +118,6 @@ pub trait Effect: Send + Sync {
     /// The game-feel cues this effect fires, in its own space and time (pixelfx `cues(o)`); none by default.
     fn cues(&self, _opts: &Options) -> Vec<TimedCue> {
         Vec::new()
-    }
-    /// The attack timing of this effect when the game's attacker performs it (pixelfx `act`); none by default.
-    fn act(&self) -> Option<Act> {
-        None
     }
     /// It draws an outline of its own, in the colour [`Options::outline_color`] gives (none when outlines are
     /// off), so the engine does not ring it again. False by default: the engine rings it when the caller asks.

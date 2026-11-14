@@ -92,11 +92,13 @@ pixfx's pieces win and the port adapts.
   around growing rings) and `flash` (lift toward white by k). Pure functions over a `Frame`.
 - Touching pixfx-fighter: check `ListAgents` for a session working in that crate first and coordinate if one is.
 
-### Acting (`pixfx-core`, new module `act`)
+### Acting (`pixfx-fighter`, module `act`)
 
 - `Act { windup, recovery, contacts: Vec<Contact { t, freeze, shake, amp, push, at }>, dust: Vec<Puff { t, x, n, dir }>,
   targets: Vec<f64> }`, the data `actTiming` returns, minus the rig pose track.
-- `Effect::act(&self) -> Option<Act>`; melee and moves effects provide theirs (values from their JS `act` exports).
+- An attack's timing is the attacker's, so it lives in `pixfx-fighter` with the poses, and `pixfx-core`'s `Effect`
+  knows nothing of it: the `Act` of each melee and moves effect is kept there by effect id (values from their JS
+  `act` exports).
 - `Performance` (pure): `new(act)`, `step(dt) -> Vec<ActEvent>` with `Contact(i)` and `Dust(i)`; time stands still
   while a contact's freeze runs; `phase()` is `Windup | Strike | Recover | Done`.
 - The attacker's look: a fighter `Pose` per phase. The default mapping per category (melee: guard, draw, slash, guard;

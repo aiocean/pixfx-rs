@@ -1,17 +1,14 @@
-//! Compare an effect's game data (cues, act timing, creature state) with what pixelfx gives.
+//! Compare an effect's game data (cues, creature state) with what pixelfx gives.
 //!
 //! A golden is `crates/pixfx-effects/tests/golden/data/<golden>.json`, written once by
 //! `node tools/pixelfx-data.mjs <id> --pixelfx DIR --opts JSON` and committed; the test never runs node.
 //! Name it `<id with / as __>__<key>=<value>[,<key>=<value>...]` in the order of the `opts` slice
 //! (`critters__bloater-hurt__from=-1,hits=2`), or `<id as __>` alone when there are no options.
 //!
-//! Shape: `{cues: [{t, type, ...}], act: null | {windup, recovery, onBody, targets, hits: [{t, freeze, shake,
-//! amp, push, at?}], dust: [{t, x, n, dir}]}, state: null | {set, name, order, next, carry}}`. Only these
-//! fields are compared, and a field the golden leaves out is null (a sound's `x`, a hit's `at`, a puff's `dir`).
-//! A hit's `skin` and the pose track stay out on purpose: the rig and the training dummy are not ported, so
-//! the port has nothing to compare them with. Numbers match within 1e-9.
+//! Shape: `{cues: [{t, type, ...}], state: null | {set, name, order, next, carry}}`. Only these fields are
+//! compared, and a field the golden leaves out is null (a sound's `x`). A golden's `act` stays out: an attack's
+//! timing is `pixfx_fighter::act`, not part of an effect. Numbers match within 1e-9.
 
-use pixfx_core::act::Act;
 use pixfx_core::cue::{Cue, TimedCue, cues_of};
 use pixfx_core::effect::{OptValue, Options};
 use serde_json::{Map, Value, json};
@@ -62,19 +59,6 @@ fn cue_json(c: &TimedCue) -> Value {
     m
 }
 
-fn act_json(a: &Act) -> Value {
-    json!({
-        "windup": a.windup,
-        "recovery": a.recovery,
-        "onBody": a.on_body,
-        "targets": a.targets,
-        "hits": a.contacts.iter().map(|c| json!({
-            "t": c.t, "freeze": c.freeze, "shake": c.shake, "amp": c.amp, "push": c.push, "at": c.at,
-        })).collect::<Vec<_>>(),
-        "dust": a.dust.iter().map(|p| json!({"t": p.t, "x": p.x, "n": p.n, "dir": p.dir})).collect::<Vec<_>>(),
-    })
-}
-
 /// What the port says for `id` at `opts`, in the golden's shape.
 fn port_data(id: &str, opts: &[(&str, f64)]) -> Result<Value, String> {
     let effect = pixfx_effects::effect(id).ok_or_else(|| format!("no pixfx effect {id}"))?;
@@ -84,7 +68,6 @@ fn port_data(id: &str, opts: &[(&str, f64)]) -> Result<Value, String> {
     });
     Ok(json!({
         "cues": cues_of(effect, &o).iter().map(cue_json).collect::<Vec<_>>(),
-        "act": effect.act().map(|a| act_json(&a)),
         "state": state,
     }))
 }
@@ -115,17 +98,8 @@ fn project(golden: &Value) -> Value {
                 .unwrap_or_default(),
         )
     };
-    let act = golden.get("act").filter(|a| !a.is_null()).map(|a| {
-        let mut m = keep(a, &["windup", "recovery", "onBody", "targets"]);
-        m["hits"] = list(&a["hits"], &|h| {
-            keep(h, &["t", "freeze", "shake", "amp", "push", "at"])
-        });
-        m["dust"] = list(&a["dust"], &|d| keep(d, &["t", "x", "n", "dir"]));
-        m
-    });
     json!({
         "cues": list(&golden["cues"], &|c| keep(c, cue_keys(c["type"].as_str().unwrap_or("")))),
-        "act": act,
         "state": golden.get("state").filter(|s| !s.is_null()).map(|s| keep(s, &["set", "name", "order", "next", "carry"])),
     })
 }
@@ -155,7 +129,7 @@ fn first_diff(path: &str, port: &Value, golden: &Value) -> Option<String> {
     }
 }
 
-/// `Ok` when the port's cues, act and state for `id` at `opts` equal the golden file `golden`.
+/// `Ok` when the port's cues and state for `id` at `opts` equal the golden file `golden`.
 pub fn check_data_matches(id: &str, opts: &[(&str, f64)], golden: &str) -> Result<(), String> {
     let path = format!(
         "{}/tests/golden/data/{golden}.json",

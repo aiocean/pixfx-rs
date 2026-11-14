@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `pixfx-fighter::act` holds an attack's timing (`Act`, `Contact`, `Puff`, `Phase`, `ActEvent`, `Performance`) next
+  to the pose for each phase; `pixfx-core` has no `act` module and `Effect` no `act()`.
 - `pixfx-web`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-canvas2d`: `setDrawBudget(n)` caps the effect layers drawn per
   frame (`Scene::set_draw_budget`); 0, the default, draws every one that changed.
 - `pixfx-gpui`: `FxScene::with_threads(n)` paints on native threads: each effect is stepped, drawn and turned into
