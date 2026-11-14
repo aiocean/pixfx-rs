@@ -96,8 +96,8 @@ fn every_posture_is_reachable() {
     let mut rng = Rng::new(9);
     for _ in 0..4000 {
         let mut r = quiet();
-        for i in 0..18 {
-            r.inputs[i] = if rng.next() < 0.5 { rng.next() } else if rng.next() < 0.5 { 0.0 } else { 1.0 };
+        for v in &mut r.inputs {
+            *v = if rng.next() < 0.5 { rng.next() } else if rng.next() < 0.5 { 0.0 } else { 1.0 };
         }
         seen.insert(pick(&r));
     }
