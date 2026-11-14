@@ -62,7 +62,9 @@ You run the loop. `update(dt)` returns the seconds the effects played: 0 in a hi
 `pixfx.feel` answers impacts. It has `shake`, `roll`, `flash`, `timeScale`, `addTrauma`, `freeze` and `slow`, and
 emits `"cue"`; `feel.setEnabled(false)` leaves the answer to your game. `pixfx.stats()` counts effects, textures and
 images. `pixfx.setDrawBudget(n)` draws at most `n` effect layers per frame (the rest keep their last frame and wait
-their turn); 0, the default, draws every one that changed. `pixfx.destroy()` ends every effect.
+their turn); 0, the default, draws every one that changed. `pixfx.destroy()` ends every effect. When your world is
+larger than the canvas, `pixfx.setView(x, y, w, h)` says which rectangle of it (game pixels) your transform shows:
+effects outside it play on undrawn and cost no painting. `pixfx.clearView()` draws them all again.
 
 ## Demo and checks
 

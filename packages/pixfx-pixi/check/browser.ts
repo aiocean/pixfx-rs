@@ -1,6 +1,6 @@
 // `bun run check:browser`: in a clean Chrome, run the demo (painting on workers) and check what a player sees: the
 // fires show and animate, stopping the ticker freezes them, an explosion's cues shake the camera and the camera
-// comes back, and `destroy()` leaves no sprite behind. Prints one line per check; exits 1 if any fails.
+// comes back, a view away from the effects draws none of them, and `destroy()` leaves no sprite behind. Prints one line per check; exits 1 if any fails.
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { launchChrome, timeoutMessage } from "pixfx-web/tools/cdp";
@@ -72,6 +72,20 @@ const DESTROY = `(() => {
   return { before, after: pixfx.container.children.length, stats: pixfx.stats(), candle: events.includes("candle destroy") };
 })()`;
 
+/** How many pixels of the screen the effects' sprites change (the game's own figure in the container left in). */
+const EFFECT_PIXELS = `(() => {
+  const { app, pixfx } = window.pixfxPixiDemo;
+  const shot = () => app.renderer.extract.pixels({ target: app.stage, frame: app.screen }).pixels;
+  const sprites = pixfx.container.children.filter((c) => c.constructor.name === "Sprite" && c.visible);
+  const withFx = shot();
+  for (const c of sprites) c.visible = false;
+  const without = shot();
+  for (const c of sprites) c.visible = true;
+  let lit = 0;
+  for (let i = 0; i < withFx.length; i += 4) if (withFx[i] !== without[i] || withFx[i + 1] !== without[i + 1] || withFx[i + 2] !== without[i + 2]) lit++;
+  return lit;
+})()`;
+
 const pictureSchema = z.object({ hash: z.number(), lit: z.number() });
 
 async function main(): Promise<void> {
@@ -108,6 +122,17 @@ async function main(): Promise<void> {
       "an explosion shakes the camera, which comes back",
       s.moved > 0 && s.still && s.complete && s.cues > 0,
       `${s.moved}/${s.frames} rendered frames moved, camera at rest before every step: ${s.still}, ${s.cues} cues, completed: ${s.complete}`,
+    );
+    await b.evaluate("window.pixfxPixiDemo.pixfx.setView(5000, 5000, 100, 100), true");
+    await Bun.sleep(400);
+    const away = z.number().parse(await b.evaluate(EFFECT_PIXELS));
+    await b.evaluate("window.pixfxPixiDemo.pixfx.clearView(), true");
+    await Bun.sleep(400);
+    const back = z.number().parse(await b.evaluate(EFFECT_PIXELS));
+    check(
+      "a view away from the effects draws none of them; clearing it draws them again",
+      away === 0 && back > 2000,
+      `${away} pixels drawn by effects with the view away, ${back} after clearView`,
     );
     const d = z
       .object({ before: z.number(), after: z.number(), stats: z.object({ engines: z.number(), images: z.number() }).passthrough(), candle: z.boolean() })

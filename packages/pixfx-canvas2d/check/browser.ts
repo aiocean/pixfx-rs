@@ -1,6 +1,6 @@
 // `bun run check:browser`: in a clean Chrome, run the demo (painting on workers) and check what a player sees: the
-// fires show and animate, a paused loop holds them still, an explosion's cues shake the view, and `destroy()` leaves
-// nothing drawn. Prints one line per check; exits 1 if any fails.
+// fires show and animate, a paused loop holds them still, an explosion's cues shake the view, a view away from
+// the effects draws none of them, and `destroy()` leaves nothing drawn. Prints one line per check; exits 1 if any fails.
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { launchChrome, timeoutMessage } from "pixfx-web/tools/cdp";
@@ -94,6 +94,17 @@ async function main(): Promise<void> {
       "an explosion shakes the view, which comes to rest",
       s.moved > 0 && s.rest && s.complete && s.cues > 0,
       `${s.moved}/${s.frames} frames shaken, at rest after: ${s.rest}, ${s.cues} cues, completed: ${s.complete}`,
+    );
+    await b.evaluate("window.pixfxCanvasDemo.pixfx.setView(5000, 5000, 100, 100), true");
+    await Bun.sleep(400);
+    const away = await picture();
+    await b.evaluate("window.pixfxCanvasDemo.pixfx.clearView(), true");
+    await Bun.sleep(400);
+    const back = await picture();
+    check(
+      "a view away from the effects draws none of them; clearing it draws them again",
+      away.lit === 0 && back.lit > 2000,
+      `${away.lit} effect pixels with the view away, ${back.lit} after clearView`,
     );
     const d = z
       .object({ stats: z.object({ engines: z.number(), images: z.number() }).passthrough(), candle: z.boolean() })

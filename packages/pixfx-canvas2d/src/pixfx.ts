@@ -86,6 +86,19 @@ export class Pixfx {
     return played;
   }
 
+  /**
+   * Draw only the effects whose frame reaches into this rectangle of the world, in game pixels: what the host's
+   * transform shows. The rest play on undrawn. Throws if a value is not finite.
+   */
+  setView(x: number, y: number, w: number, h: number): void {
+    this.stage.scene.setView(x, y, w, h, 0, 0);
+  }
+
+  /** Draw every effect again, wherever it is (the default). */
+  clearView(): void {
+    this.stage.scene.clearView();
+  }
+
   /** Draw the effects' `layer` onto the canvas, in the context's current transform. */
   drawLayer(layer: Layer): void {
     this.images.draw(this.ctx, this.scale, DEPTH[layer]);

@@ -66,6 +66,8 @@ the flash covers the screen, `feel.timeScale` freezes the game's own world in a 
 effects, textures and sprites; `pixfx.destroy()` ends every effect and frees its sprites. `pixfx.setDrawBudget(n)`
 draws at most `n` effect layers per frame (the rest keep their last frame and wait their turn); 0, the default, draws
 every one that changed.
+When your world is larger than the screen, `pixfx.setView(x, y, w, h)` says which rectangle of it (game pixels) your
+camera shows: effects outside it play on undrawn and cost no painting. `pixfx.clearView()` draws them all again.
 
 On WebGL every frame is a region of a few 4096² atlas pages, filled straight from the bytes the workers painted;
 on WebGPU each frame is a buffer texture.
