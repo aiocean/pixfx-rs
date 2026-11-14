@@ -80,7 +80,7 @@ Three parts, each on the thread that suits it:
 | Part | Holds | Runs |
 |---|---|---|
 | Decide (`Scene`) | clocks, placement, which frame shows, cues, events | the host's main thread; never touches pixels |
-| Paint (`Painter` into a `Frame`) | simulating an effect up to a frame, drawing it, cropping it, turning it into RGBA | workers for every JS shell (Canvas, Phaser, Pixi), native threads for gpui when it needs them, on the spot for files, tests and hosts without workers |
+| Paint (`Painter` into a `Frame`) | simulating an effect up to a frame, drawing it, cropping it, turning it into RGBA | workers for every JS shell (Canvas, Phaser, Pixi), native threads for gpui (`FxScene::with_threads`) when a window has many effects, on the spot for files, tests and hosts without workers |
 | Show (`Shell`) | uploading pixels into host objects and placing them | the host's main thread |
 
 The main thread has 16 ms a frame and runs the game too; simulation and painting are the cost that grows with

@@ -49,6 +49,8 @@ fx.end_frame(window)?;</code></pre>
 
 <h2>API</h2>
 <p><code>FxScene</code> is the gpui shell over a <code>pixfx-scene</code> <code>Scene</code>: the scene decides which frame each effect shows, which frames are shared and when one leaves the atlas; <code>FxScene</code> uploads, paints and drops images.</p>
+<h3><code>FxScene::default()</code>, <code>FxScene::with_threads(n)</code></h3>
+<p><code>default()</code> paints each frame on the spot, on the window's thread. <code>with_threads(n)</code> (native only) paints on <code>n</code> threads: each effect is stepped, drawn and turned into images on one of them, and the window's thread only paints images. A frame shows from the window frame after it comes back; until then the effect shows the one it had, so an effect's first frame shows one window frame late. For windows with many effects at once: with 100 fires, the window's thread spends 1.4 ms a frame instead of 81 ms, and 5 threads paint a frame's layers in 30 ms (16 ms for 50 fires).</p>
 <h3><code>FxScene::play(effect, opts)</code></h3>
 <p>Play an effect on a canvas with <code>glow_margin</code> room on every side; returns its <code>FxHandle</code>.</p>
 <h3><code>FxScene::tick(dt)</code></h3>

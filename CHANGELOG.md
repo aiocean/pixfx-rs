@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `pixfx-gpui`: `FxScene::with_threads(n)` paints on native threads: each effect is stepped, drawn and turned into
+  images on one thread, and the window's thread only paints images (100 fires: 1.4 ms a frame instead of 81 ms).
+  `FxScene::default()` still paints on the spot.
 - `crates/pixfx-canvas` is gone: `packages/pixfx-canvas2d` is the Canvas 2D shell, and the site's docs (Canvas 2D
   shell, getting started, the landing page's sample) teach it.
 - `pixfx-phaser` runs on `pixfx-web` (its copy of the runtime is gone) and draws only what the main camera sees: an

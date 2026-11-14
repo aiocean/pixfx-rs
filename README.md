@@ -28,7 +28,7 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 | `packages/pixfx-canvas2d` | Canvas 2D shell over `pixfx-web`: `createPixfx(ctx, { scale }).play(id, x, y, opts)`, then each frame `update(dt)` and `drawLayer("back")` / `drawLayer("front")` among your own drawing, `warp()` for a heavy blow's ring, `drawPicture()` for fighters and scene light Rust painted; workers paint. See its [README](packages/pixfx-canvas2d/README.md); demo in `packages/pixfx-canvas2d/demo/`. |
 | `packages/pixfx-pixi` | Pixi 8 shell: `createPixfx(app).play(id, x, y, opts)` with the same effects, events and feel as Phaser. See its [README](packages/pixfx-pixi/README.md); demo in `packages/pixfx-pixi/demo/`. |
 | `packages/pixfx-web` | The JS runtime both JS shells run on: the wasm, the painting workers, the game-wide frames, a stage per host scene. |
-| `crates/pixfx-gpui` | The gpui shell: `FxScene` plays effects through a `pixfx-scene` `Scene`, paints each at its view's origin and drops images from the atlas at the end of the frame. Needs the gpui fork (see [gpui](#gpui)). |
+| `crates/pixfx-gpui` | The gpui shell: `FxScene` plays effects through a `pixfx-scene` `Scene`, paints each at its view's origin and drops images from the atlas at the end of the frame. Frames are painted on the spot (`FxScene::default()`) or on native threads (`FxScene::with_threads(n)`), which turn them into images too. Needs the gpui fork (see [gpui](#gpui)). |
 | `examples/gpui-web` | A gpui web app that plays the candle and campfire. Needs the gpui fork. |
 
 Toolchain: `rust-toolchain.toml` pins the nightly and the wasm32 target. The commands below assume you are in

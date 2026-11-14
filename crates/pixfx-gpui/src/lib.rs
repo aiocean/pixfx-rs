@@ -19,7 +19,12 @@ use gpui::{
 use image::{Frame as ImageFrame, RgbaImage};
 use pixfx_core::{Clip, Effect, Layer, Options};
 use pixfx_draw::Frame;
-use pixfx_scene::{Frames, InlinePainter, Pass, Scene, Shell};
+use pixfx_scene::{Frames, InlinePainter, Job, Painter, Pass, Receive, Scene, Shell, Target};
+
+#[cfg(not(target_arch = "wasm32"))]
+mod threads;
+#[cfg(not(target_arch = "wasm32"))]
+pub use threads::ThreadPainter;
 
 /// A rectangle of source pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,13 +100,15 @@ fn light_bgra(word: u32) -> [u8; 4] {
 }
 
 /// One uploaded layer: the image and where its top-left sits, in source pixels from the frame's top-left.
+#[derive(Clone)]
 struct Sprite {
     image: Arc<RenderImage>,
     rect: PixelRect,
 }
 
 /// The images painted for one [`Layer`] of one frame.
-struct Painted {
+#[derive(Clone)]
+pub(crate) struct Painted {
     color: Option<Sprite>,
     light: Option<Sprite>,
 }
@@ -126,6 +133,26 @@ impl Painted {
         }
     }
 
+    /// Bytes the images take, counted as a frame's lit box is ([`pixfx_core::PixelBox::lit`]: the box round its
+    /// colour and light, 4 bytes a pixel each).
+    fn bytes(&self) -> u64 {
+        let rects = [&self.color, &self.light]
+            .into_iter()
+            .flatten()
+            .map(|s| s.rect);
+        let lit = rects.reduce(|a, b| {
+            let (x, y) = (a.x.min(b.x), a.y.min(b.y));
+            let (r, d) = ((a.x + a.w).max(b.x + b.w), (a.y + a.h).max(b.y + b.h));
+            PixelRect {
+                x,
+                y,
+                w: r - x,
+                h: d - y,
+            }
+        });
+        lit.map_or(0, |r| u64::from(r.w) * u64::from(r.h) * 8)
+    }
+
     fn images(self) -> impl Iterator<Item = Arc<RenderImage>> {
         [self.color, self.light]
             .into_iter()
@@ -134,29 +161,48 @@ impl Painted {
     }
 }
 
+/// Who paints a window's frames: on the spot, or on native threads.
+enum Paint {
+    Inline(InlinePainter),
+    #[cfg(not(target_arch = "wasm32"))]
+    Threads(ThreadPainter),
+}
+
+impl Painter for Paint {
+    fn paint(&mut self, job: &Job<'_>) -> Option<&Frame> {
+        match self {
+            Self::Inline(p) => p.paint(job),
+            #[cfg(not(target_arch = "wasm32"))]
+            Self::Threads(p) => p.paint(job),
+        }
+    }
+
+    fn end(&mut self, effect: pixfx_scene::EffectKey) {
+        match self {
+            Self::Inline(p) => p.end(effect),
+            #[cfg(not(target_arch = "wasm32"))]
+            Self::Threads(p) => p.end(effect),
+        }
+    }
+}
+
 /// The effects painted into one window: a [`Scene`] decides what each effect shows, which frames are shared and
 /// when one leaves the atlas; this crate only uploads, paints and drops images. Paint each effect with
 /// [`FxScene::paint`], then call [`FxScene::end_frame`] once per window frame.
 pub struct FxScene {
-    /// The frames the scene shares, painted on the spot.
-    frames: Frames<Painted, InlinePainter>,
+    /// The frames the scene shares, and who paints them.
+    frames: Frames<Painted, Paint>,
     scene: Scene<Painted>,
     /// Images no effect paints any more, dropped from the atlas at the end of the frame.
     retired: Vec<Arc<RenderImage>>,
+    /// Whether this window frame took back what the threads painted.
+    received: bool,
 }
 
 impl Default for FxScene {
+    /// Frames painted on the spot, on the window's thread.
     fn default() -> Self {
-        // effects sit at their view's origin in effect pixels; the view scales them as it paints
-        let mut frames = Frames::default();
-        let mut scene = frames.scene(NonZeroU32::MIN);
-        // a gpui app answers cues with its own feel, if any
-        scene.set_feel(None);
-        Self {
-            frames,
-            scene,
-            retired: Vec::new(),
-        }
+        Self::with(Paint::Inline(InlinePainter::default()))
     }
 }
 
@@ -165,6 +211,60 @@ impl Default for FxScene {
 pub struct FxHandle(u32);
 
 impl FxScene {
+    fn with(paint: Paint) -> Self {
+        // effects sit at their view's origin in effect pixels; the view scales them as it paints
+        let mut frames = Frames::new(paint);
+        let mut scene = frames.scene(NonZeroU32::MIN);
+        // a gpui app answers cues with its own feel, if any
+        scene.set_feel(None);
+        Self {
+            frames,
+            scene,
+            retired: Vec::new(),
+            received: false,
+        }
+    }
+
+    /// Frames painted on `n` native threads (at least one): each effect is stepped, drawn and turned into images
+    /// on one of them, so the window's thread only paints images. A frame asked for shows from the window frame
+    /// after it comes back; until then the effect shows the one it had. For windows with many effects at once.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn with_threads(n: usize) -> Result<Self> {
+        Ok(Self::with(Paint::Threads(ThreadPainter::new(n)?)))
+    }
+
+    /// Take back what the threads painted into `frames` and `scene`, before the first effect of the window frame
+    /// paints.
+    fn receive(
+        frames: &mut Frames<Painted, Paint>,
+        scene: &mut Scene<Painted>,
+        shell: &mut GpuiShell<'_>,
+    ) -> Result<()> {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Paint::Threads(p) = frames.painter_mut() {
+            for done in p.take() {
+                match done.target {
+                    Target::Shared(id) => {
+                        frames.deliver(&id, done.layer, &done.painted, shell)?;
+                    }
+                    Target::Own { clock, place } => {
+                        scene.deliver_own(
+                            done.effect.handle,
+                            done.layer,
+                            clock,
+                            place,
+                            &done.painted,
+                            shell,
+                        )?;
+                    }
+                }
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        let _ = (frames, scene, shell);
+        Ok(())
+    }
+
     /// Play `effect` on the canvas `opts` give it ([`Effect::canvas`]), with room round that canvas for glow that
     /// spills past it ([`pixfx_core::Meta::glow_margin`] on every side).
     pub fn play(&mut self, effect: &'static dyn Effect, opts: Options) -> Result<FxHandle> {
@@ -232,6 +332,9 @@ impl FxScene {
             scale: scale.max(1) as f32,
             retired: &mut self.retired,
         };
+        if !std::mem::replace(&mut self.received, true) {
+            Self::receive(&mut self.frames, &mut self.scene, &mut shell)?;
+        }
         self.scene
             .draw_handle(fx.0, layer, &mut self.frames, &mut shell)
     }
@@ -245,6 +348,7 @@ impl FxScene {
             scale: 1.0,
             retired: &mut self.retired,
         };
+        self.received = false;
         self.scene.end_frame(&mut self.frames, &mut shell)?;
         self.frames.end_frame(&mut shell)?;
         let mut dropping = Ok(());
@@ -317,5 +421,22 @@ impl Shell for GpuiShell<'_> {
     fn free(&mut self, surface: Painted) -> Result<()> {
         self.retired.extend(surface.images());
         Ok(())
+    }
+}
+
+/// Images a thread made: held as they are, the images they replace dropped at the end of the frame.
+impl Receive<Painted> for GpuiShell<'_> {
+    fn make_from(&mut self, painted: &Painted) -> Result<Painted> {
+        Ok(painted.clone())
+    }
+
+    fn refill_from(&mut self, surface: &mut Painted, painted: &Painted) -> Result<()> {
+        let old = std::mem::replace(surface, painted.clone());
+        self.retired.extend(old.images());
+        Ok(())
+    }
+
+    fn bytes_of(&self, painted: &Painted) -> u64 {
+        painted.bytes()
     }
 }
