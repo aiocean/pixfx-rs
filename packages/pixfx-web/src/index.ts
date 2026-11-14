@@ -1,0 +1,16 @@
+// The JS runtime every JS shell (Phaser, Pixi, ...) shares: the engine in wasm, the painting workers, the game-wide
+// frames and their surfaces, and a stage per host scene that follows the Rust scene's draw list. A shell supplies
+// only its host objects (`GfxTextures`, `GfxImages`) and its loop.
+export { Game } from "./game";
+export type { Delivering, WorkerPort } from "./game";
+export { Stage } from "./stage";
+export type { CueSink, WorldCue } from "./stage";
+export { PixfxEffect } from "./effect";
+export type { Counts, EffectHost, FollowTarget } from "./effect";
+export { PixfxFeel } from "./feel";
+export { splitPlayOptions } from "./options";
+export type { Play } from "./options";
+export { defaultWorkers, loadBaked, loadedEngine, loadedGame, loadPixfx, openWorkers, workerPort } from "./load";
+export type { LoadOptions } from "./load";
+export type { BlinkLike, EffectMeta, Engine, SquashLike } from "./engine";
+export type { GfxBlend, GfxImage, GfxImages, GfxTexture, GfxTextures } from "./gfx";

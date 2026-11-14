@@ -1,0 +1,31 @@
+{
+  "name": "pixfx-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tools/cdp": "./tools/cdp.ts"
+  },
+  "files": [
+    "src",
+    "wasm"
+  ],
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../crates/pixfx-wasm --target web --out-dir ../../packages/pixfx-web/wasm",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "check": "bun run typecheck && bun run lint && bun run test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "eslint": "^10.14.0",
+    "typescript": "^6",
+    "typescript-eslint": "^8.72.2"
+  },
+  "dependencies": {
+    "eventemitter3": "^5.0.4",
+    "zod": "^4.6.7"
+  }
+}

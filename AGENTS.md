@@ -103,7 +103,8 @@ Dependencies point one way, top to bottom. A lower layer never depends on a high
 | Layer | Crate (target) | Holds | Rules |
 |---|---|---|---|
 | Shells | `pixfx-canvas`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-gpui`, `pixfx-export`, `pixfx-cli` | Host objects, the host loop, workers, surface caches | No decisions. Thin enough that a second shell for the same host would be the same code. |
-| JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it. |
+| JS runtime | `packages/pixfx-web` (TypeScript) | Loading the wasm, painting workers, the game-wide frames and their surfaces, a stage per host scene following the draw list, effect handles, the feel's JS face | Host-neutral: no Phaser, no Pixi. A JS shell adds only its host objects and its loop. |
+| JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it, by way of `pixfx-web`. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
 | Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies | Pure and deterministic: no clock, no I/O, no host types. |
 | Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `blend`, `color`, `palette`, `outline`, `math`) | Frames with colour and light, painting, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
@@ -130,9 +131,13 @@ Where a new piece of code goes:
 Each item is a refactor. Each lands with every test green, the parity gate passing and `frame_hash` unchanged; a
 change to a JS shell also shows `bun run perf` before and after.
 
-1. **No Pixi shell.** Add `packages/pixfx-pixi` against the same contract as `packages/pixfx-phaser` (the wasm
+1. **`packages/pixfx-phaser` keeps its own copy of the JS runtime.** `game.ts`, `surfaces.ts`, `protocol.ts`,
+   `paint.ts`, `worker.ts`, `load.ts`, `engine.ts`, `stage.ts`, `effect.ts`, `feel.ts` and `options.ts` are the same
+   code as `packages/pixfx-web`. Phaser switches to `pixfx-web` (its copies deleted) once its camera culling (plan
+   Task 6) has landed; until then a fix to one goes into both.
+2. **No Pixi shell.** Add `packages/pixfx-pixi` against the same contract as `packages/pixfx-phaser` (the wasm
    `Scene`'s draw list, workers that paint, one atlas), so it stays as thin.
-2. **`pixfx-canvas` holds JS bindings and a decision.** `src/fighter.rs` and `src/light.rs` bind `pixfx-fighter` and
+3. **`pixfx-canvas` holds JS bindings and a decision.** `src/fighter.rs` and `src/light.rs` bind `pixfx-fighter` and
    `pixfx-light` for JS; bindings belong in `pixfx-wasm` so every JS shell gets them. `light.rs` also keeps the list
    of live lights, a decision for `pixfx-scene` (or the game). The crate keeps only its Canvas 2D shell.
 
