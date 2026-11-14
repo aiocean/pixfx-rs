@@ -30,7 +30,8 @@ pub use cut::cut;
 pub use diff::{Diff, diff};
 pub use grid::{Map, Run, colors, nearest, rects, shrink};
 pub use pixfx_draw::{Rgba, RgbaImage};
-pub use show::{LEGEND, TooManyColors, text, zoom};
+pub use show::{LEGEND, ParseError, TooManyColors, parse, text, text_named};
+pub use view::zoom;
 
 /// Alpha at and above which a pixel counts as painted.
 pub(crate) const OPAQUE: u8 = 128;

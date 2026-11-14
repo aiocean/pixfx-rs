@@ -1,10 +1,10 @@
-//! A grid shown back to the agent: as letters it can read cell by cell, and as a big picture it can look at.
+//! A grid as text the agent reads cell by cell, edits and hands back: [`text`] writes it, [`parse`] reads it.
 
 use core::fmt;
 
-use pixfx_draw::color::to_hex;
+use pixfx_draw::color::{hex, to_hex};
 
-use crate::{Map, Rgba, RgbaImage};
+use crate::{Map, Rgba};
 
 /// The letters [`text`] gives palette colours, in order; an empty cell is `.`.
 pub const LEGEND: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -17,7 +17,7 @@ impl fmt::Display for TooManyColors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} colours, more than the {} letters a text grid has",
+            "{} colours, more than the {} letters a text grid has: reduce the colours first",
             self.0,
             LEGEND.len()
         )
@@ -26,14 +26,29 @@ impl fmt::Display for TooManyColors {
 
 /// `map` as text: a head line (size, colours), one legend line per `palette` colour (`a #rrggbb`), then the grid
 /// with its column numbers above (tens, then units) and its row number before each row, so every cell can be named
-/// by (x, y). `.` is an empty cell.
+/// by (x, y). `.` is an empty cell. [`parse`] reads it back.
 pub fn text(map: &Map, palette: &[Rgba]) -> Result<String, TooManyColors> {
+    text_named(map, palette, &[])
+}
+
+/// [`text`] with a name on each legend line that has one (`a robe0 #f4efe2`), so the agent reads what a colour is
+/// for; a colour past the end of `names`, or with an empty name, gets none (`a #f4efe2`). A name is one word:
+/// whitespace in it is dropped.
+pub fn text_named(map: &Map, palette: &[Rgba], names: &[&str]) -> Result<String, TooManyColors> {
     if palette.len() > LEGEND.len() {
         return Err(TooManyColors(palette.len()));
     }
     let mut out = format!("{}x{}, {} colours, . empty\n", map.w, map.h, palette.len());
-    for (letter, &c) in LEGEND.chars().zip(palette) {
-        out.push_str(&format!("{letter} {}\n", to_hex(c)));
+    for (i, (letter, &c)) in LEGEND.chars().zip(palette).enumerate() {
+        let name: String = names
+            .get(i)
+            .map(|n| n.chars().filter(|c| !c.is_whitespace()).collect())
+            .unwrap_or_default();
+        if name.is_empty() {
+            out.push_str(&format!("{letter} {}\n", to_hex(c)));
+        } else {
+            out.push_str(&format!("{letter} {name} {}\n", to_hex(c)));
+        }
     }
     let pad = map.h.saturating_sub(1).to_string().len();
     let digits = |f: fn(u32) -> u32| -> String {
@@ -57,40 +72,127 @@ pub fn text(map: &Map, palette: &[Rgba]) -> Result<String, TooManyColors> {
     Ok(out)
 }
 
-/// Grid lines: between every cell, and brighter every [`MAJOR`] cells.
-const MINOR: [u8; 4] = [96, 96, 112, 255];
-const MAJOR_LINE: [u8; 4] = [200, 200, 220, 255];
-/// Cells between the brighter grid lines.
-pub const MAJOR: u32 = 8;
-/// An empty cell is a checker of these two, so it reads as empty rather than black.
-const EMPTY: [[u8; 4]; 2] = [[40, 40, 48, 255], [52, 52, 62, 255]];
+/// Why [`parse`] refused a text: the 1-based `line` of the text and what is wrong there.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParseError {
+    pub line: usize,
+    pub message: String,
+}
 
-/// `map` blown up: each cell a `scale` x `scale` square in its `palette` colour (an empty cell a dark checker), a
-/// one-pixel grid line round every cell and a brighter one every [`MAJOR`] cells, counted from the top left. An
-/// empty map gives the bare grid: a sheet to hand an image model to draw into.
-pub fn zoom(map: &Map, palette: &[Rgba], scale: u32) -> RgbaImage {
-    let scale = scale.max(1);
-    let step = scale + 1;
-    let mut img = RgbaImage::new(map.w * step + 1, map.h * step + 1);
-    for y in 0..img.h {
-        for x in 0..img.w {
-            let (on_x, on_y) = (x % step == 0, y % step == 0);
-            let p = if on_x || on_y {
-                let major = (on_x && (x / step).is_multiple_of(MAJOR))
-                    || (on_y && (y / step).is_multiple_of(MAJOR));
-                if major { MAJOR_LINE } else { MINOR }
-            } else {
-                let (cx, cy) = (x / step, y / step);
-                match map
-                    .get(i64::from(cx), i64::from(cy))
-                    .and_then(|i| palette.get(i))
-                {
-                    Some(&Rgba(r, g, b, _)) => [r, g, b, 255],
-                    None => EMPTY[((cx + cy) % 2) as usize],
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "line {}: {}", self.line, self.message)
+    }
+}
+
+/// A grid written by [`text`] or [`text_named`] (and perhaps edited) back to its map and palette:
+/// `parse(&text(m, p)?) == (m, p)` for an opaque palette. Read are the head line `WxH, ...`, the legend lines
+/// `<letter> [name] #rrggbb` (the palette, in their order; names are for the reader and dropped) and the rows
+/// `<row> <cells>`, top to bottom. The column-number lines (one word of digits), the row numbers and blank lines
+/// are skipped, so an agent need not keep them right. Refused, naming the line: a letter outside the legend (with
+/// its row and column), a row of the wrong width, the wrong number of rows, a legend letter used twice.
+pub fn parse(text: &str) -> Result<(Map, Vec<Rgba>), ParseError> {
+    let err = |line: usize, message: String| ParseError { line, message };
+    let mut lines = text
+        .lines()
+        .enumerate()
+        .map(|(i, l)| (i + 1, l.trim()))
+        .filter(|(_, l)| !l.is_empty());
+
+    let (head_line, head) = lines
+        .next()
+        .ok_or_else(|| err(1, "empty text, expected a head line `WxH, ...`".into()))?;
+    let size = head.split(',').next().unwrap_or_default().trim();
+    let (w, h) = size
+        .split_once('x')
+        .and_then(|(w, h)| Some((w.trim().parse::<u32>().ok()?, h.trim().parse::<u32>().ok()?)))
+        .ok_or_else(|| {
+            err(
+                head_line,
+                format!("head line `{head}` does not start with `WxH`"),
+            )
+        })?;
+
+    let mut palette = Vec::new();
+    let mut letters: Vec<char> = Vec::new();
+    let mut map = Map::empty(w, h);
+    let mut y: u32 = 0;
+    for (line, l) in lines {
+        let words: Vec<&str> = l.split_whitespace().collect();
+        if let Some((letter, colour)) = legend_line(&words) {
+            if y > 0 {
+                return Err(err(line, format!("legend line `{l}` after the grid rows")));
+            }
+            if letter == '.' || letters.contains(&letter) {
+                return Err(err(
+                    line,
+                    format!("legend letter `{letter}` is `.` or given twice"),
+                ));
+            }
+            if letters.len() >= LEGEND.len() {
+                return Err(err(line, TooManyColors(letters.len() + 1).to_string()));
+            }
+            let c = hex(colour)
+                .map_err(|_| err(line, format!("`{colour}` is not a #rrggbb colour")))?;
+            letters.push(letter);
+            palette.push(c);
+            continue;
+        }
+        match words.as_slice() {
+            [digits] if digits.bytes().all(|b| b.is_ascii_digit()) => {}
+            [_, cells] => {
+                if y >= h {
+                    return Err(err(line, format!("a row past the {h} the head line gives")));
                 }
-            };
-            img.set(x, y, p);
+                let n = cells.chars().count();
+                if n != w as usize {
+                    return Err(err(
+                        line,
+                        format!("row {y} has {n} cells, the head line gives {w}"),
+                    ));
+                }
+                for (x, ch) in cells.chars().enumerate() {
+                    if ch == '.' {
+                        continue;
+                    }
+                    let i = letters.iter().position(|&l| l == ch).ok_or_else(|| {
+                        err(
+                            line,
+                            format!("row {y}, column {x}: `{ch}` is not in the legend"),
+                        )
+                    })?;
+                    if let Some(cell) = map.cells.get_mut(y as usize * w as usize + x) {
+                        *cell = Some(i);
+                    }
+                }
+                y += 1;
+            }
+            _ => {
+                return Err(err(
+                    line,
+                    format!(
+                        "`{l}` is not a legend line, a column-number line or a row `<y> <cells>`"
+                    ),
+                ));
+            }
         }
     }
-    img
+    if y != h {
+        return Err(err(
+            text.lines().count().max(1),
+            format!("{y} rows, the head line gives {h}"),
+        ));
+    }
+    Ok((map, palette))
+}
+
+/// A legend line's letter and colour: a one-character first word and a last word starting with `#`.
+fn legend_line<'a>(words: &[&'a str]) -> Option<(char, &'a str)> {
+    let (first, rest) = words.split_first()?;
+    let last = rest.last()?;
+    let mut chars = first.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if last.starts_with('#') => Some((c, *last)),
+        _ => None,
+    }
 }
