@@ -1,0 +1,4 @@
+pitch 10.22
+figure 50x76
+source target/art/spike-wanglin/hero-base/image-01.png crop (265, 122, 800, 923)
+# pitch: source pixels per drawn pixel. figure: the drawn figure's box in drawn pixels (background excluded), measured in the 2026-11-14 spike; +-1 cell.

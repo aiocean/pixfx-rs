@@ -1,0 +1,4 @@
+pitch 14.65
+figure 41x57
+source target/art/spike-wanglin/hero-grid/image-01.png crop (190, 131, 820, 995)
+# pitch: source pixels per drawn pixel. figure: the drawn figure's box in drawn pixels (background excluded), measured in the 2026-11-14 spike; +-1 cell.

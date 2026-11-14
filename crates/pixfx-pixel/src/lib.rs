@@ -18,6 +18,14 @@ mod diff;
 mod grid;
 mod show;
 
+pub mod critique;
+pub mod oklab;
+pub mod parts;
+pub mod recover;
+pub mod reduce;
+pub mod sheet;
+pub mod view;
+
 pub use cut::cut;
 pub use diff::{Diff, diff};
 pub use grid::{Map, Run, colors, nearest, rects, shrink};

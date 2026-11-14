@@ -1,0 +1,4 @@
+pitch 11.9
+figure 27x40
+source target/art/spike-wanglin/draft-style/image-01.png crop (354, 282, 697, 783)
+# pitch: source pixels per drawn pixel. figure: the drawn figure's box in drawn pixels (background excluded), measured in the 2026-11-14 spike; +-1 cell.

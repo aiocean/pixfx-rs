@@ -1,6 +1,6 @@
 # pixfx-pixel: a pixel toolkit for agents
 
-Status: draft for approval, 2026-11-14. Study behind it: `docs/research/2026-11-14-pixel-tool-study.md`.
+Status: approved by the user, 2026-11-14. Study behind it: `docs/research/2026-11-14-pixel-tool-study.md`.
 
 ## Intent
 
@@ -161,19 +161,31 @@ A sheet is a layout of cells: size per cell, columns, rows, gap, and per cell wh
   `variants(n)` (a grid of tries to pick from).
 - `cut(drawn, layout)`: each cell's picture back, guide colours removed, ready for `recover`.
 
-Whether image models follow a drawn grid and skeleton is not known. The first task of the plan measures it (the
-spike, below). My calls on it:
+**Spike result (2026-11-14, `target/art/spike-wanglin/`, $0.55).** Six pictures of one character, on `draft` and
+`hero`, each with the prompt alone, with a style reference (our fighter sheet at 4x), and with style plus a 64x64
+grid plate:
 
-- **Two kinds of blank.** `blank` borders only each sprite cell; `blank --pixels` also draws a faint line round
-  every pixel. The spike tries both. Guide and border colours are picked outside the palette asked for, so `cut`
-  can remove them before `recover` sees the cell.
-- **Pass line:** a sheet passes when at least 7 of 9 cells keep their drawing inside the cell border, and
-  `recover` finds each cell's pixel size within ±10% of the size asked for; a skeleton passes when the drawn
-  limbs follow at least 4 of its 5 bones (judged by the agent on `view`, recorded in the spike notes).
-- **If sheets fail:** one subject per call, as Sprite Fusion does. The sheet (with its guide) goes in as a
-  reference image, the model draws one picture, and `recover` runs on a free picture of unknown size. `sheet`
-  stays (it still makes the reference), `cut` is kept only for a model's own grid of variants. The skill teaches
-  whichever path passed.
+| Variant | Pixel art? | Pixel size | Height in cells (our fighters: 40) |
+|---|---|---|---|
+| draft, prompt alone | no, an illustration | 5.2 px | 157 |
+| draft + style | yes | 11.9 px | 40 |
+| draft + style + plate | yes | 8.0 px | 46 |
+| hero, prompt alone | yes | 10.2 px | 76 |
+| hero + style | yes | 10.2 px | 60 |
+| hero + style + plate | yes | 14.7 px | 57 |
+
+What it settles:
+
+- **The style reference is what makes it work; the plate is not needed.** No model drew at the size the plate or
+  the prompt asked; every picture had a clean grid of its own pitch, which autocorrelation of the edge profile
+  found in each (the `recover` method). So the default loop is **the game's own sprites as a style reference, one
+  subject per call, on `draft`** ($0.02 a picture). `blank` and guides stay as options (framing, a pose skeleton),
+  not a required step; `cut` is for a model's own grid of variants.
+- **The tool must expect the model to be wrong.** Pixel size, scale and colour count (24-26 where ours have 17)
+  differ per picture, so `recover` takes no hint, `clean --height N` brings a result to the game's scale
+  (re-sampled cell by cell, majority vote), and the palette is always matched to the game's.
+- Not yet measured: whether a drawn skeleton steers a pose. The first pose the tool redoes (the knocked-down
+  `down`) measures it.
 
 #### Parts (`parts`)
 
@@ -198,7 +210,7 @@ Thin: parse arguments, read and write PNG and text, print. One verb per step of 
 
 | Verb | Does |
 |---|---|
-| `clean <picture>` | `cut` (optional), `recover` (to `--size WxH` if known), `reduce` or `--palette`; writes the clean PNG and prints the confidence |
+| `clean <picture>` | `cut` (optional), `recover` (no hint needed), `--height N` to the game's scale, `reduce` or `--palette`; writes the clean PNG and prints the pixel size found and the confidence |
 | `read <picture>` | Prints the text; `--rects` adds rects; `--region` |
 | `draw <text>` | Text back to a PNG |
 | `view <picture>` | The zoomed PNG within budget |
@@ -206,9 +218,16 @@ Thin: parse arguments, read and write PNG and text, print. One verb per step of 
 | `sheet <layout>` | A blank or guided sheet PNG plus its layout JSON |
 | `cut <drawn> <layout.json>` | The cells as PNGs, each through `clean` |
 | `parts <picture> <spec>` | The parts as PNGs and their boxes and pivots |
-| `diff` (exists) | Two pictures compared |
+| `diff` (exists) | Two pictures compared; `--anchor feet` lines them up by the bottom row and the middle of what is painted, not the top-left corner |
 
 Today's `pixfx pixel <picture>` becomes `read` plus `view`.
+
+For fighters (CLI glue over `pixfx-fighter`, not library code):
+
+- `--palette thunder|frost` labels the legend with the look's field names (`a robe0 #f4efe2`), so the agent writes
+  `c.robe[0]` and not a hex value.
+- `pixfx poses <look> --pose down --states` paints one pose in every state it has (knocked out or not, its moments,
+  facing both ways, flash, ice and shock) on one sheet, to check a redone pose in all of them.
 
 ### Scripts
 
@@ -235,7 +254,7 @@ write painter code → paint → diff and critique), when to write a script, and
   - added noise and JPEG-like blur.
 
   Then real model pictures as acceptance tests, not smoke tests (my call): one pose cropped from the stored
-  `target/art/poses/frost-gemini-r1/image-01.png` (1584x672, `hero` model) and one cell from each spike model,
+  `target/art/poses/frost-gemini-r1/image-01.png` (1584x672, `hero` model) and the figure of each spike picture,
   committed small under `crates/pixfx-pixel/tests/fixtures/`, each with its true grid (pixels per cell, size in
   cells) counted by hand on `view` and written next to it. The test checks the recovered grid against that
   answer, not a confidence threshold.
@@ -245,14 +264,11 @@ write painter code → paint → diff and critique), when to write a script, and
 - `sheet` / `cut`: a sheet laid out, filled cell by cell with known pictures, cut back to the same pictures.
 - `parts`: a known sprite split by a spec; every cell in one part; pivots where parts touch.
 - Determinism: every test result checked twice in one run, and the recover fixtures' outputs pinned by hash.
-- The image-model spike: the first plan task sends a guided sheet through `openrouter-image`, on both `draft`
-  (`openai/gpt-image-2.5-sunburst`, $0.006) and `hero` (`google/gemini-3-pro-image`, about $0.14), each with and
-  without per-pixel lines: 3 calls each, under $1 in all. It records which model follows cells and skeletons and
-  draws the cleanest pixels; that model is the skill's default. (My call: the spike decides the model.)
+- The image-model spike is done (above); its pictures are the real-model fixtures.
 
 ## Left to the builder
 
 - Exact thresholds and defaults (ΔE values, confidence cut-offs, critique limits), tuned on the fixtures.
 - The layout JSON's field names and the part spec's text form.
 - Module boundaries inside `recover` and `critique`.
-- The order of the plan's tasks, after the spike.
+- The order of the plan's tasks.
