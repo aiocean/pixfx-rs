@@ -268,6 +268,7 @@ dependencies = [
  "pixfx-effects",
  "pixfx-export",
  "pixfx-fighter",
+ "pixfx-pixel",
 ]
 
 [[package]]
@@ -337,6 +338,14 @@ dependencies = [
  "serde",
  "tsify",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "pixfx-pixel"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "pixfx-draw",
 ]
 
 [[package]]

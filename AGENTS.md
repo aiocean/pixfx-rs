@@ -119,6 +119,9 @@ Where a new piece of code goes:
   behaviour: `pixfx-core` or `pixfx-fighter`.
 - A new way to paint pixels (sprite, text, nine-slice, UI box): the drawing layer, driven by the first game that
   needs it; that game decides its API.
+- A tool an agent uses to read a picture as pixels (an image model's drawing, a customer's sprite): `pixfx-pixel`,
+  reached through `pixfx pixel`. It feeds the agent, never the game: the agent writes painter code from what it
+  reads, and nothing in the engine paints from its output.
 - Placement, layering, lifetimes, follow, fading after stop, which frame to show: `Scene`.
 - A JS-facing type or option: `pixfx-wasm`, as a translation of a Rust type.
 - A new host or output: a new shell.
@@ -133,11 +136,7 @@ Where a new piece of code goes:
 Each item is a refactor. Each lands with every test green, the parity gate passing and `frame_hash` unchanged; a
 change to a JS shell also shows `bun run perf` before and after.
 
-1. **`packages/pixfx-phaser` keeps its own copy of the JS runtime.** `game.ts`, `surfaces.ts`, `protocol.ts`,
-   `paint.ts`, `worker.ts`, `load.ts`, `engine.ts`, `stage.ts`, `effect.ts`, `feel.ts` and `options.ts` are the same
-   code as `packages/pixfx-web`. Phaser switches to `pixfx-web` (its copies deleted) once its camera culling (plan
-   Task 6) has landed; until then a fix to one goes into both.
-2. **`crates/pixfx-canvas` is a second Canvas 2D shell.** Its `Stage` paints on the main thread. Nothing uses it any
+1. **`crates/pixfx-canvas` is a second Canvas 2D shell.** Its `Stage` paints on the main thread. Nothing uses it any
    more (the site draws with `packages/pixfx-canvas2d`), but the site's docs pages still teach it; the crate goes
    with those pages rewritten for `pixfx-canvas2d`.
 

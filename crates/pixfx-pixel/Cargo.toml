@@ -1,0 +1,13 @@
+[package]
+name = "pixfx-pixel"
+description = "Pixels for agents: cut a picture (an artist's, an image model's or a game's own sprite) to a pixel grid on a palette, and show it back as text and as a zoomed grid"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm.workspace = true
+pixfx-draw = { path = "../pixfx-draw" }
+
+[lints]
+workspace = true

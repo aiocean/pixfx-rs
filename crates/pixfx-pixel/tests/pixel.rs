@@ -1,7 +1,6 @@
-// Tracing a picture into engine pixels: cut it out, match it to a palette, shrink it, merge it into rects, and
-// diff what comes out against what went in.
-use pixfx_draw::Rgba;
-use pixfx_draw::trace::{Map, RgbaImage, cut, diff, nearest, rects, shrink};
+// A picture into a pixel grid an agent reads: cut it out, match it to a palette, shrink it, merge it into rects,
+// show it as text and zoomed, and diff what comes out against what went in.
+use pixfx_pixel::{Map, Rgba, RgbaImage, colors, cut, diff, nearest, rects, shrink, text, zoom};
 
 const BACK: [u8; 4] = [42, 36, 56, 255];
 const RED: [u8; 4] = [220, 30, 30, 255];
@@ -119,4 +118,57 @@ fn diff_counts_the_pixels_that_differ_and_marks_them() {
     assert_eq!((d.differing, d.total), (2, 100));
     assert_eq!(mask.get(2, 2), Some([255, 40, 40, 255]));
     assert_eq!(diff(&a, &a).0.differing, 0);
+}
+
+#[test]
+fn a_sprite_that_already_is_pixel_art_round_trips_through_its_own_colours() {
+    let img = picture(6, 4, &[([1, 1, 2, 2], RED), ([3, 1, 2, 2], BLUE)]);
+    let palette = colors(&img);
+    assert_eq!(
+        palette,
+        vec![
+            Rgba(42, 36, 56, 255),
+            Rgba(220, 30, 30, 255),
+            Rgba(30, 30, 220, 255)
+        ]
+    );
+    let map = shrink(&nearest(&img, &palette), img.w, 1.0);
+    assert_eq!(map.paint(&palette), img);
+}
+
+#[test]
+fn text_names_every_cell_by_letter_under_column_and_row_numbers() {
+    let map = Map {
+        w: 3,
+        h: 2,
+        cells: vec![Some(0), None, Some(1), None, Some(1), None],
+    };
+    let palette = [Rgba(255, 0, 0, 255), Rgba(0, 0, 255, 255)];
+    let out = text(&map, &palette).map_err(|e| e.to_string());
+    assert_eq!(
+        out.as_deref(),
+        Ok("3x2, 2 colours, . empty\na #ff0000\nb #0000ff\n  012\n0 a.b\n1 .b.\n")
+    );
+    // past ten columns the tens come on a line above the units
+    let wide = text(&Map::empty(12, 1), &[]).unwrap_or_default();
+    assert!(wide.contains("  000000000011\n  012345678901\n0 ............\n"));
+    // more colours than letters is refused, not shown wrongly
+    assert!(text(&map, &vec![Rgba(0, 0, 0, 255); 63]).is_err());
+}
+
+#[test]
+fn zoom_draws_each_cell_as_a_square_inside_grid_lines() {
+    let map = Map {
+        w: 2,
+        h: 1,
+        cells: vec![Some(0), None],
+    };
+    let img = zoom(&map, &[Rgba(220, 30, 30, 255)], 4);
+    // two 4-pixel cells and three one-pixel lines across, one cell and two lines down
+    assert_eq!((img.w, img.h), (11, 6));
+    assert_eq!(img.get(2, 2), Some(RED));
+    assert_ne!(img.get(7, 2), Some(RED));
+    // a line pixel is neither the cell colour nor an empty cell
+    let line = img.get(5, 2);
+    assert!(line.is_some() && line != Some(RED) && line != img.get(7, 2));
 }

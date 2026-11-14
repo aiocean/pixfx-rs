@@ -6,8 +6,9 @@ anything here; this file only says what this crate holds.
 ## Job
 
 Pixel fighters, from the site's duel: a drawn fighter with a pose for each thing it can be doing (`paint`, `pose`,
-`look`; poses traced from art in `traced`, tables written by `pixfx trace`), a body that takes hits the way fighting
-games do (`body`, `act`), the screen's answer to a blow (`feel`) and the marks that hang on a fighter (`status`).
+`look`; every pose is painter code written by hand, `pixfx pixel` reading reference art for it), a body that takes
+hits the way fighting games do (`body`, `act`), the screen's answer to a blow (`feel`) and the marks that hang on a
+fighter (`status`).
 
 ## Belongs here
 

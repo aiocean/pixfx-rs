@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- `pixfx-phaser` runs on `pixfx-web` (its copy of the runtime is gone) and draws only what the main camera sees: an
+  effect off camera plays on unseen and takes no paint or texture until the camera reaches it, and one with a
+  `scrollFactor` (a HUD effect at `0`, parallax between) is culled where the camera shows it. A game's Vite config
+  adds `optimizeDeps: { exclude: ["pixfx-web"] }`.
+- `pixfx-scene`: `View` carries the camera's scroll (`scroll_x`, `scroll_y`), and `Scene::set_scroll_factor(handle,
+  f)` says how far an effect moves with it. JS: `scene.setView(x, y, w, h, scrollX, scrollY)` and
+  `scene.setScrollFactor(handle, f)`. `pixfx-web` exports `wasmEngine`.
+
+- `pixfx-pixel` (new): pixels for agents. A picture (an image model's, an artist's, a game's own sprite) is cut from
+  its background, matched to a palette (given, or its own colours), shrunk to its pixel grid and shown back as text
+  (a letter per cell, a colour legend, column and row numbers), at true size and zoomed inside grid lines. `pixfx
+  pixel <picture.png>` runs it (`--rects` lists the cells merged into rects); `pixfx pixel --blank WxH` writes an
+  empty grid to hand an image model. The cut, match, shrink, rects and diff steps move here from `pixfx-draw`
+  (`trace` is gone; `RgbaImage` stays, in `pixfx_draw::image`).
+- `pixfx-fighter`: no pose is painted from a traced table any more; launched, tumble, fall and down are painted by
+  their painter code again, as every other pose. `traced`, `paint_traced` and `pixfx trace` are gone.
+
 - The site draws with `pixfx-canvas2d`: the landing duel, the effect pages, the gallery and the pointer fx paint on
   workers and load one engine (pixfx-web's wasm). Landing duel at 4x CPU throttling: 13-15 fps before, 58-60 after;
   at 6x: 11-15 before, 47-56 after.

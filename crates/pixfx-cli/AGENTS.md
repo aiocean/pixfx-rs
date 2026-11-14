@@ -6,9 +6,9 @@ changing anything here; this file only says what this crate holds.
 ## Job
 
 The `pixfx` binary: `parity` (an effect against pixelfx), `sheet`, `render` (PNG sheets, GIF), `poses` (every pose
-of a fighter look on one sheet, `--blank` cells left empty), `trace` (a crop of art into a traced pose table in
-`pixfx-fighter/src/traced/`), `diff` (pixels two images differ by, with a mask). `src/lib.rs` holds the parts worth
-testing on their own (`opts`, `parity`, `poses`, `trace`).
+of a fighter look on one sheet, `--blank` cells left empty), `pixel` (a picture as a pixel grid for an agent to
+read: text, true-size and zoomed PNGs; `--blank` an empty grid for an image model), `diff` (pixels two images differ
+by, with a mask). `src/lib.rs` holds the parts worth testing on their own (`opts`, `parity`, `pixel`, `poses`).
 
 ## Belongs here
 
@@ -27,7 +27,8 @@ If a second host (the site, a game) would want the same output, the logic is not
 
 ## Dependencies
 
-`pixfx-core`, `pixfx-draw`, `pixfx-effects`, `pixfx-export`, `pixfx-fighter`, `gif`. Nothing depends on this crate.
+`pixfx-core`, `pixfx-draw`, `pixfx-effects`, `pixfx-export`, `pixfx-fighter`, `pixfx-pixel`, `gif`. Nothing
+depends on this crate.
 
 ## Before you finish
 
