@@ -19,12 +19,20 @@
   f)` says how far an effect moves with it. JS: `scene.setView(x, y, w, h, scrollX, scrollY)` and
   `scene.setScrollFactor(handle, f)`. `pixfx-web` exports `wasmEngine`.
 
-- `pixfx-pixel` (new): pixels for agents. A picture (an image model's, an artist's, a game's own sprite) is cut from
-  its background, matched to a palette (given, or its own colours), shrunk to its pixel grid and shown back as text
-  (a letter per cell, a colour legend, column and row numbers), at true size and zoomed inside grid lines. `pixfx
-  pixel <picture.png>` runs it (`--rects` lists the cells merged into rects); `pixfx pixel --blank WxH` writes an
-  empty grid to hand an image model. The cut, match, shrink, rects and diff steps move here from `pixfx-draw`
-  (`trace` is gone; `RgbaImage` stays, in `pixfx_draw::image`).
+- `pixfx-pixel` (new): pixels for agents, never shipped in a game. `pixfx pixel <verb>` runs it:
+  - `clean`: an image model's picture down to one pixel a cell. The grid is found by autocorrelation and dynamic
+    programming, with a confidence per cell; `--height` resamples to the game's sprite height, and colours are
+    snapped to `--palette` or merged to 32 in OKLab.
+  - `read` / `draw`: a sprite as text (a letter per cell, a legend naming a look's colours) and back.
+  - `view`: a picture sized to what it costs an agent to look at.
+  - `critique`: issues with cells and a fix each, and a score.
+  - `sheet` / `cut`: blank sheets for an image model, with bones or a sprite as a guide, and the drawn cells cut back.
+  - `parts`: a sprite split into named parts with parents and pivots, the ground for effects that take a sprite
+    apart.
+
+  Also `pixfx diff --anchor feet`, `pixfx poses <look> --pose P --states`, and the skill
+  `skills/pixfx-pixel/SKILL.md`. The cut, match, shrink, rects and diff steps move here from `pixfx-draw` (`trace`
+  is gone; `RgbaImage` stays, in `pixfx_draw::image`).
 - `pixfx-fighter`: no pose is painted from a traced table any more; launched, tumble, fall and down are painted by
   their painter code again, as every other pose. `traced`, `paint_traced` and `pixfx trace` are gone.
 

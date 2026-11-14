@@ -6,9 +6,10 @@ changing anything here; this file only says what this crate holds.
 ## Job
 
 The `pixfx` binary: `parity` (an effect against pixelfx), `sheet`, `render` (PNG sheets, GIF), `poses` (every pose
-of a fighter look on one sheet, `--blank` cells left empty), `pixel` (a picture as a pixel grid for an agent to
-read: text, true-size and zoomed PNGs; `--blank` an empty grid for an image model), `diff` (pixels two images differ
-by, with a mask). `src/lib.rs` holds the parts worth testing on their own (`opts`, `parity`, `pixel`, `poses`).
+of a fighter look on one sheet, `--blank` cells left empty; `--pose P --states` one pose in every state), `pixel`
+(the agent's pixel tool: `clean`, `read`, `draw`, `view`, `critique`, `sheet`, `cut`, `parts`; see
+`skills/pixfx-pixel/SKILL.md`), `diff` (pixels two images differ by, with a mask; `--anchor feet`). `src/lib.rs`
+holds the parts worth testing on their own (`opts`, `parity`, `pixel`, `poses`).
 
 ## Belongs here
 

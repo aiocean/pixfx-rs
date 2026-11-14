@@ -498,7 +498,7 @@ pub fn part_line(p: &Part) -> String {
     let [x, y, w, h] = p.bbox;
     let pivot = p
         .pivot
-        .map_or("-".to_string(), |(px, py)| format!("{px},{py}"));
+        .map_or("-".to_string(), |(px, py)| format!("{px:.2},{py:.2}"));
     format!(
         "{} {} {x},{y},{w},{h} {pivot}",
         p.name,
