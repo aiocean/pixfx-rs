@@ -6,11 +6,13 @@
 #![forbid(unsafe_code)]
 
 mod choice;
+mod curve;
 mod rng;
 mod sense;
 mod skill;
 
 pub use choice::{Choice, Outcome, Posture, Thought, Why};
+pub use curve::{score, Consideration, Curve, Input, Inputs};
 pub use rng::Rng;
 pub use sense::{Arena, Doing, Foe, Me, Phase, Sense, Shape, Threat};
 pub use skill::{BodySize, Inflicts, Profile, Skill, SkillKind};
