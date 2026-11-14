@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::num::NonZeroU32;
 
-use js_sys::{Int32Array, JSON, Uint8Array};
+use js_sys::{Int32Array, JSON, Uint8Array, Uint8ClampedArray};
 use pixfx_core::{Clip, Feel, Layer, PixelBox, Placement, Sim, color_rgba_in, light_rgba_in};
 use pixfx_draw::Frame;
 use pixfx_scene::{
@@ -40,6 +40,7 @@ use pixfx_scene::{
     Target, View,
 };
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 
 use crate::js::{parse, to_js};
@@ -878,6 +879,24 @@ impl JsScene {
     /// How white the view is lifted, 0 to 1.
     pub fn flash(&mut self) -> f64 {
         self.inner.scene().feel().map_or(0.0, Feel::flash)
+    }
+
+    /// `src` (a `w` x `h` RGBA picture of everything the host drew, `unit` of its pixels per game pixel) bent by the
+    /// screen ripples alive now; none when no ripple is alive (the picture stays as it is).
+    pub fn bend(
+        &mut self,
+        src: Clamped<Vec<u8>>,
+        w: u32,
+        h: u32,
+        unit: f64,
+    ) -> Option<Uint8ClampedArray> {
+        let ripples = self.inner.scene().feel().map_or(&[][..], Feel::ripples);
+        if ripples.is_empty() {
+            return None;
+        }
+        let mut bent = vec![0; src.0.len()];
+        pixfx_core::screen::ripple_rgba(&src.0, &mut bent, w, h, ripples, unit);
+        Some(Uint8ClampedArray::from(bent.as_slice()))
     }
 
     /// Whether a hit-stop holds play now.

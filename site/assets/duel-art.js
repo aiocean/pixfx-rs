@@ -2,7 +2,7 @@
 // fighters themselves (their poses, the marks that hang on them, the fire, lightning and frost over them, the dust
 // they raise) are drawn by the engine (pixfx-fighter, through the wasm `Sprites`); this module tells it what each
 // fighter is doing, in the duel's own terms. Everything is in game pixels times `s`, the canvas scale.
-import { lookColors } from "../pkg/pixfx_canvas.js";
+import { lookColors } from "../pkg/pixfx-canvas2d.js";
 import { RAGE, SPELLS, skillBar } from "./duel.js";
 
 /** Each school's colours the HUD draws in, from the engine's looks (asked once the engine has loaded). */
@@ -37,12 +37,15 @@ function marks(f, time) {
   };
 }
 
-/** The two fighters and the dust of the fight (`feel`), feet on row `ground`; `jolts` from `feel.jolts()`. */
-export function drawFighters(sprites, duel, feel, ground, jolts) {
+/**
+ * The two fighters and the dust of the fight (`feel`), feet on row `ground`; `jolts` from `feel.jolts()`. Returns
+ * the picture to draw (`pixfx.drawPicture`).
+ */
+export function paintFighters(sprites, duel, feel, ground, jolts) {
   sprites.begin();
   for (const f of duel.fighters) sprites.fighter(f.school, appearance(f, jolts[f.index]), ground, marks(f, duel.time));
   sprites.dust(feel, ground);
-  sprites.end();
+  return sprites.picture();
 }
 
 /**
@@ -131,9 +134,9 @@ export const BARS_TALL = 26;
  * The fight's bars, with no words: for each fighter a bronze medallion with its face, then its life (what a blow
  * just took drains away behind it), its qi under that, and its rage as beads that blaze once full (its ultimate
  * is ready). Between the two, a bronze plaque with a diamond for each round won. `top` is the bars' top edge in
- * game pixels.
+ * game pixels; `show(picture)` draws the faces `sprites` painted (`pixfx.drawPicture`).
  */
-export function drawBars(ctx, sprites, duel, s, top) {
+export function drawBars(ctx, sprites, show, duel, s, top) {
   const faces = [];
   const span = duel.right - duel.left;
   const medal = BARS_TALL;
@@ -220,7 +223,7 @@ export function drawBars(ctx, sprites, duel, s, top) {
     const look = { ...appearance(m.f, [0, 0]), pose: "idle", face: m.f.index === 0 ? 1 : -1, flash: false, vx: 0, act: null };
     sprites.portrait(m.f.school, look, m.x, m.y, m.size, m.f.hp <= 0 ? 0.35 : 1);
   }
-  sprites.end();
+  show(sprites.picture());
 }
 
 /** A bronze medallion at (x, top), `size` across, with f's face in it, lit in its colour once its rage is full. */

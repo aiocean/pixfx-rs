@@ -62,3 +62,21 @@ fn past_the_budget_the_least_recently_shown_go_but_never_one_shown_now() -> Resu
     );
     Ok(())
 }
+
+#[test]
+fn a_frame_that_shows_nothing_still_goes_past_the_budget() -> Result<(), ()> {
+    let mut store = FrameStore::default();
+    show(&mut store, 1, Layer::Back, 1)?;
+    // an unlit frame, shown later: its surface holds no pixels a host uploads
+    store.show(&id(0), Layer::Back, 2, || Ok::<_, ()>((0, 0)))?;
+    store.set_budget(0);
+    let mut dropped = store.trim(3);
+    dropped.sort_unstable();
+    assert_eq!(
+        dropped,
+        vec![0, 1],
+        "every surface not shown now goes, lit or not"
+    );
+    assert_eq!(store.bytes(), 0);
+    Ok(())
+}

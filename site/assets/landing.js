@@ -1,8 +1,8 @@
-// The landing page: a live duel in the hero, drawn by the pixfx-canvas Stage. The page owns the animation-frame
-// loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
-import init, { Body, FightFeel, Lights, Sprites, Stage, effects, meta } from "../pkg/pixfx_canvas.js";
+// The landing page: a live duel in the hero, drawn by pixfx-canvas2d (workers paint the effects). The page owns the
+// animation-frame loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
+import { Body, FightFeel, Lighting, Sprites, createPixfx, loadPixfx, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
 import { DECOR, createDuel, step } from "./duel.js";
-import { BARS_TALL, drawBars, drawFighters, drawNumbers, drawSkills, drawStreaks } from "./duel-art.js";
+import { BARS_TALL, drawBars, drawNumbers, drawSkills, drawStreaks, paintFighters } from "./duel-art.js";
 import { createScene, drawScene } from "./duel-scene.js";
 import { kindle, lampGlows } from "./duel-light.js";
 
@@ -18,9 +18,9 @@ export async function mount() {
   setupTabs(document.getElementById("targets"));
 
   // the skill icon atlases (site/art/skill-icons.sh), by icon size; the hero waits for them, as for the engine
-  const [, icons] = await Promise.all([init(), loadIcons([32, 24])]);
+  const [engine, icons] = await Promise.all([loadPixfx(), loadIcons([32, 24])]);
 
-  const hero = createHero(document.getElementById("scene"), off.signal, icons);
+  const hero = createHero(document.getElementById("scene"), off.signal, icons, engine);
   let last = null;
   let running = true;
   // the hero plays only while it is on screen; scrolled away, it waits where it was
@@ -57,17 +57,20 @@ export async function mount() {
 
 // ---------- hero ----------
 
-function createHero(canvas, signal, icons) {
-  const view = { canvas, icons, stage: null, duel: null, feel: null, sprites: null, lights: null, layout: null, handles: new Map() };
-  const have = new Set(effects());
+function createHero(canvas, signal, icons, engine) {
+  const view = { canvas, icons, stage: null, duel: null, feel: null, sprites: null, lighting: null, lights: [], layout: null, handles: new Map() };
+  const have = new Set(engine.effects());
+  // a picture Rust painted (fighters, faces, light), drawn and let go at once
+  const show = (picture) => {
+    view.stage.drawPicture(picture);
+    picture?.free();
+  };
   let seed = 1 + Math.floor(Math.random() * 1e6);
 
   function build() {
-    view.stage?.free();
-    view.sprites?.free();
-    view.feel?.free();
-    view.lights?.free();
+    view.free();
     view.handles.clear();
+    view.lights = [];
     const narrow = innerWidth < 760;
     // the fighters stay big enough to read their poses: bigger pixels on a wider screen
     const scale = narrow ? 2 : innerWidth < 1200 ? 3 : 4;
@@ -82,17 +85,17 @@ function createHero(canvas, signal, icons) {
     const span = Math.min(w - 16, 420);
     const arena = { left: Math.round((w - span) / 2), right: Math.round((w + span) / 2) };
 
-    view.stage = new Stage(canvas, scale);
+    view.stage = createPixfx(canvas.getContext("2d"), { scale });
     // the fight's own FightFeel answers every blow; the stage's effects just play the seconds it gives them
-    view.stage.setFeel(false);
+    view.stage.feel.setEnabled(false);
     // the night over the whole scene: one fireflies canvas its size, the meadow on the dais (the effect's ground
     // is mid-width, 10 pixels above its canvas's foot)
     if (have.has(DECOR.night)) view.stage.play(DECOR.night, Math.floor(w / 2), ground, { width: w, height: ground + 10 });
     // a brazier at each end of the arena lights it
     if (have.has(DECOR.lamp)) for (const x of [arena.left, arena.right]) view.stage.play(DECOR.lamp, x, ground, { seed: x });
     view.feel = new FightFeel();
-    view.sprites = new Sprites(canvas, scale);
-    view.lights = new Lights(w, h);
+    view.sprites = new Sprites(w, h);
+    view.lighting = new Lighting(w, h);
     // the bars go just under the page's top bar, which lies over the hero
     // (its links can wrap past its own box on a narrow screen, so measure what is in it)
     const topbar = Math.max(0, ...[...document.querySelectorAll(".topbar, .topbar *")].map((el) => el.getBoundingClientRect().bottom));
@@ -112,9 +115,9 @@ function createHero(canvas, signal, icons) {
   function play(commands) {
     for (const c of commands) {
       if (c.type === "play") view.handles.set(c.key, view.stage.play(c.fx, c.x, c.y, c.opts));
-      else if (c.type === "move" && view.handles.has(c.key)) view.stage.move(view.handles.get(c.key), c.x, c.y);
+      else if (c.type === "move" && view.handles.has(c.key)) view.handles.get(c.key).setPosition(c.x, c.y);
       else if (c.type === "stop" && view.handles.has(c.key)) {
-        view.stage.stop(view.handles.get(c.key));
+        view.handles.get(c.key).stop();
         view.handles.delete(c.key);
       }
     }
@@ -127,8 +130,7 @@ function createHero(canvas, signal, icons) {
     const commands = step(view.duel, run);
     play(commands);
     view.feel.react(commands);
-    kindle(view.lights, commands, ground, (fx) => meta(fx).loop);
-    view.lights.step(run);
+    view.lights = stepLights(kindle(view.lights, commands, ground, (fx) => engine.meta(fx).loop, putOutLight), run);
     view.stage.update(reduceMotion ? 0 : run);
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = BACKDROP;
@@ -145,9 +147,9 @@ function createHero(canvas, signal, icons) {
       ctx.fillRect(-scale * 4, -scale * 4, (w + 8) * scale, (h + 8) * scale);
     }
     // the one a blow struck shudders through the hit-stop
-    drawFighters(view.sprites, view.duel, view.feel, ground, view.feel.jolts());
+    show(paintFighters(view.sprites, view.duel, view.feel, ground, view.feel.jolts()));
     // the magic lights the dais, the peaks and the fighters in its own colour
-    view.lights.draw(ctx, scale, lampGlows(view.layout.lamps, ground, view.duel.time));
+    show(view.lighting.paint(view.lights, lampGlows(view.layout.lamps, ground, view.duel.time)));
     view.stage.drawLayer("front");
     drawStreaks(ctx, view.feel.streaks(), view.duel, scale);
     drawNumbers(ctx, view.feel.numbers(), view.duel, scale);
@@ -159,7 +161,7 @@ function createHero(canvas, signal, icons) {
       ctx.fillRect(0, 0, w * scale, band * scale);
       ctx.fillRect(0, (h - band) * scale, w * scale, band * scale);
     }
-    drawBars(ctx, view.sprites, view.duel, scale, view.layout.barTop);
+    drawBars(ctx, view.sprites, show, view.duel, scale, view.layout.barTop);
     // each fighter's skills, on the floor under its own side: bigger icons where the floor has the room, from the
     // atlas whose pixels land on whole screen pixels
     const icon = h - ground >= 20 ? 16 : 12;
@@ -173,12 +175,12 @@ function createHero(canvas, signal, icons) {
   }, { signal });
   signal.addEventListener("abort", () => clearTimeout(pending));
   view.free = () => {
-    view.stage?.free();
+    view.stage?.destroy();
     view.sprites?.free();
     view.feel?.free();
-    view.lights?.free();
+    view.lighting?.free();
   };
-  view.playing = () => view.stage?.handles().length ?? 0;
+  view.playing = () => view.stage?.stats().engines ?? 0;
 
   build();
   return view;

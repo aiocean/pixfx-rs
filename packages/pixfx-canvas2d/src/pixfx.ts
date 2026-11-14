@@ -2,8 +2,8 @@
 // (`pixfx-web`), and this draws them layer by layer onto the host's canvas, among its own drawing.
 import type { Counts, Game, PixfxEffect } from "pixfx-web";
 import { loadedGame, PixfxFeel, splitPlayOptions, Stage } from "pixfx-web";
-import type { CanvasImages, DrawContext, HolderOf, MakeHolder } from "./canvas-gfx";
-import { canvasHolder, canvasImages, canvasTextures } from "./canvas-gfx";
+import type { CanvasImages, CanvasPictures, HolderOf, MakeHolder, PictureLike } from "./canvas-gfx";
+import { canvasHolder, canvasImages, canvasPictures, canvasTextures, owned } from "./canvas-gfx";
 
 /** An effect's back layer (under what it plays around) or its front layer (over it). */
 export type Layer = "back" | "front";
@@ -44,10 +44,11 @@ export class Pixfx {
   readonly scale: number;
   private readonly stage: Stage<null>;
   private readonly images: CanvasImages;
+  private readonly pictures: CanvasPictures;
   private destroyed = false;
 
   constructor(
-    private readonly ctx: DrawContext,
+    private readonly ctx: CanvasRenderingContext2D,
     options: PixfxOptions = {},
   ) {
     const game = loadedGame();
@@ -56,6 +57,7 @@ export class Pixfx {
     if (!Number.isInteger(scale) || scale < 1) throw new Error(`pixfx: scale must be a whole number, 1 or more (got ${scale})`);
     this.scale = scale;
     this.images = canvasImages(holdersFor(game, options.holder ?? canvasHolder));
+    this.pictures = canvasPictures(options.holder ?? canvasHolder);
     let stage: Stage<null> | null = null;
     this.feel = new PixfxFeel(() => stage?.live ?? null);
     stage = new Stage<null>(game, this.images.images, (cue, effect) => this.feel.take(cue, effect), null);
@@ -79,6 +81,7 @@ export class Pixfx {
     const played = this.stage.update(t);
     this.feel.played(t, played);
     this.stage.draw();
+    this.pictures.frame();
     loadedGame()?.endFrame();
     return played;
   }
@@ -91,6 +94,26 @@ export class Pixfx {
   /** Draw both layers, back then front. */
   draw(): void {
     this.images.draw(this.ctx, this.scale, null);
+  }
+
+  /**
+   * Draw a picture Rust painted outside the effects (`Sprites.picture()`, `Lighting.paint()`), at its place in game
+   * pixels, in the context's current transform. Nothing when `picture` is undefined (nothing showed).
+   */
+  drawPicture(picture: PictureLike | undefined): void {
+    if (picture) this.pictures.draw(this.ctx, this.scale, picture);
+  }
+
+  /**
+   * Bend what the canvas shows now by the screen ripples alive (a heavy blow's ring): call it after drawing
+   * everything the ripples should move. Nothing while none is alive, the feel is off, or the shake strength is 0.
+   */
+  warp(): void {
+    const { width, height } = this.ctx.canvas;
+    if (width === 0 || height === 0) return;
+    const shown = this.ctx.getImageData(0, 0, width, height);
+    const bent = this.feel.bend(shown.data, width, height, this.scale);
+    if (bent) this.ctx.putImageData(new ImageData(owned(bent), width, height), 0, 0);
   }
 
   /** Effects playing, surfaces the game holds, and images. */
@@ -108,6 +131,6 @@ export class Pixfx {
 }
 
 /** pixfx on `ctx`; see `Pixfx`. Call after `await loadPixfx()`. */
-export function createPixfx(ctx: DrawContext, options?: PixfxOptions): Pixfx {
+export function createPixfx(ctx: CanvasRenderingContext2D, options?: PixfxOptions): Pixfx {
   return new Pixfx(ctx, options);
 }

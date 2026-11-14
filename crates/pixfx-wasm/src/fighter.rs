@@ -1,10 +1,10 @@
 //! `pixfx-fighter` for JS: the screen's answer to a fight ([`Feel`]), a fighter's body ([`Body`]) and the drawing
 //! of fighters ([`Sprites`]). Every object JS passes is read once, strictly, into the Rust types
-//! ([`pixfx_wasm::js::parse`]): a misspelt, missing or mistyped field throws, naming it.
+//! ([`crate::js::parse`]): a misspelt, missing or mistyped field throws, naming it.
 
+use crate::js::{pair, parse, to_js};
 use js_sys::{Array, Function, Object};
 use pixfx_fighter::feel::{self, Cue};
-use pixfx_wasm::js::{pair, parse, to_js};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -370,55 +370,33 @@ fn with_roll<T>(
 
 // ---------- drawing fighters ----------
 
-use crate::Surface;
-use pixfx_core::Layer;
+use crate::picture::Picture;
 use pixfx_draw::{Frame, Rgba};
 use pixfx_fighter::look::Look;
 use pixfx_fighter::paint::{self, Appearance};
 use pixfx_fighter::status::{self, DomeStyle, Figure, Mark, Silhouette};
-use pixfx_scene::{Pass, Rect};
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
-/// Fighters, their marks and the dust they raise, drawn onto a canvas in game pixels upscaled by `scale`, colour
-/// normally then light additively, like a [`crate::Stage`]'s effects. Draw into it between `begin()` and `end()`;
-/// `end()` puts what was drawn onto the canvas as it stands (in the context's current transform), so a host
-/// layers it where it wants among its own drawing.
+/// Fighters, their marks and the dust they raise, painted on a `w` x `h` game-pixel frame. Paint between `begin()`
+/// and `picture()`; the shell draws the picture where the host wants it among its own drawing, colour normally then
+/// light added, like an effect's frames.
 #[wasm_bindgen]
 pub struct Sprites {
-    ctx: CanvasRenderingContext2d,
-    scale: u32,
     frame: Frame,
-    surface: Surface,
 }
 
 #[wasm_bindgen]
 impl Sprites {
-    /// Draw onto `canvas` (the same one a Stage draws on is fine) at `scale` canvas pixels per game pixel.
     #[wasm_bindgen(constructor)]
-    pub fn new(canvas: HtmlCanvasElement, scale: u32) -> Result<Sprites, JsError> {
-        let scale = scale.max(1);
-        let ctx = canvas
-            .get_context("2d")
-            .map_err(|_| JsError::new("could not get the canvas 2d context"))?
-            .ok_or_else(|| JsError::new("the canvas has no 2d context"))?
-            .dyn_into::<CanvasRenderingContext2d>()
-            .map_err(|_| JsError::new("the canvas 2d context has an unexpected type"))?;
-        let frame = Frame::new(
-            canvas.width().div_ceil(scale).max(1),
-            canvas.height().div_ceil(scale).max(1),
-            0,
-            0,
-        );
-        let surface = Surface::new(&frame)?;
+    pub fn new(w: u32, h: u32) -> Result<Sprites, JsError> {
+        if w == 0 || h == 0 {
+            return Err(JsError::new("the sprites' frame must be at least 1 x 1"));
+        }
         Ok(Sprites {
-            ctx,
-            scale,
-            frame,
-            surface,
+            frame: Frame::new(w, h, 0, 0),
         })
     }
 
-    /// Start a new picture: nothing drawn yet.
+    /// Start a new picture: nothing painted yet.
     pub fn begin(&mut self) {
         self.frame.clear();
     }
@@ -540,25 +518,9 @@ impl Sprites {
         Ok(())
     }
 
-    /// Put what was drawn since `begin()` onto the canvas.
-    pub fn end(&mut self) -> Result<(), JsError> {
-        let s = u64::from(self.scale);
-        let rect = Rect {
-            x: 0,
-            y: 0,
-            w: u64::from(self.frame.w) * s,
-            h: u64::from(self.frame.h) * s,
-        };
-        let pass = Pass {
-            handle: 0,
-            layer: Layer::Front,
-            rect,
-        };
-        self.ctx.save();
-        self.ctx.set_image_smoothing_enabled(false);
-        let drawn = self.surface.blit(&self.ctx, pass, &self.frame);
-        self.ctx.restore();
-        drawn.map_err(|e| JsError::new(&e))
+    /// What was painted since `begin()`: its lit part, or none when nothing shows.
+    pub fn picture(&self) -> Option<Picture> {
+        Picture::of(&self.frame, true)
     }
 }
 

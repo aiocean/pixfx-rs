@@ -4,7 +4,7 @@
 // so the site lights up as effects are ported, with no change here.
 // Off with prefers-reduced-motion, or with the "Fx" switch in the top bar (remembered in localStorage), which shows
 // only once at least one of these effects is in the registry.
-import init, { Fx, Stage, effects } from "../pkg/pixfx_canvas.js";
+import { Fx, createPixfx, effects, loadPixfx } from "../pkg/pixfx-canvas2d.js";
 
 const FX = {
   cursor: "critters/wisp",
@@ -36,7 +36,7 @@ const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
  * `decorate`, which puts the fx switch into the page now in the document (call it after every page mount).
  */
 export async function startFx() {
-  await init();
+  await loadPixfx();
   const have = new Set(effects());
   const enabled = !reduced && localStorage.getItem(SWITCH) !== "off";
   if (enabled) {
@@ -58,9 +58,10 @@ function createOverlay() {
   const canvas = Object.assign(document.createElement("canvas"), { className: "fx-overlay" });
   canvas.setAttribute("aria-hidden", "true");
   document.body.append(canvas);
-  const stage = new Stage(canvas, SCALE);
+  const ctx = canvas.getContext("2d");
+  const stage = createPixfx(ctx, { scale: SCALE });
   // pointer fx decorate the page: they never shake or flash it
-  stage.setFeel(false);
+  stage.feel.setEnabled(false);
   const fit = () => {
     canvas.width = Math.ceil(innerWidth / SCALE) * SCALE;
     canvas.height = Math.ceil(innerHeight / SCALE) * SCALE;
@@ -70,7 +71,16 @@ function createOverlay() {
   };
   fit();
   addEventListener("resize", fit);
-  stage.start();
+  // the overlay's own loop: the effects play, and the canvas shows only them
+  let last = null;
+  const frame = (now) => {
+    stage.update(last === null ? 0 : Math.max(0, now - last) / 1000);
+    last = now;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    stage.draw();
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
   // pointer positions in CSS pixels to the stage's game pixels
   const at = (x, y) => [x / SCALE, y / SCALE];
   return { stage, at };
@@ -85,18 +95,18 @@ function followPointer({ stage, at }) {
     target = at(e.clientX, e.clientY);
     if (handle === null) {
       pos = target;
-      handle = stage.play(FX.cursor, pos[0] + WISP_OFFSET.x, pos[1] + WISP_OFFSET.y, undefined);
+      handle = stage.play(FX.cursor, pos[0] + WISP_OFFSET.x, pos[1] + WISP_OFFSET.y);
     }
   });
   document.addEventListener("mouseleave", () => {
-    if (handle !== null) stage.stop(handle);
+    handle?.stop();
     handle = null;
   });
   // the wisp eases toward the pointer instead of sticking to it
   const step = () => {
     if (handle !== null && target) {
       pos = [pos[0] + (target[0] - pos[0]) * 0.18, pos[1] + (target[1] - pos[1]) * 0.18];
-      stage.move(handle, pos[0] + WISP_OFFSET.x, pos[1] + WISP_OFFSET.y);
+      handle.setPosition(pos[0] + WISP_OFFSET.x, pos[1] + WISP_OFFSET.y);
     }
     requestAnimationFrame(step);
   };

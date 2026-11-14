@@ -32,9 +32,9 @@ The engine crates, `pixfx-scene`, `pixfx-wasm` (for `js::parse` and `parse_optio
 
 ## Known drift
 
-- `src/fighter.rs` and `src/light.rs` are JS bindings of `pixfx-fighter` and `pixfx-light`, and `light.rs` keeps the
-  list of live lights. Bindings belong in `pixfx-wasm` so every JS shell gets them; the list of lights is a decision
-  for `pixfx-scene` or the game. Do not add more bindings here.
+- The whole crate: `packages/pixfx-canvas2d` is the Canvas 2D shell (over `pixfx-web`, painting on workers), and the
+  site no longer loads this one. It goes once the site's docs pages are rewritten for `pixfx-canvas2d`. Do not add
+  to it.
 - It depends on `pixfx-export` for `decode`; see `crates/pixfx-wasm/AGENTS.md`.
 
 ## Before you finish

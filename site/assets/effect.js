@@ -1,6 +1,6 @@
 // One effect's page (effects/effect.html?id=<id>): the effect playing live on a stage, the options it takes as
 // controls, the call that plays it as set, and its facts. One-shots play, rest a moment, and play again.
-import init, { Stage, effects, meta } from "../pkg/pixfx_canvas.js";
+import { createPixfx, effects, loadPixfx, meta } from "../pkg/pixfx-canvas2d.js";
 
 /** The stage's sky and floor. */
 const COLORS = { sky: "#13101b", ground: "#1e1a24" };
@@ -36,7 +36,7 @@ function scaleFor(box, room) {
 
 /** Mount the effect page now in the document. Returns how to unmount it. */
 export async function mount() {
-  await init();
+  await loadPixfx();
   const id = new URLSearchParams(location.search).get("id");
   const root = document.getElementById("effect");
   const ids = effects();
@@ -110,13 +110,17 @@ export async function mount() {
 
 /** The live effect on `canvas`, driven by the controls it adds to `controls`, with its call shown in `code`. */
 function createView(canvas, controls, code, id, m, box, scale) {
-  const stage = new Stage(canvas, scale);
+  const ctx = canvas.getContext("2d");
+  const stage = createPixfx(ctx, { scale });
+  // reduced motion: nothing shakes, rings or flashes
+  if (reduceMotion) stage.feel.setShakeStrength(0).setFlashStrength(0);
   const opts = { seed: m.seed, light: 1, palette: "default", outline: "default" };
   const own = [...(OWN[id] ?? [])];
   // an effect that fires impact cues takes `feel`: how hard its hit shakes, freezes, rings and flashes the screen
   if (m.options.some((o) => o.name === "feel")) own.push({ key: "feel", label: "Feel", min: 0, max: 2, step: 0.1, value: 1 });
   for (const o of own) opts[o.key] = o.value;
-  let handle = null;
+  let effect = null;
+  let ended = false;
   let resting = 0;
 
   const range = (key, label, min, max, step) => {
@@ -168,9 +172,12 @@ function createView(canvas, controls, code, id, m, box, scale) {
   }
 
   function replay() {
-    if (handle !== null) stage.remove(handle);
+    effect?.destroy();
     const o = engineOptions();
-    handle = stage.play(id, box.at.x, box.at.y, o);
+    ended = false;
+    effect = stage.play(id, box.at.x, box.at.y, o).on("complete", () => {
+      ended = true;
+    });
     resting = 0;
     code.textContent = callText(id, o);
     if (reduceMotion) view.step(1);
@@ -180,13 +187,12 @@ function createView(canvas, controls, code, id, m, box, scale) {
     step(dt) {
       stage.update(dt);
       // a one-shot is removed once it ends: rest a moment, then play it again
-      if (!m.loop && !stage.handles().includes(handle)) {
+      if (!m.loop && ended) {
         resting += dt;
         if (resting >= REST) replay();
       }
-      const ctx = canvas.getContext("2d");
       // the effect's cues move the whole view (a hit's shake) and lift it toward white (its flash)
-      const [sx, sy] = stage.shake(reduceMotion ? 0 : 1);
+      const [sx, sy] = stage.feel.shake;
       ctx.save();
       ctx.translate(sx * scale, sy * scale);
       ctx.fillStyle = COLORS.sky;
@@ -197,14 +203,14 @@ function createView(canvas, controls, code, id, m, box, scale) {
       stage.drawLayer("front");
       ctx.restore();
       // a heavy hit's ring bends what is drawn
-      if (!reduceMotion) stage.warp();
-      const flash = reduceMotion ? 0 : stage.flash();
+      stage.warp();
+      const flash = stage.feel.flash;
       if (flash > 0) {
         ctx.fillStyle = `rgba(255, 255, 255, ${flash})`;
         ctx.fillRect(0, 0, box.w * scale, box.h * scale);
       }
     },
-    free: () => stage.free(),
+    free: () => stage.destroy(),
   };
 
   replay();

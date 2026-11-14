@@ -16,7 +16,12 @@ draw list (`Int32Array`, `OP_STRIDE` numbers per op: make, refill, show, free) w
 gives the frames to paint, a worker's `new Painting()` paints, cuts and turns each into RGBA (`painted.shape()`,
 `color()`, `light()`), the worker transfers the bytes, and `scene.deliver(frames, job, shape)` takes back only the
 shape: the make or refill it returns uploads the worker's bytes, which never pass through wasm on the main thread.
-Presets come from `palettePresets()` and `outlinePresets()`; `Squash.step(dt, x, y, vx?, vy?)` works out velocity from movement.
+Presets come from `palettePresets()` and `outlinePresets()`; `scene.bend(src, w, h, unit)` bends a picture of the
+host's screen by the feel's live ripples (`pixfx_core::screen::ripple_rgba`), for a shell that bends pixels on the
+CPU. Behind the `fighter` and `light` features (both default): `src/fighter.rs` (`Body`, `FightFeel`, `Sprites`,
+`lookColors`) and `src/light.rs` (`stepLights`, `putOutLight`, `Lighting`; the game owns its list of lights);
+`Sprites.picture()` and `Lighting.paint()` return a `Picture` (`src/picture.rs`: the lit box's colour and light
+RGBA) that a shell draws. `Squash.step(dt, x, y, vx?, vy?)` works out velocity from movement.
 
 ## Belongs here
 

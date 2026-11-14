@@ -14,6 +14,8 @@ pixfx-core = { path = "../pixfx-core", features = ["ts"] }
 pixfx-draw = { path = "../pixfx-draw" }
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
 pixfx-export = { path = "../pixfx-export" }
+pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"], optional = true }
+pixfx-light = { path = "../pixfx-light", features = ["ts"], optional = true }
 pixfx-scene = { path = "../pixfx-scene", features = ["ts"] }
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
@@ -27,10 +29,14 @@ wasm-bindgen.workspace = true
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
 
 [features]
-default = ["all"]
+default = ["all", "fighter", "light"]
 # every effect. For fewer, build with --no-default-features and name the effects or categories of pixfx-effects:
 # --features pixfx-effects/fire-candle,pixfx-effects/explosions (EffectId then lists only those)
 all = ["pixfx-effects/all"]
+# pixfx-fighter for JS: `Body`, `FightFeel`, `Sprites`, `lookColors`. A game without fighters builds without it.
+fighter = ["dep:pixfx-fighter"]
+# pixfx-light for JS: `stepLights`, `putOutLight`, `Lighting`. A game without scene light builds without it.
+light = ["dep:pixfx-light"]
 
 # wasm-pack's wasm-opt pass tuned for speed: -O3 runs effects 3 to 23% faster than its default -O (interleaved
 # benchmark of all 25 effects) at the same size.

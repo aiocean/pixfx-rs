@@ -324,10 +324,10 @@ fn a_shared_frame_counts_against_the_budget_as_the_lit_box_a_shell_holds() -> Re
     scene.update(1.0 / 60.0)?;
     let shown = host_frame(&mut frames, &mut scene, &mut shell)?;
     assert!(!shown.is_empty());
+    // a frame that lights nothing still counts a byte, so it too goes past the budget
     let lit: u64 = shown
         .iter()
-        .filter_map(pixfx_core::PixelBox::lit)
-        .map(|b| u64::from(b.w) * u64::from(b.h) * 8)
+        .map(|f| pixfx_core::PixelBox::lit(f).map_or(1, |b| u64::from(b.w) * u64::from(b.h) * 8))
         .sum();
     let whole: u64 = shown
         .iter()

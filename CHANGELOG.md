@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- The site draws with `pixfx-canvas2d`: the landing duel, the effect pages, the gallery and the pointer fx paint on
+  workers and load one engine (pixfx-web's wasm). Landing duel at 4x CPU throttling: 13-15 fps before, 58-60 after;
+  at 6x: 11-15 before, 47-56 after.
+- `pixfx-wasm`: the duel's bindings move here from `pixfx-canvas`, behind the `fighter` and `light` features (both
+  default; +290 KB, a game builds without them): `Body`, `FightFeel`, `lookColors`, `Sprites` (now `new Sprites(w,
+  h)` and `picture()`), and for light `stepLights(lights, dt)`, `putOutLight(light, within)` and `new Lighting(w,
+  h).paint(lights, glows)`: the game keeps its own list of lights (`Lights` is gone). Pictures (`Picture`: the lit
+  box, colour and light RGBA) are drawn by a shell. `scene.bend(src, w, h, unit)` bends a picture of the screen by
+  the live ripples.
+- `pixfx-canvas2d`: `drawPicture(picture)`, `warp()`; re-exports the engine's `effects`, `meta`, `Fx` and the fighter
+  and light bindings. `pixfx-web`: `PixfxFeel.bend(src, w, h, unit)`.
+- `pixfx-core`: a held frame counts at least one byte, so an unlit frame also goes past the budget (it was held
+  forever, and which one stayed depended on hash order).
 - `pixfx-canvas2d` (new): pixfx on a Canvas 2D context over `pixfx-web`, painting on workers. `createPixfx(ctx, {
   scale })`, `play(id, x, y, opts)`, and each frame `update(dt)` then `drawLayer("back")` / `drawLayer("front")` (or
   `draw()`) in the context's transform. `bun run build` writes `dist/` for pages without a bundler.

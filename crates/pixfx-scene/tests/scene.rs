@@ -595,7 +595,7 @@ fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
     let held = frames.bytes();
     assert!(held > 0);
     // a budget below one frame keeps only what the current draw shows
-    frames.set_budget(1);
+    frames.set_budget(0);
     scene.update(1.0 / 30.0)?;
     draw_once(&mut frames, &mut scene);
     assert!(frames.bytes() <= held, "the older frame went");
@@ -687,8 +687,9 @@ fn every_surface_a_scene_drops_is_freed() -> Res {
     scene.update(1.0 / 30.0)?;
     assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
     assert!(scene.remove(other));
-    // a budget below one frame drops every shared frame not shown in the current draw
-    frames.set_budget(1);
+    // a budget below one frame (a held frame counts at least a byte, lit or not) drops every shared frame not
+    // shown in the current draw
+    frames.set_budget(0);
     run_out(&mut frames, &mut scene, &mut shell, 600)?;
     // one more host frame hands over what the last update released
     assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));

@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { Game, Stage } from "pixfx-web";
-import type { DrawContext, Holder } from "../src/canvas-gfx";
-import { canvasImages, canvasTextures } from "../src/canvas-gfx";
+import type { DrawContext, Holder, PictureLike } from "../src/canvas-gfx";
+import { canvasImages, canvasPictures, canvasTextures } from "../src/canvas-gfx";
+import type { Appearance } from "pixfx-web/wasm";
 import { memory, wasm } from "./wasm";
 
 /** A holder keeping its bytes, so a test reads what reached it. */
@@ -135,4 +136,59 @@ test("an effect removed draws nothing more", () => {
   fx.destroy();
   frame();
   expect(draw(null)).toEqual([]);
+});
+
+/** Draws pictures through fake holders and a fake context. */
+function pictures() {
+  const holders = new Map<CanvasImageSource, FakeHolder>();
+  const drawer = canvasPictures((w, h) => {
+    const holder = fakeHolder(w, h);
+    holders.set(holder.source, holder);
+    return holder;
+  });
+  const { ctx, drawn } = fakeContext(holders);
+  return { draw: (c: DrawContext, scale: number, p: PictureLike) => drawer.draw(c, scale, p), ctx, drawn };
+}
+
+test("fighters Rust painted draw at their place, scaled, colour normally then light added", () => {
+  const sprites = new wasm.Sprites(120, 80);
+  sprites.begin();
+  const body = new wasm.Body(60);
+  const a: Appearance = { x: body.x, air: 0, pose: "idle", poseT: 0, face: 1, vx: 0, vy: 0, out: false, flash: false, untouchable: false,
+    frozen: false, shocked: false, hitT: 0, hitPower: 0, dodged: 0, jolt: [0, 0], act: null };
+  sprites.fighter("thunder", a, 70, null);
+  const picture = sprites.picture();
+  if (!picture) throw new Error("a fighter painted nothing");
+  const { draw, ctx, drawn } = pictures();
+  draw(ctx, 2, picture);
+  expect(drawn.map((d) => d.op)).toEqual(["source-over", "lighter"]);
+  for (const d of drawn) {
+    expect([d.dx, d.dy, d.dw, d.dh]).toEqual([picture.x * 2, picture.y * 2, picture.w * 2, picture.h * 2]);
+  }
+  // the fighter stands on its feet at x 60, row 70
+  expect(picture.x).toBeLessThan(60);
+  expect(picture.x + picture.w).toBeGreaterThan(60);
+  // its feet (and the outline and shadow under them) end on the ground row, its head well above
+  expect(Math.abs(picture.y + picture.h - 70)).toBeLessThanOrEqual(3);
+  expect(picture.y).toBeLessThan(70 - 30);
+  const color = drawn[0];
+  if (!color) throw new Error("no colour drawn");
+  const { bytes, width } = color.holder;
+  let opaque = 0;
+  for (let row = 0; row < picture.h; row++) for (let x = 0; x < picture.w; x++) if ((bytes[(row * width + x) * 4 + 3] ?? 0) > 0) opaque++;
+  expect(opaque).toBeGreaterThan(100);
+});
+
+test("scene light draws added only, and nothing when no light burns", () => {
+  const lighting = new wasm.Lighting(100, 60);
+  const { draw, ctx, drawn } = pictures();
+  expect(lighting.paint([], [])).toBeUndefined();
+  const lights = wasm.stepLights([{ x: 50, y: 30, reach: 12, color: "#ff8040", strength: 0.8 }], 0.5);
+  const picture = lighting.paint(lights, []);
+  if (!picture) throw new Error("a burning light painted nothing");
+  expect(picture.color).toBeUndefined();
+  draw(ctx, 3, picture);
+  expect(drawn.map((d) => d.op)).toEqual(["lighter"]);
+  // gone once put out and aged past it
+  expect(wasm.stepLights(lights.map((l) => wasm.putOutLight(l, 0.1)), 0.2)).toEqual([]);
 });

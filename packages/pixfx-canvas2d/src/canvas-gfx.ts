@@ -138,3 +138,70 @@ export function canvasImages(holderOf: HolderOf): CanvasImages {
   };
   return { images, draw };
 }
+
+/** A picture Rust painted outside the effects (fighters, the scene's light): its lit part, where it goes, its bytes. */
+export interface PictureLike {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+  /** `w × h` RGBA, straight alpha; none for a picture of light alone. */
+  readonly color: Uint8ClampedArray | undefined;
+  /** `w × h` RGBA, to draw added. */
+  readonly light: Uint8ClampedArray;
+}
+
+/** Draws pictures onto a context; `frame()` starts a new host frame. */
+export interface CanvasPictures {
+  /**
+   * Draw `picture` onto `ctx`, one game pixel as `scale × scale` canvas pixels in its current transform: colour
+   * normally, then light with "lighter".
+   */
+  draw(ctx: DrawContext, scale: number, picture: PictureLike): void;
+  frame(): void;
+}
+
+/**
+ * The n-th picture of a frame goes through the n-th holder, grown to the largest it held: a holder is filled once
+ * a frame, so filling it never waits on the draw of the picture before it.
+ */
+export function canvasPictures(make: MakeHolder): CanvasPictures {
+  const holders: { holder: Holder; w: number; h: number }[] = [];
+  let n = 0;
+  return {
+    frame() {
+      n = 0;
+    },
+    draw(ctx, scale, p) {
+      if (p.w === 0 || p.h === 0) return;
+      let slot = holders[n];
+      if (!slot || p.w > slot.w || p.h > slot.h) {
+        const w = Math.max(p.w, slot?.w ?? 0);
+        const h = Math.max(p.h, slot?.h ?? 0);
+        slot = { holder: make(w * 2, h), w, h };
+        holders[n] = slot;
+      }
+      n += 1;
+      const { holder, w: half } = slot;
+      const color = p.color ? owned(p.color) : null;
+      if (color) holder.put(color, 0, p.w, p.h);
+      holder.put(owned(p.light), half, p.w, p.h);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      const [dx, dy, dw, dh] = [p.x * scale, p.y * scale, p.w * scale, p.h * scale];
+      if (color) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(holder.source, 0, 0, p.w, p.h, dx, dy, dw, dh);
+      }
+      ctx.globalCompositeOperation = "lighter";
+      ctx.drawImage(holder.source, half, 0, p.w, p.h, dx, dy, dw, dh);
+      ctx.restore();
+    },
+  };
+}
+
+/** `bytes` as an array over a plain `ArrayBuffer` (what `ImageData` takes): a view when it is one, else a copy. */
+export function owned(bytes: Uint8ClampedArray): Uint8ClampedArray<ArrayBuffer> {
+  const { buffer } = bytes;
+  return buffer instanceof ArrayBuffer ? new Uint8ClampedArray(buffer, bytes.byteOffset, bytes.length) : new Uint8ClampedArray(bytes);
+}

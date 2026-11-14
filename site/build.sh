@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build the static site into site/dist: the pages as they are, plus the pixfx-canvas wasm engine in dist/pkg.
+# Build the static site into site/dist: the pages as they are, plus the engine in dist/pkg: the pixfx-canvas2d bundle,
+# its painting worker and the pixfx-web wasm.
 # Usage: site/build.sh            (from anywhere in the repo)
 #        site/build.sh --serve    (build, then serve dist on http://127.0.0.1:8770/)
 set -euo pipefail
@@ -7,14 +8,14 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 site="$root/site"
 out="$site/dist"
-pkg="$root/target/site-pkg"
 
-wasm-pack build "$root/crates/pixfx-canvas" --release --target web --out-dir "$pkg"
+(cd "$root/packages/pixfx-web" && bun install && bun run build:wasm)
+(cd "$root/packages/pixfx-canvas2d" && bun install && bun run build)
 
 rm -rf "$out"
-mkdir -p "$out/pkg"
+mkdir -p "$out"
 rsync -a --exclude dist --exclude build.sh --exclude preload.js --exclude tests "$site/" "$out/"
-cp "$pkg/pixfx_canvas.js" "$pkg/pixfx_canvas_bg.wasm" "$out/pkg/"
+cp -R "$root/packages/pixfx-canvas2d/dist" "$out/pkg"
 bun "$site/preload.js" "$out"
 echo "site: $out"
 

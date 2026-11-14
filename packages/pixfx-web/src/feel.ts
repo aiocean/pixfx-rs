@@ -96,6 +96,16 @@ export class PixfxFeel extends EventEmitter {
     return s ? s.flash() * this.flashK : 0;
   }
 
+  /**
+   * `src` (a `w × h` RGBA picture of everything drawn, `unit` of its pixels per game pixel) bent by the screen
+   * ripples alive now, for a shell that bends its pixels itself; undefined when nothing ripples, the answer is off
+   * or the shake strength is 0 (ripples are motion), so the picture stays as it is.
+   */
+  bend(src: Uint8ClampedArray, w: number, h: number, unit: number): Uint8ClampedArray | undefined {
+    const s = this.answering && this.shakeK > 0 ? this.scene() : null;
+    return s?.bend(src, w, h, unit);
+  }
+
   /** How shaken the camera is, 0 to 1. */
   get trauma(): number {
     return this.scene()?.trauma() ?? 0;

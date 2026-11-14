@@ -12,9 +12,9 @@ export function imports(source) {
   return [...found].map((m) => m[1]);
 }
 
-/** The wasm file a wasm-bindgen module fetches next to itself, or null. */
+/** The wasm file a wasm-bindgen module fetches beside itself (a bundler writes the path as a template literal), or null. */
 export function wasmOf(source) {
-  return source.match(/new URL\(\s*["']([^"']+\.wasm)["']\s*,\s*import\.meta\.url\s*\)/)?.[1] ?? null;
+  return source.match(/new URL\(\s*["'`]([^"'`]+\.wasm)["'`]\s*,\s*import\.meta\.url\s*\)/)?.[1] ?? null;
 }
 
 /**

@@ -10,13 +10,15 @@ decides nothing.
 
 | File | Holds |
 |---|---|
-| `pixfx.ts` | `Pixfx`: play options, `update(dt)` (stage update, draw list, end of frame), `drawLayer`, `draw`. |
-| `canvas-gfx.ts` | The host objects: an `OffscreenCanvas` per surface (colour left, light right) filled with `putImageData`, and the images a scene shows, drawn by depth. |
+| `pixfx.ts` | `Pixfx`: play options, `update(dt)` (stage update, draw list, end of frame), `drawLayer`, `draw`, `drawPicture`, `warp`. |
+| `canvas-gfx.ts` | The host objects: an `OffscreenCanvas` per surface (colour left, light right) filled with `putImageData`, the images a scene shows, drawn by depth, and pictures (fighters, light), one holder per picture of a frame. |
 
 ## Traps
 
 - An image keeps the holder it showed, not its key: a surface Rust frees at the end of the frame still draws this
   frame's pixels.
+- Each picture of a host frame goes through its own holder: filling the one holder a picture before was drawn from
+  stalls on that draw (measured: putImageData 208 ms/s against 56 ms/s on the landing duel at 4x CPU).
 - `drawLayer` filters by the default depths (back 0, front 1); an effect given other depths shows only in `draw()`.
 - `bun run build` is not library mode: library mode inlines the wasm into the module and the worker (twice, as
   base64). `base: "./"` keeps asset URLs relative to the module.

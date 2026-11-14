@@ -19,21 +19,15 @@
 //! this file only blits.
 #![forbid(unsafe_code)]
 
-pub mod fighter;
-pub mod light;
-
 use std::cell::{Cell, RefCell};
 use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
-use js_sys::{Array, Uint8Array, Uint8ClampedArray};
+use js_sys::{Array, Uint8Array};
 use pixfx_core::{Clip, Feel, Layer, Meta, Options, PixelBox, color_rgba_in, light_rgba_in};
 use pixfx_draw::Frame;
 use pixfx_effects::effect;
-use pixfx_scene::{
-    Frames, InlinePainter, Pass, PlacementChange, Scene, Shell, StageError, View, color_rgba,
-    light_rgba,
-};
+use pixfx_scene::{Frames, InlinePainter, Pass, PlacementChange, Scene, Shell, StageError, View};
 use pixfx_wasm::js::{pair, parse, to_js};
 use pixfx_wasm::parse_options;
 use wasm_bindgen::Clamped;
@@ -553,9 +547,6 @@ impl Renderer {
     }
 }
 
-/// Frame to RGBA bytes for one half of a layer; true if anything shows.
-type Convert = fn(&Frame, &mut [u8]) -> bool;
-
 /// One drawn layer of one effect on scratch canvases: its colour and its light, each kept only if it shows.
 /// [`parse_options`] for [`Stage::play`]: the stage sizes each effect's margin itself, so a `margin` option is an
 /// error.
@@ -673,72 +664,6 @@ impl Shell for CanvasShell<'_> {
     /// Scratch canvases are garbage-collected once nothing holds them.
     fn free(&mut self, surface: Held) -> Result<(), String> {
         drop(surface);
-        Ok(())
-    }
-}
-
-/// One effect's scratch canvas and the pixel buffer each layer goes through on its way to the stage. Built
-/// once per effect, reused every frame: drawing a layer allocates nothing on either side.
-struct Surface {
-    canvas: OffscreenCanvas,
-    ctx: OffscreenCanvasRenderingContext2d,
-    /// The layer as RGBA bytes, converted in Rust ...
-    bytes: Vec<u8>,
-    /// ... copied into this JS array, which `image` views.
-    js: Uint8ClampedArray,
-    image: ImageData,
-}
-
-impl Surface {
-    fn new(frame: &Frame) -> Result<Self, JsError> {
-        let (w, h) = (frame.w, frame.h);
-        let canvas = OffscreenCanvas::new(w, h)
-            .map_err(|_| JsError::new("could not create an OffscreenCanvas"))?;
-        let ctx = canvas
-            .get_context("2d")
-            .map_err(|_| JsError::new("could not get an OffscreenCanvas 2d context"))?
-            .ok_or_else(|| JsError::new("OffscreenCanvas has no 2d context"))?
-            .dyn_into::<OffscreenCanvasRenderingContext2d>()
-            .map_err(|_| JsError::new("OffscreenCanvas 2d context has an unexpected type"))?;
-        let len = w as usize * h as usize * 4;
-        let js = Uint8ClampedArray::new_with_length(len as u32);
-        let image = ImageData::new_with_js_u8_clamped_array_and_sh(&js, w, h)
-            .map_err(|_| JsError::new("could not create ImageData"))?;
-        Ok(Self {
-            canvas,
-            ctx,
-            bytes: vec![0; len],
-            js,
-            image,
-        })
-    }
-
-    /// Draw `frame` (one layer of one effect) into `pass.rect`: colour normally, then light with "lighter".
-    /// Empty colour or light is skipped.
-    fn blit(
-        &mut self,
-        stage: &CanvasRenderingContext2d,
-        pass: Pass,
-        frame: &Frame,
-    ) -> Result<(), String> {
-        let r = pass.rect;
-        let (x, y, w, h) = (r.x as f64, r.y as f64, r.w as f64, r.h as f64);
-        let steps: [(Convert, &str); 2] = [(color_rgba, "source-over"), (light_rgba, "lighter")];
-        for (convert, op) in steps {
-            if !convert(frame, &mut self.bytes) {
-                continue;
-            }
-            self.js.copy_from(&self.bytes);
-            self.ctx
-                .put_image_data(&self.image, 0.0, 0.0)
-                .map_err(|e| js_message("putImageData failed", &e))?;
-            stage
-                .set_global_composite_operation(op)
-                .map_err(|e| js_message("could not set compositing", &e))?;
-            stage
-                .draw_image_with_offscreen_canvas_and_dw_and_dh(&self.canvas, x, y, w, h)
-                .map_err(|e| js_message("drawImage failed", &e))?;
-        }
         Ok(())
     }
 }

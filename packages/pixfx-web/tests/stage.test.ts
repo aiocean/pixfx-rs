@@ -220,3 +220,22 @@ test("a scene's feel reads still once the scene shut down, as a host loop may re
   expect(feel.frozen).toBe(false);
   expect(() => feel.addTrauma(1).freeze(1).slow(1, 0.5)).not.toThrow();
 });
+
+test("a heavy blow's ring bends a picture of the screen while it lasts; at shake strength 0 nothing bends", () => {
+  const { game, stage, feel } = setup();
+  const [w, h] = [64, 48];
+  // stripes, so moving any pixel sideways or up changes it
+  const src = new Uint8ClampedArray(w * h * 4).map((_, i) => ((i >> 2) % w) * 4 + (Math.floor((i >> 2) / w) % 2) * 100);
+  expect(feel.bend(src, w, h, 1)).toBeUndefined();
+  stage.play("explosions/plasma-explosion", 32, 24, {}, 1);
+  let bent: Uint8ClampedArray | undefined;
+  for (let i = 0; i < 90 && !bent; i++) {
+    frame(game, stage);
+    bent = feel.bend(src, w, h, 1);
+  }
+  if (!bent) throw new Error("no ring came");
+  expect(bent.length).toBe(src.length);
+  expect(bent.some((b, i) => b !== src[i])).toBe(true);
+  feel.setShakeStrength(0);
+  expect(feel.bend(src, w, h, 1)).toBeUndefined();
+});

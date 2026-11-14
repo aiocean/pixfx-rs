@@ -1,7 +1,7 @@
 // The effects page (effects/): a card for every effect, each a still of the effect at its brightest moment,
 // linking to the effect's own page where it plays live. A still is drawn once, when its card first comes near
 // the screen, so the page runs no animation and costs little however many effects there are.
-import init, { Fx, effects, meta } from "../pkg/pixfx_canvas.js";
+import { Fx, effects, loadPixfx, meta } from "../pkg/pixfx-canvas2d.js";
 
 /** A card's picture, in game pixels; the effect is centred in it, scaled up by whole numbers when it is small. */
 const CARD = { w: 240, h: 180 };
@@ -12,7 +12,7 @@ const MOMENTS = 8;
 
 /** Mount the effects page now in the document. Returns how to unmount it. */
 export async function mount() {
-  await init();
+  await loadPixfx();
   const grid = document.getElementById("effects-grid");
   const ids = effects();
   document.getElementById("effects-count").textContent = String(ids.length);

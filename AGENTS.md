@@ -137,15 +137,15 @@ change to a JS shell also shows `bun run perf` before and after.
    `paint.ts`, `worker.ts`, `load.ts`, `engine.ts`, `stage.ts`, `effect.ts`, `feel.ts` and `options.ts` are the same
    code as `packages/pixfx-web`. Phaser switches to `pixfx-web` (its copies deleted) once its camera culling (plan
    Task 6) has landed; until then a fix to one goes into both.
-2. **`pixfx-canvas` holds JS bindings and a decision.** `src/fighter.rs` and `src/light.rs` bind `pixfx-fighter` and
-   `pixfx-light` for JS; bindings belong in `pixfx-wasm` so every JS shell gets them. `light.rs` also keeps the list
-   of live lights, a decision for `pixfx-scene` (or the game).
-3. **`crates/pixfx-canvas` is a second Canvas 2D shell.** Its `Stage` paints on the main thread, and the site still
-   draws with it. The site moves to `packages/pixfx-canvas2d` once the duel's bindings are in `pixfx-wasm` (item 2)
-   and `pixfx-web` shows screen ripples (the effect pages bend the view with them); then the crate goes.
+2. **`crates/pixfx-canvas` is a second Canvas 2D shell.** Its `Stage` paints on the main thread. Nothing uses it any
+   more (the site draws with `packages/pixfx-canvas2d`), but the site's docs pages still teach it; the crate goes
+   with those pages rewritten for `pixfx-canvas2d`.
 
 ## Rules
 
 - Parity: every effect in `pixfx_effects::EFFECTS` passes the parity gate against pixelfx (`pixfx parity`).
 - Determinism: the same scene, options and time give the same `frame_hash` on every target.
 - Lints: clippy `unwrap_used`, `expect_used` and `panic` are denied; `unsafe_code` is forbidden.
+- Tests run in two tiers. While working: the tests of the crate or package you changed, and `bun run perf` (or an
+  fps measurement) for anything that claims speed. Once, before each commit: the whole gate (README "Whole-repo
+  check"). Keep every test; a slow loop is fixed by running less of it, not by deleting it.

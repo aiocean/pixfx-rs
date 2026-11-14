@@ -4,9 +4,15 @@
 #![forbid(unsafe_code)]
 
 mod feel;
+#[cfg(feature = "fighter")]
+pub mod fighter;
 mod hit_flash;
 pub mod js;
+#[cfg(feature = "light")]
+pub mod light;
 mod options;
+#[cfg(any(feature = "fighter", feature = "light"))]
+mod picture;
 pub mod scene;
 mod squash;
 
@@ -14,6 +20,8 @@ pub use feel::Feel;
 pub use hit_flash::HitFlash;
 use js::to_js;
 pub use options::{MAX_MARGIN, parse_options};
+#[cfg(any(feature = "fighter", feature = "light"))]
+pub use picture::Picture;
 pub use pixfx_core::Player;
 pub use squash::{Blink, Squash};
 

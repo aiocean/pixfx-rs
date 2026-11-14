@@ -36,7 +36,7 @@ impl<S> Default for FrameStore<S> {
 
 impl<S> FrameStore<S> {
     /// The surface holding `layer` of frame `id`, marked shown at `now` (the host's draw count). When the
-    /// store lacks it, `make` draws it and returns the surface and how many bytes it holds.
+    /// store lacks it, `make` draws it and returns the surface and how many bytes it holds (counted as at least 1).
     pub fn show<E>(
         &mut self,
         id: &FrameId,
@@ -49,6 +49,8 @@ impl<S> FrameStore<S> {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(e) => {
                 let (surface, bytes) = make()?;
+                // a surface that holds no pixels (an unlit frame) still counts, so it too goes past the budget
+                let bytes = bytes.max(1);
                 self.bytes += bytes;
                 e.insert(Held {
                     surface,

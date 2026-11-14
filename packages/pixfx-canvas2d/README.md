@@ -52,6 +52,12 @@ is the engine's (`seed`, `flip`, `angle`, `light`, `palette`, `outline`, the eff
 option throws and creates nothing. `drawLayer` draws the default depths (back 0, front 1); `draw()` draws every
 depth, lowest first.
 
+`pixfx.warp()`, after drawing everything a heavy blow's ring should bend, bends the canvas by the live ripples.
+`pixfx.drawPicture(picture)` draws a picture Rust painted outside the effects: fighters (`new Sprites(w, h)`, then
+`picture()`) or scene light (`new Lighting(w, h).paint(lights, glows)`). The package re-exports the engine's
+`effects`, `meta`, `Fx`, `Body`, `FightFeel`, `lookColors`, `Sprites`, `Lighting`, `stepLights` and `putOutLight`,
+usable once `loadPixfx()` resolved.
+
 You run the loop. `update(dt)` returns the seconds the effects played: 0 in a hit-stop, less in slow motion.
 `pixfx.feel` answers impacts. It has `shake`, `roll`, `flash`, `timeScale`, `addTrauma`, `freeze` and `slow`, and
 emits `"cue"`; `feel.setEnabled(false)` leaves the answer to your game. `pixfx.stats()` counts effects, textures and
