@@ -6,8 +6,9 @@ before changing anything here; this file only says what this crate holds.
 ## Job
 
 Pixels and nothing else: `Frame` with a colour layer and an additive light layer, the `painter`, `shapes`, `blend`
-and `composite`, `frame_hash`, `color` (`Rgba`, `hex`), `palette` presets, `outline` rings, and the JS-number maths
-in `math` (`js_round`, `js_max`, `js_min`, `clamp`). Every other crate paints through it.
+and `composite`, `frame_hash`, `color` (`Rgba`, `hex`), `palette` presets, `outline` rings, `trace` (art to sprite
+pixels: cut, match a palette, shrink, merge into rects, diff), and the JS-number maths in `math` (`js_round`,
+`js_max`, `js_min`, `clamp`). Every other crate paints through it.
 
 ## Belongs here
 

@@ -14,7 +14,8 @@ use std::io;
 pub use bake::{bake, decode, write_bake};
 pub use gif::write_gif;
 pub use json::{FileNames, beanfx_json};
-pub use sheet::{Grid, SheetFiles, write_sheet};
+pub use pixfx_draw::RgbaImage;
+pub use sheet::{Grid, SheetFiles, decode_png_rgba, pack_cells, write_png_rgba, write_sheet};
 
 /// Why an export failed.
 #[derive(Debug)]

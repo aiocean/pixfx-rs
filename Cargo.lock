@@ -269,6 +269,7 @@ dependencies = [
  "pixfx-draw",
  "pixfx-effects",
  "pixfx-export",
+ "pixfx-fighter",
 ]
 
 [[package]]

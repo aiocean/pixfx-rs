@@ -1,12 +1,12 @@
-//! Sprite sheets: the grid layout and pixel packing are pure ([`Grid`], [`pack`]); [`write_sheet`] writes
-//! the files.
+//! Sprite sheets: the grid layout and pixel packing are pure ([`Grid`], [`pack_cells`]); [`write_png_rgba`]
+//! writes any RGBA image, and [`write_sheet`] an effect's sheets.
 
 use std::fs;
-use std::io::BufWriter;
+use std::io::{BufWriter, Cursor};
 use std::path::{Path, PathBuf};
 
 use pixfx_core::{Meta, Rendered};
-use pixfx_draw::{Frame, composite};
+use pixfx_draw::{Frame, RgbaImage, composite};
 
 use crate::ExportError;
 use crate::json::{FileNames, beanfx_json};
@@ -62,8 +62,9 @@ pub struct SheetFiles {
     pub json: PathBuf,
 }
 
-/// Lay equally sized `cells` (each `grid.cell_w` x `grid.cell_h`, `bpp` bytes a pixel) out on one image.
-fn pack(grid: &Grid, cells: &[Vec<u8>], bpp: usize) -> Vec<u8> {
+/// Lay equally sized `cells` (each `grid.cell_w` x `grid.cell_h`, `bpp` bytes a pixel) out on one image, in
+/// order; what no cell covers stays zero (transparent).
+pub fn pack_cells(grid: &Grid, cells: &[Vec<u8>], bpp: usize) -> Vec<u8> {
     let (sheet_w, cell_w) = (grid.width() as usize, grid.cell_w as usize);
     let mut out = vec![0; sheet_w * grid.height() as usize * bpp];
     for (i, cell) in (0..).zip(cells) {
@@ -101,18 +102,59 @@ fn composite_rgba(f: &Frame) -> Vec<u8> {
     out
 }
 
+/// Decode a PNG of any 8-bit colour type (grey, grey and alpha, RGB, RGBA; palettes expanded) as RGBA.
+pub fn decode_png_rgba(bytes: &[u8]) -> Result<RgbaImage, String> {
+    let bad = |e: png::DecodingError| format!("png: {e}");
+    let mut decoder = png::Decoder::new(Cursor::new(bytes));
+    decoder.set_transformations(png::Transformations::normalize_to_color8());
+    let mut reader = decoder.read_info().map_err(bad)?;
+    let mut data = vec![0; reader.output_buffer_size().ok_or("png too big")?];
+    let info = reader.next_frame(&mut data).map_err(bad)?;
+    data.truncate(info.buffer_size());
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => data,
+        png::ColorType::Rgb => data
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .flat_map(|&[r, g, b]| [r, g, b, 255])
+            .collect(),
+        png::ColorType::GrayscaleAlpha => data
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .flat_map(|&[g, a]| [g, g, g, a])
+            .collect(),
+        png::ColorType::Grayscale => data.iter().flat_map(|&g| [g, g, g, 255]).collect(),
+        png::ColorType::Indexed => return Err("png: palette not expanded".to_string()),
+    };
+    Ok(RgbaImage {
+        w: info.width,
+        h: info.height,
+        rgba,
+    })
+}
+
+/// Write a `w` x `h` image of `color` pixels (8 bits a channel, rows top to bottom) to `path` as a PNG: the
+/// one PNG encoder every export goes through.
 fn write_png(
     path: &Path,
-    grid: &Grid,
+    w: u32,
+    h: u32,
     data: &[u8],
     color: png::ColorType,
 ) -> Result<(), ExportError> {
     let file = BufWriter::new(fs::File::create(path)?);
-    let mut enc = png::Encoder::new(file, grid.width(), grid.height());
+    let mut enc = png::Encoder::new(file, w, h);
     enc.set_color(color);
     enc.set_depth(png::BitDepth::Eight);
     enc.write_header()?.write_image_data(data)?;
     Ok(())
+}
+
+/// Write a `w` x `h` RGBA image (8 bits a channel, straight alpha, rows top to bottom) to `path` as a PNG.
+pub fn write_png_rgba(path: &Path, w: u32, h: u32, rgba: &[u8]) -> Result<(), ExportError> {
+    write_png(path, w, h, rgba, png::ColorType::Rgba)
 }
 
 /// Write `<name>.png` (colour with light added), `<name>_color.png`, `<name>_light.png` (RGB, to add over
@@ -134,23 +176,15 @@ pub fn write_sheet(
     };
     let layers = |f: fn(&Frame) -> Vec<u8>, bpp| {
         let cells: Vec<Vec<u8>> = r.frames.iter().map(f).collect();
-        pack(&grid, &cells, bpp)
+        pack_cells(&grid, &cells, bpp)
     };
-    write_png(
-        &files.sheet,
-        &grid,
-        &layers(composite_rgba, 4),
-        png::ColorType::Rgba,
-    )?;
-    write_png(
-        &files.color,
-        &grid,
-        &layers(colour_rgba, 4),
-        png::ColorType::Rgba,
-    )?;
+    let (w, h) = (grid.width(), grid.height());
+    write_png_rgba(&files.sheet, w, h, &layers(composite_rgba, 4))?;
+    write_png_rgba(&files.color, w, h, &layers(colour_rgba, 4))?;
     write_png(
         &files.light,
-        &grid,
+        w,
+        h,
         &layers(light_rgb, 3),
         png::ColorType::Rgb,
     )?;

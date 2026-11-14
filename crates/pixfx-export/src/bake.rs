@@ -7,7 +7,7 @@
 //! Rendering, packing and decoding are pure; only [`write_bake`] touches files.
 
 use std::fs;
-use std::io::{BufWriter, Cursor};
+
 use std::path::{Path, PathBuf};
 
 use pixfx_core::{ClipKey, Effect, FrameId, Layer, Options, Player};
@@ -112,11 +112,7 @@ pub struct BakeSprite {
 }
 
 /// A page's pixels, RGBA8.
-pub struct PageImage {
-    pub w: u32,
-    pub h: u32,
-    pub rgba: Vec<u8>,
-}
+pub type PageImage = crate::RgbaImage;
 
 /// A frame layer half as RGBA bytes, and whether a pixel shows.
 type Half = (&'static str, fn(&Frame, usize) -> [u8; 4]);
@@ -253,10 +249,7 @@ pub fn write_bake(clip: &Clip, out_dir: &Path, name: &str) -> Result<BakeFiles, 
     };
     for (page, image) in index.pages.iter().zip(&pages) {
         let path = out_dir.join(&page.file);
-        let mut enc = png::Encoder::new(BufWriter::new(fs::File::create(&path)?), image.w, image.h);
-        enc.set_color(png::ColorType::Rgba);
-        enc.set_depth(png::BitDepth::Eight);
-        enc.write_header()?.write_image_data(&image.rgba)?;
+        crate::write_png_rgba(&path, image.w, image.h, &image.rgba)?;
         files.pages.push(path);
     }
     fs::write(&files.json, serde_json::to_vec(&index)?)?;
@@ -348,19 +341,5 @@ pub fn decode(json: &str, pages: &[&[u8]]) -> Result<Vec<BakedLayer>, String> {
 }
 
 fn read_png(bytes: &[u8]) -> Result<PageImage, String> {
-    let bad = |e: png::DecodingError| format!("bake page: {e}");
-    let mut reader = png::Decoder::new(Cursor::new(bytes))
-        .read_info()
-        .map_err(bad)?;
-    if reader.output_color_type() != (png::ColorType::Rgba, png::BitDepth::Eight) {
-        return Err("bake page is not RGBA8".to_string());
-    }
-    let mut rgba = vec![0; reader.output_buffer_size().ok_or("bake page too big")?];
-    let info = reader.next_frame(&mut rgba).map_err(bad)?;
-    rgba.truncate(info.buffer_size());
-    Ok(PageImage {
-        w: info.width,
-        h: info.height,
-        rgba,
-    })
+    crate::decode_png_rgba(bytes).map_err(|e| format!("bake page: {e}"))
 }

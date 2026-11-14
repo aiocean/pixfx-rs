@@ -11,3 +11,4 @@ pub mod look;
 pub mod paint;
 pub mod pose;
 pub mod status;
+pub mod traced;

@@ -6,7 +6,9 @@ changing anything here; this file only says what this crate holds.
 ## Job
 
 The `pixfx` binary: `parity` (an effect against pixelfx), `sheet`, `render` (PNG sheets, GIF), `poses` (every pose
-of a fighter look on one sheet). `src/lib.rs` holds the parts worth testing on their own (`opts`, `parity`, `poses`).
+of a fighter look on one sheet, `--blank` cells left empty), `trace` (a crop of art into a traced pose table in
+`pixfx-fighter/src/traced/`), `diff` (pixels two images differ by, with a mask). `src/lib.rs` holds the parts worth
+testing on their own (`opts`, `parity`, `poses`, `trace`).
 
 ## Belongs here
 

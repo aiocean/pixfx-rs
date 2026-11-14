@@ -1,0 +1,10 @@
+The reference image is a pixel-art sprite sheet of one fighter from a 2D fighting game: 8 columns by 3 rows of equal square cells, separated by thin grid lines, on a flat dark purple background (#2a2438). Every cell shows the same character, facing right, standing on the bottom edge of the cell, drawn with big hard-edged square pixels (each game pixel is a 4 x 4 block), a 1-pixel dark outline, and this exact palette and costume.
+
+The first four cells of the bottom row are empty. Redraw the whole sheet exactly as it is, every filled cell unchanged, and fill those four empty cells with the four missing poses of the same character, at the same pixel size, palette, proportions and outline, each pose inside its own cell:
+
+1. Bottom row, cell 1, LAUNCHED: just hit by a heavy blow and thrown up and backward through the air. The body is arched back on a diagonal, chest up, head lower than the hips and pointing down-left away from the attacker on the right; the legs kick up to the upper right, the arms are flung wide, the hair and the robe's hem stream behind. Clear dynamic silhouette, in the upper middle of the cell.
+2. Bottom row, cell 2, TUMBLE: spinning helplessly through the air, curled into a twisting ball-like star: knees pulled in, one arm wrapped round, the other flung out, hair and sash whipping around. Compact and centred in the cell.
+3. Bottom row, cell 3, FALL: dropping back-first toward the floor, body almost level and slightly tilted head-down, back toward the ground, arms and legs trailing upward, the robe flaring up, the hair hanging down. Placed a little above the bottom of the cell.
+4. Bottom row, cell 4, DOWN: lying flat on its back on the floor at the bottom of the cell, head on the left, feet on the right, one knee bent up, one arm flopped out on the floor, eyes shut, the hair spread on the floor beside the head. Clearly a person lying down, not a plank: show the shoulders, the bent knee and the arm.
+
+Keep the same flat background and the same grid. No text, no labels, no new characters, no effects, no shadows, no anti-aliasing, no gradients.

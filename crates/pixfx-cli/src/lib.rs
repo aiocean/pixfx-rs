@@ -4,3 +4,5 @@
 pub mod bench;
 pub mod opts;
 pub mod parity;
+pub mod poses;
+pub mod trace;

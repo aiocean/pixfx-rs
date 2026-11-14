@@ -9,12 +9,13 @@
 
 use crate::look::{Hairdo, Look};
 use crate::pose::{Gather, Pose};
+use crate::traced::{self, Traced};
 use core::f64::consts::PI;
 use libm::{cos, floor, sin, sqrt};
 use pixfx_core::squash::{self, Shape, SquashSpec};
 use pixfx_draw::blend::{cover_over, mul_div255, over_premul, straighten};
 use pixfx_draw::math::{js_max, js_min, js_round};
-use pixfx_draw::{Frame, Rgba};
+use pixfx_draw::{Frame, Rgba, RgbaImage};
 
 /// Sprite width and height, in pixels.
 pub const SPRITE: usize = 64;
@@ -141,6 +142,22 @@ impl Default for Sprite {
 }
 
 impl Sprite {
+    /// The whole sprite as a straight-alpha RGBA image.
+    pub fn to_image(&self) -> RgbaImage {
+        RgbaImage {
+            w: SPRITE as u32,
+            h: SPRITE as u32,
+            rgba: self
+                .px
+                .iter()
+                .flat_map(|&p| {
+                    let c = straighten(p);
+                    [c.0, c.1, c.2, c.3]
+                })
+                .collect(),
+        }
+    }
+
     /// The pixel at (x, y) as a straight (not premultiplied) colour; `None` outside the sprite.
     pub fn pixel(&self, x: usize, y: usize) -> Option<Rgba> {
         if x >= SPRITE {
@@ -260,6 +277,20 @@ impl Pen<'_> {
             Tint::Ice => ICE_DARK,
         };
         self.sprite.fill_rect(x, 60.0 - dy - h + 1.0, w, h, col);
+    }
+
+    /// A traced pose's rects, each in its role's colour.
+    fn traced(&mut self, rects: &[Traced]) {
+        for r in rects {
+            let col = r.role.color(self.c);
+            self.px(
+                f64::from(r.dx),
+                f64::from(r.dy),
+                f64::from(r.w),
+                f64::from(r.h),
+                col,
+            );
+        }
     }
 
     fn dot(&mut self, dx: f64, dy: f64, col: Rgba) {
@@ -533,6 +564,14 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
         lean: 0.0,
     };
     let c = look;
+    // a pose traced from drawn art paints from its table
+    if let Some(rects) = traced::pose(a.pose, c.hairdo) {
+        pen.traced(rects);
+        if a.pose == Pose::Down && a.out {
+            pen.line(-6.0, -1.0, 10.0, -1.0, c.blade[2]);
+        }
+        return pen.sprite;
+    }
     match a.pose {
         Pose::Down => {
             // flat on its back; a knocked-out fighter's eyes are crossed out and its sword lies dropped beside it
@@ -987,6 +1026,24 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
         }
     }
     pen.sprite
+}
+
+/// Traced `rects` painted and outlined as the duel draws a pose of `look` facing right: what `pixfx trace` checks
+/// the engine's own painting against.
+pub fn paint_traced(look: &Look, rects: &[Traced]) -> Sprite {
+    let mut pen = Pen {
+        sprite: Sprite::default(),
+        c: look,
+        face: 1.0,
+        tint: Tint::Own,
+        t: 0.0,
+        wind: 0.0,
+        lean: 0.0,
+    };
+    pen.traced(rects);
+    let mut sprite = pen.sprite;
+    outline(&mut sprite, look.outline);
+    sprite
 }
 
 /// Ring every painted pixel with `color`: each empty pixel touching a painted one (alpha over 128) takes it.

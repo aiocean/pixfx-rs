@@ -11,9 +11,11 @@ pub mod outline;
 pub mod painter;
 pub mod palette;
 pub mod shapes;
+pub mod trace;
 
 pub use color::{ColorError, Rgba, hex};
 pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use math::{Rng, rand};
 pub use outline::{Outline, OutlineError, Ring};
 pub use painter::Painter;
+pub use trace::RgbaImage;

@@ -25,6 +25,14 @@
   spells in a slot share one cooldown, which darkens the slot and sweeps back as it runs out; the ultimate's slot
   fills with rage. The icons are generated (OpenRouter `bytedance-seed/seedream-5-5`, with a frame of the duel as
   reference) and pixelated to 32 and 24 px atlases by `site/art/skill-icons.sh`.
+- `pixfx-fighter`: the launched, tumble, fall and down poses of both looks are traced from generated art
+  (`site/art/fighter-fall.prompt.txt`, Gemini 3 Pro filling the empty cells of a pose sheet) into rect tables in
+  `src/traced/`, painted in the look's colours by role (`traced::pose`); these four poses are now still pictures.
+- `pixfx-draw`: `trace` cuts a picture from its background, matches it to a palette, shrinks it to sprite pixels,
+  merges the pixels into rects and diffs two images. `pixfx-cli`: `pixfx trace` turns a crop of art into a pose
+  table, `pixfx diff` counts the pixels two images differ by and writes a mask, and `pixfx poses --blank` leaves
+  chosen cells empty for an image model to fill. `pixfx-export`: `write_png_rgba`, `decode_png_rgba` and
+  `pack_cells` are public, the one PNG encoder and decoder every file goes through.
 - `site/`: the effect page picks a palette preset, an outline and (for impact effects) the feel, and copies the call.
 - `pixfx-core`: the trauma shake follows the usual model on every axis: `Feel::roll(strength)` tilts the screen
   (radians, `FeelSpec::roll`) next to `shake`'s x and y, each axis is the most it can move times trauma squared times

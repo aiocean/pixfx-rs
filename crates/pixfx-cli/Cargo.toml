@@ -15,6 +15,7 @@ pixfx-core = { path = "../pixfx-core" }
 pixfx-draw = { path = "../pixfx-draw" }
 pixfx-effects = { path = "../pixfx-effects" }
 pixfx-export = { path = "../pixfx-export" }
+pixfx-fighter = { path = "../pixfx-fighter" }
 
 [lints]
 workspace = true
