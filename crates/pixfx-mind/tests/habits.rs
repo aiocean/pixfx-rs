@@ -16,7 +16,9 @@ fn pattern(h: &mut Habits, times: usize, now: f64) {
 fn a_repeated_pattern_is_predicted() {
     let mut h = Habits::new();
     pattern(&mut h, 5, 10.0);
-    let Some((m, confidence)) = h.predict(Posture::Pressure, 10.0) else { unreachable!() };
+    let Some((m, confidence)) = h.predict(Posture::Pressure, 10.0) else {
+        unreachable!()
+    };
     assert_eq!(m, FoeMove::Guard);
     assert!(confidence > 0.6, "{confidence}");
 }
@@ -25,7 +27,9 @@ fn a_repeated_pattern_is_predicted() {
 fn a_thin_read_barely_counts() {
     let mut h = Habits::new();
     pattern(&mut h, 1, 10.0);
-    let (_, confidence) = h.predict(Posture::Pressure, 10.0).unwrap_or((FoeMove::Idle, 0.0));
+    let (_, confidence) = h
+        .predict(Posture::Pressure, 10.0)
+        .unwrap_or((FoeMove::Idle, 0.0));
     assert!(confidence < 0.3, "{confidence}");
 }
 
@@ -33,7 +37,9 @@ fn a_thin_read_barely_counts() {
 fn old_habits_fade() {
     let mut h = Habits::new();
     pattern(&mut h, 5, 10.0);
-    let (_, confidence) = h.predict(Posture::Pressure, 30.0).unwrap_or((FoeMove::Idle, 0.0));
+    let (_, confidence) = h
+        .predict(Posture::Pressure, 30.0)
+        .unwrap_or((FoeMove::Idle, 0.0));
     assert!(confidence < 0.2, "{confidence}");
 }
 
@@ -53,7 +59,10 @@ fn the_longer_pattern_wins_when_it_knows_more() {
     }
     h.see(Posture::Neutral, FoeMove::Retreat, 1.0);
     h.see(Posture::Neutral, FoeMove::Approach, 1.0);
-    assert_eq!(h.predict(Posture::Neutral, 1.0).map(|p| p.0), Some(FoeMove::Blink));
+    assert_eq!(
+        h.predict(Posture::Neutral, 1.0).map(|p| p.0),
+        Some(FoeMove::Blink)
+    );
 }
 
 #[test]

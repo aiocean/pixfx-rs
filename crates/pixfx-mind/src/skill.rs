@@ -34,7 +34,10 @@ pub enum SkillKind {
 /// What a skill does to the one it lands on, besides damage.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields, default))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields, default)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Inflicts {
     /// Seconds frozen.
@@ -53,7 +56,10 @@ pub struct Inflicts {
 /// One skill a fighter holds. Times in seconds, lengths in game pixels.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Skill {
     /// The game's name for it, handed back as is in `Choice::Cast`.
@@ -81,7 +87,10 @@ pub struct Skill {
 /// The fighter's sizes the mind reasons with, from the game's body.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct BodySize {
     pub half_width: f64,
@@ -98,7 +107,10 @@ pub struct BodySize {
 /// A fighter's temperament: how it picks its moments. A school of the game is one profile.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Profile {
     /// How much it values damage dealt.

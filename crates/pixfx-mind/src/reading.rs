@@ -4,7 +4,7 @@
 
 use crate::choice::Posture;
 use crate::curve::{Input, Inputs};
-use crate::sense::{Arena, Doing, Foe, Me, Phase, Shape, Threat};
+use crate::sense::{ActPhase, Arena, Doing, Foe, Me, Threat, ThreatShape};
 use crate::skill::{BodySize, Profile, Skill, SkillKind};
 
 /// Urgency of 20 reads as a full threat.
@@ -72,7 +72,10 @@ impl Inputs for Reading {
 }
 
 pub fn is_close(kind: SkillKind) -> bool {
-    matches!(kind, SkillKind::Melee | SkillKind::Dive | SkillKind::Dash | SkillKind::Blast)
+    matches!(
+        kind,
+        SkillKind::Melee | SkillKind::Dive | SkillKind::Dash | SkillKind::Blast
+    )
 }
 
 pub fn is_ranged(kind: SkillKind) -> bool {
@@ -85,7 +88,10 @@ pub fn is_area(kind: SkillKind) -> bool {
 
 /// A skill the foe winds up that strikes where it stands: no opening, only a trade.
 fn striking(kind: SkillKind) -> bool {
-    matches!(kind, SkillKind::Melee | SkillKind::Dive | SkillKind::Blast | SkillKind::Dash)
+    matches!(
+        kind,
+        SkillKind::Melee | SkillKind::Dive | SkillKind::Blast | SkillKind::Dash
+    )
 }
 
 /// The hardest blow `foe` could land on `me` within `time` seconds (my recovery after a miss), from what it has
@@ -117,28 +123,60 @@ fn urgency(me: &Me, foe: &Foe, threats: &[Threat], body: &BodySize) -> f64 {
     let mut worst: f64 = 0.0;
     for th in threats {
         let u = match th.shape {
-            Shape::Barrage { .. } => th.damage * 1.4,
-            Shape::Projectile { x, y, vx } => {
+            ThreatShape::Barrage { .. } => th.damage * 1.4,
+            ThreatShape::Projectile { x, y, vx } => {
                 let toward = vx != 0.0 && (me.x - x).signum() == vx.signum();
-                let tti = if vx == 0.0 { f64::INFINITY } else { (me.x - x).abs() / vx.abs() };
+                let tti = if vx == 0.0 {
+                    f64::INFINITY
+                } else {
+                    (me.x - x).abs() / vx.abs()
+                };
                 let hits = y >= me.air - 3.0 && y <= me.air + body.body + 3.0;
-                if toward && hits && tti <= 0.6 { th.damage * (1.2 - tti) } else { 0.0 }
+                if toward && hits && tti <= 0.6 {
+                    th.damage * (1.2 - tti)
+                } else {
+                    0.0
+                }
             }
-            Shape::Seeker { x, y, .. } => {
+            ThreatShape::Seeker { x, y, .. } => {
                 let d = libm::hypot(x - me.x, y - (me.air + body.chest));
-                if d <= 48.0 { th.damage * (1.4 - d / 48.0) } else { 0.0 }
+                if d <= 48.0 {
+                    th.damage * (1.4 - d / 48.0)
+                } else {
+                    0.0
+                }
             }
-            Shape::Area { x, radius, reach, lands_in, .. } => {
-                if (me.x - x).abs() <= reach + radius + body.half_width + 4.0 { th.damage * (1.5 - lands_in) } else { 0.0 }
+            ThreatShape::Area {
+                x,
+                radius,
+                reach,
+                lands_in,
+                ..
+            } => {
+                if (me.x - x).abs() <= reach + radius + body.half_width + 4.0 {
+                    th.damage * (1.5 - lands_in)
+                } else {
+                    0.0
+                }
             }
-            Shape::Field { x, reach } => {
+            ThreatShape::Field { x, reach } => {
                 let dx = (me.x - x).abs();
-                if reach > 0.0 && dx <= reach { th.damage * (1.2 - dx / reach) } else { 0.0 }
+                if reach > 0.0 && dx <= reach {
+                    th.damage * (1.2 - dx / reach)
+                } else {
+                    0.0
+                }
             }
         };
         worst = worst.max(u);
     }
-    if let Doing::Act { kind: SkillKind::Melee | SkillKind::Blast | SkillKind::Dive, phase: Phase::Windup, reach, damage, .. } = foe.doing
+    if let Doing::Act {
+        kind: SkillKind::Melee | SkillKind::Blast | SkillKind::Dive,
+        phase: ActPhase::Windup,
+        reach,
+        damage,
+        ..
+    } = foe.doing
         && (foe.x - me.x).abs() <= reach + body.half_width + 6.0
     {
         worst = worst.max(damage * 1.2);
@@ -155,11 +193,21 @@ pub fn read_posture(me: &Me, foe: &Foe) -> Posture {
     match &foe.doing {
         Doing::Act { kind, reach, .. } if is_close(*kind) && d < reach + 30.0 => Posture::Pressure,
         Doing::Act { kind, .. } if is_ranged(*kind) || is_area(*kind) => Posture::Zone,
-        Doing::Act { kind: SkillKind::Barrier | SkillKind::Ward | SkillKind::Heal, .. } => Posture::Defend,
-        Doing::Act { kind: SkillKind::Blink, .. } => Posture::Evade,
+        Doing::Act {
+            kind: SkillKind::Barrier | SkillKind::Ward | SkillKind::Heal,
+            ..
+        } => Posture::Defend,
+        Doing::Act {
+            kind: SkillKind::Blink,
+            ..
+        } => Posture::Evade,
         Doing::Meditate => Posture::Recover,
         Doing::Guard => Posture::Defend,
-        Doing::Move { dir } if *dir != 0.0 && dir.signum() == (me.x - foe.x).signum() && d < 90.0 => Posture::Pressure,
+        Doing::Move { dir }
+            if *dir != 0.0 && dir.signum() == (me.x - foe.x).signum() && d < 90.0 =>
+        {
+            Posture::Pressure
+        }
         Doing::Fly if d > 60.0 => Posture::Zone,
         _ if foe.qi < 25.0 => Posture::Recover,
         _ => Posture::Neutral,
@@ -183,36 +231,51 @@ impl Reading {
         let d = dx.abs();
         let level = (foe.air - me.air).abs() < body.chest;
         let act = match foe.doing {
-            Doing::Act { kind, phase, t, windup, recover, .. } => Some((kind, phase, t, windup, recover)),
+            Doing::Act {
+                kind,
+                phase,
+                t,
+                windup,
+                recover,
+                ..
+            } => Some((kind, phase, t, windup, recover)),
             _ => None,
         };
         let busy = foe.out_for
             + act.map_or(0.0, |(_, phase, t, windup, recover)| match phase {
-                Phase::Windup => (windup - t).max(0.0) + recover,
-                Phase::Recover => (recover - t).max(0.0),
+                ActPhase::Windup => (windup - t).max(0.0) + recover,
+                ActPhase::Recover => (recover - t).max(0.0),
             });
         let opening = foe.out_for
             + foe.frozen
             + foe.shocked
             + act.map_or(0.0, |(kind, phase, t, windup, recover)| match phase {
-                Phase::Recover => (recover - t).max(0.0),
-                Phase::Windup if striking(kind) => 0.0,
-                Phase::Windup => (windup - t).max(0.0) + recover,
+                ActPhase::Recover => (recover - t).max(0.0),
+                ActPhase::Windup if striking(kind) => 0.0,
+                ActPhase::Windup => (windup - t).max(0.0) + recover,
             });
         let free = foe.out_for == 0.0 && act.is_none() && foe.frozen == 0.0 && foe.shocked == 0.0;
         let lead = ((me.hp - foe.hp) / 40.0).clamp(-1.0, 1.0);
         let urgency = urgency(me, foe, threats, body);
 
         let held = |test: fn(SkillKind) -> bool| skills.iter().any(|s| test(s.kind));
-        let has_ready = |test: &dyn Fn(&Skill) -> bool| skills.iter().zip(ready).any(|(s, r)| *r && test(s));
+        let has_ready =
+            |test: &dyn Fn(&Skill) -> bool| skills.iter().zip(ready).any(|(s, r)| *r && test(s));
         // the distance it keeps comes from what it can use: its range with spells that fly or fall, arm's length
         // with a blast or dash, a blade's length with nothing else; with too little qi, its `dry` distance
-        let blade = skills.iter().filter(|s| s.kind == SkillKind::Melee).map(|s| s.reach).fold(24.0, f64::min);
+        let blade = skills
+            .iter()
+            .filter(|s| s.kind == SkillKind::Melee)
+            .map(|s| s.reach)
+            .fold(24.0, f64::min);
         let want = if me.qi < 25.0 {
             profile.dry
         } else if held(is_ranged) || held(is_area) {
             profile.range
-        } else if skills.iter().any(|s| matches!(s.kind, SkillKind::Blast | SkillKind::Dash)) {
+        } else if skills
+            .iter()
+            .any(|s| matches!(s.kind, SkillKind::Blast | SkillKind::Dash))
+        {
             34.0
         } else {
             blade - 4.0
@@ -223,11 +286,19 @@ impl Reading {
             .filter(|(s, r)| **r && s.damage > 0.0)
             .map(|(s, _)| s.windup)
             .fold(f64::INFINITY, f64::min);
-        let opening_n = if quickest.is_finite() { (opening - quickest * 0.5) / quickest.max(0.05) } else { 0.0 };
+        let opening_n = if quickest.is_finite() {
+            (opening - quickest * 0.5) / quickest.max(0.05)
+        } else {
+            0.0
+        };
         let wall = |x: f64| (x - arena.left).min(arena.right - x);
         let posture = read_posture(me, foe);
         let rage_full = me.rage >= me.rage_full && has_ready(&|s: &Skill| s.ultimate);
-        let foe_recovering = if matches!(foe.doing, Doing::Meditate) { 1.0 } else { (30.0 - foe.qi) / 30.0 };
+        let foe_recovering = if matches!(foe.doing, Doing::Meditate) {
+            1.0
+        } else {
+            (30.0 - foe.qi) / 30.0
+        };
 
         let mut inputs = [0.0; 18];
         let mut set = |input: Input, v: f64| inputs[slot(input)] = unit(v);
@@ -239,18 +310,57 @@ impl Reading {
         set(Input::Threat, urgency / THREAT_FULL);
         set(Input::InRange, 1.0 - (d - want).abs() / 60.0);
         set(Input::Close, 1.0 - (d - 20.0) / 60.0);
-        set(Input::CloseReady, f64::from(u8::from(has_ready(&|s: &Skill| is_close(s.kind) && !s.ultimate))));
-        set(Input::RangedReady, f64::from(u8::from(has_ready(&|s: &Skill| is_ranged(s.kind)))));
-        set(Input::AreaReady, f64::from(u8::from(has_ready(&|s: &Skill| is_area(s.kind) && !s.ultimate))));
+        set(
+            Input::CloseReady,
+            f64::from(u8::from(has_ready(&|s: &Skill| {
+                is_close(s.kind) && !s.ultimate
+            }))),
+        );
+        set(
+            Input::RangedReady,
+            f64::from(u8::from(has_ready(&|s: &Skill| is_ranged(s.kind)))),
+        );
+        set(
+            Input::AreaReady,
+            f64::from(u8::from(has_ready(&|s: &Skill| {
+                is_area(s.kind) && !s.ultimate
+            }))),
+        );
         set(Input::Cornered, 1.0 - wall(me.x) / CORNER);
         set(Input::FoeCornered, 1.0 - wall(foe.x) / CORNER);
-        set(Input::FoePressing, f64::from(u8::from(posture == Posture::Pressure)));
-        set(Input::FoeZoning, f64::from(u8::from(posture == Posture::Zone)));
+        set(
+            Input::FoePressing,
+            f64::from(u8::from(posture == Posture::Pressure)),
+        );
+        set(
+            Input::FoeZoning,
+            f64::from(u8::from(posture == Posture::Zone)),
+        );
         set(Input::FoeRecovering, foe_recovering);
         set(Input::RageFull, f64::from(u8::from(rage_full)));
-        set(Input::Calm, if profile.tempo > 0.0 { calm / profile.tempo } else { 0.0 });
+        set(
+            Input::Calm,
+            if profile.tempo > 0.0 {
+                calm / profile.tempo
+            } else {
+                0.0
+            },
+        );
 
-        Reading { d, dx, level, busy, opening, open_in: foe.open_in, free, lead, urgency, foe_posture: posture, want, inputs }
+        Reading {
+            d,
+            dx,
+            level,
+            busy,
+            opening,
+            open_in: foe.open_in,
+            free,
+            lead,
+            urgency,
+            foe_posture: posture,
+            want,
+            inputs,
+        }
     }
 
     /// Set an input, clamped to `[0, 1]`: the mind blends what it remembers of the foe into the moment's read.

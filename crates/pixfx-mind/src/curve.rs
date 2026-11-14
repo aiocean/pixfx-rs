@@ -28,7 +28,11 @@ impl Curve {
             Curve::Power { k } => libm::pow(x, k),
             Curve::Logistic { k, mid } => 1.0 / (1.0 + libm::exp(-k * (x - mid))),
             Curve::Step { at } => {
-                if x >= at { 1.0 } else { 0.0 }
+                if x >= at {
+                    1.0
+                } else {
+                    0.0
+                }
             }
             Curve::Inverse => 1.0 - x,
         })

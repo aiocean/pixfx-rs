@@ -1,6 +1,6 @@
 //! Response curves and considerations: inputs in [0, 1] shaped and multiplied, a zero vetoes.
 
-use pixfx_mind::{score, Consideration, Curve, Input, Inputs};
+use pixfx_mind::{Consideration, Curve, Input, Inputs, score};
 use std::cell::Cell;
 
 fn close(a: f64, b: f64) -> bool {
@@ -60,11 +60,23 @@ impl Inputs for Fixed {
 
 #[test]
 fn score_vetoes_on_zero() {
-    let r = Fixed { value: 0.3, reads: Cell::new(0) };
+    let r = Fixed {
+        value: 0.3,
+        reads: Cell::new(0),
+    };
     let cs = [
-        Consideration { input: Input::Qi, curve: Curve::Step { at: 0.5 } },
-        Consideration { input: Input::Hp, curve: Curve::Linear { m: 1.0, b: 0.0 } },
-        Consideration { input: Input::Lead, curve: Curve::Linear { m: 1.0, b: 0.0 } },
+        Consideration {
+            input: Input::Qi,
+            curve: Curve::Step { at: 0.5 },
+        },
+        Consideration {
+            input: Input::Hp,
+            curve: Curve::Linear { m: 1.0, b: 0.0 },
+        },
+        Consideration {
+            input: Input::Lead,
+            curve: Curve::Linear { m: 1.0, b: 0.0 },
+        },
     ];
     assert!(close(score(&cs, &r), 0.0));
     assert_eq!(r.reads.get(), 1);
@@ -72,14 +84,29 @@ fn score_vetoes_on_zero() {
 
 #[test]
 fn score_multiplies() {
-    let r = Fixed { value: 0.5, reads: Cell::new(0) };
+    let r = Fixed {
+        value: 0.5,
+        reads: Cell::new(0),
+    };
     let line = Curve::Linear { m: 1.0, b: 0.0 };
-    let cs = [Consideration { input: Input::Qi, curve: line }, Consideration { input: Input::Hp, curve: line }];
+    let cs = [
+        Consideration {
+            input: Input::Qi,
+            curve: line,
+        },
+        Consideration {
+            input: Input::Hp,
+            curve: line,
+        },
+    ];
     assert!(close(score(&cs, &r), 0.25));
 }
 
 #[test]
 fn no_considerations_score_one() {
-    let r = Fixed { value: 0.5, reads: Cell::new(0) };
+    let r = Fixed {
+        value: 0.5,
+        reads: Cell::new(0),
+    };
     assert!(close(score(&[], &r), 1.0));
 }

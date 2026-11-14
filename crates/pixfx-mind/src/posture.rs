@@ -5,7 +5,7 @@
 //! to land, or a real opening, wins at once.
 
 use crate::choice::Posture;
-use crate::curve::{score, Consideration, Curve, Input};
+use crate::curve::{Consideration, Curve, Input, score};
 use crate::reading::Reading;
 use crate::skill::Profile;
 
@@ -80,8 +80,16 @@ pub static POSTURES: [PostureDef; 8] = [
                 c(Input::Lead, NUDGE),
                 c(Input::Calm, NOT_CALM),
             ],
-            &[c(Input::FoeRecovering, LINE), c(Input::CloseReady, READY), c(Input::Calm, NOT_CALM)],
-            &[c(Input::FoeCornered, Curve::Power { k: 2.0 }), c(Input::CloseReady, READY), c(Input::Close, LINE)],
+            &[
+                c(Input::FoeRecovering, LINE),
+                c(Input::CloseReady, READY),
+                c(Input::Calm, NOT_CALM),
+            ],
+            &[
+                c(Input::FoeCornered, Curve::Power { k: 2.0 }),
+                c(Input::CloseReady, READY),
+                c(Input::Close, LINE),
+            ],
         ],
         weights: [2.0, 0.3, 2.5, 0.8, 1.0, 0.8, 0.6, 0.6, 0.1, 0.3],
     },
@@ -91,8 +99,18 @@ pub static POSTURES: [PostureDef; 8] = [
         interrupt: false,
         min_time: 1.2,
         options: &[
-            &[c(Input::RangedReady, READY), c(Input::Qi, HAS_QI), c(Input::Close, Curve::Inverse), c(Input::FoePressing, NUDGE)],
-            &[c(Input::AreaReady, READY), c(Input::Qi, HAS_QI), c(Input::Close, Curve::Inverse), c(Input::FoePressing, NUDGE)],
+            &[
+                c(Input::RangedReady, READY),
+                c(Input::Qi, HAS_QI),
+                c(Input::Close, Curve::Inverse),
+                c(Input::FoePressing, NUDGE),
+            ],
+            &[
+                c(Input::AreaReady, READY),
+                c(Input::Qi, HAS_QI),
+                c(Input::Close, Curve::Inverse),
+                c(Input::FoePressing, NUDGE),
+            ],
         ],
         weights: [0.4, 1.8, 0.6, 2.5, 2.0, 1.0, 1.2, 1.0, 0.5, 0.6],
     },
@@ -117,7 +135,10 @@ pub static POSTURES: [PostureDef; 8] = [
         base: 1.0,
         interrupt: false,
         min_time: 0.5,
-        options: &[&[c(Input::Cornered, Curve::Logistic { k: 10.0, mid: 0.6 }), c(Input::Close, LINE)]],
+        options: &[&[
+            c(Input::Cornered, Curve::Logistic { k: 10.0, mid: 0.6 }),
+            c(Input::Close, LINE),
+        ]],
         weights: [0.4, 2.0, 0.8, 0.8, 0.6, 1.5, 3.0, 0.6, 0.1, 0.3],
     },
     PostureDef {
@@ -125,7 +146,11 @@ pub static POSTURES: [PostureDef; 8] = [
         base: 1.0,
         interrupt: false,
         min_time: 1.0,
-        options: &[&[c(Input::Qi, Curve::Inverse), c(Input::Threat, Curve::Inverse), c(Input::Close, Curve::Inverse)]],
+        options: &[&[
+            c(Input::Qi, Curve::Inverse),
+            c(Input::Threat, Curve::Inverse),
+            c(Input::Close, Curve::Inverse),
+        ]],
         weights: [0.2, 2.0, 0.4, 0.8, 0.5, 1.0, 1.5, 1.5, 3.0, 1.0],
     },
     PostureDef {
@@ -134,7 +159,11 @@ pub static POSTURES: [PostureDef; 8] = [
         interrupt: false,
         min_time: 1.5,
         options: &[
-            &[c(Input::FoeHpLow, Curve::Linear { m: 1.6, b: -0.6 }), c(Input::Lead, NUDGE), c(Input::Calm, NOT_CALM)],
+            &[
+                c(Input::FoeHpLow, Curve::Linear { m: 1.6, b: -0.6 }),
+                c(Input::Lead, NUDGE),
+                c(Input::Calm, NOT_CALM),
+            ],
             &[c(Input::RageFull, Curve::Linear { m: 0.8, b: 0.0 })],
         ],
         weights: [2.0, 0.3, 2.5, 2.0, 2.5, 0.6, 0.5, 0.6, 0.1, 0.2],
@@ -149,7 +178,12 @@ pub struct Held {
 }
 
 /// The posture to be in now, and every posture's score (with band and commitment), in `Posture::ALL` order.
-pub fn choose_posture(held: &Held, now: f64, r: &Reading, profile: &Profile) -> (Posture, [f64; 8]) {
+pub fn choose_posture(
+    held: &Held,
+    now: f64,
+    r: &Reading,
+    profile: &Profile,
+) -> (Posture, [f64; 8]) {
     let mut scores = [0.0; 8];
     for (i, def) in POSTURES.iter().enumerate() {
         let fit = def.options.iter().map(|o| score(o, r)).fold(0.0, f64::max);
@@ -163,7 +197,15 @@ pub fn choose_posture(held: &Held, now: f64, r: &Reading, profile: &Profile) -> 
         scores[i] = s;
     }
     let held_i = held.posture as usize;
-    let (best, top) = scores.iter().enumerate().fold((held_i, f64::MIN), |b, (i, s)| if *s > b.1 { (i, *s) } else { b });
-    let pick = if best != held_i && top < scores[held_i] + MARGIN { held_i } else { best };
+    let (best, top) =
+        scores.iter().enumerate().fold(
+            (held_i, f64::MIN),
+            |b, (i, s)| if *s > b.1 { (i, *s) } else { b },
+        );
+    let pick = if best != held_i && top < scores[held_i] + MARGIN {
+        held_i
+    } else {
+        best
+    };
     (Posture::ALL[pick], scores)
 }

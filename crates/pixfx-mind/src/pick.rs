@@ -25,7 +25,11 @@ pub struct Read {
 
 impl Read {
     pub fn new(skills: usize) -> Read {
-        Read { tried: vec![0.0; skills], landed: vec![0.0; skills], punished: vec![None; skills] }
+        Read {
+            tried: vec![0.0; skills],
+            landed: vec![0.0; skills],
+            punished: vec![None; skills],
+        }
     }
 
     pub fn tried(&mut self, i: usize) {
@@ -63,10 +67,15 @@ impl Read {
 
     /// The skill tried most this round.
     pub fn favourite(&self) -> Option<usize> {
-        self.tried.iter().enumerate().filter(|(_, n)| **n > 0.0).fold(None, |b: Option<(usize, f64)>, (i, n)| match b {
-            Some((_, m)) if m >= *n => b,
-            _ => Some((i, *n)),
-        }).map(|(i, _)| i)
+        self.tried
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| **n > 0.0)
+            .fold(None, |b: Option<(usize, f64)>, (i, n)| match b {
+                Some((_, m)) if m >= *n => b,
+                _ => Some((i, *n)),
+            })
+            .map(|(i, _)| i)
     }
 
     pub fn clear(&mut self) {
@@ -75,7 +84,11 @@ impl Read {
 }
 
 /// The chosen candidate's index, and every candidate's score, best first. `None` with nothing worth doing.
-pub fn pick(cands: &[Candidate], weights: &[f64; 10], rng: &mut Rng) -> Option<(usize, Vec<(usize, f64)>)> {
+pub fn pick(
+    cands: &[Candidate],
+    weights: &[f64; 10],
+    rng: &mut Rng,
+) -> Option<(usize, Vec<(usize, f64)>)> {
     let mut ranked: Vec<(usize, f64)> = cands
         .iter()
         .enumerate()
@@ -91,7 +104,11 @@ pub fn pick(cands: &[Candidate], weights: &[f64; 10], rng: &mut Rng) -> Option<(
     {
         return Some((second.0, ranked));
     }
-    let kept: Vec<(usize, f64)> = ranked.iter().copied().take_while(|(_, s)| *s >= best * KEEP).collect();
+    let kept: Vec<(usize, f64)> = ranked
+        .iter()
+        .copied()
+        .take_while(|(_, s)| *s >= best * KEEP)
+        .collect();
     let total: f64 = kept.iter().map(|(_, s)| s).sum();
     let mut at = roll * total;
     for (i, s) in &kept {

@@ -25,7 +25,7 @@ fn rng_matches_mulberry32() {
 
 #[cfg(feature = "serde")]
 mod serde_shapes {
-    use pixfx_mind::{Choice, Doing, Phase, Sense, SkillKind};
+    use pixfx_mind::{ActPhase, Choice, Doing, Sense, SkillKind};
 
     const SENSE: &str = r#"{
         "time": 1.5,
@@ -46,7 +46,15 @@ mod serde_shapes {
         assert!(sense.me.can_act);
         assert_eq!(
             sense.foe.doing,
-            Doing::Act { kind: SkillKind::Melee, phase: Phase::Windup, t: 0.1, windup: 0.2, recover: 0.32, reach: 24.0, damage: 5.0 }
+            Doing::Act {
+                kind: SkillKind::Melee,
+                phase: ActPhase::Windup,
+                t: 0.1,
+                windup: 0.2,
+                recover: 0.32,
+                reach: 24.0,
+                damage: 5.0
+            }
         );
         assert_eq!(sense.ready, vec![true, false]);
     }
@@ -61,7 +69,11 @@ mod serde_shapes {
     fn choice_writes_tagged() {
         let json = serde_json::to_string(&Choice::Move { dir: -1.0 }).unwrap_or_default();
         assert_eq!(json, r#"{"type":"move","dir":-1.0}"#);
-        let cast = serde_json::to_string(&Choice::Cast { skill: "bolt".into(), target: None }).unwrap_or_default();
+        let cast = serde_json::to_string(&Choice::Cast {
+            skill: "bolt".into(),
+            target: None,
+        })
+        .unwrap_or_default();
         assert_eq!(cast, r#"{"type":"cast","skill":"bolt","target":null}"#);
     }
 }

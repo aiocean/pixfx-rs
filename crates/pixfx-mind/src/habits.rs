@@ -56,7 +56,14 @@ pub fn foe_move(before: &Foe, after: &Foe, me_x: f64) -> Option<FoeMove> {
         return Some(FoeMove::Jump);
     }
     let started = match (&before.doing, &after.doing) {
-        (Doing::Act { t: t0, kind: k0, .. }, Doing::Act { t: t1, kind: k1, .. }) => t1 < t0 || k0 != k1,
+        (
+            Doing::Act {
+                t: t0, kind: k0, ..
+            },
+            Doing::Act {
+                t: t1, kind: k1, ..
+            },
+        ) => t1 < t0 || k0 != k1,
         (Doing::Move { dir: d0 }, Doing::Move { dir: d1 }) => d0 != d1,
         (a, b) => std::mem::discriminant(a) != std::mem::discriminant(b),
     };
@@ -67,9 +74,14 @@ pub fn foe_move(before: &Foe, after: &Foe, me_x: f64) -> Option<FoeMove> {
         Doing::Act { kind, .. } if is_close(kind) => FoeMove::Close,
         Doing::Act { kind, .. } if is_ranged(kind) => FoeMove::Ranged,
         Doing::Act { kind, .. } if is_area(kind) => FoeMove::Area,
-        Doing::Act { kind: SkillKind::Blink, .. } => FoeMove::Blink,
+        Doing::Act {
+            kind: SkillKind::Blink,
+            ..
+        } => FoeMove::Blink,
         Doing::Act { .. } | Doing::Guard => FoeMove::Guard,
-        Doing::Move { dir } if dir != 0.0 && dir.signum() == (me_x - after.x).signum() => FoeMove::Approach,
+        Doing::Move { dir } if dir != 0.0 && dir.signum() == (me_x - after.x).signum() => {
+            FoeMove::Approach
+        }
         Doing::Move { .. } => FoeMove::Retreat,
         Doing::Meditate => FoeMove::Meditate,
         Doing::Fly => FoeMove::Fly,
@@ -146,7 +158,10 @@ impl Habits {
         let read = |row: &[Count]| -> Option<(FoeMove, f64)> {
             let counts: Vec<f64> = row.iter().map(|c| c.at(now)).collect();
             let seen: f64 = counts.iter().sum();
-            let (best, most) = counts.iter().enumerate().fold((0, 0.0), |b, (i, c)| if *c > b.1 { (i, *c) } else { b });
+            let (best, most) = counts
+                .iter()
+                .enumerate()
+                .fold((0, 0.0), |b, (i, c)| if *c > b.1 { (i, *c) } else { b });
             (seen > 1e-6).then(|| (FoeMove::ALL[best], most / seen * seen / (seen + PRIOR)))
         };
         let at = Habits::row_one(posture, last);
@@ -182,7 +197,9 @@ const CATEGORIES: usize = 10;
 
 impl Answers {
     pub fn new() -> Answers {
-        Answers { counts: vec![Count::default(); CATEGORIES * MOVES] }
+        Answers {
+            counts: vec![Count::default(); CATEGORIES * MOVES],
+        }
     }
 
     /// The foe started `m` after I did something of `mine`.
@@ -193,9 +210,15 @@ impl Answers {
     /// What the foe will most likely answer `mine` with, and how far to trust it.
     pub fn predict(&self, mine: Category, now: f64) -> Option<(FoeMove, f64)> {
         let at = mine as usize * MOVES;
-        let counts: Vec<f64> = self.counts[at..at + MOVES].iter().map(|c| c.at(now)).collect();
+        let counts: Vec<f64> = self.counts[at..at + MOVES]
+            .iter()
+            .map(|c| c.at(now))
+            .collect();
         let seen: f64 = counts.iter().sum();
-        let (best, most) = counts.iter().enumerate().fold((0, 0.0), |b, (i, c)| if *c > b.1 { (i, *c) } else { b });
+        let (best, most) = counts
+            .iter()
+            .enumerate()
+            .fold((0, 0.0), |b, (i, c)| if *c > b.1 { (i, *c) } else { b });
         (seen > 1e-6).then(|| (FoeMove::ALL[best], most / (seen + PRIOR)))
     }
 

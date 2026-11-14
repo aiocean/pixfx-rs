@@ -1,12 +1,12 @@
 //! The mind of one fighter for a round: it takes in every tick's sense, sees the foe late, counts its habits, and
 //! every `think` seconds or so (when free to act) reads the moment, settles its posture, and picks what to do.
 
-use crate::candidates::{candidates, Candidate, Ctx};
+use crate::candidates::{Candidate, Ctx, candidates};
 use crate::choice::{Choice, Outcome, Posture, Thought, Why};
-use crate::habits::{foe_move, Answers, FoeMove, Habits};
-use crate::pick::{pick, Read};
-use crate::posture::{choose_posture, Category, Held, POSTURES};
-use crate::reading::{read_posture, Reading};
+use crate::habits::{Answers, FoeMove, Habits, foe_move};
+use crate::pick::{Read, pick};
+use crate::posture::{Category, Held, POSTURES, choose_posture};
+use crate::reading::{Reading, read_posture};
 use crate::rng::Rng;
 use crate::sense::{Foe, Sense};
 use crate::skill::{BodySize, Profile, Skill};
@@ -53,7 +53,10 @@ impl Mind {
             clock: 0.0,
             calm: 0.0,
             hold: 0.0,
-            held: Held { posture: Posture::Neutral, since: f64::NEG_INFINITY },
+            held: Held {
+                posture: Posture::Neutral,
+                since: f64::NEG_INFINITY,
+            },
             level: 0,
             now: 0.0,
             view: Delayed::new(),
@@ -73,7 +76,10 @@ impl Mind {
         self.clock = 0.4 + 0.3 * self.rng.next();
         self.calm = 0.0;
         self.hold = 0.0;
-        self.held = Held { posture: Posture::Neutral, since: f64::NEG_INFINITY };
+        self.held = Held {
+            posture: Posture::Neutral,
+            since: f64::NEG_INFINITY,
+        };
         self.level = 0;
         self.view.clear();
         self.seen = None;
@@ -127,11 +133,16 @@ impl Mind {
         );
         let (posture, scores) = choose_posture(&self.held, sense.time, &reading, &self.profile);
         if posture != self.held.posture {
-            self.held = Held { posture, since: sense.time };
+            self.held = Held {
+                posture,
+                since: sense.time,
+            };
             self.level = self.yomi.draw(&mut self.rng);
         }
         let predicted = self.habits.predict(reading.foe_posture, sense.time);
-        let answer = self.mine.and_then(|(c, _, _)| self.answers.predict(c, sense.time));
+        let answer = self
+            .mine
+            .and_then(|(c, _, _)| self.answers.predict(c, sense.time));
         let roll = self.rng.next();
         let cands = candidates(&Ctx {
             me: &sense.me,
@@ -161,12 +172,22 @@ impl Mind {
             postures: Posture::ALL.iter().copied().zip(scores).collect(),
             top: picked
                 .as_ref()
-                .map(|(_, ranked)| ranked.iter().take(WHY_TOP).map(|(i, s)| (cands[*i].choice.clone(), *s)).collect())
+                .map(|(_, ranked)| {
+                    ranked
+                        .iter()
+                        .take(WHY_TOP)
+                        .map(|(i, s)| (cands[*i].choice.clone(), *s))
+                        .collect()
+                })
                 .unwrap_or_default(),
             level: self.level,
             predicted: predicted.map(|(m, sure)| format!("{m:?} {sure:.2}")),
         });
-        Some(Thought { choice, posture, why })
+        Some(Thought {
+            choice,
+            posture,
+            why,
+        })
     }
 
     /// What the game saw happen to my skills.
@@ -175,7 +196,9 @@ impl Mind {
             Outcome::Landed { skill } => (skill, 1.0),
             Outcome::Punished { skill } => (skill, -1.0),
         };
-        let Some(i) = self.skills.iter().position(|s| &s.name == name) else { return };
+        let Some(i) = self.skills.iter().position(|s| &s.name == name) else {
+            return;
+        };
         if payoff > 0.0 {
             self.read.landed(i);
         } else {

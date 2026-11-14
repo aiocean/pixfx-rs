@@ -6,7 +6,10 @@ use crate::skill::{Skill, SkillKind};
 /// The arena's walls and ceiling, in game pixels.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Arena {
     pub left: f64,
@@ -19,7 +22,7 @@ pub struct Arena {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
-pub enum Phase {
+pub enum ActPhase {
     Windup,
     Recover,
 }
@@ -27,23 +30,44 @@ pub enum Phase {
 /// What the foe is doing.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        tag = "type",
+        rename_all = "camelCase",
+        rename_all_fields = "camelCase",
+        deny_unknown_fields
+    )
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub enum Doing {
     Idle,
     /// Walking: `dir` -1 left, 1 right.
-    Move { dir: f64 },
+    Move {
+        dir: f64,
+    },
     Guard,
     Meditate,
     Fly,
     /// Using a skill: `t` seconds into its `phase`.
-    Act { kind: SkillKind, phase: Phase, t: f64, windup: f64, recover: f64, reach: f64, damage: f64 },
+    Act {
+        kind: SkillKind,
+        phase: ActPhase,
+        t: f64,
+        windup: f64,
+        recover: f64,
+        reach: f64,
+        damage: f64,
+    },
 }
 
 /// The fighter itself.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Me {
     pub x: f64,
@@ -75,7 +99,10 @@ pub struct Me {
 /// The foe.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Foe {
     pub x: f64,
@@ -98,13 +125,27 @@ pub struct Foe {
 /// The shape of a threat in flight, as the mind reasons about it. Heights from the ground, lengths in game pixels.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        tag = "type",
+        rename_all = "camelCase",
+        rename_all_fields = "camelCase",
+        deny_unknown_fields
+    )
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
-pub enum Shape {
+pub enum ThreatShape {
     /// Flies level at height `y`.
     Projectile { x: f64, y: f64, vx: f64 },
     /// Lands on `x` in `lands_in` seconds, hurting within `radius` (and drawing in from `reach`).
-    Area { x: f64, radius: f64, reach: f64, lands_in: f64, grounded: bool },
+    Area {
+        x: f64,
+        radius: f64,
+        reach: f64,
+        lands_in: f64,
+        grounded: bool,
+    },
     /// Hunts the foe; at `x`, `y` now.
     Seeker { x: f64, y: f64, radius: f64 },
     /// Stays on `x`, hurting within `reach`.
@@ -116,19 +157,25 @@ pub enum Shape {
 /// A foe's shot that could reach me.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Threat {
     /// Seconds it has been there to see.
     pub age: f64,
     pub damage: f64,
-    pub shape: Shape,
+    pub shape: ThreatShape,
 }
 
 /// Everything a fighter could perceive this tick.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Sense {
     /// The fight's clock, seconds.

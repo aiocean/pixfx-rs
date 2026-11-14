@@ -40,26 +40,48 @@ impl Posture {
 /// What the fighter does now.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        tag = "type",
+        rename_all = "camelCase",
+        rename_all_fields = "camelCase",
+        deny_unknown_fields
+    )
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub enum Choice {
     /// Walk: `dir` -1 left, 1 right.
-    Move { dir: f64 },
+    Move {
+        dir: f64,
+    },
     Jump,
-    Duck { hold: f64 },
-    Guard { hold: f64 },
+    Duck {
+        hold: f64,
+    },
+    Guard {
+        hold: f64,
+    },
     /// Fly at `height` over the ground; 0 lands.
-    Fly { height: f64 },
+    Fly {
+        height: f64,
+    },
     Meditate,
     Wait,
     /// Use the skill of that name; `target` is an x for areas and blinks.
-    Cast { skill: String, target: Option<f64> },
+    Cast {
+        skill: String,
+        target: Option<f64>,
+    },
 }
 
 /// What the game tells the mind about its skills, which the mind cannot see for itself.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "camelCase", deny_unknown_fields))]
+#[cfg_attr(
+    feature = "serde",
+    serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)
+)]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub enum Outcome {
     /// The skill hurt the foe.

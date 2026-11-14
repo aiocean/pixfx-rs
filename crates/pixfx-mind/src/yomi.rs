@@ -38,7 +38,9 @@ impl Yomi {
 
     /// Playing `level` paid `payoff`: 1 a blow landed, -1 I was punished.
     pub fn paid(&mut self, level: u8, payoff: f64) {
-        let Some(w) = self.weights.get_mut(usize::from(level)) else { return };
+        let Some(w) = self.weights.get_mut(usize::from(level)) else {
+            return;
+        };
         *w = (*w + STEP * payoff).max(FLOOR);
         let total: f64 = self.weights.iter().sum();
         for w in &mut self.weights {

@@ -3,7 +3,15 @@
 
 use pixfx_mind::*;
 
-pub fn skill(name: &str, kind: SkillKind, cost: f64, windup: f64, recover: f64, damage: f64, reach: f64) -> Skill {
+pub fn skill(
+    name: &str,
+    kind: SkillKind,
+    cost: f64,
+    windup: f64,
+    recover: f64,
+    damage: f64,
+    reach: f64,
+) -> Skill {
     Skill {
         name: name.into(),
         kind,
@@ -47,7 +55,13 @@ pub fn kit() -> Vec<Skill> {
 
 /// The site's duel's body (pixfx-fighter's `BodySpec::default`).
 pub fn body() -> BodySize {
-    BodySize { half_width: 6.0, chest: 20.0, body: 34.0, duck: 16.0, walk: 52.0 }
+    BodySize {
+        half_width: 6.0,
+        chest: 20.0,
+        body: 34.0,
+        duck: 16.0,
+        walk: 52.0,
+    }
 }
 
 pub fn profile() -> Profile {
@@ -107,22 +121,51 @@ pub fn foe(x: f64) -> Foe {
 }
 
 pub fn arena() -> Arena {
-    Arena { left: 0.0, right: 220.0, top: 96.0 }
+    Arena {
+        left: 0.0,
+        right: 220.0,
+        top: 96.0,
+    }
 }
 
 pub fn sense(time: f64, me: Me, foe: Foe) -> Sense {
     let n = kit().len();
-    Sense { time, me, foe, arena: arena(), threats: vec![], ready: vec![true; n] }
+    Sense {
+        time,
+        me,
+        foe,
+        arena: arena(),
+        threats: vec![],
+        ready: vec![true; n],
+    }
 }
 
 pub fn blade_windup(t: f64) -> Doing {
-    Doing::Act { kind: SkillKind::Melee, phase: Phase::Windup, t, windup: 0.2, recover: 0.32, reach: 24.0, damage: 5.0 }
+    Doing::Act {
+        kind: SkillKind::Melee,
+        phase: ActPhase::Windup,
+        t,
+        windup: 0.2,
+        recover: 0.32,
+        reach: 24.0,
+        damage: 5.0,
+    }
 }
 
 pub fn reading(me: &Me, foe: &Foe, threats: &[Threat]) -> Reading {
     let kit = kit();
     let ready = vec![true; kit.len()];
-    Reading::of(me, foe, threats, &arena(), &kit, &ready, &body(), &profile(), 0.0)
+    Reading::of(
+        me,
+        foe,
+        threats,
+        &arena(),
+        &kit,
+        &ready,
+        &body(),
+        &profile(),
+        0.0,
+    )
 }
 
 /// A reading of a quiet moment: every input 0.5 but nothing open, nothing coming, no rage, no breath to take;
@@ -142,7 +185,15 @@ pub fn quiet() -> Reading {
         want: 100.0,
         inputs: [0.5; 18],
     };
-    with(r, &[(Input::Opening, 0.0), (Input::Threat, 0.0), (Input::RageFull, 0.0), (Input::Calm, 0.0)])
+    with(
+        r,
+        &[
+            (Input::Opening, 0.0),
+            (Input::Threat, 0.0),
+            (Input::RageFull, 0.0),
+            (Input::Calm, 0.0),
+        ],
+    )
 }
 
 pub fn with(mut r: Reading, inputs: &[(Input, f64)]) -> Reading {

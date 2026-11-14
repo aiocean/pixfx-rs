@@ -27,7 +27,11 @@ impl Delayed {
         }
         self.past.push_back((sense.time, sense.foe.doing.clone()));
         // keep one entry at or before the edge of memory, so a reaction that long still finds one
-        while self.past.get(1).is_some_and(|(t, _)| *t <= sense.time - MEMORY) {
+        while self
+            .past
+            .get(1)
+            .is_some_and(|(t, _)| *t <= sense.time - MEMORY)
+        {
             self.past.pop_front();
         }
         self.now = Some((sense.foe.clone(), sense.threats.clone()));
@@ -40,12 +44,21 @@ impl Delayed {
             return (empty_foe(), vec![]);
         };
         let edge = now - reaction;
-        let past = self.past.iter().rev().find(|(t, _)| *t <= edge + 1e-9).or(self.past.front());
+        let past = self
+            .past
+            .iter()
+            .rev()
+            .find(|(t, _)| *t <= edge + 1e-9)
+            .or(self.past.front());
         let mut seen = foe.clone();
         if let Some((t, doing)) = past {
             seen.doing = aged(doing, now - t);
         }
-        let threats = threats.iter().filter(|th| th.age >= reaction).cloned().collect();
+        let threats = threats
+            .iter()
+            .filter(|th| th.age >= reaction)
+            .cloned()
+            .collect();
         (seen, threats)
     }
 
@@ -66,7 +79,15 @@ impl Delayed {
 /// A doing seen `by` seconds ago, as it would stand now if it went on.
 fn aged(doing: &Doing, by: f64) -> Doing {
     match doing {
-        Doing::Act { kind, phase, t, windup, recover, reach, damage } => Doing::Act {
+        Doing::Act {
+            kind,
+            phase,
+            t,
+            windup,
+            recover,
+            reach,
+            damage,
+        } => Doing::Act {
             kind: *kind,
             phase: *phase,
             t: t + by,

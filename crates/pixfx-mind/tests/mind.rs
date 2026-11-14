@@ -90,12 +90,19 @@ fn reset_forgets_the_round() {
     // a foe that keeps coming in with its blade
     run(&mut m, 0.0, 6.0, |t| {
         let mut f = foe(70.0 - (t % 1.0) * 30.0);
-        f.doing = if t % 1.0 < 0.5 { Doing::Move { dir: -1.0 } } else { blade_windup(t % 0.5) };
+        f.doing = if t % 1.0 < 0.5 {
+            Doing::Move { dir: -1.0 }
+        } else {
+            blade_windup(t % 0.5)
+        };
         sense(t, me(40.0), f)
     });
     m.reset();
     assert_eq!(m.posture(), Posture::Neutral);
-    assert!(run(&mut m, 6.0, 0.35, calm_moment).is_empty(), "the first thought of the new round waits again");
+    assert!(
+        run(&mut m, 6.0, 0.35, calm_moment).is_empty(),
+        "the first thought of the new round waits again"
+    );
 }
 
 #[test]
@@ -103,11 +110,22 @@ fn scenario_punishes_a_whiff() {
     let mut m = mind(5);
     let thoughts = run(&mut m, 0.0, 1.5, |t| {
         let mut f = foe(62.0);
-        f.doing = Doing::Act { kind: SkillKind::Melee, phase: Phase::Recover, t, windup: 0.2, recover: 3.0, reach: 24.0, damage: 5.0 };
+        f.doing = Doing::Act {
+            kind: SkillKind::Melee,
+            phase: ActPhase::Recover,
+            t,
+            windup: 0.2,
+            recover: 3.0,
+            reach: 24.0,
+            damage: 5.0,
+        };
         sense(t, me(40.0), f)
     });
     let first = &thoughts[..2.min(thoughts.len())];
-    assert!(first.iter().any(|th| th.posture == Posture::Punish), "{first:?}");
+    assert!(
+        first.iter().any(|th| th.posture == Posture::Punish),
+        "{first:?}"
+    );
     assert!(
         first.iter().any(|th| matches!(&th.choice, Choice::Cast { skill, .. } if skill == "slash" || skill == "lotus")),
         "{first:?}"
@@ -125,8 +143,19 @@ fn scenario_meditates_when_dry() {
         s
     });
     let last = thoughts.last().cloned();
-    assert_eq!(last.as_ref().map(|t| t.posture), Some(Posture::Recover), "{thoughts:?}");
-    assert!(thoughts.iter().rev().take(4).any(|t| t.choice == Choice::Meditate), "{thoughts:?}");
+    assert_eq!(
+        last.as_ref().map(|t| t.posture),
+        Some(Posture::Recover),
+        "{thoughts:?}"
+    );
+    assert!(
+        thoughts
+            .iter()
+            .rev()
+            .take(4)
+            .any(|t| t.choice == Choice::Meditate),
+        "{thoughts:?}"
+    );
 }
 
 #[test]
@@ -136,12 +165,27 @@ fn scenario_leaves_a_falling_area() {
     let mut t = 0.0;
     while first.is_none() && t < 2.0 {
         let mut s = sense(t, me(40.0), foe(150.0));
-        s.threats = vec![Threat { age: 0.5, damage: 28.0, shape: Shape::Area { x: 44.0, radius: 16.0, reach: 0.0, lands_in: 0.4, grounded: true } }];
+        s.threats = vec![Threat {
+            age: 0.5,
+            damage: 28.0,
+            shape: ThreatShape::Area {
+                x: 44.0,
+                radius: 16.0,
+                reach: 0.0,
+                lands_in: 0.4,
+                grounded: true,
+            },
+        }];
         first = m.think(&s, DT);
         t += DT;
     }
-    let Some(th) = first else { unreachable!("no thought") };
-    assert!(matches!(th.posture, Posture::Defend | Posture::Evade), "{th:?}");
+    let Some(th) = first else {
+        unreachable!("no thought")
+    };
+    assert!(
+        matches!(th.posture, Posture::Defend | Posture::Evade),
+        "{th:?}"
+    );
     let leaves = match &th.choice {
         Choice::Move { dir } => *dir < 0.0,
         Choice::Fly { .. } => true,
@@ -176,18 +220,30 @@ fn an_attack_is_followed_by_a_breath() {
 #[test]
 fn tells_are_learnt() {
     let mut m = mind(9);
-    m.tell(&Outcome::Landed { skill: "slash".into() });
-    m.tell(&Outcome::Punished { skill: "bolt".into() });
-    m.tell(&Outcome::Landed { skill: "no such skill".into() });
+    m.tell(&Outcome::Landed {
+        skill: "slash".into(),
+    });
+    m.tell(&Outcome::Punished {
+        skill: "bolt".into(),
+    });
+    m.tell(&Outcome::Landed {
+        skill: "no such skill".into(),
+    });
 }
 
 #[test]
 fn explain_fills_why() {
     let mut m = mind(10);
-    assert!(run(&mut m, 0.0, 1.0, calm_moment).iter().all(|t| t.why.is_none()));
+    assert!(
+        run(&mut m, 0.0, 1.0, calm_moment)
+            .iter()
+            .all(|t| t.why.is_none())
+    );
     m.explain(true);
     let thoughts = run(&mut m, 1.0, 1.0, calm_moment);
-    let Some(why) = thoughts.last().and_then(|t| t.why.clone()) else { unreachable!("no why") };
+    let Some(why) = thoughts.last().and_then(|t| t.why.clone()) else {
+        unreachable!("no why")
+    };
     assert_eq!(why.postures.len(), 8);
     assert!(!why.top.is_empty());
 }
