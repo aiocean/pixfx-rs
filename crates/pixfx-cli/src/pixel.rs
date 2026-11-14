@@ -27,7 +27,7 @@ pub const USAGE: &str = "pixfx pixel clean <picture.png> [--crop X,Y,W,H] [--fli
        pixfx pixel sheet (--cell WxH --grid CxR | --directions <sprite.png>) [--gap N] [--scale N] [--pixel-lines] [--bones FILE]
        pixfx pixel cut <drawn.png> <sheet.json>
        pixfx pixel parts <sprite.png> <spec.txt> [--palette P]
-every verb takes [--out DIR] (default target/pixel); P is hex colours split by commas, or a fighter look (thunder, frost)";
+every verb takes [--out DIR] (default target/pixel); P is hex colours split by commas, or a fighter look (thunder, frost, alchemist)";
 
 /// Colours a grid is matched to, with a name for each the agent reads in the legend (empty when it has none).
 #[derive(Clone, Debug, PartialEq)]

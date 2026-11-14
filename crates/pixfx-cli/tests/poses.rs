@@ -30,3 +30,20 @@ fn poses_are_known_by_their_lowercase_names() {
     assert_eq!(pose_named("tumble"), Some(Pose::Tumble));
     assert_eq!(pose_named("Tumble"), None);
 }
+
+#[test]
+fn alchemist_is_a_preset_painted_in_her_own_colours() {
+    let look = Look::preset("alchemist");
+    assert_eq!(look, Some(Look::alchemist()));
+    let look = Look::alchemist();
+    let cells = pose_cells(&look, &[]);
+    let robe = [look.robe[0].0, look.robe[0].1, look.robe[0].2, 255];
+    for (cell, &(name, _)) in cells.iter().zip(&POSES) {
+        assert!(painted(cell) > 50, "{name} should be painted");
+    }
+    let idle = cells.first().map(Vec::as_slice).unwrap_or_default();
+    assert!(
+        idle.chunks(4).any(|p| p == robe),
+        "idle shows her white dress"
+    );
+}

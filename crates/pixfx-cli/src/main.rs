@@ -6,7 +6,7 @@
 //!   pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
 //!   pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]
 //!   pixfx bench [--ids ID,ID...] [--n N] [--secs S] [--hz H]
-//!   pixfx poses <thunder|frost> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]
+//!   pixfx poses <thunder|frost|alchemist> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]
 //!   pixfx pixel <clean|read|draw|view|critique|sheet|cut|parts> ... (`pixfx_cli::pixel::USAGE`)
 //!   pixfx diff <a.png> <b.png> [--a-crop X,Y,W,H] [--b-crop X,Y,W,H] [--anchor feet] [--out PNG]
 //!
@@ -64,7 +64,7 @@ const USAGE: &str = "usage: pixfx parity <id> [--opt key=value]... [--pixelfx DI
        pixfx sheet <id> [--palette WORD] [--outline WORD] [--out DIR]
        pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
        pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]
-       pixfx poses <thunder|frost> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]
+       pixfx poses <thunder|frost|alchemist> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]
        pixfx pixel <clean|read|draw|view|critique|sheet|cut|parts> ... (pixfx pixel, alone, lists them)
        pixfx diff <a.png> <b.png> [--a-crop X,Y,W,H] [--b-crop X,Y,W,H] [--anchor feet] [--out PNG]
        pixfx bench [--ids ID,ID...] [--n N] [--secs S] [--hz H]";
@@ -265,7 +265,7 @@ fn poses(args: &[String]) -> Result<(), String> {
     }
     let name = look.ok_or(USAGE)?;
     let look = pixfx_fighter::look::Look::preset(&name)
-        .ok_or(format!("no fighter look {name}: thunder or frost"))?;
+        .ok_or(format!("no fighter look {name}: thunder, frost or alchemist"))?;
     std::fs::create_dir_all(&out).map_err(|e| format!("creating {}: {e}", out.display()))?;
     let (cells, grid, path) = match &one {
         Some((pose_name, pose)) => {

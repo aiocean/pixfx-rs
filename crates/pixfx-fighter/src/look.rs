@@ -41,11 +41,12 @@ const fn c(rgb: u32) -> Rgba {
 }
 
 impl Look {
-    /// The stock looks by name: `"thunder"` or `"frost"`.
+    /// The stock looks by name: `"thunder"`, `"frost"` or `"alchemist"`.
     pub fn preset(name: &str) -> Option<Look> {
         match name {
             "thunder" => Some(Look::thunder()),
             "frost" => Some(Look::frost()),
+            "alchemist" => Some(Look::alchemist()),
             _ => None,
         }
     }
@@ -82,6 +83,26 @@ impl Look {
             ribbon: [c(0xbff2ff), c(0x7ab8e0)],
             glow: c(0xa6ecff),
             outline: c(0x0c1024),
+            hairdo: Hairdo::Flowing,
+        }
+    }
+
+    /// An alchemist: a white dress shaded lavender over a blue under-robe, silver-blue
+    /// trim and sash ribbons, long black hair held by a teal jade pin. Colours read from a reference drawing with
+    /// `pixfx pixel` (`clean`, then `read`).
+    pub const fn alchemist() -> Look {
+        Look {
+            robe: [c(0xf4f0fc), c(0xcec3ec), c(0x9d92ba)],
+            inner: [c(0x9dbaed), c(0x5062a7)],
+            trim: [c(0xe6dffc), c(0x758ecb)],
+            hair: [c(0x322837), c(0x1d1023)],
+            skin: [c(0xfbe2cb), c(0xcaa999)],
+            boot: c(0xd1d2d7),
+            blade: [c(0xfcfcfd), c(0xcfcdd2), c(0x635b68)],
+            jade: c(0x5d91a6),
+            ribbon: [c(0xacc9fa), c(0x6b83c4)],
+            glow: c(0xc6d8ff),
+            outline: c(0x1d1023),
             hairdo: Hairdo::Flowing,
         }
     }

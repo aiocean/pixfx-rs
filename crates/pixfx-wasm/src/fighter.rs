@@ -401,7 +401,7 @@ impl Sprites {
         self.frame.clear();
     }
 
-    /// Fighter `a` in `look` (a preset's name, `"thunder"` or `"frost"`, or a look object as `lookColors` reads
+    /// Fighter `a` in `look` (a preset's name, `"thunder"`, `"frost"` or `"alchemist"`, or a look object as `lookColors` reads
     /// it), its feet on the floor at row `ground` (game pixels). `a`:
     /// `{x, air, pose, poseT, face, vx, vy, out, flash, untouchable, frozen, shocked, hitT, hitPower, dodged, jolt: [dx, dy],
     /// act: null | {how: "summon"|"palm"|"lunge"|"prayer"|"cross", dive, progress: number|null, long}}`. `marks`:
@@ -558,7 +558,7 @@ pub struct LookColors {
 }
 
 /// A look's colours the host draws its own parts in: `{glow, outline, ribbon: [light, dark]}` as `#rrggbb`.
-/// `look` is a preset's name (`"thunder"`, `"frost"`) or a whole look: `{robe: [3], inner: [2], trim: [2],
+/// `look` is a preset's name (`"thunder"`, `"frost"`, `"alchemist"`) or a whole look: `{robe: [3], inner: [2], trim: [2],
 /// hair: [2], skin: [2], boot, blade: [3], jade, ribbon: [2], glow, outline, hairdo: "topknot" | "flowing"}`, each
 /// colour `"#rrggbb"`, lists light to dark.
 #[wasm_bindgen(js_name = lookColors, unchecked_return_type = "LookColors")]
@@ -578,7 +578,7 @@ fn look_of(v: &JsValue) -> Result<Look, JsError> {
     match v.as_string() {
         Some(name) => Look::preset(&name).ok_or_else(|| {
             JsError::new(&format!(
-                "unknown look {name:?}: expected \"thunder\", \"frost\" or a look object"
+                "unknown look {name:?}: expected \"thunder\", \"frost\", \"alchemist\" or a look object"
             ))
         }),
         None => parse("look", v),
