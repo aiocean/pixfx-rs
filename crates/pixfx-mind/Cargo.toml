@@ -1,0 +1,24 @@
+[package]
+name = "pixfx-mind"
+description = "A fighter's brain for pixfx games: postures chosen by score, the foe read late and learnt, skills as data"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm.workspace = true
+serde = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[features]
+# serde for the value types, in the shapes JS passes them (camelCase, enums tagged with "type")
+serde = ["dep:serde"]
+# TypeScript declarations for the value types, for the wasm bindings
+ts = ["serde", "dep:tsify", "dep:wasm-bindgen"]
+
+[lints]
+workspace = true

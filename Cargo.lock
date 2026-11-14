@@ -324,6 +324,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pixfx-mind"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "serde",
+ "serde_json",
+ "tsify",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "pixfx-pixel"
 version = "0.1.0"
 dependencies = [
