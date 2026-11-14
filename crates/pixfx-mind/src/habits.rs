@@ -3,6 +3,7 @@
 //! counting, and a prediction's confidence grows with what has been seen (a wrong read is worse than none).
 
 use crate::choice::Posture;
+use crate::posture::Category;
 use crate::reading::{is_area, is_close, is_ranged};
 use crate::sense::{Doing, Foe};
 use crate::skill::SkillKind;
@@ -162,5 +163,43 @@ impl Habits {
 
     pub fn clear(&mut self) {
         *self = Habits::new();
+    }
+}
+
+/// What the foe does after each kind of thing I do (yomi level 2: its usual answer to my usual move).
+#[derive(Clone, Debug)]
+pub struct Answers {
+    counts: Vec<Count>,
+}
+
+impl Default for Answers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+const CATEGORIES: usize = 10;
+
+impl Answers {
+    pub fn new() -> Answers {
+        Answers { counts: vec![Count::default(); CATEGORIES * MOVES] }
+    }
+
+    /// The foe started `m` after I did something of `mine`.
+    pub fn see(&mut self, mine: Category, m: FoeMove, now: f64) {
+        self.counts[mine as usize * MOVES + m.index()].add(now);
+    }
+
+    /// What the foe will most likely answer `mine` with, and how far to trust it.
+    pub fn predict(&self, mine: Category, now: f64) -> Option<(FoeMove, f64)> {
+        let at = mine as usize * MOVES;
+        let counts: Vec<f64> = self.counts[at..at + MOVES].iter().map(|c| c.at(now)).collect();
+        let seen: f64 = counts.iter().sum();
+        let (best, most) = counts.iter().enumerate().fold((0, 0.0), |b, (i, c)| if *c > b.1 { (i, *c) } else { b });
+        (seen > 1e-6).then(|| (FoeMove::ALL[best], most / (seen + PRIOR)))
+    }
+
+    pub fn clear(&mut self) {
+        *self = Answers::new();
     }
 }

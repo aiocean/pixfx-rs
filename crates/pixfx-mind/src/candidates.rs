@@ -339,6 +339,12 @@ fn blows(out: &mut Out) -> f64 {
     u
 }
 
+/// An attack's worth with a bonus for what it is, only if it is worth anything on its own: a bonus never gets an
+/// attack past the breath, a barrier or the foe being out of reach.
+fn lift(value: f64, bonus: f64) -> f64 {
+    if value > 0.0 { value + bonus } else { 0.0 }
+}
+
 /// Each attack I could start now, worth the damage I expect from it for what it costs me.
 fn attacks(out: &mut Out) {
     let ctx = out.ctx;
@@ -382,7 +388,7 @@ fn attacks(out: &mut Out) {
                 }
                 let target = (foe.x + pace * lead * 0.8).clamp(ctx.arena.left + 6.0, ctx.arena.right - 6.0);
                 let base = if s.ultimate {
-                    ctx.value(i, 0.8, lead) * f64::from(s.strikes.max(1)) + 3.0
+                    lift(ctx.value(i, 0.8, lead) * f64::from(s.strikes.max(1)), 3.0)
                 } else {
                     // a blow that only finds a foe on the floor
                     let low = if s.grounded && (foe.air >= 10.0 || foe.flying) { 0.1 } else { 1.0 };
@@ -394,7 +400,7 @@ fn attacks(out: &mut Out) {
             SkillKind::Blast if d < s.reach + 4.0 => out.cast(i, None, ctx.value(i, hit(0.9, 0.2, 0.55), s.windup), None),
             // a fire or a vortex under the foe: worth it on a foe that cannot leave it soon
             SkillKind::Field if busy > 0.4 || foe.frozen > 0.0 || foe.hp < 75.0 => {
-                out.cast(i, Some(foe.x), ctx.value(i, 0.7, s.windup + s.lands) + 4.0, None);
+                out.cast(i, Some(foe.x), lift(ctx.value(i, 0.7, s.windup + s.lands), 4.0), None);
             }
             // a rush through the foe: within a stride, on my level
             SkillKind::Dash if d > 12.0 && d < s.reach - 10.0 && (foe.air - me.air).abs() < body.chest => {

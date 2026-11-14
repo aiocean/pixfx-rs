@@ -147,7 +147,7 @@ fn urgency(me: &Me, foe: &Foe, threats: &[Threat], body: &BodySize) -> f64 {
 }
 
 /// How the foe seems to be playing, from what it does now.
-fn foe_posture(me: &Me, foe: &Foe) -> Posture {
+pub fn read_posture(me: &Me, foe: &Foe) -> Posture {
     let d = (foe.x - me.x).abs();
     if foe.out_for > 0.0 || foe.frozen > 0.0 || foe.shocked > 0.0 {
         return Posture::Defend;
@@ -225,7 +225,7 @@ impl Reading {
             .fold(f64::INFINITY, f64::min);
         let opening_n = if quickest.is_finite() { (opening - quickest * 0.5) / quickest.max(0.05) } else { 0.0 };
         let wall = |x: f64| (x - arena.left).min(arena.right - x);
-        let posture = foe_posture(me, foe);
+        let posture = read_posture(me, foe);
         let rage_full = me.rage >= me.rage_full && has_ready(&|s: &Skill| s.ultimate);
         let foe_recovering = if matches!(foe.doing, Doing::Meditate) { 1.0 } else { (30.0 - foe.qi) / 30.0 };
 
