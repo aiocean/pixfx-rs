@@ -1,6 +1,6 @@
 //! How far two pictures are apart.
 
-use crate::RgbaImage;
+use crate::{OPAQUE, RgbaImage};
 
 /// How far two images are apart: pixels that differ, of all the pixels the larger covers. Two transparent pixels
 /// are equal whatever colour they hold; past an image's edge counts as transparent.
@@ -39,13 +39,13 @@ pub fn diff(a: &RgbaImage, b: &RgbaImage) -> (Diff, RgbaImage) {
     (Diff { differing, total }, mask)
 }
 
-/// Where a figure stands: the middle of its painted columns (halves down) and the row just under its lowest
+/// Where a figure stands (painted at alpha `OPAQUE` and above): the middle of its painted columns (halves down) and the row just under its lowest
 /// painted pixel; `None` when nothing is painted.
 fn feet_of(img: &RgbaImage) -> Option<(u32, u32)> {
     let mut span: Option<(u32, u32, u32)> = None;
     for y in 0..img.h {
         for x in 0..img.w {
-            if img.get(x, y).is_some_and(|p| p[3] > 0) {
+            if img.get(x, y).is_some_and(|p| p[3] >= OPAQUE) {
                 let (x0, x1, _) = span.unwrap_or((x, x, y));
                 span = Some((x0.min(x), x1.max(x), y + 1));
             }

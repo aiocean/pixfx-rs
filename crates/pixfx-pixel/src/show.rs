@@ -7,6 +7,9 @@ use pixfx_draw::color::{hex, to_hex};
 use crate::{Map, Rgba};
 
 /// The letters [`text`] gives palette colours, in order; an empty cell is `.`.
+/// The most cells a text grid may hold (`parse` refuses more): 4096 x 4096.
+pub const MAX_CELLS: u64 = 4096 * 4096;
+
 pub const LEGEND: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 /// A palette with more colours than [`LEGEND`] has letters.
@@ -113,6 +116,12 @@ pub fn parse(text: &str) -> Result<(Map, Vec<Rgba>), ParseError> {
             )
         })?;
 
+    if u64::from(w) * u64::from(h) > MAX_CELLS {
+        return Err(err(
+            head_line,
+            format!("{w}x{h} is more than {MAX_CELLS} cells: a sprite, not a picture"),
+        ));
+    }
     let mut palette = Vec::new();
     let mut letters: Vec<char> = Vec::new();
     let mut map = Map::empty(w, h);

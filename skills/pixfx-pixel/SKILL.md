@@ -20,7 +20,7 @@ split by commas or a fighter look (`thunder`, `frost`); a look names each colour
 | `draw <txt>` | The text (edited or not) back to a PNG. |
 | `view <png> [--region X,Y,W,H] [--max-side 512]` | A picture sized to what it costs you to look at; grid lines from 8x, an overview when too big. |
 | `critique <png>... [--frames] [--intended X,Y;X,Y]` | Issues with cells and a fix each, and a score (100 − 30 an error, 12 a warning, 4 a note); `--frames` checks drift across a row; exits 1 on an error. |
-| `sheet --cell WxH --grid CxR [--scale 8] [--gap 2] [--pixel-lines] [--bones FILE]` or `sheet --directions <png>` | A blank sheet for an image model (`sheet.png` + `sheet.json`); bones (`X,Y X,Y` per line) drawn into each cell as a skeleton to draw on. |
+| `sheet --cell WxH --grid CxR [--scale 8] [--gap 2] [--pixel-lines] [--bones FILE]` or `sheet --directions <png> [--scale 8]` | A blank sheet for an image model (`sheet.png` + `sheet.json`); bones (`X,Y X,Y` per line) drawn into each cell as a skeleton to draw on. `--directions` is a 3x3 round the sprite with a gap of 2. |
 | `cut <drawn.png> <sheet.json>` | Each cell the model drew, back to one pixel a cell (`cell-C-R.png`). |
 | `parts <png> <spec.txt> [--palette P]` | A sprite split into named parts with a parent and a pivot each (`<part>.png`, `<part>.txt`). |
 
@@ -29,7 +29,9 @@ flash, ice, shock) and `pixfx diff a.png b.png --anchor feet` (two pictures stoo
 
 ## The loop: redraw a sprite that looks wrong
 
-1. See what is there now: `pixfx poses thunder --pose down --states --out target/pixel`, then `view` it.
+1. See what is there now: `pixfx poses thunder --pose down --states --out target/pixel` writes the sheet
+   (`thunder-down.png`, a row per state it prints) and each cell alone (`thunder-down/r<row>-m<moment>.png`);
+   `view` them.
 2. Get a reference drawing (optional; skip when you can fix it by hand). One subject per call, on the cheap tier,
    with the game's own sprites as the style reference: that reference, not a grid plate, is what makes the model
    draw at the game's pixel size (spike of 2026-11-14: draft + style reference gave 40 rows, the fighters' height).
@@ -40,12 +42,13 @@ flash, ice, shock) and `pixfx diff a.png b.png --anchor feet` (two pictures stoo
    ```
    A new `--out-dir` each call (a rerun costs money); `--dry-run` shows the request for free. Ask the user before
    spending on `hero`.
-3. `clean <drawing> --cut 40 --height <the sprite's rows> --palette <look>`. Check the confidence it prints: below
-   about 0.8 the grid is doubtful, so `view` the result before trusting it.
+3. `clean <drawing> --cut 40 --height <the sprite's rows> --palette <look>`. Check the confidence it prints (the mean over
+   painted cells): below about 0.8 the grid is doubtful, so `view` the result before trusting it.
 4. `read` the clean sprite with the same palette (and `--rects`), then write the pose as painter code in the
    fighter's painter, the way the neighbouring poses are written. Copy shapes and proportions, not every cell.
-5. Paint the result (`poses --pose P --states`), compare with `diff <clean.png> <painted.png> --anchor feet`, and run
-   `critique` on the painted cell. Fix, repeat.
+5. Paint the result (`poses --pose P`), compare one cell with the clean drawing,
+   `diff <clean.png> target/pixel/thunder-down/r0-m1.png --anchor feet`, and `critique` that cell (or
+   `critique --frames r0-m0.png r0-m1.png r0-m2.png` for the three moments). Fix, repeat.
 
 ## Parts: effects that act on a sprite
 

@@ -43,6 +43,33 @@ pub enum Guide {
     Sprite(RgbaImage),
 }
 
+/// The longest side a sheet may have, in sheet pixels; [`check`] refuses a bigger one.
+pub const MAX_SIDE: u64 = 16384;
+
+/// Whether a layout makes a sheet worth drawing: at least one cell of at least one pixel, and no side longer than
+/// [`MAX_SIDE`]. Check a layout that came from outside (a flag, a file) before [`size`] or [`blank`], whose sums
+/// would overflow on a huge one.
+pub fn check(layout: &Layout) -> Result<(), String> {
+    let l = layout;
+    if l.cell_w == 0 || l.cell_h == 0 || l.cols == 0 || l.rows == 0 {
+        return Err(format!(
+            "a sheet needs cells: {}x{} cells of {}x{}",
+            l.cols, l.rows, l.cell_w, l.cell_h
+        ));
+    }
+    let side = |n: u32, cell: u32| {
+        (u64::from(n) * u64::from(cell) + (u64::from(n) + 1) * u64::from(l.gap))
+            * u64::from(l.scale.max(1))
+    };
+    let (w, h) = (side(l.cols, l.cell_w), side(l.rows, l.cell_h));
+    if w > MAX_SIDE || h > MAX_SIDE {
+        return Err(format!(
+            "a {w}x{h} sheet is bigger than {MAX_SIDE} pixels a side: fewer cells or a smaller scale"
+        ));
+    }
+    Ok(())
+}
+
 fn scale(layout: &Layout) -> u32 {
     layout.scale.max(1)
 }
@@ -320,12 +347,13 @@ pub fn parse_layout(json: &str) -> Result<Layout, String> {
             .copied()
             .ok_or(format!("sheet.json has no {k}"))
     };
-    Ok(Layout {
+    let layout = Layout {
         cell_w: get("cell_w")?,
         cell_h: get("cell_h")?,
         cols: get("cols")?,
         rows: get("rows")?,
         gap: get("gap")?,
         scale: get("scale")?,
-    })
+    };
+    check(&layout).map(|()| layout)
 }

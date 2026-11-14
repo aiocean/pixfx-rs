@@ -275,3 +275,32 @@ fn a_layout_comes_back_from_its_json_and_bones_from_their_text() {
     assert_eq!(bones, Ok(vec![[(16, 10), (16, 30)], [(16, 30), (10, 46)]]));
     assert!(pixfx_pixel::sheet::parse_bones("16,10 16").is_err());
 }
+
+#[test]
+fn a_layout_too_big_or_without_cells_is_refused() {
+    use pixfx_pixel::sheet::check;
+    let ok = Layout {
+        cell_w: 64,
+        cell_h: 64,
+        cols: 4,
+        rows: 2,
+        gap: 2,
+        scale: 8,
+    };
+    assert_eq!(check(&ok), Ok(()));
+    assert!(
+        check(&Layout {
+            cell_w: 1_000_000,
+            cols: 1000,
+            rows: 1,
+            cell_h: 1,
+            ..ok
+        })
+        .is_err()
+    );
+    assert!(check(&Layout { cell_w: 0, ..ok }).is_err());
+    assert!(pixfx_pixel::sheet::parse_layout(
+        "{\"cell_w\": 70000, \"cell_h\": 70000, \"cols\": 8, \"rows\": 8, \"gap\": 2, \"scale\": 8}"
+    )
+    .is_err());
+}

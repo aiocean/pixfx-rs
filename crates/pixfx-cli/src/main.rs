@@ -30,7 +30,8 @@
 //! `poses` writes `<look>-poses.png`, every pose of a fighter look painted as the duel paints it, 8 to a row in
 //! the order of `pixfx_cli::poses::POSES`; `--blank` leaves the named poses' cells empty (a reference sheet for an
 //! artist or an image model to fill). `--pose P` writes `<look>-<P>.png` instead: the pose at three moments, and
-//! with `--states` one row per state (out, facing, flash, ice, shock), labelled in the output.
+//! with `--states` one row per state (out, facing, flash, ice, shock), labelled in the output; each cell is also
+//! written alone, `<look>-<P>/r<row>-m<moment>.png`.
 //!
 //! `pixel` is the agent's pixel tool (`pixfx_cli::pixel`): `clean` an image model's picture down to one pixel a
 //! cell, `read` a sprite as text and `draw` text back, `view` it at a size worth looking at, `critique` it, make a
@@ -266,7 +267,7 @@ fn poses(args: &[String]) -> Result<(), String> {
     let look = pixfx_fighter::look::Look::preset(&name)
         .ok_or(format!("no fighter look {name}: thunder or frost"))?;
     std::fs::create_dir_all(&out).map_err(|e| format!("creating {}: {e}", out.display()))?;
-    let (cells, grid, path) = match one {
+    let (cells, grid, path) = match &one {
         Some((pose_name, pose)) => {
             let rows = if with_states {
                 states()
@@ -280,7 +281,7 @@ fn poses(args: &[String]) -> Result<(), String> {
             for (i, s) in rows.iter().enumerate() {
                 println!("row {i}: {}", s.label());
             }
-            let cells = state_cells(&look, pose, &rows);
+            let cells = state_cells(&look, *pose, &rows);
             let grid = Grid {
                 frames: cells.len() as u32,
                 columns: MOMENTS.len() as u32,
@@ -305,6 +306,18 @@ fn poses(args: &[String]) -> Result<(), String> {
     )
     .map_err(|e| format!("writing {}: {e}", path.display()))?;
     println!("{name}: {}", path.display());
+    if let Some((pose_name, _)) = one {
+        // Each cell on its own too, a sprite `diff` and `critique` take as it is.
+        let dir = out.join(format!("{name}-{pose_name}"));
+        std::fs::create_dir_all(&dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
+        for (i, cell) in cells.iter().enumerate() {
+            let (row, moment) = (i / MOMENTS.len(), i % MOMENTS.len());
+            let cell_path = dir.join(format!("r{row}-m{moment}.png"));
+            write_png_rgba(&cell_path, SPRITE as u32, SPRITE as u32, cell)
+                .map_err(|e| format!("writing {}: {e}", cell_path.display()))?;
+        }
+        println!("cells: {}/r<row>-m<moment>.png", dir.display());
+    }
     Ok(())
 }
 

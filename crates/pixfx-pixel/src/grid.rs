@@ -1,10 +1,14 @@
 //! A picture as a grid of palette indices: matched, shrunk to its pixel grid, merged into rects.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::{OPAQUE, Rgba, RgbaImage, distance};
 
 /// For each pixel of `img`, row by row: the index of the nearest `palette` colour, or `None` where it is
 /// transparent.
 pub fn nearest(img: &RgbaImage, palette: &[Rgba]) -> Vec<Option<usize>> {
+    // Each distinct colour is matched once: a big picture repeats its colours many times over.
+    let mut matched: BTreeMap<[u8; 3], Option<usize>> = BTreeMap::new();
     img.rgba
         .as_chunks::<4>()
         .0
@@ -13,8 +17,10 @@ pub fn nearest(img: &RgbaImage, palette: &[Rgba]) -> Vec<Option<usize>> {
             if a < OPAQUE {
                 return None;
             }
-            (0..palette.len())
-                .min_by_key(|&i| palette.get(i).map_or(u32::MAX, |&c| distance([r, g, b], c)))
+            *matched.entry([r, g, b]).or_insert_with(|| {
+                (0..palette.len())
+                    .min_by_key(|&i| palette.get(i).map_or(u32::MAX, |&c| distance([r, g, b], c)))
+            })
         })
         .collect()
 }
@@ -23,10 +29,10 @@ pub fn nearest(img: &RgbaImage, palette: &[Rgba]) -> Vec<Option<usize>> {
 /// row: the palette of a picture that already is pixel art, such as a game's sprite.
 pub fn colors(img: &RgbaImage) -> Vec<Rgba> {
     let mut out: Vec<Rgba> = Vec::new();
+    let mut seen: BTreeSet<[u8; 3]> = BTreeSet::new();
     for &[r, g, b, a] in img.rgba.as_chunks::<4>().0 {
-        let c = Rgba(r, g, b, 255);
-        if a >= OPAQUE && !out.contains(&c) {
-            out.push(c);
+        if a >= OPAQUE && seen.insert([r, g, b]) {
+            out.push(Rgba(r, g, b, 255));
         }
     }
     out

@@ -14,7 +14,7 @@ use pixfx_pixel::parts::{Part, parse_spec, split};
 use pixfx_pixel::recover::{fit_height, recover};
 use pixfx_pixel::reduce::{SnapMode, reduce, snap};
 use pixfx_pixel::sheet::{
-    Guide, Layout, blank, directions, guide, layout_json, parse_bones, parse_layout,
+    Guide, Layout, blank, check, directions, guide, layout_json, parse_bones, parse_layout,
 };
 use pixfx_pixel::view::{View, ViewOptions};
 use pixfx_pixel::{LEGEND, Map, colors, nearest, rects, shrink, text_named};
@@ -348,7 +348,7 @@ pub struct Cleaned {
     pub sprite: RgbaImage,
     /// The picture's pixels per cell.
     pub pitch: f64,
-    /// The mean confidence of the cells, 0..1.
+    /// The mean confidence of the painted cells, 0..1.
     pub confidence: f64,
 }
 
@@ -368,6 +368,7 @@ pub fn clean(img: &RgbaImage, a: &CleanArgs) -> Result<Cleaned, String> {
         return Err("nothing left of the picture once cut".to_string());
     }
     let found = recover(&img);
+    let confidence = painted_confidence(&found.picture, &found.confidence);
     let sprite = match a.height {
         Some(h) => fit_height(&found.picture, h),
         None => found.picture,
@@ -379,8 +380,25 @@ pub fn clean(img: &RgbaImage, a: &CleanArgs) -> Result<Cleaned, String> {
     Ok(Cleaned {
         sprite,
         pitch: found.pitch,
-        confidence: found.total,
+        confidence,
     })
+}
+
+/// The mean confidence of the painted cells only: background cells are always sure, and counting them would hide a
+/// badly recovered figure on a big empty grid. 1 when nothing is painted.
+fn painted_confidence(picture: &RgbaImage, confidence: &[f64]) -> f64 {
+    let painted: Vec<f64> = picture
+        .rgba
+        .chunks(4)
+        .zip(confidence)
+        .filter(|(p, _)| p.get(3).is_some_and(|&a| a >= 128))
+        .map(|(_, &c)| c)
+        .collect();
+    if painted.is_empty() {
+        1.0
+    } else {
+        painted.iter().sum::<f64>() / painted.len() as f64
+    }
 }
 
 /// A sprite (one pixel a cell) as a map on `palette`, or on its own colours when there is none.
@@ -443,14 +461,26 @@ pub fn view(sprite: &RgbaImage, region: Option<[u32; 4]>, max_side: u32) -> View
     pixfx_pixel::view::view(&map, &palette.colors, &opts)
 }
 
-/// A blank sheet: `directions` round a sprite when given, else `cell` x `grid` cells; `bones` drawn into each.
+/// A blank sheet: `directions` round a sprite when given (a 3x3 with a gap of 2: `--gap` and `--pixel-lines` do
+/// not apply), else `cell` x `grid` cells; `bones` drawn into each. Refuses a sheet too big to draw.
 pub fn sheet(
     a: &SheetArgs,
     sprite: Option<&RgbaImage>,
     bones: &[[(u32, u32); 2]],
-) -> (Layout, RgbaImage) {
+) -> Result<(Layout, RgbaImage), String> {
     let (layout, mut img) = match sprite {
-        Some(s) => directions(s, a.scale),
+        Some(s) => {
+            let layout = Layout {
+                cell_w: s.w,
+                cell_h: s.h,
+                cols: 3,
+                rows: 3,
+                gap: 2,
+                scale: a.scale,
+            };
+            check(&layout)?;
+            directions(s, a.scale)
+        }
         None => {
             let layout = Layout {
                 cell_w: a.cell.0,
@@ -460,6 +490,7 @@ pub fn sheet(
                 gap: a.gap,
                 scale: a.scale,
             };
+            check(&layout)?;
             (layout, blank(&layout, a.pixel_lines))
         }
     };
@@ -470,7 +501,7 @@ pub fn sheet(
             }
         }
     }
-    (layout, img)
+    Ok((layout, img))
 }
 
 /// Each cell an image model drew into a sheet, row by row, down to one pixel a cell.
@@ -636,7 +667,7 @@ pub fn run(cmd: &Command) -> Result<bool, String> {
                 Some(p) => parse_bones(&read_text(p)?)?,
                 None => Vec::new(),
             };
-            let (layout, img) = sheet(a, sprite.as_ref(), &bones);
+            let (layout, img) = sheet(a, sprite.as_ref(), &bones)?;
             write_image(&out.join("sheet.png"), &img)?;
             write_text(&out.join("sheet.json"), &layout_json(&layout))?;
         }
@@ -656,6 +687,18 @@ pub fn run(cmd: &Command) -> Result<bool, String> {
             let (parts, palette) =
                 parts(&read_image(sprite)?, &read_text(spec)?, palette.as_ref())?;
             let names: Vec<&str> = palette.names.iter().map(String::as_str).collect();
+            for p in &parts {
+                if !p
+                    .name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+                {
+                    return Err(format!(
+                        "part name {:?}: letters, digits, _ and - only (it names files)",
+                        p.name
+                    ));
+                }
+            }
             for p in &parts {
                 println!("{}", part_line(p));
                 write_image(

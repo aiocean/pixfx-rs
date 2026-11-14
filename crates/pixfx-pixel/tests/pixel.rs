@@ -189,3 +189,21 @@ fn feet_stands_two_figures_on_the_same_spot() {
     assert_eq!((a.w, a.h), (b.w, b.h));
     assert_eq!(pixfx_pixel::diff(&a, &b).0.differing, 0);
 }
+
+#[test]
+fn a_huge_cut_tolerance_clears_everything_without_overflow() {
+    let mut img = RgbaImage::new(4, 4);
+    for y in 0..4 {
+        for x in 0..4 {
+            img.set(x, y, [x as u8 * 60, 0, 0, 255]);
+        }
+    }
+    let out = cut(&img, u32::MAX);
+    assert_eq!((out.w, out.h), (0, 0));
+}
+
+#[test]
+fn a_text_grid_too_big_to_be_a_sprite_is_refused_on_its_head_line() {
+    let e = pixfx_pixel::parse("100000x100000, 1 colours, . empty\na #ffffff\n");
+    assert!(e.is_err_and(|e| e.line == 1));
+}

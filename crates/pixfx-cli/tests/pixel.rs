@@ -143,6 +143,15 @@ fn clean_without_a_palette_merges_thousands_of_colours_to_32() -> Check {
     }
     assert!(colors(&img).len() > 4000);
     let c = clean(&img, &clean_args("many.png")?)?;
+    assert_eq!(
+        (c.sprite.w, c.sprite.h),
+        (64, 64),
+        "the grid of 4-pixel cells"
+    );
+    assert!(
+        colors(&c.sprite).len() > 16,
+        "merging keeps a palette, not one colour"
+    );
     assert!(
         colors(&c.sprite).len() <= 32,
         "{} colours",
@@ -183,4 +192,30 @@ fn a_state_sheet_has_one_painted_cell_per_state_and_moment() {
             state.label()
         );
     }
+}
+
+#[test]
+fn critique_suggests_a_clean_command_the_cli_takes() -> Check {
+    // 64 cells in 64 colours: far over the colour budget.
+    let mut img = RgbaImage::new(8, 8);
+    for i in 0..64u32 {
+        img.set(
+            i % 8,
+            i / 8,
+            [(i * 4) as u8, 255 - (i * 4) as u8, (i % 7 * 30) as u8, 255],
+        );
+    }
+    let report = pixfx_pixel::critique::critique(&img, &[]);
+    let issue = report
+        .issues
+        .iter()
+        .find(|i| i.check == "colour_budget")
+        .ok_or("no colour_budget issue")?;
+    let command = issue.fix.split('`').nth(1).ok_or("no command in the fix")?;
+    let words = command
+        .strip_prefix("pixfx pixel ")
+        .ok_or(format!("not a pixfx pixel command: {command}"))?
+        .replace("<sprite.png>", "s.png");
+    assert!(matches!(verb(&words)?, Verb::Clean(_)), "{command}");
+    Ok(())
 }

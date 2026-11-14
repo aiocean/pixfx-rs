@@ -70,7 +70,7 @@ pub fn cut(img: &RgbaImage, tolerance: u32) -> RgbaImage {
             let Some([r, g, b, a]) = img.get(x, y) else {
                 continue;
             };
-            if a < OPAQUE || distance([r, g, b], back) <= tolerance * tolerance {
+            if a < OPAQUE || distance([r, g, b], back) <= tolerance.saturating_mul(tolerance) {
                 out.set(x, y, [0; 4]);
             }
         }
