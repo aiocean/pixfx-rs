@@ -8,6 +8,7 @@
 mod choice;
 mod curve;
 mod habits;
+mod posture;
 mod reading;
 mod rng;
 mod sense;
@@ -18,6 +19,7 @@ mod yomi;
 pub use choice::{Choice, Outcome, Posture, Thought, Why};
 pub use habits::{foe_move, FoeMove, Habits};
 pub use curve::{score, Consideration, Curve, Input, Inputs};
+pub use posture::{choose_posture, Category, Held, PostureDef, POSTURES};
 pub use reading::{is_area, is_close, is_ranged, punisher, Reading};
 pub use rng::Rng;
 pub use sense::{Arena, Doing, Foe, Me, Phase, Sense, Shape, Threat};

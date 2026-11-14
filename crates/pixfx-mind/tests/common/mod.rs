@@ -123,3 +123,30 @@ pub fn reading(me: &Me, foe: &Foe, threats: &[Threat]) -> Reading {
     let ready = vec![true; kit.len()];
     Reading::of(me, foe, threats, &arena(), &kit, &ready, &body(), &profile(), 0.0)
 }
+
+/// A reading of a quiet moment: every input 0.5 but nothing open, nothing coming, no rage, no breath to take;
+/// the foe 60 px off.
+pub fn quiet() -> Reading {
+    let r = Reading {
+        d: 60.0,
+        dx: 60.0,
+        level: true,
+        busy: 0.0,
+        opening: 0.0,
+        open_in: 0.0,
+        free: true,
+        lead: 0.0,
+        urgency: 0.0,
+        foe_posture: Posture::Neutral,
+        want: 100.0,
+        inputs: [0.5; 18],
+    };
+    with(r, &[(Input::Opening, 0.0), (Input::Threat, 0.0), (Input::RageFull, 0.0), (Input::Calm, 0.0)])
+}
+
+pub fn with(mut r: Reading, inputs: &[(Input, f64)]) -> Reading {
+    for (i, v) in inputs {
+        r.set(*i, *v);
+    }
+    r
+}
