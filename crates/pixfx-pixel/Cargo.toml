@@ -11,3 +11,7 @@ pixfx-draw = { path = "../pixfx-draw" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# PNG for tests and example scripts only; the library itself does no I/O
+pixfx-export = { path = "../pixfx-export" }
