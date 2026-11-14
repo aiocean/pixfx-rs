@@ -255,3 +255,23 @@ fn frames_lay_out_one_row() {
     );
     assert_eq!(cut(&blank(&l, false), &l).len(), 5);
 }
+
+#[test]
+fn a_layout_comes_back_from_its_json_and_bones_from_their_text() {
+    let layout = Layout {
+        cell_w: 32,
+        cell_h: 48,
+        cols: 3,
+        rows: 2,
+        gap: 1,
+        scale: 6,
+    };
+    assert_eq!(
+        pixfx_pixel::sheet::parse_layout(&pixfx_pixel::sheet::layout_json(&layout)),
+        Ok(layout)
+    );
+    assert!(pixfx_pixel::sheet::parse_layout("{\"cell_w\": 3}").is_err());
+    let bones = pixfx_pixel::sheet::parse_bones("# spine\n16,10 16,30\n\n16,30 10,46\n");
+    assert_eq!(bones, Ok(vec![[(16, 10), (16, 30)], [(16, 30), (10, 46)]]));
+    assert!(pixfx_pixel::sheet::parse_bones("16,10 16").is_err());
+}

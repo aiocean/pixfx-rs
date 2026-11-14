@@ -38,3 +38,42 @@ pub fn diff(a: &RgbaImage, b: &RgbaImage) -> (Diff, RgbaImage) {
     let total = w as usize * h as usize;
     (Diff { differing, total }, mask)
 }
+
+/// Where a figure stands: the middle of its painted columns (halves down) and the row just under its lowest
+/// painted pixel; `None` when nothing is painted.
+fn feet_of(img: &RgbaImage) -> Option<(u32, u32)> {
+    let mut span: Option<(u32, u32, u32)> = None;
+    for y in 0..img.h {
+        for x in 0..img.w {
+            if img.get(x, y).is_some_and(|p| p[3] > 0) {
+                let (x0, x1, _) = span.unwrap_or((x, x, y));
+                span = Some((x0.min(x), x1.max(x), y + 1));
+            }
+        }
+    }
+    span.map(|(x0, x1, bottom)| ((x0 + x1) / 2, bottom))
+}
+
+/// `a` and `b` placed on one canvas so they stand on the same spot: their bottom painted rows and the middles of
+/// their painted columns line up. A picture with nothing painted stands at its bottom centre. Compare the two with
+/// [`diff`] to see a drawing against a sprite whatever margin each was cut with.
+pub fn feet(a: &RgbaImage, b: &RgbaImage) -> (RgbaImage, RgbaImage) {
+    let (ax, ay) = feet_of(a).unwrap_or((a.w / 2, a.h));
+    let (bx, by) = feet_of(b).unwrap_or((b.w / 2, b.h));
+    let (left, top) = (ax.max(bx), ay.max(by));
+    let w = left + (a.w - ax).max(b.w - bx);
+    let h = top + (a.h - ay).max(b.h - by);
+    let place = |img: &RgbaImage, fx: u32, fy: u32| {
+        let mut out = RgbaImage::new(w, h);
+        let (ox, oy) = (left - fx, top - fy);
+        for y in 0..img.h {
+            for x in 0..img.w {
+                if let Some(p) = img.get(x, y) {
+                    out.set(ox + x, oy + y, p);
+                }
+            }
+        }
+        out
+    };
+    (place(a, ax, ay), place(b, bx, by))
+}

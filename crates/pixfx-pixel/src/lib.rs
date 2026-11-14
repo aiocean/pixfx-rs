@@ -27,7 +27,7 @@ pub mod sheet;
 pub mod view;
 
 pub use cut::cut;
-pub use diff::{Diff, diff};
+pub use diff::{Diff, diff, feet};
 pub use grid::{Map, Run, colors, nearest, rects, shrink};
 pub use pixfx_draw::{Rgba, RgbaImage};
 pub use show::{LEGEND, ParseError, TooManyColors, parse, text, text_named};

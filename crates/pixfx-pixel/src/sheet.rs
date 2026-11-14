@@ -269,3 +269,63 @@ pub fn cut(drawn: &RgbaImage, layout: &Layout) -> Vec<RgbaImage> {
     }
     out
 }
+
+/// Bones from their text form: one `X,Y X,Y` per line, in sprite pixels; blank lines and `#` lines skipped.
+pub fn parse_bones(text: &str) -> Result<Vec<[(u32, u32); 2]>, String> {
+    let point = |p: &str| -> Option<(u32, u32)> {
+        let (x, y) = p.split_once(',')?;
+        Some((x.trim().parse().ok()?, y.trim().parse().ok()?))
+    };
+    text.lines()
+        .map(str::trim)
+        .enumerate()
+        .filter(|(_, l)| !l.is_empty() && !l.starts_with('#'))
+        .map(
+            |(n, l)| match l.split_whitespace().collect::<Vec<_>>().as_slice() {
+                [a, b] => match (point(a), point(b)) {
+                    (Some(a), Some(b)) => Ok([a, b]),
+                    _ => Err(format!("bones line {}: expected X,Y X,Y: {l}", n + 1)),
+                },
+                _ => Err(format!("bones line {}: expected X,Y X,Y: {l}", n + 1)),
+            },
+        )
+        .collect()
+}
+
+/// A layout as `sheet.json`.
+pub fn layout_json(l: &Layout) -> String {
+    format!(
+        "{{\"cell_w\": {}, \"cell_h\": {}, \"cols\": {}, \"rows\": {}, \"gap\": {}, \"scale\": {}}}\n",
+        l.cell_w, l.cell_h, l.cols, l.rows, l.gap, l.scale
+    )
+}
+
+/// A layout back from `sheet.json` (a flat object of whole numbers, as [`layout_json`] writes it).
+pub fn parse_layout(json: &str) -> Result<Layout, String> {
+    let body = json.trim().trim_start_matches('{').trim_end_matches('}');
+    let mut fields = std::collections::BTreeMap::new();
+    for field in body.split(',').filter(|f| !f.trim().is_empty()) {
+        let (k, v) = field
+            .split_once(':')
+            .ok_or(format!("sheet.json: expected \"key\": number, got {field}"))?;
+        let v: u32 = v
+            .trim()
+            .parse()
+            .map_err(|_| format!("sheet.json: {} is not a whole number", k.trim()))?;
+        fields.insert(k.trim().trim_matches('"').to_string(), v);
+    }
+    let get = |k: &str| {
+        fields
+            .get(k)
+            .copied()
+            .ok_or(format!("sheet.json has no {k}"))
+    };
+    Ok(Layout {
+        cell_w: get("cell_w")?,
+        cell_h: get("cell_h")?,
+        cols: get("cols")?,
+        rows: get("rows")?,
+        gap: get("gap")?,
+        scale: get("scale")?,
+    })
+}

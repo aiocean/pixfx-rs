@@ -172,3 +172,20 @@ fn zoom_draws_each_cell_as_a_square_inside_grid_lines() {
     let line = img.get(5, 2);
     assert!(line.is_some() && line != Some(RED) && line != img.get(7, 2));
 }
+
+#[test]
+fn feet_stands_two_figures_on_the_same_spot() {
+    // The same 2x3 figure, once at the top left of a 4x4 picture and once at the bottom right of a 6x5 one.
+    let figure = |w: u32, h: u32, ox: u32, oy: u32| {
+        let mut img = RgbaImage::new(w, h);
+        for y in 0..3 {
+            for x in 0..2 {
+                img.set(ox + x, oy + y, [200, 10, 10, 255]);
+            }
+        }
+        img
+    };
+    let (a, b) = pixfx_pixel::feet(&figure(4, 4, 0, 0), &figure(6, 5, 4, 2));
+    assert_eq!((a.w, a.h), (b.w, b.h));
+    assert_eq!(pixfx_pixel::diff(&a, &b).0.differing, 0);
+}

@@ -6,11 +6,9 @@
 //!   pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
 //!   pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]
 //!   pixfx bench [--ids ID,ID...] [--n N] [--secs S] [--hz H]
-//!   pixfx poses <thunder|frost> [--blank POSE,...] [--out DIR]
-//!   pixfx pixel <picture.png> [--crop X,Y,W,H] [--flip] [--cut TOLERANCE] [--px N]
-//!               [--palette HEX,HEX,...|thunder|frost] [--rects] [--scale N] [--out DIR]
-//!   pixfx pixel --blank WxH [--scale N] [--out DIR]
-//!   pixfx diff <a.png> <b.png> [--a-crop X,Y,W,H] [--b-crop X,Y,W,H] [--out PNG]
+//!   pixfx poses <thunder|frost> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]
+//!   pixfx pixel <clean|read|draw|view|critique|sheet|cut|parts> ... (`pixfx_cli::pixel::USAGE`)
+//!   pixfx diff <a.png> <b.png> [--a-crop X,Y,W,H] [--b-crop X,Y,W,H] [--anchor feet] [--out PNG]
 //!
 //! `sheet` writes `<name>.png`, `<name>_color.png`, `<name>_light.png` and `<name>.json` (beanfx layout) for
 //! `<id>`; `render --gif` writes `<name>.gif`, each pixel blown up `N` times (default 4); `bake` writes
@@ -31,21 +29,18 @@
 //!
 //! `poses` writes `<look>-poses.png`, every pose of a fighter look painted as the duel paints it, 8 to a row in
 //! the order of `pixfx_cli::poses::POSES`; `--blank` leaves the named poses' cells empty (a reference sheet for an
-//! artist or an image model to fill).
+//! artist or an image model to fill). `--pose P` writes `<look>-<P>.png` instead: the pose at three moments, and
+//! with `--states` one row per state (out, facing, flash, ice, shock), labelled in the output.
 //!
-//! `pixel` shows a picture to an agent as a pixel grid: an image model's drawing, an artist's, or a game's own
-//! sprite. The picture is `--crop`ped, mirrored with `--flip`, cut from its background with `--cut` (the top-left
-//! colour, give or take the tolerance; specks and guide lines go too), matched to `--palette` (hex colours, or a
-//! fighter look's colours by name; left out, the picture's own colours) and shrunk by `--px` (the picture's pixels
-//! per cell, default 1). It prints the grid as text, a letter per cell with a colour legend and the column and row
-//! numbers, and `--rects` adds the cells merged into rects (`x y w h letter`, y down from the top). It writes
-//! `<name>.txt`, `<name>.pixels.png` (one pixel a cell) and `<name>.zoom.png` (`--scale` pixels a cell, default 8,
-//! inside grid lines, brighter every 8 cells) into `--out` (default `target/pixel`). `--blank WxH` writes only
-//! `blank-<W>x<H>.zoom.png`, the empty grid, for an image model to draw into. The output is for the agent to read
-//! and write painter code from; nothing in the engine paints from it.
+//! `pixel` is the agent's pixel tool (`pixfx_cli::pixel`): `clean` an image model's picture down to one pixel a
+//! cell, `read` a sprite as text and `draw` text back, `view` it at a size worth looking at, `critique` it, make a
+//! `sheet` for a model to draw into and `cut` the drawn cells back, split it into `parts`. Its output is for the
+//! agent to read and write painter code from; nothing in the engine paints from it.
 //!
 //! `diff` compares two images (each `--a-crop` / `--b-crop`ped first), prints how many pixels differ, and with
-//! `--out` writes a, b and the difference side by side. Exits 0 when they match, 1 when they differ.
+//! `--out` writes a, b and the difference side by side. `--anchor feet` first stands both on the same spot (bottom
+//! painted row, middle of the painted columns), to compare a drawing with a sprite whatever their margins. Exits 0
+//! when they match, 1 when they differ.
 #![forbid(unsafe_code)]
 
 use std::path::{Path, PathBuf};
@@ -54,7 +49,7 @@ use std::process::{Command, ExitCode};
 use pixfx_cli::bench;
 use pixfx_cli::opts::CliOpts;
 use pixfx_cli::parity::{compare, read_reference, write_side_gif};
-use pixfx_cli::poses::{POSES, pose_cells, pose_named};
+use pixfx_cli::poses::{MOMENTS, POSES, State, Tint, pose_cells, pose_named, state_cells, states};
 use pixfx_core::{Options, render_frames};
 use pixfx_draw::Outline;
 use pixfx_draw::RgbaImage;
@@ -62,16 +57,15 @@ use pixfx_export::{
     Grid, bake, decode_png_rgba, pack_cells, write_bake, write_gif, write_png_rgba, write_sheet,
 };
 use pixfx_fighter::paint::SPRITE;
-use pixfx_pixel::{Map, diff, rects, text, zoom};
+use pixfx_pixel::{diff, feet};
 
 const USAGE: &str = "usage: pixfx parity <id> [--opt key=value]... [--pixelfx DIR] [--out DIR]
        pixfx sheet <id> [--palette WORD] [--outline WORD] [--out DIR]
        pixfx render <id> --gif [--scale N] [--palette WORD] [--outline WORD] [--out DIR]
        pixfx bake <id> [--palette WORD] [--outline WORD] [--out DIR]
-       pixfx poses <thunder|frost> [--blank POSE,...] [--out DIR]
-       pixfx pixel <picture.png> [--crop X,Y,W,H] [--flip] [--cut TOLERANCE] [--px N] [--palette HEX,HEX,...|thunder|frost] [--rects] [--scale N] [--out DIR]
-       pixfx pixel --blank WxH [--scale N] [--out DIR]
-       pixfx diff <a.png> <b.png> [--a-crop X,Y,W,H] [--b-crop X,Y,W,H] [--out PNG]
+       pixfx poses <thunder|frost> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]
+       pixfx pixel <clean|read|draw|view|critique|sheet|cut|parts> ... (pixfx pixel, alone, lists them)
+       pixfx diff <a.png> <b.png> [--a-crop X,Y,W,H] [--b-crop X,Y,W,H] [--anchor feet] [--out PNG]
        pixfx bench [--ids ID,ID...] [--n N] [--secs S] [--hz H]";
 
 /// What `pixfx sheet`, `pixfx render` and `pixfx bake` produce.
@@ -104,7 +98,9 @@ fn main() -> ExitCode {
     let result = match args.split_first() {
         Some((cmd, rest)) if cmd == "parity" => parse_parity(rest).and_then(|a| parity(&a)),
         Some((cmd, rest)) if cmd == "poses" => poses(rest).map(|()| true),
-        Some((cmd, rest)) if cmd == "pixel" => pixel(rest).map(|()| true),
+        Some((cmd, rest)) if cmd == "pixel" => {
+            pixfx_cli::pixel::parse_args(rest).and_then(|c| pixfx_cli::pixel::run(&c))
+        }
         Some((cmd, rest)) if cmd == "diff" => diff_images(rest),
         Some((cmd, rest)) if cmd == "sheet" || cmd == "render" || cmd == "bake" => {
             parse_export(cmd, rest).and_then(|a| export(&a).map(|()| true))
@@ -240,6 +236,7 @@ fn export(a: &ExportArgs) -> Result<(), String> {
 fn poses(args: &[String]) -> Result<(), String> {
     let mut look = None;
     let mut blank = Vec::new();
+    let (mut one, mut with_states) = (None, false);
     let mut out = PathBuf::from("out");
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -250,6 +247,15 @@ fn poses(args: &[String]) -> Result<(), String> {
                     blank.push(pose_named(name).ok_or(format!("no pose {name}: one of {names}"))?);
                 }
             }
+            "--pose" => {
+                let name = it.next().ok_or(USAGE)?;
+                let names = POSES.map(|(n, _)| n).join(", ");
+                one = Some((
+                    name.clone(),
+                    pose_named(name).ok_or(format!("no pose {name}: one of {names}"))?,
+                ));
+            }
+            "--states" => with_states = true,
             "--out" => out = it.next().ok_or(USAGE)?.into(),
             flag if flag.starts_with("--") => return Err(format!("unknown flag {flag}\n{USAGE}")),
             _ if look.is_none() => look = Some(a.clone()),
@@ -259,10 +265,38 @@ fn poses(args: &[String]) -> Result<(), String> {
     let name = look.ok_or(USAGE)?;
     let look = pixfx_fighter::look::Look::preset(&name)
         .ok_or(format!("no fighter look {name}: thunder or frost"))?;
-    let cells = pose_cells(&look, &blank);
-    let grid = Grid::new(cells.len() as u32, SPRITE as u32, SPRITE as u32);
     std::fs::create_dir_all(&out).map_err(|e| format!("creating {}: {e}", out.display()))?;
-    let path = out.join(format!("{name}-poses.png"));
+    let (cells, grid, path) = match one {
+        Some((pose_name, pose)) => {
+            let rows = if with_states {
+                states()
+            } else {
+                vec![State {
+                    out: false,
+                    face: 1.0,
+                    tint: Tint::Own,
+                }]
+            };
+            for (i, s) in rows.iter().enumerate() {
+                println!("row {i}: {}", s.label());
+            }
+            let cells = state_cells(&look, pose, &rows);
+            let grid = Grid {
+                frames: cells.len() as u32,
+                columns: MOMENTS.len() as u32,
+                rows: rows.len() as u32,
+                cell_w: SPRITE as u32,
+                cell_h: SPRITE as u32,
+            };
+            (cells, grid, out.join(format!("{name}-{pose_name}.png")))
+        }
+        None if with_states => return Err(format!("--states needs --pose\n{USAGE}")),
+        None => {
+            let cells = pose_cells(&look, &blank);
+            let grid = Grid::new(cells.len() as u32, SPRITE as u32, SPRITE as u32);
+            (cells, grid, out.join(format!("{name}-poses.png")))
+        }
+    };
     write_png_rgba(
         &path,
         grid.width(),
@@ -298,61 +332,20 @@ fn cropped(img: RgbaImage, rect: Option<[u32; 4]>) -> RgbaImage {
     }
 }
 
-/// Write `img` as a PNG.
-fn write_image(path: &Path, img: &RgbaImage) -> Result<(), String> {
-    write_png_rgba(path, img.w, img.h, &img.rgba)
-        .map_err(|e| format!("writing {}: {e}", path.display()))
-}
-
-/// `pixfx pixel`: a picture as a pixel grid an agent reads, or a blank grid for an image model.
-fn pixel(args: &[String]) -> Result<(), String> {
-    let a = pixfx_cli::pixel::parse_args(args)?;
-    std::fs::create_dir_all(&a.out).map_err(|e| format!("creating {}: {e}", a.out.display()))?;
-    let Some(picture) = &a.picture else {
-        let (w, h) = a.blank.ok_or(pixfx_cli::pixel::USAGE)?;
-        let path = a.out.join(format!("blank-{w}x{h}.zoom.png"));
-        write_image(&path, &zoom(&Map::empty(w, h), &[], a.scale))?;
-        println!("{}", path.display());
-        return Ok(());
-    };
-    let (map, palette) = pixfx_cli::pixel::grid(&read_image(picture)?, &a)?;
-    let name = picture
-        .file_stem()
-        .map_or("picture".into(), |s| s.to_string_lossy());
-    let mut listing = text(&map, &palette).map_err(|e| e.to_string())?;
-    if a.rects {
-        let letters: Vec<char> = pixfx_pixel::LEGEND.chars().collect();
-        listing.push_str("rects: x y w h letter\n");
-        for r in rects(&map) {
-            let letter = letters.get(r.value).copied().unwrap_or('?');
-            listing.push_str(&format!("{} {} {} {} {letter}\n", r.x, r.y, r.w, r.h));
-        }
-    }
-    let txt = a.out.join(format!("{name}.txt"));
-    std::fs::write(&txt, &listing).map_err(|e| format!("writing {}: {e}", txt.display()))?;
-    let pixels = a.out.join(format!("{name}.pixels.png"));
-    write_image(&pixels, &map.paint(&palette))?;
-    let zoomed = a.out.join(format!("{name}.zoom.png"));
-    write_image(&zoomed, &zoom(&map, &palette, a.scale))?;
-    print!("{listing}");
-    println!(
-        "{}\n{}\n{}",
-        txt.display(),
-        pixels.display(),
-        zoomed.display()
-    );
-    Ok(())
-}
-
 /// `pixfx diff`: `Ok(true)` when the two images match.
 fn diff_images(args: &[String]) -> Result<bool, String> {
     let (mut paths, mut a_crop, mut b_crop, mut out) = (Vec::new(), None, None, None);
+    let mut anchor_feet = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--a-crop" => a_crop = Some(parse_rect(it.next())?),
             "--b-crop" => b_crop = Some(parse_rect(it.next())?),
             "--out" => out = Some(PathBuf::from(it.next().ok_or(USAGE)?)),
+            "--anchor" => match it.next().map(String::as_str) {
+                Some("feet") => anchor_feet = true,
+                _ => return Err(format!("--anchor takes feet\n{USAGE}")),
+            },
             flag if flag.starts_with("--") => return Err(format!("unknown flag {flag}\n{USAGE}")),
             _ => paths.push(PathBuf::from(a)),
         }
@@ -360,6 +353,7 @@ fn diff_images(args: &[String]) -> Result<bool, String> {
     let [a_path, b_path] = <[PathBuf; 2]>::try_from(paths).map_err(|_| USAGE.to_string())?;
     let a = cropped(read_image(&a_path)?, a_crop);
     let b = cropped(read_image(&b_path)?, b_crop);
+    let (a, b) = if anchor_feet { feet(&a, &b) } else { (a, b) };
     let (d, mask) = diff(&a, &b);
     println!("{} of {} pixels differ", d.differing, d.total);
     if let Some(path) = out {
