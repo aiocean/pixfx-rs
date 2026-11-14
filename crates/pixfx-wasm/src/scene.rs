@@ -827,12 +827,37 @@ impl JsScene {
         self.inner.scene().set_screen_w(w);
     }
 
-    /// Draw only the effects whose frame overlaps the view (game pixels); the rest play on undrawn.
+    /// Draw only the effects whose frame overlaps the view (game pixels; for a camera, its world view) where the
+    /// camera shows them; the rest play on undrawn. `scrollX`/`scrollY`: how far the camera has scrolled, 0 for a
+    /// host without one (see `setScrollFactor`).
     #[wasm_bindgen(js_name = setView)]
-    pub fn set_view(&mut self, x: f64, y: f64, w: f64, h: f64) -> Result<(), JsError> {
+    pub fn set_view(
+        &mut self,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        #[wasm_bindgen(js_name = scrollX)] scroll_x: f64,
+        #[wasm_bindgen(js_name = scrollY)] scroll_y: f64,
+    ) -> Result<(), JsError> {
+        let view = View {
+            x,
+            y,
+            w,
+            h,
+            scroll_x,
+            scroll_y,
+        };
+        self.inner.scene().set_view(Some(view)).map_err(js_err)
+    }
+
+    /// How far the effect moves when the camera scrolls: 1 (the default) with the world, 0 fixed to the camera.
+    /// The view culls it where the camera shows it. False for an unknown handle; throws on a factor not finite.
+    #[wasm_bindgen(js_name = setScrollFactor)]
+    pub fn set_scroll_factor(&mut self, handle: u32, f: f64) -> Result<bool, JsError> {
         self.inner
             .scene()
-            .set_view(Some(View { x, y, w, h }))
+            .set_scroll_factor(handle, f)
             .map_err(js_err)
     }
 

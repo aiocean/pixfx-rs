@@ -1,14 +1,16 @@
 // `bun run perf:check`: in a clean Chrome, check that the demo (default worker pool) shows its fires, that pausing
 // the scene freezes them, and that an effect drawn by a worker uploads exactly the bytes the main thread uploads
-// for the same effect, seed and steps. Prints one line per check; exits 1 if any fails.
+// for the same effect, seed and steps, and that the camera culls: an effect off camera shows no image until the
+// camera scrolls onto it, and one fixed to the camera (scroll factor 0) shows wherever it scrolls. Prints one line per check; exits 1 if any fails.
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import type { Browser } from "./cdp";
-import { launchChrome, timeoutMessage } from "./cdp";
+import type { Browser } from "pixfx-web/tools/cdp";
+import { launchChrome, timeoutMessage } from "pixfx-web/tools/cdp";
 import { ROOT, startServer } from "./server";
 
-const SRC = `/@fs${join(import.meta.dir, "..", "src")}`;
+/** pixfx-web, the runtime the plugin runs on, served as source. */
+const WEB = `/@fs${join(import.meta.dir, "..", "..", "pixfx-web")}`;
 
 async function waitFor(b: Browser, expression: string, timeoutMs: number): Promise<void> {
   const until = Date.now() + timeoutMs;
@@ -50,16 +52,42 @@ const LIT_PIXELS = `(() => {
 })()`;
 
 /**
+ * Play a candle far off camera and one fixed to the camera, count the visible pixfx images of each with the camera
+ * at the start and scrolled onto the far one, then put everything back.
+ */
+const CAMERA_CULLS = `(async () => {
+  const s = window.pixfxDemo.scene;
+  const cam = s.cameras.main;
+  const frames = (n) => new Promise((r) => { let k = 0; const f = () => (++k >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+  const images = () => s.children.list.filter((o) => o.visible && typeof o.texture?.key === "string" && o.texture.key.startsWith("pixfx:"));
+  const count = () => {
+    const all = images();
+    return { far: all.filter((o) => o.x > 4000).length, fixed: all.filter((o) => o.scrollFactorX === 0).length };
+  };
+  const far = s.pixfx.play("fire/candle", 5000, 5000, { seed: 11 });
+  const fixed = s.pixfx.play("fire/candle", 40, 40, { seed: 12, scrollFactor: 0 });
+  await frames(30);
+  const atStart = count();
+  cam.setScroll(5000 - cam.width / 2, 5000 - cam.height / 2);
+  await frames(30);
+  const scrolled = count();
+  cam.setScroll(0, 0);
+  far.destroy();
+  fixed.destroy();
+  return { atStart, scrolled };
+})()`;
+
+/**
  * Play fire/campfire (seed 3) in a game painting on the main thread and in one painting on a real worker, each
  * with textures that record every fill, step both by the same scene times (the worker's game draws again once its
  * frames are back), and compare the filled sizes and bytes.
  */
 const SAME_PIXELS = `(async () => {
-  const wasm = await import("${SRC}/../wasm/pixfx_wasm.js");
+  const wasm = await import("${WEB}/wasm/pixfx_wasm.js");
   const { memory } = await wasm.default();
-  const { Game } = await import("${SRC}/game.ts");
-  const { Stage } = await import("${SRC}/stage.ts");
-  const { openWorkers, workerPort } = await import("${SRC}/load.ts");
+  const { Game } = await import("${WEB}/src/game.ts");
+  const { Stage } = await import("${WEB}/src/stage.ts");
+  const { openWorkers, workerPort } = await import("${WEB}/src/load.ts");
   const recorder = () => {
     const fills = [];
     const texture = () => ({
@@ -77,10 +105,10 @@ const SAME_PIXELS = `(async () => {
   const off = new Game(wasm, memory, workers.map(workerPort));
   inline.useTextures(a.texture);
   off.useTextures(b.texture);
-  const sa = new Stage(inline, a.image, () => {});
-  const sb = new Stage(off, b.image, () => {});
-  sa.play("fire/campfire", 50, 50, { seed: 3 });
-  sb.play("fire/campfire", 50, 50, { seed: 3 });
+  const sa = new Stage(inline, a.image, () => {}, 1);
+  const sb = new Stage(off, b.image, () => {}, 1);
+  sa.play("fire/campfire", 50, 50, { seed: 3 }, 1);
+  sb.play("fire/campfire", 50, 50, { seed: 3 }, 1);
   const step = (game, stage, dt) => { stage.update(dt); stage.draw(); game.endFrame(); };
   for (let i = 0; i < 12; i++) {
     step(inline, sa, 1 / 12);
@@ -128,6 +156,13 @@ async function main(): Promise<void> {
     await Bun.write(shot, Buffer.from(p1, "base64"));
     console.log(`paused screenshot: ${shot}`);
     await b.evaluate("window.pixfxDemo.scene.scene.resume(), true");
+    const seen = z.object({ far: z.number(), fixed: z.number() });
+    const culled = z.object({ atStart: seen, scrolled: seen }).parse(await b.evaluate(CAMERA_CULLS));
+    check(
+      "the camera culls",
+      culled.atStart.far === 0 && culled.atStart.fixed > 0 && culled.scrolled.far > 0 && culled.scrolled.fixed > 0,
+      `visible images of an effect off camera / of one fixed to the camera: ${culled.atStart.far} / ${culled.atStart.fixed} at the start, ${culled.scrolled.far} / ${culled.scrolled.fixed} with the camera on the far one`,
+    );
     const same = z
       .object({ uploads: z.number(), workerUploads: z.number(), nonEmpty: z.number(), equal: z.boolean() })
       .parse(await b.evaluate(SAME_PIXELS));

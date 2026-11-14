@@ -11,32 +11,35 @@ Requires Phaser `^4.2.1`.
 The package is not on npm yet. Build the engine once, then link the package into your game:
 
 ```sh
-cd pixfx-rs/packages/pixfx-phaser
-bun install
-bun run build:wasm          # wasm-pack → wasm/ (git-ignored), shipped beside the JS
-cd /path/to/your-game
-bun add ../pixfx-rs/packages/pixfx-phaser
+cd pixfx-rs/packages/pixfx-web && bun install && bun run build:wasm   # wasm-pack → pixfx-web/wasm
+cd ../pixfx-phaser && bun install
+cd /path/to/your-game && bun add ../pixfx-rs/packages/pixfx-phaser
 ```
 
 That builds every effect into the `.wasm`. A game that plays a few builds only those, and pays for no other:
 
 ```sh
-bun run build:wasm --no-default-features --features pixfx-effects/fire-candle,pixfx-effects/explosions
+bun run build:wasm --no-default-features --features pixfx-effects/fire-candle,pixfx-effects/explosions   # in pixfx-web
 ```
 
 Name an effect by its id with the `/` as `-` (`fire/candle` is `pixfx-effects/fire-candle`), or a whole category
 (`pixfx-effects/explosions`). `EffectId` then lists only those effects, so TypeScript flags a `play` of one left out.
 
-The package exports its TypeScript source (`src/index.ts`); Vite compiles it with the game. The `.wasm` file
-sits next to its JS glue and is loaded through `new URL(..., import.meta.url)`, so Vite bundles it with no
-plugin.
+The package exports its TypeScript source (`src/index.ts`); Vite compiles it with the game. It runs on pixfx-web
+(the runtime every pixfx JS shell shares), which loads its wasm and its worker through
+`new URL(..., import.meta.url)`. Tell Vite to serve it as source, not pre-bundled:
+
+```js
+// vite.config.js of the game
+export default { optimizeDeps: { exclude: ["pixfx-web"] } };
+```
 
 A local package carries its own dev copy of Phaser in its `node_modules`. Tell Vite to use the game's copy,
 or the bundle holds two Phasers (2.8 MB instead of 1.5 MB, measured):
 
 ```js
 // vite.config.js of the game
-export default { resolve: { dedupe: ["phaser"] } };
+export default { optimizeDeps: { exclude: ["pixfx-web"] }, resolve: { dedupe: ["phaser"] } };
 ```
 
 ## Load the engine and register the plugin
@@ -123,6 +126,10 @@ shown.
 One effect pixel is one world unit; camera zoom and `pixelArt` enlarge it, and positions snap to whole pixels.
 An unknown id or a bad option throws and creates nothing.
 
+Only effects the main camera sees are drawn, each where its scroll factor puts it; the rest keep playing, firing
+cues and ending on time unseen, and take no paint or texture until the camera reaches them. A camera that follows
+a target moves after pixfx draws, so an effect it brings into view shows from the next frame.
+
 Options (all optional):
 
 | Option | Meaning |
@@ -131,7 +138,7 @@ Options (all optional):
 | `flip`, `angle`, `palette` | Passed to the effect (see `meta(id)` in `pixfx-wasm`). |
 | `light` | Glow strength, a number: `0` is no glow, default `1`. |
 | `depth: {back, front}` | Depths of the back and front images. Default `{back: 0, front: 1}`. |
-| `scrollFactor` | Camera scroll factor of the images: `1` world space (default), `0` screen space (HUD effects). |
+| `scrollFactor` | Camera scroll factor of the images: `1` world space (default), `0` screen space (HUD effects), between for parallax. |
 | `outline` | Outline round the effect: `true`, `false`, `"white"`, `"#ffcc00"`, `{color, width, corners}` (see the repo README's [Outlines](../../README.md#outlines)). Left out, the effect looks as designed. |
 
 Other numeric or array options are passed through to the effect.

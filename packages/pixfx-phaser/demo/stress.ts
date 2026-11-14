@@ -3,14 +3,14 @@
 // `workers=N` sets the painting workers (0: paint on the main thread; default: the package default) and
 // `slowdown=K` stretches each worker message K times (phone emulation: Chrome cannot CPU-throttle workers).
 // `seeds=shared` gives every effect of one id the same seed, so identical effects share frames; the default gives
-// each its own.
+// each its own. `world=K` spreads the effects over K times the camera's area, and `pan=1` sweeps the camera across
+// that world, so most effects are off camera at any moment.
 // Frame cost is main-thread time from Phaser's PRE_STEP to POST_RENDER (update, painting on the main thread, uploads
 // and the render submission; uploads of frames arriving from workers happen between steps and are not in it); fps is
 // game steps per second, which also drops when the GPU falls behind.
 import Phaser from "phaser";
 import type { Counts, PixfxEffect } from "../src";
-import { PixfxPlugin, loadPixfx } from "../src";
-import { defaultWorkers } from "../src/load";
+import { PixfxPlugin, defaultWorkers, loadPixfx } from "../src";
 import type { Seeds } from "./seeds";
 import { seedsParam, stressSeed } from "./seeds";
 
@@ -29,6 +29,10 @@ interface Config {
   churn: number;
   /** One seed per effect, or one per id ([`stressSeed`]). */
   seeds: Seeds;
+  /** The world's area in cameras (1: the effects fill the camera). */
+  world: number;
+  /** Whether the camera sweeps the world. */
+  pan: boolean;
 }
 
 interface Result extends Config {
@@ -73,11 +77,16 @@ const base: Config = {
   follow: Math.min(1, Math.max(0, num("follow", 0))),
   churn: Math.max(0, num("churn", 0)),
   seeds: seedsParam(params.get("seeds")),
+  world: Math.max(1, num("world", 1)),
+  pan: params.get("pan") === "1",
 };
 const WORKERS = params.has("workers") ? Math.max(0, Math.floor(num("workers", 0))) : defaultWorkers(navigator.hardwareConcurrency);
 const SLOWDOWN = Math.max(1, num("slowdown", 1));
 const WARM_MS = num("warm", 1000);
 const MEASURE_MS = num("measure", 3000);
+
+/** Seconds the camera takes to sweep the world across and back. */
+const PAN_SECONDS = 8;
 
 /** mulberry32: the same positions and seeds on every run. */
 function rng(seed: number): () => number {
@@ -98,6 +107,7 @@ class StressScene extends Phaser.Scene {
   private live: PixfxEffect[] = [];
   private churnDebt = 0;
   private spawned = 0;
+  private panTime = 0;
 
   constructor() {
     super("stress");
@@ -108,7 +118,10 @@ class StressScene extends Phaser.Scene {
     this.live = [];
     this.churnDebt = 0;
     this.spawned = 0;
-    this.add.rectangle(0, 0, WIDTH, HEIGHT, 0x1a1a24).setOrigin(0, 0).setDepth(-10);
+    this.panTime = 0;
+    const [w, h] = this.worldSize();
+    this.add.rectangle(0, 0, w, h, 0x1a1a24).setOrigin(0, 0).setDepth(-10);
+    this.cameras.main.setBounds(0, 0, w, h).setScroll(0, 0);
     const followers = Math.round(this.cfg.n * this.cfg.follow);
     for (let i = 0; i < this.cfg.n; i++) {
       const effect = this.spawn();
@@ -121,6 +134,7 @@ class StressScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    if (this.cfg.pan) this.panCamera(delta);
     if (this.cfg.churn <= 0) return;
     this.churnDebt += (this.cfg.churn * delta) / 1000;
     while (this.churnDebt >= 1 && this.live.length > 0) {
@@ -131,14 +145,29 @@ class StressScene extends Phaser.Scene {
     }
   }
 
+  /** The world in game pixels: `world` cameras of area, the camera's shape. */
+  private worldSize(): [number, number] {
+    const side = Math.sqrt(this.cfg.world);
+    return [Math.round(WIDTH * side), Math.round(HEIGHT * side)];
+  }
+
+  /** Across the world and back every `PAN_SECONDS`, down and up at another pace, so the camera covers it all. */
+  private panCamera(delta: number): void {
+    this.panTime += delta / 1000;
+    const [w, h] = this.worldSize();
+    const wave = (period: number): number => 0.5 - 0.5 * Math.cos((2 * Math.PI * this.panTime) / period);
+    this.cameras.main.setScroll((w - WIDTH) * wave(PAN_SECONDS), (h - HEIGHT) * wave(PAN_SECONDS * 1.7));
+  }
+
   private pickIndex(): number {
     const i = this.cfg.mix === "mixed" ? this.spawned % IDS.length : IDS.findIndex((id) => id === `fire/${this.cfg.mix}`);
     return i < 0 ? 0 : i;
   }
 
   private spawn(): { fx: PixfxEffect; x: number; y: number } {
-    const x = Math.round(30 + this.rand() * (WIDTH - 60));
-    const y = Math.round(90 + this.rand() * (HEIGHT - 100));
+    const [w, h] = this.worldSize();
+    const x = Math.round(30 + this.rand() * (w - 60));
+    const y = Math.round(90 + this.rand() * (h - 100));
     const i = this.pickIndex();
     const id = IDS[i] ?? IDS[0];
     const opts = { seed: stressSeed(this.cfg.seeds, this.spawned, i) };
@@ -170,7 +199,7 @@ function rendererType(): number {
 }
 
 function row(r: Result): string {
-  return [r.mix, r.n, r.follow, r.churn, r.seeds, r.workers, r.slowdown, r.fps, r.cpuMedian, r.cpuP95, r.stats.textures].map(String).join("\t");
+  return [r.mix, r.n, r.follow, r.churn, r.seeds, r.world, r.pan, r.workers, r.slowdown, r.fps, r.cpuMedian, r.cpuP95, r.stats.textures].map(String).join("\t");
 }
 
 async function main(): Promise<void> {
@@ -202,7 +231,7 @@ async function main(): Promise<void> {
 
   const hud = document.getElementById("hud");
   const results: Result[] = [];
-  const header = "mix\tn\tfollow\tchurn\tseeds\tworkers\tslowdown\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
+  const header = "mix\tn\tfollow\tchurn\tseeds\tworld\tpan\tworkers\tslowdown\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
 
   async function run(cfg: Config): Promise<Result> {
     game.loop.wake();

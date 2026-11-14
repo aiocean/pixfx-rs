@@ -39,6 +39,15 @@ const VIEW: View = View {
     y: 0.0,
     w: 100.0,
     h: 100.0,
+    scroll_x: 0.0,
+    scroll_y: 0.0,
+};
+
+/// A camera scrolled 1000 game pixels right: it sees world x 1000 to 1100.
+const SCROLLED: View = View {
+    x: 1000.0,
+    scroll_x: 1000.0,
+    ..VIEW
 };
 
 const FRAME: f64 = 1.0 / 60.0;
@@ -219,6 +228,64 @@ fn under_a_draw_budget_effects_outside_the_view_take_no_turn() -> Res {
     assert_eq!(
         r.shown.iter().map(|(p, _)| p.handle).collect::<Vec<_>>(),
         [inside]
+    );
+    Ok(())
+}
+
+/// Which handles the scene shows in one host frame.
+fn shown_handles(frames: &mut Frames<Frame, InlinePainter>, scene: &mut Scene<Frame>) -> Vec<u32> {
+    let mut h: Vec<u32> = draw_once(frames, scene)
+        .shown
+        .iter()
+        .map(|(p, _)| p.handle)
+        .collect();
+    h.dedup();
+    h
+}
+
+#[test]
+fn an_effect_fixed_to_the_camera_is_seen_wherever_the_camera_scrolls() -> Res {
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    scene.set_view(Some(SCROLLED))?;
+    // both at (50, 50): in the world, far left of the camera; fixed to the camera, inside it
+    let hud = scene.play(candle()?, 50.0, 50.0)?;
+    scene.play(candle()?, 50.0, 50.0)?;
+    assert_eq!(scene.set_scroll_factor(hud, 0.0), Ok(true));
+    scene.update(0.1)?;
+    assert_eq!(shown_handles(&mut frames, &mut scene), [hud]);
+    Ok(())
+}
+
+#[test]
+fn a_parallax_effect_is_seen_where_its_scroll_factor_puts_it() -> Res {
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    scene.set_view(Some(SCROLLED))?;
+    // at half the camera's scroll, the camera sees x 500 to 600 of this effect's plane
+    let near = scene.play(candle()?, 550.0, 50.0)?;
+    let far = scene.play(candle()?, 1050.0, 50.0)?;
+    for h in [near, far] {
+        assert_eq!(scene.set_scroll_factor(h, 0.5), Ok(true));
+    }
+    scene.update(0.1)?;
+    assert_eq!(shown_handles(&mut frames, &mut scene), [near]);
+    Ok(())
+}
+
+#[test]
+fn a_scroll_factor_that_is_not_finite_is_refused() -> Res {
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    let h = scene.play(candle()?, 50.0, 50.0)?;
+    assert_eq!(
+        scene.set_scroll_factor(h, f64::INFINITY),
+        Err(pixfx_scene::StageError::NotFinite)
+    );
+    assert_eq!(
+        scene.set_scroll_factor(h + 1, 0.0),
+        Ok(false),
+        "no such effect"
     );
     Ok(())
 }

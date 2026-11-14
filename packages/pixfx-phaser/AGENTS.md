@@ -7,7 +7,9 @@ Layer: **Shell** (Phaser 4, TypeScript). Read the root `AGENTS.md` ("The boundar
 
 A Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete` / `destroy` events,
 `scene.pixfx.feel` and `scene.pixfx.squash(sprite)`. It loads the engine through `pixfx-wasm` and follows the draw
-list the wasm `Scene` hands it each frame: make, refill, show and free surfaces. It decides nothing.
+list the wasm `Scene` hands it each frame: make, refill, show and free surfaces. It runs on `pixfx-web` (the JS runtime
+every JS shell shares: wasm, workers, frames, surfaces, stage, effect, feel) and adds Phaser's host objects, its
+events and its camera. It decides nothing.
 
 ## A shell may only
 
@@ -18,24 +20,23 @@ the Rust `Feel` to the camera, load wasm, run workers, and parse options at the 
 
 | File | Holds |
 |---|---|
-| `plugin.ts` | The scene plugin: Phaser events in, `Stage` calls out; the camera shake and flash. |
-| `stage.ts` | One Phaser scene's wasm `Scene`: plays, follow targets read each frame, events, the show ops on images. |
-| `effect.ts` | `PixfxEffect`, the handle a game holds; its events. |
-| `game.ts` | The game-wide wasm `Frames`, the surfaces, and routing jobs to workers and painted frames back. |
-| `surfaces.ts` | The draw-list op codes; makes, refills and frees surfaces on `GfxTexture`s. |
-| `gfx.ts`, `phaser-gfx.ts` | The host objects: atlas pages on WebGL, canvas textures on the Canvas renderer, images. |
-| `worker.ts`, `paint.ts`, `protocol.ts` | The painting worker, what it does with a message, and the messages (zod). |
-| `load.ts`, `engine.ts` | Loading wasm and the workers; the engine's read-only data (effects, meta, presets). |
-| `feel.ts`, `sprite-feel.ts` | The Rust `Feel` and `Squash`/`Blink` applied to the camera and to sprites. |
-| `options.ts` | zod parsing of play options at the boundary; the engine checks the rest. |
+| `plugin.ts` | The scene plugin: Phaser events in, `Stage` (pixfx-web) calls out; the camera's view handed to the Rust scene each frame; the camera shake and flash. |
+| `phaser-gfx.ts` | The host objects: atlas pages on WebGL, canvas textures on the Canvas renderer, images placed by scroll factor. |
+| `sprite-feel.ts` | The Rust `Squash`/`Blink` applied to sprites. |
+| `options.ts` | Phaser's own play options (`scrollFactor`, `depth`), split from the engine's by pixfx-web's `splitPlayOptions`. |
 
 ## Traps
 
 - Phaser's frame UVs assume a texture stored bottom row first. The atlas is made with `flipY` and filled with
   `flipY: true` at row `size - y - h`; filled any other way the regions show upside down or mixed.
 - `Game.endFrame()` runs once per host frame after every scene drew (game `POST_RENDER`), never per scene.
-- An effect's state lives in one worker for its life; its `ended` goes in the same message as its last job, and the
-  worker paints the jobs before it lets go.
+- The camera's `preRender` (follow, bounds) runs after the plugin draws, so `worldView` is a frame old then: the
+  plugin works the view out from the camera's scroll, size, zoom and tilt (`cameraView`). Only a following camera
+  still moves after that; an effect it brings into view shows a frame later.
+- An effect's scroll factor goes to the Rust scene too (`setScrollFactor`): the view culls an effect where the
+  camera shows it, so a HUD effect (`0`) is seen wherever the camera scrolls.
+- `pixfx-web` is a `file:` dependency, copied into `node_modules`: `bun run check` runs `bun install` first so it
+  tests the current one.
 
 ## Does not belong here
 
@@ -55,7 +56,7 @@ TypeScript strict; zod at every boundary; no `any`, no non-null assertions, no t
 
 ```
 bun run perf          # before the change, and again after; put both in the commit message
-bun run build:wasm    # when Rust changed
+bun run build:wasm    # when Rust changed (builds pixfx-web's wasm)
 bun run check         # tsc, eslint, bun test
 bun run perf:check
 ```

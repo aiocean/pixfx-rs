@@ -222,19 +222,23 @@ Start only when Phaser drives a wasm `Scene` (the boundary plan's Task 4, or a04
 Phaser runs its own TypeScript loop and culling there would put a decision in the shell.
 
 **Files:**
-- Modify: `crates/pixfx-wasm/src/scene.rs` (`setView`, `clearView` on the JS `Scene`), `packages/pixfx-phaser/src/plugin.ts`
-  (each tick before `draw()`: `setView` from `this.cameras.main.worldView`), `packages/pixfx-phaser/README.md`,
+- Modify: `crates/pixfx-scene/src/lib.rs` (`View` scroll, `set_scroll_factor`), `crates/pixfx-wasm/src/scene.rs`
+  (`setView`, `setScrollFactor`), `packages/pixfx-phaser/src/plugin.ts` (each tick before `draw()`: `setView` from
+  the main camera), `packages/pixfx-phaser/README.md`,
   `packages/pixfx-phaser/demo/stress.ts` and `perf/run.ts` (scenario "world 4× the camera, camera pans":
   `world=4&pan=1`)
-- Test: `crates/pixfx-wasm/tests/scene.rs`, `packages/pixfx-phaser/tests/plugin.test.ts`
+- Test: `crates/pixfx-scene/tests/view.rs`, `packages/pixfx-phaser/perf/check.ts`
 
-- [ ] **Step 1:** `bun run perf` on the starting commit (the "before").
-- [ ] **Step 2:** Failing test in `plugin.test.ts`: an effect outside the camera's `worldView` gives no `make` or
-  `show` op; after the camera scrolls onto it, it shows its current frame.
-- [ ] **Step 3:** Implement. `bun run check` and `bun run perf:check` pass.
-- [ ] **Step 4:** `bun run perf` after: the panning scenario's engine time is about a quarter of "before"; the
-  existing scenarios are within the sweep's own spread.
-- [ ] **Step 5:** Gate, then commit `phaser: the camera's view culls effects`, both perf results in the message.
+- [x] **Step 1:** `bun run perf` on the starting commit (the "before"), with the panning scenario added to it.
+- [x] **Step 2:** Failing tests. A single `worldView` would cull a HUD effect (`scrollFactor: 0`) once the camera
+  scrolls, so the view carries the camera's scroll and each effect its scroll factor:
+  `crates/pixfx-scene/tests/view.rs` (`an_effect_fixed_to_the_camera_is_seen_wherever_the_camera_scrolls`,
+  `a_parallax_effect_is_seen_where_its_scroll_factor_puts_it`). The plugin needs a real Phaser camera, so its test
+  is the browser check "the camera culls" in `perf/check.ts` (fails with `setView` or `setScrollFactor` removed).
+- [x] **Step 3:** Implement. `bun run check` and `bun run perf:check` pass. The plugin works the view out from the
+  camera's scroll, since the camera fills `worldView` in its `preRender`, after pixfx draws.
+- [x] **Step 4:** `bun run perf` after: see the commit.
+- [x] **Step 5:** Gate, then commit, both perf results in the message. Landed with the switch to `pixfx-web`.
 
 ### Task 7: stress runs with both unique and shared seeds
 

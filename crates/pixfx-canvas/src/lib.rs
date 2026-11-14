@@ -238,7 +238,14 @@ impl Stage {
         self.renderer
             .borrow_mut()
             .scene
-            .set_view(Some(View { x, y, w, h }))
+            .set_view(Some(View {
+                x,
+                y,
+                w,
+                h,
+                scroll_x: 0.0,
+                scroll_y: 0.0,
+            }))
             .map_err(|e| JsError::new(&e.to_string()))
     }
 
@@ -419,6 +426,8 @@ pub fn own_view(canvas_w: u32, canvas_h: u32, scale: NonZeroU32, shake_px: f64) 
         y: -shake_px,
         w: f64::from(canvas_w) / unit + 2.0 * shake_px,
         h: f64::from(canvas_h) / unit + 2.0 * shake_px,
+        scroll_x: 0.0,
+        scroll_y: 0.0,
     }
 }
 

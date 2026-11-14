@@ -73,19 +73,30 @@ pub struct Rect {
 
 /// What the host can see, in game pixels (world units for a host with a camera). A scene with a view draws only the
 /// effects whose frame, canvas plus glow margin, overlaps it; the rest keep playing and firing cues unseen.
+///
+/// `scroll_x`/`scroll_y` say how far the camera has scrolled (0 for a host without one). An effect with a scroll
+/// factor `f` ([`Scene::set_scroll_factor`]) moves `f` times as far as the camera does, so the camera sees the view
+/// moved back by `(1 - f) * scroll` of it: an effect fixed to the camera (`f = 0`) sees the camera's own rectangle.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct View {
     pub x: f64,
     pub y: f64,
     pub w: f64,
     pub h: f64,
+    pub scroll_x: f64,
+    pub scroll_y: f64,
 }
 
 impl View {
-    /// Whether `rect` (canvas pixels, `scale` per game pixel) overlaps this view; rectangles that only touch do not.
-    fn overlaps(self, rect: Rect, scale: NonZeroU32) -> bool {
+    /// Whether `rect` (canvas pixels, `scale` per game pixel) of an effect with scroll factor `f` overlaps this
+    /// view; rectangles that only touch do not.
+    fn overlaps(self, rect: Rect, f: f64, scale: NonZeroU32) -> bool {
         let s = f64::from(scale.get());
-        let (x0, y0) = (self.x * s, self.y * s);
+        let back = 1.0 - f;
+        let (x0, y0) = (
+            (self.x - back * self.scroll_x) * s,
+            (self.y - back * self.scroll_y) * s,
+        );
         let (x1, y1) = (x0 + self.w * s, y0 + self.h * s);
         // canvas pixels past 2^53 lose precision as f64; no canvas reaches them
         let (rx, ry) = (rect.x as f64, rect.y as f64);
@@ -222,6 +233,9 @@ struct Entry<S> {
     waiting: [Option<u64>; 3],
     /// Plays real time through a hit-stop instead of freezing with the rest ([`Scene::set_plays_through_hitstop`]).
     through_hitstop: bool,
+    /// How far it moves when the camera scrolls, as a share of the scroll (1: with the world, 0: fixed to the
+    /// camera); the view culls it where the camera shows it ([`View`]).
+    scroll_factor: f64,
 }
 
 /// Why a frame was not put in a surface: the shell failed, the draw budget leaves it for a later host frame, or it
@@ -307,7 +321,9 @@ impl<S> Scene<S> {
     /// and the view stays as it was.
     pub fn set_view(&mut self, view: Option<View>) -> Result<(), StageError> {
         if let Some(v) = view
-            && ![v.x, v.y, v.w, v.h].iter().all(|n| n.is_finite())
+            && ![v.x, v.y, v.w, v.h, v.scroll_x, v.scroll_y]
+                .iter()
+                .all(|n| n.is_finite())
         {
             return Err(StageError::NotFinite);
         }
@@ -346,6 +362,7 @@ impl<S> Scene<S> {
             awaiting: [None, None, None],
             waiting: [None, None, None],
             through_hitstop: false,
+            scroll_factor: 1.0,
         });
         Ok(handle)
     }
@@ -392,6 +409,21 @@ impl<S> Scene<S> {
             ..p
         };
         Ok(true)
+    }
+
+    /// How far the instance moves when the camera scrolls, as a share of the scroll: 1 (the default) with the
+    /// world, 0 fixed to the camera, between for parallax. The host places it so; the view culls it where the camera
+    /// shows it ([`View`]). A factor that is not finite is refused. `Ok(false)` if no instance has this handle.
+    pub fn set_scroll_factor(&mut self, handle: u32, f: f64) -> Result<bool, StageError> {
+        if !f.is_finite() {
+            return Err(StageError::NotFinite);
+        }
+        Ok(self
+            .entries
+            .iter_mut()
+            .find(|e| e.handle == handle)
+            .map(|e| e.scroll_factor = f)
+            .is_some())
     }
 
     /// Let the instance keep playing real time through a hit-stop while the rest of the scene freezes (`on`), as a
@@ -446,9 +478,11 @@ impl<S> Scene<S> {
             .map(|e| self.rect_of(e))
     }
 
-    /// Whether a frame at `rect` is seen: it overlaps the view, or there is no view.
-    fn in_view(&self, rect: Rect) -> bool {
-        self.view.is_none_or(|v| v.overlaps(rect, self.scale))
+    /// Whether the effect's frame is seen: it overlaps the view where the camera shows the effect, or there is no
+    /// view.
+    fn in_view(&self, e: &Entry<S>) -> bool {
+        self.view
+            .is_none_or(|v| v.overlaps(self.rect_of(e), e.scroll_factor, self.scale))
     }
 
     /// The instance's frame (its canvas plus margin) placed so the effect's origin lands on `e.at`.
@@ -586,7 +620,7 @@ impl<S> Scene<S> {
         let mut due: Vec<(u64, usize)> = Vec::new();
         for (i, e) in self.entries.iter().enumerate() {
             // an effect the host cannot see is not shown, so it takes no turn from one it can
-            if !self.in_view(self.rect_of(e)) {
+            if !self.in_view(e) {
                 continue;
             }
             let needs = match shown(e) {
@@ -709,7 +743,7 @@ impl<S> Scene<S> {
             layer,
             rect: self.rect_of(e),
         };
-        if !self.in_view(pass.rect) {
+        if !self.in_view(e) {
             return Ok(());
         }
         let scene = self.id;

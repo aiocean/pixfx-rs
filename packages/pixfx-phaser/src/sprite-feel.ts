@@ -1,4 +1,4 @@
-import type { BlinkLike, SquashLike } from "./engine";
+import type { BlinkLike, SquashLike } from "pixfx-web";
 
 /** What a sprite with feel looks like this frame, over its own scale and alpha. */
 export interface Look {

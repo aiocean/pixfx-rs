@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { devToolsPort, mainFrameNavigation, pageError, timeoutMessage } from "../perf/cdp";
+import { devToolsPort, mainFrameNavigation, pageError, timeoutMessage } from "../tools/cdp";
 
 describe("pageError", () => {
   test("an uncaught exception gives its description", () => {

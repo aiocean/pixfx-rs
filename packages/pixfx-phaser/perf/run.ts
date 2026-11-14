@@ -9,8 +9,8 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import type { Browser } from "./cdp";
-import { launchChrome, timeoutMessage } from "./cdp";
+import type { Browser } from "pixfx-web/tools/cdp";
+import { launchChrome, timeoutMessage } from "pixfx-web/tools/cdp";
 import type { Category } from "./profile";
 import { CATEGORIES, categoryTimes, cpuProfileSchema } from "./profile";
 import { ROOT, startServer } from "./server";
@@ -27,6 +27,7 @@ const SCENARIOS = [
   { name: "fires, one object each", query: "mix=mixed" },
   { name: "fires, one object each, shared seeds (identical fires share frames)", query: "mix=mixed&seeds=shared" },
   { name: "game-like: half follow sprites, 10 replaced/s", query: "mix=mixed&follow=0.5&churn=10" },
+  { name: "world 4× the camera, camera pans", query: "mix=mixed&world=4&pan=1" },
 ];
 
 const resultSchema = z.object({

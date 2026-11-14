@@ -2,7 +2,7 @@
 // textures, filled straight from the painted bytes with `texSubImage2D`, so the images of a layer go out in few
 // batches), a canvas texture per surface on Phaser's Canvas renderer, and the images showing them.
 import Phaser from "phaser";
-import type { GfxImages, GfxTexture, GfxTextures } from "./gfx";
+import type { GfxImages, GfxTexture, GfxTextures } from "pixfx-web";
 
 /** Side of an atlas page, at most: big enough for many surfaces, small enough for every WebGL device. */
 const ATLAS_SIZE = 4096;
@@ -142,8 +142,8 @@ export function phaserTextures(scene: Phaser.Scene): GfxTextures {
   return renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer ? phaserAtlas(renderer, scene.textures) : phaserCanvasTextures(scene.textures);
 }
 
-/** Images of one scene, top-left origin, hidden until shown. */
-export function phaserImages(scene: Phaser.Scene): GfxImages {
+/** Images of one scene, top-left origin, hidden until shown; an effect's images are placed by its scroll factor. */
+export function phaserImages(scene: Phaser.Scene): GfxImages<number> {
   return (blend) => {
     const img = scene.add.image(0, 0, "__DEFAULT").setOrigin(0, 0).setVisible(false);
     if (blend === "add") img.setBlendMode(Phaser.BlendModes.ADD);

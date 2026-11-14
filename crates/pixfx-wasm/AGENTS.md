@@ -16,7 +16,8 @@ draw list (`Int32Array`, `OP_STRIDE` numbers per op: make, refill, show, free) w
 gives the frames to paint, a worker's `new Painting()` paints, cuts and turns each into RGBA (`painted.shape()`,
 `color()`, `light()`), the worker transfers the bytes, and `scene.deliver(frames, job, shape)` takes back only the
 shape: the make or refill it returns uploads the worker's bytes, which never pass through wasm on the main thread.
-Presets come from `palettePresets()` and `outlinePresets()`; `scene.bend(src, w, h, unit)` bends a picture of the
+Presets come from `palettePresets()` and `outlinePresets()`; `scene.setView(x, y, w, h, scrollX, scrollY)` and `scene.setScrollFactor(handle, f)` say what a camera sees and how
+far each effect moves with it, so the scene draws only those it sees. `scene.bend(src, w, h, unit)` bends a picture of the
 host's screen by the feel's live ripples (`pixfx_core::screen::ripple_rgba`), for a shell that bends pixels on the
 CPU. Behind the `fighter` and `light` features (both default): `src/fighter.rs` (`Body`, `FightFeel`, `Sprites`,
 `lookColors`) and `src/light.rs` (`stepLights`, `putOutLight`, `Lighting`; the game owns its list of lights);
@@ -56,7 +57,8 @@ effect on), `js-sys`, `wasm-bindgen`, `serde`, `serde-wasm-bindgen`, `serde_json
 ```
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-(cd packages/pixfx-phaser && bun run build:wasm && bun run check)
+(cd packages/pixfx-web && bun run build:wasm && bun run check)
+(cd packages/pixfx-phaser && bun run check)
 ```
 
 A changed JS-facing name or shape breaks every JS shell; update them in the same change.

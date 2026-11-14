@@ -16,7 +16,9 @@ fn the_own_view_reaches_as_far_as_the_shake() -> Result<(), Box<dyn Error>> {
             x: -16.0,
             y: -16.0,
             w: 192.0,
-            h: 122.0
+            h: 122.0,
+            scroll_x: 0.0,
+            scroll_y: 0.0,
         }
     );
     assert_eq!(
@@ -25,7 +27,9 @@ fn the_own_view_reaches_as_far_as_the_shake() -> Result<(), Box<dyn Error>> {
             x: 0.0,
             y: 0.0,
             w: 160.0,
-            h: 90.0
+            h: 90.0,
+            scroll_x: 0.0,
+            scroll_y: 0.0,
         }
     );
     Ok(())

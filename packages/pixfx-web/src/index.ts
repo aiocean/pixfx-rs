@@ -12,5 +12,6 @@ export { splitPlayOptions } from "./options";
 export type { Play } from "./options";
 export { defaultWorkers, loadBaked, loadedEngine, loadedGame, loadPixfx, openWorkers, workerPort } from "./load";
 export type { LoadOptions } from "./load";
+export { wasmEngine } from "./engine";
 export type { BlinkLike, EffectMeta, Engine, SquashLike } from "./engine";
 export type { GfxBlend, GfxImage, GfxImages, GfxTexture, GfxTextures } from "./gfx";

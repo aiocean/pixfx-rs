@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { type FeelSprite, PixfxSpriteFeel, SpriteFeelCore } from "../src/sprite-feel";
-import { wasmEngine } from "../src/engine";
+import { wasmEngine } from "pixfx-web";
 import { wasm } from "./wasm";
 
 /** A sprite drawn at scale 2 that records what it is drawn at. */

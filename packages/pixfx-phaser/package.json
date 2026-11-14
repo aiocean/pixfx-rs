@@ -7,17 +7,16 @@
     ".": "./src/index.ts"
   },
   "files": [
-    "src",
-    "wasm"
+    "src"
   ],
   "scripts": {
-    "build:wasm": "wasm-pack build ../../crates/pixfx-wasm --target web --out-dir ../../packages/pixfx-phaser/wasm",
+    "build:wasm": "cd ../pixfx-web && bun run build:wasm",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "perf": "bun perf/run.ts",
     "perf:check": "bun perf/check.ts",
-    "check": "bun run typecheck && bun run lint && bun run test"
+    "check": "bun install && bun run typecheck && bun run lint && bun run test"
   },
   "peerDependencies": {
     "phaser": "^4.2.1"
@@ -25,13 +24,13 @@
   "devDependencies": {
     "@types/bun": "^1.4.4",
     "eslint": "^10.14.0",
-    "eventemitter3": "^5.0.4",
     "phaser": "4.2.1",
     "typescript": "^6",
     "typescript-eslint": "^8.72.2",
     "vite": "^8.3.8"
   },
   "dependencies": {
+    "pixfx-web": "file:../pixfx-web",
     "zod": "^4.6.7"
   }
 }

@@ -1,17 +1,34 @@
 import Phaser from "phaser";
-import type { Counts, PixfxEffect } from "./effect";
-import { PixfxFeel } from "./feel";
-import type { Game } from "./game";
-import { loadedEngine, loadedGame } from "./load";
+import type { Counts, Game, PixfxEffect } from "pixfx-web";
+import { loadedEngine, loadedGame, PixfxFeel, Stage } from "pixfx-web";
 import { parsePlayOptions } from "./options";
 import { phaserImages, phaserTextures } from "./phaser-gfx";
 import { type FeelSprite, PixfxSpriteFeel, SpriteFeelCore } from "./sprite-feel";
-import { Stage } from "./stage";
 
 /** Effect seconds for one scene update; anything not finite or not positive gives 0. */
 function stepSeconds(deltaMs: number, timeScale: number): number {
   const s = (deltaMs / 1000) * timeScale;
   return Number.isFinite(s) && s > 0 ? s : 0;
+}
+
+/**
+ * What `camera` sees this frame in world pixels (`x, y, w, h`), tilted by `roll` more than its own rotation, and how
+ * far it scrolled: Phaser's `worldView`, worked out from the scroll the game set, since the camera's `preRender` fills
+ * `worldView` only after pixfx draws. A tilted view is the box around the tilted rectangle.
+ */
+function cameraView(camera: Phaser.Cameras.Scene2D.Camera, roll: number): [number, number, number, number, number, number] {
+  const sx = camera.useBounds ? camera.clampX(camera.scrollX) : camera.scrollX;
+  const sy = camera.useBounds ? camera.clampY(camera.scrollY) : camera.scrollY;
+  let w = camera.width / camera.zoomX;
+  let h = camera.height / camera.zoomY;
+  // the game's own tilt: Phaser's types keep `rotation` private and give it through `toJSON`
+  const tilt = camera.toJSON().rotation + roll;
+  if (tilt !== 0) {
+    const [c, s] = [Math.abs(Math.cos(tilt)), Math.abs(Math.sin(tilt))];
+    [w, h] = [w * c + h * s, w * s + h * c];
+  }
+  const [mx, my] = [sx + camera.width / 2, sy + camera.height / 2];
+  return [mx - w / 2, my - h / 2, w, h, sx, sy];
 }
 
 /**
@@ -21,6 +38,8 @@ function stepSeconds(deltaMs: number, timeScale: number): number {
  * the scene's `update()` and physics, so `follow` sees final positions) and are freed when the scene shuts down or
  * is destroyed.
  *
+ * Only effects the main camera sees are drawn (its view, at each effect's scroll factor); the rest play on unseen.
+ *
  * Game feel: `this.pixfx.feel` answers the cues effects fire. A hit-stop freezes the scene's effects (the game
  * reads `feel.timeScale` to freeze its own world), the shake moves and tilts the main camera's view for the render
  * only (its scroll, follow and rotation are untouched), and the flash lifts the view toward white.
@@ -28,7 +47,7 @@ function stepSeconds(deltaMs: number, timeScale: number): number {
  */
 export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   private readonly host: Phaser.Scene;
-  private stageHeld: Stage | null = null;
+  private stageHeld: Stage<number> | null = null;
   private destroyed = false;
   /** The scene's answer to impacts: camera shake, hit-stop, slow motion, flash, and every effect's cues. */
   readonly feel: PixfxFeel;
@@ -40,7 +59,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   constructor(scene: Phaser.Scene, pluginManager: Phaser.Plugins.PluginManager, pluginKey: string) {
     super(scene, pluginManager, pluginKey);
     this.host = scene;
-    this.feel = new PixfxFeel(() => this.stage()?.scene ?? null);
+    this.feel = new PixfxFeel(() => this.stage()?.live ?? null);
   }
 
   override boot(): void {
@@ -54,11 +73,13 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   }
 
   /** Play effect `id` with its origin at world (x, y). Throws on an unknown id, invalid options, or before `loadPixfx()`. */
-  play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
+  play(id: string, x: number, y: number, opts?: unknown): PixfxEffect<number> {
     const stage = this.stage();
     if (!stage) throw new Error("pixfx: call await loadPixfx() before play()");
     const p = parsePlayOptions(opts);
-    return stage.play(id, x, y, p.engine, p.depth, p.scrollFactor);
+    const effect = stage.play(id, x, y, p.engine, p.scrollFactor, p.depth);
+    if (p.scrollFactor !== 1) stage.scene.setScrollFactor(effect.handle, p.scrollFactor);
+    return effect;
   }
 
   /**
@@ -98,12 +119,12 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   }
 
   /** The scene's stage, made the first time it is needed after `loadPixfx()` resolves. */
-  private stage(): Stage | null {
+  private stage(): Stage<number> | null {
     if (this.stageHeld) return this.stageHeld;
     const game: Game | null = loadedGame();
     if (!game || this.destroyed) return null;
     game.useTextures(phaserTextures(this.host));
-    this.stageHeld = new Stage(game, phaserImages(this.host), (cue, effect) => this.feel.take(cue, effect));
+    this.stageHeld = new Stage(game, phaserImages(this.host), (cue, effect) => this.feel.take(cue, effect), 1);
     this.stageHeld.scene.setFeel(this.feel.enabled);
     return this.stageHeld;
   }
@@ -118,7 +139,11 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   };
 
   private readonly onPreRender = (): void => {
-    this.stageHeld?.draw();
+    const stage = this.stageHeld;
+    if (stage) {
+      stage.scene.setView(...cameraView(this.host.cameras.main, this.feel.roll));
+      stage.draw();
+    }
     this.showFeel();
   };
 

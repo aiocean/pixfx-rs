@@ -7,8 +7,9 @@ anything here; this file only says what this crate holds.
 
 What a stage shows and where, decided once in Rust for every shell. `Scene` holds the effects playing (each a
 `Clip` and its `Clock`), their placement and margins, the scale, the order their layers are drawn in, when finished
-ones go, which frame each shows, which effects the host can see (a `View`: the rest play on undrawn), the game's
-answer to their cues (a `Feel`), and events (`StageEvent`).
+ones go, which frame each shows, which effects the host can see (a `View` with the camera's scroll, and each
+effect's scroll factor: the rest play on undrawn), the game's answer to their cues (a `Feel`), and events
+(`StageEvent`).
 
 `Frames` is game-wide and shared by every `Scene` of the game (a canvas, a Phaser scene, a gpui window each, made
 with `Frames::scene`): the shared frames under one budget (`FRAME_BUDGET`) and the `Painter` that paints them. A
