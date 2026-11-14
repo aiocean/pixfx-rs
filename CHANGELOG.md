@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `pixfx-web`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-canvas2d`: `setDrawBudget(n)` caps the effect layers drawn per
+  frame (`Scene::set_draw_budget`); 0, the default, draws every one that changed.
 - `pixfx-gpui`: `FxScene::with_threads(n)` paints on native threads: each effect is stepped, drawn and turned into
   images on one thread, and the window's thread only paints images (100 fires: 1.4 ms a frame instead of 81 ms).
   `FxScene::default()` still paints on the spot.

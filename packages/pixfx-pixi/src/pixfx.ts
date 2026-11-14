@@ -80,6 +80,15 @@ export class Pixfx {
     return this.stage.play(id, x, y, engine, null, own.depth);
   }
 
+  /**
+   * Draw at most `layers` effect layers per frame, so many effects reaching a new frame at once cannot make one
+   * frame slow; the ones left over show their last frame and are drawn in a later frame. 0 (the default) draws every
+   * one that changed. Throws unless `layers` is a whole number, 0 or more.
+   */
+  setDrawBudget(layers: number): void {
+    this.stage.setDrawBudget(layers);
+  }
+
   /** Effects playing, textures the game holds, and sprites. */
   stats(): Counts {
     return this.stage.counts();

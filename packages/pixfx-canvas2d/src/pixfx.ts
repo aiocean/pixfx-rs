@@ -116,6 +116,15 @@ export class Pixfx {
     if (bent) this.ctx.putImageData(new ImageData(owned(bent), width, height), 0, 0);
   }
 
+  /**
+   * Draw at most `layers` effect layers per frame, so many effects reaching a new frame at once cannot make one
+   * frame slow; the ones left over show their last frame and are drawn in a later frame. 0 (the default) draws every
+   * one that changed. Throws unless `layers` is a whole number, 0 or more.
+   */
+  setDrawBudget(layers: number): void {
+    this.stage.setDrawBudget(layers);
+  }
+
   /** Effects playing, surfaces the game holds, and images. */
   stats(): Counts {
     return this.stage.counts();

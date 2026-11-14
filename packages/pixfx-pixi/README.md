@@ -63,7 +63,9 @@ events `"complete"`, `"destroy"` and `"cue"`, as in `pixfx-phaser`.
 Effects advance on `app.ticker` (after the game's own ticker callbacks, before the render); `ticker.speed` scales
 them and `ticker.stop()` freezes them. `pixfx.feel` is the same `PixfxFeel` as Phaser's: the shake moves `camera`,
 the flash covers the screen, `feel.timeScale` freezes the game's own world in a hit-stop. `pixfx.stats()` counts
-effects, textures and sprites; `pixfx.destroy()` ends every effect and frees its sprites.
+effects, textures and sprites; `pixfx.destroy()` ends every effect and frees its sprites. `pixfx.setDrawBudget(n)`
+draws at most `n` effect layers per frame (the rest keep their last frame and wait their turn); 0, the default, draws
+every one that changed.
 
 On WebGL every frame is a region of a few 4096² atlas pages, filled straight from the bytes the workers painted;
 on WebGPU each frame is a buffer texture.

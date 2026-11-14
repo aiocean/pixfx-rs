@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import type { Counts, Game, PixfxEffect } from "pixfx-web";
-import { loadedEngine, loadedGame, PixfxFeel, Stage } from "pixfx-web";
+import { drawBudget, loadedEngine, loadedGame, PixfxFeel, Stage } from "pixfx-web";
 import { parsePlayOptions } from "./options";
 import { phaserImages, phaserTextures } from "./phaser-gfx";
 import { type FeelSprite, PixfxSpriteFeel, SpriteFeelCore } from "./sprite-feel";
@@ -48,6 +48,8 @@ function cameraView(camera: Phaser.Cameras.Scene2D.Camera, roll: number): [numbe
 export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   private readonly host: Phaser.Scene;
   private stageHeld: Stage<number> | null = null;
+  /** Layers drawn at most per frame, for the stage made after `loadPixfx()`; 0 draws every changed one. */
+  private drawBudget = 0;
   private destroyed = false;
   /** The scene's answer to impacts: camera shake, hit-stop, slow motion, flash, and every effect's cues. */
   readonly feel: PixfxFeel;
@@ -98,6 +100,17 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     return s;
   }
 
+  /**
+   * Draw at most `layers` effect layers per frame in this scene, so many effects reaching a new frame at once cannot
+   * make one frame slow; the ones left over show their last frame and are drawn in a later frame. 0 (the default)
+   * draws every one that changed. Set before `loadPixfx()` resolves, it applies once it does. Throws unless `layers`
+   * is a whole number, 0 or more.
+   */
+  setDrawBudget(layers: number): void {
+    this.drawBudget = drawBudget(layers);
+    this.stageHeld?.setDrawBudget(this.drawBudget);
+  }
+
   /** Effects playing in this scene, textures the game holds for every scene, and this scene's images. */
   stats(): Counts {
     return this.stageHeld?.counts() ?? { engines: 0, textures: loadedGame()?.counts().textures ?? 0, images: 0 };
@@ -126,6 +139,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     game.useTextures(phaserTextures(this.host));
     this.stageHeld = new Stage(game, phaserImages(this.host), (cue, effect) => this.feel.take(cue, effect), 1);
     this.stageHeld.scene.setFeel(this.feel.enabled);
+    this.stageHeld.setDrawBudget(this.drawBudget);
     return this.stageHeld;
   }
 

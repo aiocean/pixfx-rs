@@ -239,3 +239,28 @@ test("a heavy blow's ring bends a picture of the screen while it lasts; at shake
   feel.setShakeStrength(0);
   expect(feel.bend(src, w, h, 1)).toBeUndefined();
 });
+
+test("a draw budget shows effects that share nothing a few per frame, until every one shows", () => {
+  const run = (budget: number) => {
+    const { gfx, game, stage } = setup();
+    stage.setDrawBudget(budget);
+    for (let seed = 1; seed <= 4; seed++) stage.play("fire/candle", 20 * seed, 40, { seed }, 1);
+    const shown: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      frame(game, stage, i === 0 ? 1 / 30 : 0);
+      shown.push(gfx.showing().length);
+    }
+    return shown;
+  };
+  const free = run(0);
+  const capped = run(1);
+  expect(free.every((n) => n === free[0])).toBe(true);
+  expect(capped[0]).toBeLessThan(free[0] ?? 0);
+  for (let i = 1; i < capped.length; i++) expect(capped[i]).toBeGreaterThanOrEqual(capped[i - 1] ?? 0);
+  expect(capped.at(-1)).toBe(free[0]);
+});
+
+test("a draw budget is a whole number of layers, 0 or more", () => {
+  const { stage } = setup();
+  for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) expect(() => stage.setDrawBudget(bad)).toThrow();
+});

@@ -3,7 +3,7 @@
 // only its host objects (`GfxTextures`, `GfxImages`) and its loop.
 export { Game } from "./game";
 export type { Delivering, WorkerPort } from "./game";
-export { Stage } from "./stage";
+export { drawBudget, Stage } from "./stage";
 export type { CueSink, WorldCue } from "./stage";
 export { PixfxEffect } from "./effect";
 export type { Counts, EffectHost, FollowTarget } from "./effect";

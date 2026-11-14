@@ -1,5 +1,6 @@
 // One host scene's effects, played, timed and drawn by a Rust scene drawing from the game's frames. Rust decides
 // what shows where; this follows its draw list with the shell's images.
+import { z } from "zod";
 import type * as Wasm from "../wasm/pixfx_wasm.js";
 import type { Counts, EffectHost, FollowTarget } from "./effect";
 import { PixfxEffect } from "./effect";
@@ -28,6 +29,14 @@ interface Follow {
   target: FollowTarget;
   dx: number;
   dy: number;
+}
+
+/** Layers per frame: a whole number the wasm reads as a `u32`. */
+const DRAW_BUDGET = z.number().int().min(0).max(0xffff_ffff);
+
+/** `layers` as a draw budget (`Stage.setDrawBudget`); throws unless it is a whole number, 0 or more. */
+export function drawBudget(layers: number): number {
+  return DRAW_BUDGET.parse(layers);
 }
 
 /** The colour image of a surface and the light image drawn over it. */
@@ -117,6 +126,15 @@ export class Stage<P> implements EffectHost<P>, Delivering {
       }
     }
     return played;
+  }
+
+  /**
+   * Draw at most `layers` effect layers per frame, so many effects reaching a new frame at once cannot make one
+   * frame slow: the ones left over show their last frame and are drawn in a later frame, the longest waiting first.
+   * 0 (the default) draws every layer whose frame changed. Throws unless `layers` is a whole number, 0 or more.
+   */
+  setDrawBudget(layers: number): void {
+    this.scene.setDrawBudget(drawBudget(layers));
   }
 
   /** Draw: follow the scene's draw list, showing each surface with a pair of images, and hide the rest. */

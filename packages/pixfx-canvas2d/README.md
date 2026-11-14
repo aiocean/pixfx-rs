@@ -61,7 +61,8 @@ usable once `loadPixfx()` resolved.
 You run the loop. `update(dt)` returns the seconds the effects played: 0 in a hit-stop, less in slow motion.
 `pixfx.feel` answers impacts. It has `shake`, `roll`, `flash`, `timeScale`, `addTrauma`, `freeze` and `slow`, and
 emits `"cue"`; `feel.setEnabled(false)` leaves the answer to your game. `pixfx.stats()` counts effects, textures and
-images. `pixfx.destroy()` ends every effect.
+images. `pixfx.setDrawBudget(n)` draws at most `n` effect layers per frame (the rest keep their last frame and wait
+their turn); 0, the default, draws every one that changed. `pixfx.destroy()` ends every effect.
 
 ## Demo and checks
 

@@ -105,6 +105,10 @@ The engine (`pixfx-scene`, through `pixfx-wasm`) decides all of this; the plugin
 `stats()` returns `{engines, textures, images}`: effects playing in the scene, the game's surface regions, and the
 scene's images.
 
+`setDrawBudget(n)` draws at most `n` effect layers per frame in the scene, so a burst of effects reaching new frames
+at once cannot make one frame slow: the ones left over keep their last frame and are drawn in a later frame, the
+longest waiting first. 0 (the default) draws every one that changed.
+
 ### Baked frames
 
 `pixfx bake <id> [--palette WORD] [--outline WORD] --out public/fx` writes `<name>.bake.json` and its PNG pages:
