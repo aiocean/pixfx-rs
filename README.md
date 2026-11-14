@@ -24,7 +24,6 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 | `crates/pixfx-pixel` | Pixels for agents, not shipped in a game: a picture (an image model's, an artist's, a game's sprite) cut to a pixel grid on a palette and shown back as text with a colour legend and as a zoomed grid (`pixfx pixel`). |
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
-| `crates/pixfx-canvas` | Being retired: nothing uses it; `packages/pixfx-canvas2d` is the Canvas 2D shell. A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `move`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick` (which draw only what the canvas shows); for a host-owned loop `update(dt)` then `drawLayer("back")` / `drawLayer("front")` around its own sprites, with `setView(x, y, w, h)` / `clearView()` to draw only what its camera sees; game feel: `shake(strength)`, `roll(strength)`, `flash()`, `frozen()`, `addTrauma`, `freeze`, `slow`, `setFeel(on)`, cue events. Demo in `crates/pixfx-canvas/demo/` (`wide.html`: 100 fires panned past with `?view=on` or `off`). |
 | `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
 | `packages/pixfx-canvas2d` | Canvas 2D shell over `pixfx-web`: `createPixfx(ctx, { scale }).play(id, x, y, opts)`, then each frame `update(dt)` and `drawLayer("back")` / `drawLayer("front")` among your own drawing, `warp()` for a heavy blow's ring, `drawPicture()` for fighters and scene light Rust painted; workers paint. See its [README](packages/pixfx-canvas2d/README.md); demo in `packages/pixfx-canvas2d/demo/`. |
 | `packages/pixfx-pixi` | Pixi 8 shell: `createPixfx(app).play(id, x, y, opts)` with the same effects, events and feel as Phaser. See its [README](packages/pixfx-pixi/README.md); demo in `packages/pixfx-pixi/demo/`. |
@@ -201,7 +200,7 @@ bun test site/tests
 
 Each effect is a cargo feature of `pixfx-effects`, named after its id with the `/` as `-` (`fire/candle` is
 `fire-candle`); each category (`fire`, `explosions`, ...) turns on all of its effects, and `all` turns on every one.
-`pixfx-wasm` and `pixfx-canvas` build `all` by default. A game that plays a few effects builds only those, so
+`pixfx-wasm` builds `all` by default. A game that plays a few effects builds only those, so
 effects added to the library later cost it nothing:
 
 ```sh
@@ -225,14 +224,12 @@ cd crates/pixfx-wasm/demo && python3 -m http.server 8765 --bind 127.0.0.1
 
 Open http://127.0.0.1:8765/.
 
-### Canvas renderer
+### Canvas 2D
 
 ```sh
-wasm-pack build crates/pixfx-canvas --target web --out-dir demo/pkg
-cd crates/pixfx-canvas/demo && python3 -m http.server 8766 --bind 127.0.0.1
+cd packages/pixfx-web && bun install && bun run build:wasm
+cd ../pixfx-canvas2d && bun install && bunx vite demo
 ```
-
-Open http://127.0.0.1:8766/.
 
 ### gpui
 
@@ -261,7 +258,7 @@ The first build takes about 5 minutes; later builds take seconds.
 The landing page and docs are static HTML in `site/`, live at https://pixfx.pages.dev.
 
 ```sh
-site/build.sh --serve        # build site/dist (pages + pixfx-canvas wasm), serve on http://127.0.0.1:8770/
+site/build.sh --serve        # build site/dist (pages + the pixfx-canvas2d bundle), serve on http://127.0.0.1:8770/
 wrangler pages deploy site/dist --project-name pixfx --branch main
 ```
 

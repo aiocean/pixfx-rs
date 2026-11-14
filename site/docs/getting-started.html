@@ -47,34 +47,45 @@ cargo run -p pixfx-cli -- render fire/campfire --gif --scale 4 --out out</code><
 <p><code>sheet</code> writes <code>fire_campfire.png</code>, <code>fire_campfire_color.png</code>, <code>fire_campfire_light.png</code> and <code>fire_campfire.json</code> into <code>out/</code>. <code>render --gif</code> writes <code>fire_campfire.gif</code>, each pixel enlarged 4 times. See <a href="cli.html">Command line</a> and <a href="sheets.html">Sprite sheet format</a>.</p>
 
 <h2>Play it in a browser</h2>
-<p>The canvas demo shows the candle, campfire and brazier on a ground, with a figure standing between the campfire's back and front layers:</p>
-<pre><code>wasm-pack build crates/pixfx-canvas --target web --out-dir demo/pkg
-cd crates/pixfx-canvas/demo &amp;&amp; python3 -m http.server 8766 --bind 127.0.0.1</code></pre>
-<p>Open <code>http://127.0.0.1:8766/</code>. Click the canvas to restart the nearest effect.</p>
+<p>The Canvas 2D demo shows a campfire, braziers and a candle following a walker, painted on worker threads; click for an explosion:</p>
+<pre><code>cd packages/pixfx-web &amp;&amp; bun install &amp;&amp; bun run build:wasm
+cd ../pixfx-canvas2d &amp;&amp; bun install &amp;&amp; bunx vite demo</code></pre>
+<p>Open the URL Vite prints.</p>
 <p>The JS engine demo plays the campfire by reading its pixels each frame:</p>
 <pre><code>wasm-pack build crates/pixfx-wasm --target web --out-dir demo/pkg
 cd crates/pixfx-wasm/demo &amp;&amp; python3 -m http.server 8765 --bind 127.0.0.1</code></pre>
-<p>Open <code>http://127.0.0.1:8765/</code>. Both demos must be served over HTTP: browsers do not load WebAssembly modules from <code>file://</code>.</p>
+<p>Open <code>http://127.0.0.1:8765/</code>. Pages must be served over HTTP: browsers do not load WebAssembly modules from <code>file://</code>.</p>
 
 <h2>Use it in your page</h2>
-<p>Copy the files <code>wasm-pack</code> wrote (<code>pixfx_canvas.js</code> and <code>pixfx_canvas_bg.wasm</code>) next to your page and import them:</p>
+<p>Build the Canvas 2D bundle (<code>cd packages/pixfx-canvas2d &amp;&amp; bun run build</code>), copy its <code>dist/</code> next to your page as <code>pkg/</code>, and import it:</p>
 <pre><code>&lt;canvas id="fx" width="512" height="512" style="image-rendering: pixelated"&gt;&lt;/canvas&gt;
 &lt;script type="module"&gt;
-  import init, { Stage } from "./pkg/pixfx_canvas.js";
+  import { createPixfx, loadPixfx } from "./pkg/pixfx-canvas2d.js";
 
-  await init();
-  const stage = new Stage(document.getElementById("fx"), 4); // one game pixel = 4×4 canvas pixels
-  stage.background("#13101b");                                // light only shows over a dark ground
-  stage.play("fire/campfire", 64, 112, { seed: 3 });           // origin at game pixel (64, 112)
-  stage.start();
+  await loadPixfx();
+  const ctx = document.getElementById("fx").getContext("2d");
+  const pixfx = createPixfx(ctx, { scale: 4 });       // one game pixel = 4×4 canvas pixels
+  pixfx.play("fire/campfire", 64, 112, { seed: 3 });   // origin at game pixel (64, 112)
+  let last = performance.now();
+  requestAnimationFrame(function frame(now) {
+    pixfx.update((now - last) / 1000);
+    last = now;
+    ctx.fillStyle = "#13101b";                         // light only shows over a dark ground
+    ctx.fillRect(0, 0, 512, 512);
+    pixfx.draw();
+    requestAnimationFrame(frame);
+  });
 &lt;/script&gt;</code></pre>
-<p>That is the whole integration for a page that only shows effects. Games that draw sprites between an effect's layers own the loop instead; see <a href="canvas.html#host-owned-loop">Canvas renderer</a>.</p>
+<p>Games that draw sprites between an effect's layers call <code>drawLayer("back")</code> and <code>drawLayer("front")</code> around them; see <a href="canvas.html">Canvas 2D shell</a>. With a bundler, install <code>pixfx-canvas2d</code> as a package instead.</p>
 
 <h2>Whole-repo check</h2>
 <p>What to run before a commit:</p>
 <pre><code>cargo fmt --check &amp;&amp; cargo clippy --workspace --all-targets -- -D warnings &amp;&amp; cargo test --workspace
-wasm-pack test --node crates/pixfx-wasm
-wasm-pack test --node crates/pixfx-canvas</code></pre>
+(cd packages/pixfx-phaser &amp;&amp; bun run check)
+(cd packages/pixfx-web &amp;&amp; bun run build:wasm &amp;&amp; bun run check)
+(cd packages/pixfx-canvas2d &amp;&amp; bun run check &amp;&amp; bun run check:browser)
+(cd packages/pixfx-pixi &amp;&amp; bun run check &amp;&amp; bun run check:browser)
+bun test site/tests</code></pre>
     </main>
     <aside class="toc" aria-label="On this page"></aside>
   </div>

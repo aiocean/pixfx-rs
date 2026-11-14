@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Canvas renderer · pixfx docs</title>
-  <meta name="description" content="pixfx-canvas draws effects onto an HTML canvas with Canvas 2D. Mount a Stage, say which effects play where, and either let it run its own loop or drive it from yours.">
+  <title>Canvas 2D shell · pixfx docs</title>
+  <meta name="description" content="pixfx-canvas2d plays pixfx effects on a Canvas 2D context, among your own drawing. Effects are painted on worker threads; you run the loop and draw the back and front layers around your sprites.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
@@ -23,145 +23,79 @@
   <div class="docs-shell">
     <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
     <main class="doc">
-<h1>Canvas renderer</h1>
-<p class="lead"><code>pixfx-canvas</code> draws effects onto an HTML canvas with Canvas 2D. Mount a <code>Stage</code>, say which effects play where, and either let it run its own loop or drive it from yours.</p>
+<h1>Canvas 2D shell</h1>
+<p class="lead"><code>pixfx-canvas2d</code> plays pixfx effects on a Canvas 2D context, among your own drawing. Effects are painted on worker threads. Each effect draws in two layers: its back layer goes under what you draw between the two calls, its front layer over it. Colour is drawn normally and light is added (<code>"lighter"</code>).</p>
+<p>It runs on <code>pixfx-web</code>, the runtime every pixfx JS shell shares.</p>
 
-<h2>Build</h2>
-<pre><code>wasm-pack build crates/pixfx-canvas --target web --out-dir pkg</code></pre>
-<p>Ship <code>pkg/pixfx_canvas.js</code> and <code>pkg/pixfx_canvas_bg.wasm</code> together and serve them over HTTP. The module also exports the <a href="js-engine.html">JS engine</a>'s <code>effects()</code>, <code>meta(id)</code> and <code>Fx</code>, so one wasm file covers both.</p>
-<pre><code>import init, { Stage, effects, meta } from "./pkg/pixfx_canvas.js";
-await init();</code></pre>
+<h2>Install</h2>
+<pre><code>cd pixfx-rs/packages/pixfx-web &amp;&amp; bun install &amp;&amp; bun run build:wasm
+cd ../pixfx-canvas2d &amp;&amp; bun install
+cd /path/to/your-game &amp;&amp; bun add ../pixfx-rs/packages/pixfx-canvas2d</code></pre>
+<p><code>pixfx-web</code> loads its wasm and its worker through <code>new URL(..., import.meta.url)</code>; tell Vite to serve it as source:</p>
+<pre><code>// vite.config.js
+export default { optimizeDeps: { exclude: ["pixfx-web"] } };</code></pre>
+<p>A page without a bundler loads <code>dist/pixfx-canvas2d.js</code> from <code>bun run build</code>; the worker and the wasm sit beside it in <code>dist/assets/</code>.</p>
 
-<h2>Self-running stage</h2>
-<p>For a page that only shows effects:</p>
-<pre><code>const canvas = document.querySelector("canvas");
-canvas.width = 320 * 4;
-canvas.height = 180 * 4;
+<h2>Use</h2>
+<pre><code>import { createPixfx, loadPixfx } from "pixfx-canvas2d";
 
-const stage = new Stage(canvas, 4);
-stage.background("#13101b");
-const fire = stage.play("fire/campfire", 160, 160, { seed: 3 });
-stage.start();
-
-// later
-stage.stop(fire);   // fades out, then removes itself
-stage.pause();      // effects keep their state; start() resumes</code></pre>
-<p>Each frame the stage clears the canvas (or fills the background colour), then draws the back layer of every effect, then the front layer of every effect, oldest first. Time is the real time between animation frames.</p>
-<p>Set <code>image-rendering: pixelated</code> on the canvas if CSS resizes it, so the browser keeps the pixels sharp.</p>
-
-<h2>Host-owned loop</h2>
-<p>A game that draws its own sprites between an effect's layers owns the loop. Call <code>update(dt)</code>, draw your ground, <code>drawLayer("back")</code>, draw your sprites, then <code>drawLayer("front")</code>. <code>drawLayer</code> never clears and leaves the context's compositing and smoothing as you had them.</p>
-<pre><code>const SCALE = 4;
-const stage = new Stage(canvas, SCALE);
+await loadPixfx(); // once, before createPixfx()
 const ctx = canvas.getContext("2d");
-stage.play("fire/campfire", 168, 160, { seed: 1 });
+if (!ctx) throw new Error("no 2d context");
+const pixfx = createPixfx(ctx, { scale: 4 }); // one game pixel is 4×4 canvas pixels
 
-let last = null;
-function frame(now) {
-  const dt = last === null ? 0 : Math.max(0, now - last) / 1000;
+pixfx.play("fire/campfire", 168, 160);
+const hero = { x: 100, y: 142, active: true };
+pixfx.play("fire/candle", 0, 0).follow(hero);
+
+let last = performance.now();
+requestAnimationFrame(function frame(now) {
+  pixfx.update((now - last) / 1000); // effects play; frames still to paint go to the workers
   last = now;
-  stage.update(dt);
-  ctx.fillStyle = "#17131c";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  stage.drawLayer("back");
-  drawPlayer(ctx);            // your sprites, in canvas pixels (game pixels × SCALE)
-  stage.drawLayer("front");
+  drawBackground(ctx);
+  const [sx, sy] = pixfx.feel.shake; // the view's shake, in game pixels
+  ctx.save();
+  ctx.translate(sx * 4, sy * 4);
+  pixfx.drawLayer("back");
+  drawHero(ctx);
+  pixfx.drawLayer("front");
+  ctx.restore();
   requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);</code></pre>
-<p><code>tick(dt)</code> is <code>update(dt)</code> plus a full draw (clear or fill, back, front), for a host that owns the loop but draws nothing between layers.</p>
-
-<h2>Cues and feel</h2>
-<p>Some effects fire cues at the frame of their impact: a camera shake, a hit-stop, a screen ripple, a flash or a sound. By default the stage answers them itself with its Feel. A hit-stop freezes its effects, and its own loop (<code>start</code>, <code>tick</code>) shakes the view and lifts it toward white. Sounds are always the host's to play.</p>
-<p>A host-owned loop freezes with the effects by advancing its own world by what <code>update</code> returns, and moves its view by <code>shake</code>:</p>
-<pre><code>const played = stage.update(dt);   // 0 during a hit-stop, a fraction in slow motion
-world.step(played);
-const [dx, dy] = stage.shake(settings.shake);   // game pixels; 0 holds the view still
-ctx.save();
-ctx.translate(dx * SCALE, dy * SCALE);
-// ground, drawLayer("back"), sprites, drawLayer("front")
-ctx.restore();
-for (const e of stage.events()) {
-  if (e.type === "cue" &amp;&amp; e.cue.type === "sound") audio.play(e.cue.name, e.pan);
-}</code></pre>
-<p>A host with its own answer (a Phaser camera, say) calls <code>setFeel(false)</code> and reads the <code>cue</code> events. The stage then plays every second <code>update</code> gives it, and <code>shake</code>, <code>flash</code> and <code>ripples</code> stay empty.</p>
+});</code></pre>
 
 <h2>API</h2>
-<h3><code>new Stage(canvas, scale)</code></h3>
-<p>Draw onto <code>canvas</code> (an <code>HTMLCanvasElement</code>), one game pixel as <code>scale</code>×<code>scale</code> canvas pixels. <code>scale</code> must be at least 1. Throws if the canvas has no 2D context, for example because it already has a WebGL one.</p>
+<h3><code>createPixfx(ctx, { scale? })</code></h3>
+<p><code>ctx</code> is a <code>CanvasRenderingContext2D</code>; <code>scale</code> is canvas pixels per game pixel, a whole number (default 1). Positions are game pixels, drawn in the context's current transform. Call it after <code>loadPixfx()</code> resolved.</p>
 
-<h3><code>play(id, x, y, opts?)</code> → handle</h3>
-<p>Play effect <code>id</code> with its origin at game pixel (<code>x</code>, <code>y</code>), rounded to a whole pixel. Returns a numeric handle; handles start at 1 and are never reused. <code>opts</code> takes the <a href="concepts.html#options">common options</a> and the effect's own. Throws on an unknown id, a bad option, a non-finite position, or a <code>margin</code> option (the stage sizes each effect's margin itself, as <code>meta.glowMargin</code>).</p>
+<h3><code>play(id, x, y, opts?)</code> → <code>PixfxEffect</code></h3>
+<p>Place the effect's origin at game pixel <code>(x, y)</code>. Every option is the engine's (<code>seed</code>, <code>flip</code>, <code>angle</code>, <code>light</code>, <code>palette</code>, <code>outline</code>, the effect's own; see <a href="concepts.html#options">options</a>). An unknown id or a bad option throws and creates nothing. The effect has <code>stop()</code>, <code>destroy()</code>, <code>follow(target, dx?, dy?)</code> and <code>setPosition(x, y)</code>, and emits <code>"complete"</code>, <code>"destroy"</code> and <code>"cue"</code>, as in the <a href="phaser.html">Phaser plugin</a>.</p>
 
-<h3><code>stop(handle)</code></h3>
-<p>Let the effect end: loops fade out over 0.3 s, one-shots are cut short. It is removed once done. Unknown handles are ignored.</p>
+<h3><code>update(dt)</code> → seconds played</h3>
+<p>Advance every effect by <code>dt</code> seconds of your loop and send the frames still to paint to the workers. Returns the seconds the effects played: 0 in a hit-stop, less in slow motion. Until a worker sends a frame back, an effect shows the last one it had.</p>
 
-<h3><code>move(handle, x, y)</code></h3>
-<p>Move the effect's origin to game pixel (<code>x</code>, <code>y</code>), rounded to a whole pixel, without restarting it: for an effect that follows the pointer or a sprite. Unknown handles are ignored; a non-finite position throws.</p>
-<pre><code>const wisp = stage.play("critters/wisp", 0, 0);
-addEventListener("pointermove", (e) =&gt; stage.move(wisp, e.offsetX / SCALE, e.offsetY / SCALE));</code></pre>
+<h3><code>drawLayer("back" | "front")</code>, <code>draw()</code></h3>
+<p><code>drawLayer</code> draws the effects' back (depth 0) or front (depth 1) layer. <code>draw()</code> draws every depth, lowest first, for effects played with other depths or a page with nothing between the layers.</p>
 
-<h3><code>set(handle, change)</code></h3>
-<p>Change where and how the effect draws without restarting it: <code>{x?, y?, flip?, angle?, light?}</code>. Each key left out keeps its value; <code>x</code>/<code>y</code> are game pixels, rounded as <code>move</code> does, and <code>angle</code> is radians. An unknown key, a wrong type or a non-finite number throws; unknown handles are ignored.</p>
+<h3><code>warp()</code></h3>
+<p>After drawing everything a heavy blow's ring should bend, bend the canvas by the screen ripples alive now. Nothing bends at shake strength 0.</p>
 
-<h3><code>events()</code> → StageEvent[]</h3>
-<p>What happened since the last call, oldest first; the queue is emptied. <code>{type: "end", handle}</code> for each effect that finished, faded out after <code>stop</code>, or was removed. <code>{type: "cue", handle, t, pan, cue}</code> for each cue an effect fired, <code>t</code> seconds into its playback, with <code>pan</code> from -1 to 1 across the stage. <code>cue.type</code> is one of:</p>
-<ul>
-  <li><code>"shake"</code>: <code>{trauma}</code>, 0 to 1</li>
-  <li><code>"hitstop"</code>: <code>{dur}</code> seconds of freeze</li>
-  <li><code>"ripple"</code>: <code>{x, y, r0, r1, dur, amp}</code>, a ring growing from <code>r0</code> to <code>r1</code> game pixels</li>
-  <li><code>"flash"</code>: <code>{k, dur}</code></li>
-  <li><code>"sound"</code>: <code>{name, gain, pitch, len, x}</code>; <code>len</code> caps its length in seconds, or is <code>null</code></li>
-</ul>
+<h3><code>drawPicture(picture)</code></h3>
+<p>Draw a picture Rust painted outside the effects: fighters (<code>new Sprites(w, h)</code>, then <code>picture()</code>) or scene light (<code>new Lighting(w, h).paint(lights, glows)</code>). The package re-exports the engine's <code>effects</code>, <code>meta</code>, <code>Fx</code>, <code>Body</code>, <code>FightFeel</code>, <code>lookColors</code>, <code>Sprites</code>, <code>Lighting</code>, <code>stepLights</code> and <code>putOutLight</code>, usable once <code>loadPixfx()</code> resolved.</p>
 
-<h3><code>setFeel(on)</code></h3>
-<p><code>true</code> (the default): the stage answers cues, as described in <a href="#cues-and-feel">Cues and feel</a>. <code>false</code>: the host answers them from the <code>cue</code> events.</p>
+<h3><code>feel</code></h3>
+<p>The answer to impacts: <code>shake</code> ([dx, dy] game pixels), <code>roll</code> (radians), <code>flash</code> (0 to 1), <code>timeScale</code>, and the game's own impacts <code>addTrauma(k)</code>, <code>freeze(secs)</code>, <code>slow(secs, speed)</code>. <code>setShakeStrength(k)</code> and <code>setFlashStrength(k)</code> are the player's settings (1 as designed, 0 off); <code>setEnabled(false)</code> leaves the answer to your game, which reads the <code>"cue"</code> events. You apply shake, roll and flash where your view is drawn.</p>
 
-<h3><code>shake(strength)</code> → [dx, dy]</h3>
-<p>Where the view sits this frame, in whole game pixels, from the trauma the cues and <code>addTrauma</code> built up. <code>strength</code> is the player's setting: 1 as designed, 0 holds the view still.</p>
-
-<h3><code>roll(strength)</code> → radians</h3>
-<p>How far the view tilts this frame (positive is clockwise), for a host that draws the stage into a view it can rotate. The stage's own loop leaves it out to keep the pixel grid.</p>
-
-<h3><code>setShakeStrength(strength)</code></h3>
-<p>How hard the stage's own loop shakes the view: 1 as designed (the default), 0 not at all.</p>
-
-<h3><code>trauma()</code>, <code>flash()</code>, <code>frozen()</code>, <code>ripples()</code></h3>
-<p>How shaken the view is (0 to 1), how white it is lifted (0 to 1), whether a hit-stop freezes play now, and the screen ripples alive now as <code>{x, y, r0, r1, dur, amp, age}</code> in game pixels and seconds. The stage's own loop applies shake and flash; ripples are for a host that bends its view.</p>
-
-<h3><code>addTrauma(k)</code>, <code>freeze(secs)</code>, <code>slow(secs, speed)</code></h3>
-<p>The game's own impacts, answered like cues. <code>addTrauma</code> adds <code>k</code> (0 to 1) to the shake. <code>freeze</code> is a hit-stop of <code>secs</code> seconds; freezes do not add up, the longest wins. <code>slow</code> plays at <code>speed</code> (0 to 1) of real time for the next <code>secs</code> seconds, after any freeze. They do nothing while <code>setFeel(false)</code>.</p>
-
-<h3><code>remove(handle)</code></h3>
-<p>Drop the effect now. Unknown handles are ignored.</p>
-
-<h3><code>start()</code> and <code>pause()</code></h3>
-<p><code>start()</code> runs the stage's own <code>requestAnimationFrame</code> loop; calling it while running does nothing. The first frame after <code>start()</code> steps 0 s. <code>pause()</code> stops the loop; effects keep their state. If a frame fails, the loop logs <code>pixfx Stage stopped: ...</code> to the console and stops; <code>pause()</code> then <code>start()</code> retries.</p>
-
-<h3><code>update(dt)</code>, <code>drawLayer(layer)</code>, <code>tick(dt)</code></h3>
-<p>For host-owned loops, as above. <code>dt</code> is seconds, a finite number, 0 or more; anything else throws and changes nothing. <code>layer</code> is <code>"back"</code> or <code>"front"</code>. <code>update</code> removes effects that are done.</p>
-
-<h3><code>setScale(scale)</code></h3>
-<p>Change game pixel to canvas pixels (at least 1). Resize the canvas yourself to match.</p>
-
-<h3><code>background(css)</code></h3>
-<p>Fill the canvas with this CSS colour before each <code>tick</code> or self-run frame. <code>""</code> clears to transparent instead (the default). Has no effect on <code>drawLayer</code>.</p>
-
-<h3><code>handles()</code></h3>
-<p>The playing handles, oldest first. Finished effects are gone.</p>
-
-<h3><code>free()</code></h3>
-<p>Release the stage's wasm memory (generated by wasm-bindgen). Freeing a running stage stops its loop.</p>
+<h3><code>stats()</code>, <code>destroy()</code></h3>
+<p><code>stats()</code> counts effects, textures and images. <code>destroy()</code> ends every effect and frees what it held.</p>
 
 <h2>How it draws</h2>
-<p>Each effect has its own small <code>OffscreenCanvas</code> and pixel buffer, made once when it is played and reused every frame. For each layer, the colour half is drawn with <code>source-over</code>, then the light half with <code>"lighter"</code> (additive, saturating), each enlarged by <code>scale</code> with image smoothing off. Empty halves are skipped. Every effect gets <code>glowMargin</code> pixels of room round its canvas and no edge fade, so glow shows in full.</p>
+<p>Workers paint each frame and send its colour and light bytes back; each fills a small <code>OffscreenCanvas</code> (colour on the left, light on the right) with <code>putImageData</code>. <code>drawLayer</code> draws the colour half with <code>source-over</code>, then the light half with <code>"lighter"</code>, enlarged by <code>scale</code> with image smoothing off. The Rust scene decides which frame each effect shows, where and in what order; frames identical effects share are painted once.</p>
 <p>Light is drawn as light over transparency: it adds exactly its light to an opaque canvas, and shows as that light's colour on a transparent one.</p>
-<p>The decisions (placement, ordering, removal, the pixels of each layer) are plain Rust in <code>crates/pixfx-canvas/src/stage.rs</code>, tested natively; <code>lib.rs</code> only blits.</p>
 
-<h2>Demo</h2>
-<pre><code>wasm-pack build crates/pixfx-canvas --target web --out-dir demo/pkg
-cd crates/pixfx-canvas/demo &amp;&amp; python3 -m http.server 8766 --bind 127.0.0.1</code></pre>
-<p>The demo owns the loop and draws a figure between the layers. <code>window.pixfxDemo</code> exposes its stage and frame rate for tests.</p>
+<h2>Demo and checks</h2>
+<pre><code>bunx vite demo             # campfire, braziers, a candle following a walker; click for an explosion
+bun run check              # tsc, eslint, bun test (real wasm)
+bun run check:browser      # Chrome: fires show and animate, a paused loop holds them, shake, destroy frees</code></pre>
     </main>
     <aside class="toc" aria-label="On this page"></aside>
   </div>

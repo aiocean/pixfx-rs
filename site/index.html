@@ -58,14 +58,14 @@ cargo run -p pixfx-cli -- render fire/campfire --gif --scale 4 --out out</code><
         </div>
 
         <div role="tabpanel" id="panel-canvas" aria-labelledby="tab-canvas" hidden>
-          <p>A <code>Stage</code> on a canvas runs its own loop and draws every effect, upscaled by a whole number with no smoothing.</p>
-<pre><code>import init, { Stage } from "./pkg/pixfx_canvas.js";
+          <p>Effects are painted on worker threads and drawn on a Canvas 2D context, upscaled by a whole number with no smoothing, among your own drawing.</p>
+<pre><code>import { createPixfx, loadPixfx } from "pixfx-canvas2d";
 
-await init();
-const stage = new Stage(document.querySelector("canvas"), 4);
-stage.play("fire/campfire", 64, 112, { seed: 3 });
-stage.start();</code></pre>
-          <p><a href="docs/canvas.html">Canvas renderer reference</a></p>
+await loadPixfx();
+const pixfx = createPixfx(canvas.getContext("2d"), { scale: 4 });
+pixfx.play("fire/campfire", 64, 112, { seed: 3 });
+// each frame: pixfx.update(dt), then pixfx.draw()</code></pre>
+          <p><a href="docs/canvas.html">Canvas 2D shell reference</a></p>
         </div>
 
         <div role="tabpanel" id="panel-phaser" aria-labelledby="tab-phaser" hidden>
@@ -123,9 +123,9 @@ frames.end_frame(window)?;</code></pre>
 <pre><code>cargo run -p pixfx-cli -- render fire/campfire --gif --out out</code></pre>
         </li>
         <li>
-          <p>Or play it in the browser through the canvas demo:</p>
-<pre><code>wasm-pack build crates/pixfx-canvas --target web --out-dir demo/pkg
-cd crates/pixfx-canvas/demo &amp;&amp; python3 -m http.server 8766 --bind 127.0.0.1</code></pre>
+          <p>Or play it in the browser through the Canvas 2D demo:</p>
+<pre><code>cd packages/pixfx-web &amp;&amp; bun install &amp;&amp; bun run build:wasm
+cd ../pixfx-canvas2d &amp;&amp; bun install &amp;&amp; bunx vite demo</code></pre>
         </li>
       </ol>
       <p><a href="docs/getting-started.html">Full getting-started guide</a></p>

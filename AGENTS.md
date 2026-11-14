@@ -104,7 +104,7 @@ Dependencies point one way, top to bottom. A lower layer never depends on a high
 
 | Layer | Crate (target) | Holds | Rules |
 |---|---|---|---|
-| Shells | `pixfx-canvas2d`, `pixfx-canvas`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-gpui`, `pixfx-export`, `pixfx-cli` | Host objects, the host loop, workers, surface caches | No decisions. Thin enough that a second shell for the same host would be the same code. |
+| Shells | `pixfx-canvas2d`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-gpui`, `pixfx-export`, `pixfx-cli` | Host objects, the host loop, workers, surface caches | No decisions. Thin enough that a second shell for the same host would be the same code. |
 | JS runtime | `packages/pixfx-web` (TypeScript) | Loading the wasm, painting workers, the game-wide frames and their surfaces, a stage per host scene following the draw list, effect handles, the feel's JS face | Host-neutral: no Phaser, no Pixi. A JS shell adds only its host objects and its loop. |
 | JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it, by way of `pixfx-web`. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
@@ -136,9 +136,8 @@ Where a new piece of code goes:
 Each item is a refactor. Each lands with every test green, the parity gate passing and `frame_hash` unchanged; a
 change to a JS shell also shows `bun run perf` before and after.
 
-1. **`crates/pixfx-canvas` is a second Canvas 2D shell.** Its `Stage` paints on the main thread. Nothing uses it any
-   more (the site draws with `packages/pixfx-canvas2d`), but the site's docs pages still teach it; the crate goes
-   with those pages rewritten for `pixfx-canvas2d`.
+Nothing is out of place now. Code found on the wrong side of a boundary is listed here, one numbered item each,
+until its refactor lands.
 
 ## Rules
 

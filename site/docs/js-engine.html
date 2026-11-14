@@ -110,7 +110,7 @@ gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, fx.width(), fx.height(), gl.RGBA, gl.UN
 <p>Make a new view each frame: wasm memory can grow, which detaches old views.</p>
 
 <h2>Rust side</h2>
-<p>The bindings are a thin layer over plain Rust, which other crates use directly: <code>pixfx_wasm::Player</code> (an instance plus its canvas) and <code>pixfx_wasm::parse_options</code> (JS object to typed <code>Options</code> and margin). <code>pixfx-canvas</code> is built on both.</p>
+<p>The bindings are a thin layer over plain Rust, which other crates use directly: <code>pixfx_wasm::Player</code> (an instance plus its canvas) and <code>pixfx_wasm::parse_options</code> (JS object to typed <code>Options</code> and margin).</p>
 
 <h2>Demo</h2>
 <pre><code>wasm-pack build crates/pixfx-wasm --target web --out-dir demo/pkg

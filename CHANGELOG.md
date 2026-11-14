@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `crates/pixfx-canvas` is gone: `packages/pixfx-canvas2d` is the Canvas 2D shell, and the site's docs (Canvas 2D
+  shell, getting started, the landing page's sample) teach it.
 - `pixfx-phaser` runs on `pixfx-web` (its copy of the runtime is gone) and draws only what the main camera sees: an
   effect off camera plays on unseen and takes no paint or texture until the camera reaches it, and one with a
   `scrollFactor` (a HUD effect at `0`, parallax between) is culled where the camera shows it. A game's Vite config

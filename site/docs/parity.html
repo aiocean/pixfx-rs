@@ -74,17 +74,20 @@ wasm-pack test --node crates/pixfx-effects --test determinism</code></pre>
     <tr><td><code>crates/pixfx-effects/tests/fire.rs</code></td><td>Fire effects' behaviour.</td></tr>
     <tr><td><code>crates/pixfx-export/tests</code></td><td>Sheet layout and JSON, GIF output.</td></tr>
     <tr><td><code>crates/pixfx-cli/tests</code></td><td>Commands, exit codes, the parity comparison.</td></tr>
-    <tr><td><code>crates/pixfx-wasm/tests/web.rs</code>, <code>crates/pixfx-canvas/tests</code></td><td>The JS bindings and stage, under <code>wasm-pack test --node</code>, plus the stage's decisions natively.</td></tr>
-    <tr><td><code>packages/pixfx-phaser/tests</code></td><td>The Phaser plugin under <code>bun test</code>, including pixel checks against the engine.</td></tr>
+    <tr><td><code>crates/pixfx-wasm/tests/web.rs</code></td><td>The JS bindings, under <code>wasm-pack test --node</code>.</td></tr>
+    <tr><td><code>crates/pixfx-scene/tests</code></td><td>The scene's decisions: placement, shared frames, the frame budget, the view, hit-stop.</td></tr>
+    <tr><td><code>packages/pixfx-web/tests</code></td><td>The JS runtime under <code>bun test</code> against the real wasm, including frames painted on workers against frames painted on the spot.</td></tr>
   </tbody>
 </table>
 </div>
 
 <h2>Whole-repo check</h2>
 <pre><code>cargo fmt --check &amp;&amp; cargo clippy --workspace --all-targets -- -D warnings &amp;&amp; cargo test --workspace
-wasm-pack test --node crates/pixfx-wasm
-wasm-pack test --node crates/pixfx-canvas
-cd packages/pixfx-phaser &amp;&amp; bun run check</code></pre>
+(cd packages/pixfx-phaser &amp;&amp; bun run check)
+(cd packages/pixfx-web &amp;&amp; bun run build:wasm &amp;&amp; bun run check)
+(cd packages/pixfx-canvas2d &amp;&amp; bun run check &amp;&amp; bun run check:browser)
+(cd packages/pixfx-pixi &amp;&amp; bun run check &amp;&amp; bun run check:browser)
+bun test site/tests</code></pre>
     </main>
     <aside class="toc" aria-label="On this page"></aside>
   </div>
