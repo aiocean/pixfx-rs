@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `pixfx-pixi` (new): pixfx in a Pixi 8 application. `createPixfx(app, { container, camera })`, then `play(id, x, y,
+  opts)` with the same effects, events and feel as Phaser; the shake moves and tilts a camera container, the flash
+  covers the screen. On WebGL frames are regions of atlas pages filled with `texSubImage2D`.
+- `pixfx-web` (new): the JS runtime every JS shell shares (wasm, painting workers, game-wide frames, a stage per
+  host scene, effect and feel handles), host-neutral on eventemitter3.
 - `pixfx-canvas`: a shared frame is held cut to the box that holds anything, so it takes the bytes the frame budget
   counts for it; what the stage shows is unchanged.
 - `pixfx-phaser`: a pure shell over the wasm `Scene`. Placement, timing, which frame shows, fading, follow-stop,

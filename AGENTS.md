@@ -51,7 +51,7 @@ Every shell is equal. None is the main one:
 | Phaser 4 | `packages/pixfx-phaser` | shipped |
 | gpui | `crates/pixfx-gpui` | shipped (own workspace, needs the gpui fork) |
 | Files (PNG sheets, beanfx JSON, GIF) | `crates/pixfx-export`, `crates/pixfx-cli` | shipped |
-| Pixi | `packages/pixfx-pixi` | next, for games like color-connect |
+| Pixi 8 | `packages/pixfx-pixi` | shipped |
 | CSS and DOM | `packages/pixfx-dom` | possible |
 | WebGL | a shell of its own | possible |
 
@@ -135,9 +135,7 @@ change to a JS shell also shows `bun run perf` before and after.
    `paint.ts`, `worker.ts`, `load.ts`, `engine.ts`, `stage.ts`, `effect.ts`, `feel.ts` and `options.ts` are the same
    code as `packages/pixfx-web`. Phaser switches to `pixfx-web` (its copies deleted) once its camera culling (plan
    Task 6) has landed; until then a fix to one goes into both.
-2. **No Pixi shell.** Add `packages/pixfx-pixi` against the same contract as `packages/pixfx-phaser` (the wasm
-   `Scene`'s draw list, workers that paint, one atlas), so it stays as thin.
-3. **`pixfx-canvas` holds JS bindings and a decision.** `src/fighter.rs` and `src/light.rs` bind `pixfx-fighter` and
+2. **`pixfx-canvas` holds JS bindings and a decision.** `src/fighter.rs` and `src/light.rs` bind `pixfx-fighter` and
    `pixfx-light` for JS; bindings belong in `pixfx-wasm` so every JS shell gets them. `light.rs` also keeps the list
    of live lights, a decision for `pixfx-scene` (or the game). The crate keeps only its Canvas 2D shell.
 

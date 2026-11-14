@@ -24,7 +24,9 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
 | `crates/pixfx-canvas` | A renderer with its own loop on a Canvas 2D: `new Stage(canvas, scale)`, `play`, `move`, `stop`, `remove`, `start`, `pause`, `setScale`, `background`, `tick` (which draw only what the canvas shows); for a host-owned loop `update(dt)` then `drawLayer("back")` / `drawLayer("front")` around its own sprites, with `setView(x, y, w, h)` / `clearView()` to draw only what its camera sees; game feel: `shake(strength)`, `roll(strength)`, `flash()`, `frozen()`, `addTrauma`, `freeze`, `slow`, `setFeel(on)`, cue events. Demo in `crates/pixfx-canvas/demo/` (`wide.html`: 100 fires panned past with `?view=on` or `off`). |
-| `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, scene-wide layers, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
+| `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
+| `packages/pixfx-pixi` | Pixi 8 shell: `createPixfx(app).play(id, x, y, opts)` with the same effects, events and feel as Phaser. See its [README](packages/pixfx-pixi/README.md); demo in `packages/pixfx-pixi/demo/`. |
+| `packages/pixfx-web` | The JS runtime both JS shells run on: the wasm, the painting workers, the game-wide frames, a stage per host scene. |
 | `crates/pixfx-gpui` | The gpui shell: `FxScene` plays effects through a `pixfx-scene` `Scene`, paints each at its view's origin and drops images from the atlas at the end of the frame. Needs the gpui fork (see [gpui](#gpui)). |
 | `examples/gpui-web` | A gpui web app that plays the candle and campfire. Needs the gpui fork. |
 
@@ -187,6 +189,8 @@ wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignor
 ```sh
 cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 (cd packages/pixfx-phaser && bun run check)
+(cd packages/pixfx-web && bun run build:wasm && bun run check)
+(cd packages/pixfx-pixi && bun run check && bun run check:browser)
 bun test site/tests
 ```
 

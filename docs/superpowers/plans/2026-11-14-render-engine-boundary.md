@@ -238,6 +238,12 @@ Done in two commits: 2a moves `Scene` and `Shell` (with `free` and `Scene::clear
 
 ### Task 5: `packages/pixfx-pixi`
 
+> **Shape as built.** The host-neutral half of the Phaser package moved into `packages/pixfx-web` (wasm, workers,
+> game-wide frames and surfaces, `Stage`, `PixfxEffect`, `PixfxFeel`, on eventemitter3), and `pixfx-pixi` is two
+> files over it: `pixfx.ts` (`createPixfx(app, { container, camera })`, the ticker step, shake and flash) and
+> `pixi-gfx.ts` (WebGL atlas, buffer textures, sprites). Its tests drive real Pixi objects with the real wasm;
+> `bun run check:browser` checks the demo in Chrome. Phaser switches to `pixfx-web` after Task 6.
+
 **Files:**
 - Create: `packages/pixfx-pixi/{package.json,tsconfig.json,eslint.config.ts,README.md}`, `src/{index,plugin,layer,engine}.ts`,
   `tests/shell.test.ts`, `demo/index.html`

@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./tools/cdp": "./tools/cdp.ts"
+    "./tools/cdp": "./tools/cdp.ts",
+    "./wasm": "./wasm/pixfx_wasm.js"
   },
   "files": [
     "src",

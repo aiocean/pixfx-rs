@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixi shell · pixfx docs</title>
+  <meta name="description" content="pixfx-pixi plays pixfx effects in a Pixi 8 application. Effects are painted on worker threads and show up as Pixi sprites: a back pair and a front pair, each a colour sprite and an additive light sprite.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <link rel="stylesheet" href="../assets/site.css">
+</head>
+<body class="docs-page">
+  <header class="topbar">
+    <a class="brand" href="../">pixfx</a>
+    <nav aria-label="Site">
+      <a href="./" aria-current="page">Docs</a>
+      <a href="../effects/">Effects</a>
+      <a href="getting-started.html">Get started</a>
+    </nav>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Menu</button>
+  </header>
+  <div class="docs-shell">
+    <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
+    <main class="doc">
+<h1>Pixi shell</h1>
+<p class="lead"><code>pixfx-pixi</code> plays pixfx effects in a Pixi 8 application. Effects are painted on worker threads and show up as Pixi sprites: a back pair and a front pair, each a colour sprite and an additive light sprite, so your sprites can stand between them.</p>
+<p>Requires <code>pixi.js</code> <code>^8.22.0</code>. It runs on <code>pixfx-web</code>, the runtime every pixfx JS shell shares.</p>
+
+<h2>Install</h2>
+<pre><code>cd pixfx-rs/packages/pixfx-web &amp;&amp; bun install &amp;&amp; bun run build:wasm
+cd ../pixfx-pixi &amp;&amp; bun install
+cd /path/to/your-game &amp;&amp; bun add ../pixfx-rs/packages/pixfx-pixi</code></pre>
+<p><code>pixfx-web</code> loads its wasm and its worker through <code>new URL(..., import.meta.url)</code>; tell Vite to serve it as source:</p>
+<pre><code>// vite.config.js
+export default { optimizeDeps: { exclude: ["pixfx-web"] } };</code></pre>
+
+<h2>Use</h2>
+<pre><code>import { Application, Container } from "pixi.js";
+import { createPixfx, loadPixfx } from "pixfx-pixi";
+
+await loadPixfx();
+const app = new Application();
+await app.init({ width: 1344, height: 720, background: "#17131c", roundPixels: true });
+const world = app.stage.addChild(new Container());
+world.scale.set(4);
+const fx = world.addChild(new Container());
+const pixfx = createPixfx(app, { container: fx, camera: world });
+
+pixfx.play("fire/campfire", 168, 160);
+pixfx.play("fire/candle", 0, 0).follow(hero);</code></pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Option of <code>createPixfx</code></th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>container</code></td><td>Where the effects' sprites go, sorted by <code>zIndex</code>. Default: a new container on <code>app.stage</code>.</td></tr>
+    <tr><td><code>camera</code></td><td>What the shake moves and tilts about the screen's centre, put back after each render. Default: <code>app.stage</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+<p><code>play(id, x, y, opts?)</code> places the effect's origin at <code>(x, y)</code> in <code>container</code>. <code>depth: {back, front}</code> sets the sprites' <code>zIndex</code>; every other option is the engine's, as in the <a href="phaser.html">Phaser plugin</a>. The returned <code>PixfxEffect</code> and <code>pixfx.feel</code> work as there.</p>
+<p>Effects advance on <code>app.ticker</code>, after the game's own callbacks and before the render: <code>ticker.speed</code> scales them, <code>ticker.stop()</code> freezes them. <code>pixfx.destroy()</code> ends every effect and frees its sprites. On WebGL every frame is a region of a few atlas pages, filled straight from the bytes the workers painted.</p>
+
+<h2>Demo and checks</h2>
+<pre><code>bunx vite demo           # campfire, braziers, a candle following a walker; click for an explosion with shake
+bun run check            # tsc, eslint, bun test
+bun run check:browser    # Chrome: show, animate, freeze, shake and destroy</code></pre>
+    </main>
+    <aside class="toc" aria-label="On this page"></aside>
+  </div>
+  <script type="module" src="../assets/site.js"></script>
+</body>
+</html>
