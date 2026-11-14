@@ -5,7 +5,10 @@ use pixfx_pixel::oklab::{delta_e, lab};
 #[test]
 fn white_and_black_sit_at_the_ends_of_lightness() {
     let w = lab(Rgba(255, 255, 255, 255));
-    assert!((w.l - 1.0).abs() < 1e-6 && w.a.abs() < 1e-6 && w.b.abs() < 1e-6, "{w:?}");
+    assert!(
+        (w.l - 1.0).abs() < 1e-6 && w.a.abs() < 1e-6 && w.b.abs() < 1e-6,
+        "{w:?}"
+    );
     assert_eq!(lab(Rgba(0, 0, 0, 255)).l, 0.0);
 }
 
