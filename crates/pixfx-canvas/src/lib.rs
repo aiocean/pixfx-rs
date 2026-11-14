@@ -27,10 +27,13 @@ use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
 use js_sys::{Array, Uint8Array, Uint8ClampedArray};
-use pixfx_core::{Feel, Layer, Meta, Options, Player};
+use pixfx_core::{Clip, Feel, Layer, Meta, Options};
 use pixfx_draw::Frame;
 use pixfx_effects::effect;
-use pixfx_scene::{Pass, PlacementChange, Scene, Shell, StageError, View, color_rgba, light_rgba};
+use pixfx_scene::{
+    Frames, InlinePainter, Pass, PlacementChange, Scene, Shell, StageError, View, color_rgba,
+    light_rgba,
+};
 use pixfx_wasm::js::{pair, parse, to_js};
 use pixfx_wasm::parse_options;
 use wasm_bindgen::Clamped;
@@ -63,10 +66,13 @@ impl Stage {
             })?
             .dyn_into::<CanvasRenderingContext2d>()
             .map_err(|_| JsError::new("the canvas 2d context has an unexpected type"))?;
+        let mut frames = Frames::default();
+        let scene = frames.scene(nonzero_scale(scale)?);
         Ok(Stage {
             renderer: Rc::new(RefCell::new(Renderer {
                 ctx,
-                scene: Scene::new(nonzero_scale(scale)?),
+                frames,
+                scene,
                 scratch: Vec::new(),
                 background: None,
                 shake_strength: 1.0,
@@ -85,9 +91,9 @@ impl Stage {
         #[wasm_bindgen(unchecked_optional_param_type = "FxOptions")] opts: JsValue,
     ) -> Result<u32, JsError> {
         let fx = effect(id).ok_or_else(|| JsError::new(&format!("unknown effect {id:?}")))?;
-        let player = Player::live(fx, stage_options(fx.meta(), &opts)?);
+        let clip = Clip::live(fx, stage_options(fx.meta(), &opts)?);
         let mut r = self.renderer.borrow_mut();
-        Ok(r.scene.play(player, x, y)?)
+        Ok(r.scene.play(clip, x, y)?)
     }
 
     /// Hold the frames of a clip baked by `pixfx bake`: `json` is the text of `<name>.bake.json`, `pages` the bytes
@@ -102,7 +108,7 @@ impl Stage {
         let mut r = self.renderer.borrow_mut();
         let Renderer {
             ctx,
-            scene,
+            frames,
             scratch,
             ..
         } = &mut *r;
@@ -111,8 +117,8 @@ impl Stage {
             bytes: scratch,
         };
         for l in &layers {
-            scene
-                .load(&l.id, l.layer, &l.frame, &mut shell)
+            frames
+                .deliver(&l.id, l.layer, &l.frame, &mut shell)
                 .map_err(|e| JsError::new(&e))?;
         }
         Ok(u32::try_from(layers.len()).unwrap_or(u32::MAX))
@@ -428,6 +434,8 @@ fn nonzero_scale(scale: u32) -> Result<NonZeroU32, JsError> {
 
 struct Renderer {
     ctx: CanvasRenderingContext2d,
+    /// The frames the stage's scene shares, painted on the spot.
+    frames: Frames<Held, InlinePainter>,
     scene: Scene<Held>,
     /// RGBA bytes a drawn layer goes through on its way to a scratch canvas, reused across draws.
     scratch: Vec<u8>,
@@ -479,7 +487,8 @@ impl Renderer {
             .map_err(|e| js_message("could not move the view", &e))?;
         let drawn = self
             .draw_layer(Layer::Back)
-            .and_then(|()| self.draw_layer(Layer::Front));
+            .and_then(|()| self.draw_layer(Layer::Front))
+            .and_then(|()| self.end_frame());
         self.ctx.restore();
         drawn?;
         self.warp()?;
@@ -529,9 +538,18 @@ impl Renderer {
             stage: ctx,
             bytes: &mut self.scratch,
         };
-        let drawn = self.scene.draw_layer(layer, &mut shell);
+        let drawn = self.scene.draw_layer(layer, &mut self.frames, &mut shell);
         ctx.restore();
         drawn
+    }
+
+    /// End the host frame: past the budget, the least recently shown shared frames go.
+    fn end_frame(&mut self) -> Result<(), String> {
+        let mut shell = CanvasShell {
+            stage: &self.ctx,
+            bytes: &mut self.scratch,
+        };
+        self.frames.end_frame(&mut shell)
     }
 }
 

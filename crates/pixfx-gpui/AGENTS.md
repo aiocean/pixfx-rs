@@ -24,15 +24,17 @@ hand Rust the elapsed time.
 | a feel or effect rule | `pixfx-core` / `pixfx-effects` |
 | paints or composites pixels | `pixfx-draw` |
 
-## Known drift
+## Shape
 
-`FxView` (over `Player`) and `FxFrames` keep their own layout and frame store instead of a `Scene` driven through a
-gpui `Shell`. That is item 1 of "Out of place today" in the root `AGENTS.md`. Do not grow `FxView` or `FxFrames`;
-new behaviour goes into `Scene`, and this crate moves onto it.
+`FxScene` wraps one `Scene` per window and is the gpui `Shell`: `play` an effect, `tick` the scene, `paint` each
+effect at its view's origin (`Scene::draw_handle`), then `end_frame` once per window frame (`Scene::end_frame`, then `Frames::end_frame`). It owns its `Frames` with an
+`InlinePainter`: frames are painted on the spot.
+Images the scene lets go of are queued and dropped from the atlas at `end_frame`, never mid-frame. New behaviour goes
+into `Scene`, not here.
 
 ## Dependencies
 
-`gpui` (the local fork), `image`, `anyhow`, `pixfx-core`, `pixfx-draw`; `pixfx-scene` once it moves onto `Scene`.
+`gpui` (the local fork), `image`, `anyhow`, `pixfx-core`, `pixfx-draw`, `pixfx-scene`.
 
 ## Before you finish
 

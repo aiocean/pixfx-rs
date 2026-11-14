@@ -18,7 +18,7 @@ Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use
 |---|---|
 | `crates/pixfx-draw` | Drawing, the lowest layer: frame with colour and additive light, painter, shapes, blending, `composite`, `frame_hash`, palette presets, outline rings, the JS-number maths (`math`). Knows nothing of effects or hosts. |
 | `crates/pixfx-core` | The engine on top of `pixfx-draw`: `Effect`/`Instance`, particles, `render_frames`, `Player`, the frame key and store; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`. |
-| `crates/pixfx-scene` | What a stage shows and where, for every shell: `Scene` (effects playing, placement, layers, shared frames, the view outside which nothing is drawn, the answer to their cues, events) and the `Shell` contract (`make`, `refill`, `show`, `free`). No browser or gpui types. |
+| `crates/pixfx-scene` | What a stage shows and where, for every shell: `Scene` (effects playing, placement, layers, the view outside which nothing is drawn, the answer to their cues, events), `Frames` (the frames every scene of a game shares, and the `Painter` that paints them, on the spot or on another thread) and the `Shell` contract (`make`, `refill`, `show`, `free`). No browser or gpui types. |
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
 | `crates/pixfx-cli` | The `pixfx` binary: `parity`, `sheet`, `render`, `bake`, `bench`. |
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |

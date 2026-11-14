@@ -1,50 +1,38 @@
 //! One effect playing on its own canvas: what every host plays through (the wasm `Fx`, the canvas stage, gpui).
 
 use crate::cue::TimedCue;
-use crate::effect::{Canvas, Effect, Instance, Layer, Meta, Options, Placement};
+use crate::effect::{Canvas, Clock, Effect, Instance, Layer, Meta, Options, Placement, Sim};
 use crate::key::{ClipKey, FrameId};
 use crate::render::edge_fade;
 use pixfx_draw::frame::{Frame, composite};
 
-/// An effect instance and the canvas it draws into: the instance's canvas ([`Effect::canvas`]: `meta.size`
-/// unless its options size it) plus `margin` empty pixels on every side, with the effect's origin at the
-/// canvas origin plus `margin`. While its clock is on frame k ([`Player::frame_index`]), `draw(Layer::Both)`
-/// leaves the frame equal to [`crate::render_frames`] frame k at the same margin, whatever steps the clock
-/// took: margin 0 eases light out at the canvas edge (as the sprite sheet does), a margin leaves room for glow
-/// that spills past the canvas and fades nothing.
-pub struct Player {
-    inst: Instance,
-    /// The options the instance was spawned with (its origin on this player's frame): part of its frames' key.
+/// What one effect draws and how big: the effect, its options with its origin where its canvas puts it, and the
+/// margin of empty pixels round the canvas. Every instance of a clip with the same placement and frame draws a
+/// byte-equal frame ([`Clip::key`]), so a host can draw it once and share it, or draw it on another thread.
+#[derive(Clone)]
+pub struct Clip {
+    effect: &'static dyn Effect,
+    /// The options the clip plays with, its origin on the clip's frame: part of its frames' key.
     opts: Options,
-    meta: &'static Meta,
     canvas: Canvas,
     margin: u32,
-    frame: Frame,
-    rgba: Vec<u8>,
 }
 
-impl Player {
-    /// Spawn `effect` with `opts` on a canvas `margin` pixels bigger on every side; `opts.x` and `opts.y` are
-    /// replaced by the effect's origin.
+impl Clip {
+    /// `effect` with `opts` on a canvas `margin` pixels bigger on every side; `opts.x` and `opts.y` are replaced
+    /// by the effect's origin.
     pub fn new(effect: &'static dyn Effect, opts: Options, margin: u32) -> Self {
-        let meta = effect.meta();
         let canvas = effect.canvas(&opts);
-        let (w, h) = (canvas.size.0 + 2 * margin, canvas.size.1 + 2 * margin);
         let at_origin = Options {
             x: f64::from(canvas.origin.0),
             y: f64::from(canvas.origin.1),
             ..opts
         };
-        // the frame's top-left sits `margin` up and left of the effect canvas's, as in `render_frames`
-        let corner = -(margin as i32);
         Self {
-            inst: Instance::new(effect, at_origin.clone()),
+            effect,
             opts: at_origin,
-            meta,
             canvas,
             margin,
-            frame: Frame::new(w, h, corner, corner),
-            rgba: vec![0; w as usize * h as usize * 4],
         }
     }
 
@@ -55,10 +43,10 @@ impl Player {
     }
 
     pub fn meta(&self) -> &'static Meta {
-        self.meta
+        self.effect.meta()
     }
 
-    /// The canvas this instance draws on, margin not included.
+    /// The canvas the effect draws on, margin not included.
     pub fn canvas(&self) -> Canvas {
         self.canvas
     }
@@ -66,6 +54,116 @@ impl Player {
     /// Empty pixels round the effect's canvas on every side.
     pub fn margin(&self) -> u32 {
         self.margin
+    }
+
+    /// The frame's size: the canvas plus the margin on every side.
+    pub fn size(&self) -> (u32, u32) {
+        (
+            self.canvas.size.0 + 2 * self.margin,
+            self.canvas.size.1 + 2 * self.margin,
+        )
+    }
+
+    /// An empty frame of the clip's size, its top-left `margin` up and left of the effect canvas's (as in
+    /// [`crate::render_frames`]).
+    pub fn blank(&self) -> Frame {
+        let (w, h) = self.size();
+        let corner = -(self.margin as i32);
+        Frame::new(w, h, corner, corner)
+    }
+
+    /// Where its options place it on the clip's frame ([`Instance::placement`]).
+    pub fn placement(&self) -> Placement {
+        let o = &self.opts;
+        Placement {
+            x: o.x,
+            y: o.y,
+            flip: o.flip,
+            angle: o.angle,
+            light: o.light,
+        }
+    }
+
+    /// The key of every frame the clip draws placed as `place`.
+    pub fn key(&self, place: Placement) -> ClipKey {
+        ClipKey::new(self.effect.meta().id, &self.opts, self.margin, place)
+    }
+
+    /// A clock for a new instance.
+    pub fn clock(&self) -> Clock {
+        Clock::new(self.effect, &self.opts)
+    }
+
+    /// The state of a new instance, to draw from.
+    pub fn sim(&self) -> Sim {
+        Sim::new(self.effect, self.opts.clone())
+    }
+
+    /// Clear `frame` (made by [`Clip::blank`]) and draw `layer` of `sim`'s frame into it, placed as `place` says
+    /// and at opacity `fade` ([`Clock::fade`]). With margin 0, light is eased out at the canvas edge unless the
+    /// effect is full-screen (as [`crate::render_frames`] does).
+    pub fn draw(&self, sim: &Sim, frame: &mut Frame, layer: Layer, place: Placement, fade: f64) {
+        frame.clear();
+        sim.draw(frame, layer, place, fade);
+        if self.margin == 0 && !self.effect.meta().is_screen() {
+            edge_fade(frame);
+        }
+    }
+}
+
+/// An effect instance and the canvas it draws into: the instance's canvas ([`Effect::canvas`]: `meta.size`
+/// unless its options size it) plus `margin` empty pixels on every side, with the effect's origin at the
+/// canvas origin plus `margin`. While its clock is on frame k ([`Player::frame_index`]), `draw(Layer::Both)`
+/// leaves the frame equal to [`crate::render_frames`] frame k at the same margin, whatever steps the clock
+/// took: margin 0 eases light out at the canvas edge (as the sprite sheet does), a margin leaves room for glow
+/// that spills past the canvas and fades nothing.
+pub struct Player {
+    clip: Clip,
+    inst: Instance,
+    frame: Frame,
+    rgba: Vec<u8>,
+}
+
+impl Player {
+    /// Spawn `effect` with `opts` on a canvas `margin` pixels bigger on every side; `opts.x` and `opts.y` are
+    /// replaced by the effect's origin.
+    pub fn new(effect: &'static dyn Effect, opts: Options, margin: u32) -> Self {
+        Self::of(Clip::new(effect, opts, margin))
+    }
+
+    /// `effect` with `opts` as live hosts play it ([`Clip::live`]).
+    pub fn live(effect: &'static dyn Effect, opts: Options) -> Self {
+        Self::of(Clip::live(effect, opts))
+    }
+
+    /// A new instance of `clip`.
+    pub fn of(clip: Clip) -> Self {
+        let (w, h) = clip.size();
+        Self {
+            inst: Instance::new(clip.effect, clip.opts.clone()),
+            frame: clip.blank(),
+            rgba: vec![0; w as usize * h as usize * 4],
+            clip,
+        }
+    }
+
+    /// What it plays.
+    pub fn clip(&self) -> &Clip {
+        &self.clip
+    }
+
+    pub fn meta(&self) -> &'static Meta {
+        self.clip.meta()
+    }
+
+    /// The canvas this instance draws on, margin not included.
+    pub fn canvas(&self) -> Canvas {
+        self.clip.canvas
+    }
+
+    /// Empty pixels round the effect's canvas on every side.
+    pub fn margin(&self) -> u32 {
+        self.clip.margin
     }
 
     /// Advance the clock by `dt` seconds ([`Instance::update`]: at most `MAX_DT`; a NaN, infinite or negative
@@ -106,7 +204,7 @@ impl Player {
             return None;
         }
         Some(FrameId {
-            key: ClipKey::new(self.meta.id, &self.opts, self.margin, place),
+            key: self.clip.key(place),
             index: self.inst.frame(),
         })
     }
@@ -126,11 +224,13 @@ impl Player {
     /// frame). With margin 0, light is eased out at the canvas edge unless the effect is full-screen (as
     /// [`crate::render_frames`] does).
     pub fn draw(&mut self, layer: Layer, place: Placement) {
-        self.frame.clear();
-        self.inst.draw(&mut self.frame, layer, place);
-        if self.margin == 0 && !self.meta.is_screen() {
-            edge_fade(&mut self.frame);
-        }
+        self.clip.draw(
+            self.inst.sim(),
+            &mut self.frame,
+            layer,
+            place,
+            self.inst.clock().fade(),
+        );
     }
 
     /// The last drawn frame.

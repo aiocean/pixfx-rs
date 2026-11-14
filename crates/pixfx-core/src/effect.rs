@@ -442,39 +442,29 @@ pub struct Placement {
     pub light: f64,
 }
 
-/// A live effect: pixelfx `createFx`.
-pub struct Instance {
+/// An instance's clock: its time, its stop, the cues playback passes and when it ends. Everything a host decides
+/// (which frame shows, when to redraw, the fade, the end) reads the clock alone; only drawing needs the effect's
+/// state ([`Sim`]), so a host can keep the clock on one thread and draw elsewhere.
+pub struct Clock {
     effect: &'static dyn Effect,
-    state: Box<dyn EffectState>,
+    /// Where cues land: the options' origin and flip.
     opts: Options,
-    seed: u64,
-    /// The host's clock: seconds since the start. Cues, stop and the end follow it.
+    /// Seconds since the start. Cues, stop and the end follow it.
     t: f64,
-    /// Ticks of `1 / fps` the state has taken since it was spawned: the frame it shows.
-    tick: u64,
-    /// The state's own time: `1 / fps` added once per tick, as the render adds it.
-    tick_t: f64,
     stop_at: Option<f64>,
     cues: Vec<TimedCue>,
     fired: Vec<TimedCue>,
     screen_w: f64,
 }
 
-impl Instance {
-    pub fn new(effect: &'static dyn Effect, opts: Options) -> Self {
-        let seed = opts.seed.unwrap_or(effect.meta().seed);
-        let state = effect.spawn(&opts, seed);
-        let cues = cues_of(effect, &opts);
+impl Clock {
+    pub fn new(effect: &'static dyn Effect, opts: &Options) -> Self {
         Self {
             effect,
-            state,
-            opts,
-            seed,
+            opts: opts.clone(),
             t: 0.0,
-            tick: 0,
-            tick_t: 0.0,
             stop_at: None,
-            cues,
+            cues: cues_of(effect, opts),
             fired: Vec::new(),
             screen_w: 0.0,
         }
@@ -490,10 +480,8 @@ impl Instance {
         std::mem::take(&mut self.fired)
     }
 
-    /// Advance the clock by `dt` seconds, at most [`MAX_DT`], firing the cues it passes, and bring the state to
-    /// the frame the clock is on ([`Instance::frame`]). A step that fails [`valid_dt`] (NaN, infinite or
-    /// negative) is ignored and leaves the instance as it was: it would make the time NaN for good or run it
-    /// backwards. Shells that report such a step to their caller check [`valid_dt`] themselves first.
+    /// Advance by `dt` seconds, at most [`MAX_DT`], firing the cues it passes. A step that fails [`valid_dt`]
+    /// (NaN, infinite or negative) is ignored and leaves the clock as it was.
     pub fn update(&mut self, dt: f64) {
         if valid_dt(dt) {
             let dt = js_min(dt, MAX_DT);
@@ -502,16 +490,97 @@ impl Instance {
                 self.fire_cues(self.t, self.t + dt);
             }
             self.t += dt;
-            self.seek(self.frame_at(self.t));
         }
     }
 
-    /// The frame the clock `t` is on: `floor(t * fps)`, wrapped round a loop, held at a one-shot's last frame.
-    fn frame_at(&self, t: f64) -> u64 {
+    /// Record the cues in `(t0, t1]`; a cue at time 0 fires on the first update that passes time (pixelfx
+    /// `fire`).
+    fn fire_cues(&mut self, t0: f64, t1: f64) {
+        let from = if t0 == 0.0 { -1e-9 } else { t0 };
         let meta = self.effect.meta();
-        let k = libm::floor(t * f64::from(meta.fps) + FRAME_SLACK) as u64;
-        let n = meta.frames();
-        if meta.looping { k % n } else { k.min(n - 1) }
+        let hit = cues_between(&self.cues, from, t1, meta, &self.opts, self.screen_w);
+        self.fired.extend(hit);
+    }
+
+    /// The frame the clock is on: `floor(t * fps)`, wrapped round a loop, held at a one-shot's last frame. The
+    /// effect's state shows it once brought there ([`Sim::seek`]).
+    pub fn frame(&self) -> u64 {
+        let n = self.effect.meta().frames();
+        let k = self.clock_frame();
+        if self.effect.meta().looping {
+            k % n
+        } else {
+            k.min(n - 1)
+        }
+    }
+
+    /// Frames of `1 / fps` the clock has passed, unwrapped: it changes exactly when anything drawn can change
+    /// (the frame, or the fade after [`Clock::stop`]). A host redraws when it changes.
+    pub fn clock_frame(&self) -> u64 {
+        libm::floor(self.t * f64::from(self.effect.meta().fps) + FRAME_SLACK) as u64
+    }
+
+    /// How opaque a frame drawn now is: 1 until [`Clock::stop`], then down to 0 over [`FADE`]. It follows the
+    /// clock snapped down to its frame, so it changes once a frame like everything else drawn and does not
+    /// depend on when the host draws.
+    pub fn fade(&self) -> f64 {
+        match self.stop_at {
+            None => 1.0,
+            Some(s) => {
+                let shown_t = self.clock_frame() as f64 / f64::from(self.effect.meta().fps);
+                clamp(1.0 - (shown_t - s) / FADE, 0.0, 1.0)
+            }
+        }
+    }
+
+    /// Let it end: loops fade out over [`FADE`], one-shots are cut short. Later calls keep the first stop.
+    pub fn stop(&mut self) {
+        if self.stop_at.is_none() {
+            self.stop_at = Some(self.t);
+        }
+    }
+
+    /// Whether [`Clock::stop`] was called: from then on it fades out.
+    pub fn stopped(&self) -> bool {
+        self.stop_at.is_some()
+    }
+
+    pub fn done(&self) -> bool {
+        let meta = self.effect.meta();
+        self.stop_at.is_some_and(|s| self.t - s >= FADE)
+            || (!meta.looping && self.t >= meta.duration)
+    }
+
+    /// Seconds since the start.
+    pub fn t(&self) -> f64 {
+        self.t
+    }
+}
+
+/// What an instance draws: its effect's state, brought to a frame on demand ([`Sim::seek`]). The same effect,
+/// options and seed brought to the same frame draw byte-equal frames, whatever frames it was brought to before.
+pub struct Sim {
+    effect: &'static dyn Effect,
+    state: Box<dyn EffectState>,
+    opts: Options,
+    seed: u64,
+    /// Ticks of `1 / fps` the state has taken since it was spawned: the frame it shows.
+    tick: u64,
+    /// The state's own time: `1 / fps` added once per tick, as the render adds it.
+    tick_t: f64,
+}
+
+impl Sim {
+    pub fn new(effect: &'static dyn Effect, opts: Options) -> Self {
+        let seed = opts.seed.unwrap_or(effect.meta().seed);
+        Self {
+            effect,
+            state: effect.spawn(&opts, seed),
+            opts,
+            seed,
+            tick: 0,
+            tick_t: 0.0,
+        }
     }
 
     /// The frame the state shows: ticks of `1 / fps` since it was spawned (a loop's restart from frame 0
@@ -522,7 +591,7 @@ impl Instance {
 
     /// Bring the state to frame `k`: tick forward, or respawn and tick from 0 when `k` is behind (a loop that
     /// came round). The same seed gives the same frames each time round.
-    pub(crate) fn seek(&mut self, k: u64) {
+    pub fn seek(&mut self, k: u64) {
         if k < self.tick {
             self.state = self.effect.spawn(&self.opts, self.seed);
             self.tick = 0;
@@ -540,41 +609,26 @@ impl Instance {
         }
     }
 
-    /// Record the cues in `(t0, t1]`; a cue at time 0 fires on the first update that passes time (pixelfx
-    /// `fire`).
-    fn fire_cues(&mut self, t0: f64, t1: f64) {
-        let from = if t0 == 0.0 { -1e-9 } else { t0 };
-        let meta = self.effect.meta();
-        let hit = cues_between(&self.cues, from, t1, meta, &self.opts, self.screen_w);
-        self.fired.extend(hit);
-    }
-
-    /// Draw the current frame ([`Instance::frame`]) into `frame`, placed as `place` says: the state at its own
-    /// time, faded by the clock's time since [`Instance::stop`], ringed by its outline when the caller set one
-    /// (round what this call drew, not what `frame` held before).
-    pub fn draw(&self, frame: &mut Frame, layer: Layer, place: Placement) {
+    /// Draw the current frame ([`Sim::frame`]) into `frame`, placed as `place` says and at opacity `fade`
+    /// ([`Clock::fade`]), ringed by its outline when the caller set one (round what this call drew, not what
+    /// `frame` held before).
+    pub fn draw(&self, frame: &mut Frame, layer: Layer, place: Placement, fade: f64) {
         let ring = match self.opts.outline {
             Some(Outline::On(r)) if !self.effect.draws_outline() => Some(r),
             _ => None,
         };
         let before = ring.map(|_| frame.color.clone());
-        self.paint(frame, layer, place);
+        self.paint(frame, layer, place, fade);
         if let (Some(r), Some(before)) = (ring, before) {
             ring_round(frame, &before, r);
         }
     }
 
-    fn paint(&self, frame: &mut Frame, layer: Layer, place: Placement) {
+    fn paint(&self, frame: &mut Frame, layer: Layer, place: Placement, fade: f64) {
         let meta = self.effect.meta();
         let mut p = Painter::new(frame);
         p.place(place.x, place.y, place.flip, place.angle);
-        // the fade follows the clock snapped down to its frame, so it changes once a frame like everything else
-        // drawn and does not depend on when the host draws
-        let shown_t = self.clock_frame() as f64 / f64::from(meta.fps);
-        p.fade = match self.stop_at {
-            None => 1.0,
-            Some(s) => clamp(1.0 - (shown_t - s) / FADE, 0.0, 1.0),
-        };
+        p.fade = fade;
         p.light_k = place.light;
         let t = if meta.looping {
             self.tick_t % meta.duration
@@ -589,35 +643,6 @@ impl Instance {
         }
     }
 
-    /// Let it end: loops fade out over [`FADE`], one-shots are cut short. Later calls keep the first stop.
-    pub fn stop(&mut self) {
-        if self.stop_at.is_none() {
-            self.stop_at = Some(self.t);
-        }
-    }
-
-    /// Frames of `1 / fps` the clock has passed, unwrapped: it changes exactly when anything drawn can change
-    /// (the frame, or the fade after [`Instance::stop`]). A host redraws when it changes.
-    pub fn clock_frame(&self) -> u64 {
-        libm::floor(self.t * f64::from(self.effect.meta().fps) + FRAME_SLACK) as u64
-    }
-
-    /// Whether [`Instance::stop`] was called: from then on it fades out.
-    pub fn stopped(&self) -> bool {
-        self.stop_at.is_some()
-    }
-
-    pub fn done(&self) -> bool {
-        let meta = self.effect.meta();
-        self.stop_at.is_some_and(|s| self.t - s >= FADE)
-            || (!meta.looping && self.t >= meta.duration)
-    }
-
-    /// Seconds since the instance started.
-    pub fn t(&self) -> f64 {
-        self.t
-    }
-
     /// Where and how its options place it.
     pub fn placement(&self) -> Placement {
         let o = &self.opts;
@@ -628,6 +653,96 @@ impl Instance {
             angle: o.angle,
             light: o.light,
         }
+    }
+}
+
+/// A live effect: pixelfx `createFx`. Its [`Clock`] and its [`Sim`] kept in step: each update brings the state to
+/// the frame the clock is on.
+pub struct Instance {
+    clock: Clock,
+    sim: Sim,
+}
+
+impl Instance {
+    pub fn new(effect: &'static dyn Effect, opts: Options) -> Self {
+        Self {
+            clock: Clock::new(effect, &opts),
+            sim: Sim::new(effect, opts),
+        }
+    }
+
+    /// The screen width that sets the stereo pan of fired cues; 0 (the default) leaves them without pan.
+    pub fn set_screen_w(&mut self, screen_w: f64) {
+        self.clock.set_screen_w(screen_w);
+    }
+
+    /// The cues playback has passed since the last call, in world space and time order; clears them.
+    pub fn take_cues(&mut self) -> Vec<TimedCue> {
+        self.clock.take_cues()
+    }
+
+    /// Advance the clock by `dt` seconds ([`Clock::update`]) and bring the state to the frame the clock is on
+    /// ([`Instance::frame`]). Shells that report a bad step to their caller check [`valid_dt`] themselves first.
+    pub fn update(&mut self, dt: f64) {
+        if valid_dt(dt) {
+            self.clock.update(dt);
+            self.sim.seek(self.clock.frame());
+        }
+    }
+
+    /// The frame the state shows.
+    pub fn frame(&self) -> u64 {
+        self.sim.frame()
+    }
+
+    /// Bring the state to frame `k` ([`Sim::seek`]).
+    pub(crate) fn seek(&mut self, k: u64) {
+        self.sim.seek(k);
+    }
+
+    /// Draw the current frame ([`Instance::frame`]) into `frame`, placed as `place` says, faded by the clock's
+    /// time since [`Instance::stop`] ([`Sim::draw`]).
+    pub fn draw(&self, frame: &mut Frame, layer: Layer, place: Placement) {
+        self.sim.draw(frame, layer, place, self.clock.fade());
+    }
+
+    /// Let it end: loops fade out over [`FADE`], one-shots are cut short. Later calls keep the first stop.
+    pub fn stop(&mut self) {
+        self.clock.stop();
+    }
+
+    /// Frames of `1 / fps` the clock has passed, unwrapped ([`Clock::clock_frame`]).
+    pub fn clock_frame(&self) -> u64 {
+        self.clock.clock_frame()
+    }
+
+    /// Whether [`Instance::stop`] was called: from then on it fades out.
+    pub fn stopped(&self) -> bool {
+        self.clock.stopped()
+    }
+
+    pub fn done(&self) -> bool {
+        self.clock.done()
+    }
+
+    /// Seconds since the instance started.
+    pub fn t(&self) -> f64 {
+        self.clock.t()
+    }
+
+    /// Where and how its options place it.
+    pub fn placement(&self) -> Placement {
+        self.sim.placement()
+    }
+
+    /// Its clock.
+    pub fn clock(&self) -> &Clock {
+        &self.clock
+    }
+
+    /// Its state.
+    pub fn sim(&self) -> &Sim {
+        &self.sim
     }
 }
 

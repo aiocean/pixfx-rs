@@ -20,13 +20,13 @@ pub mod state;
 pub use act::{Act, ActEvent, Contact, Performance, Phase, Puff};
 pub use cue::{Cue, FEEL, TimedCue, cues_between, cues_of, impact};
 pub use effect::{
-    Canvas, ColorOpt, Effect, EffectState, Instance, Layer, Meta, NumOpt, OptKind, OptSpec,
-    OptValue, OptionError, Options, Placement, RampOpt, check_options, find, valid_dt,
+    Canvas, Clock, ColorOpt, Effect, EffectState, Instance, Layer, Meta, NumOpt, OptKind, OptSpec,
+    OptValue, OptionError, Options, Placement, RampOpt, Sim, check_options, find, valid_dt,
 };
 pub use feel::{Feel, FeelSpec};
 pub use frames::{FRAME_BUDGET, FrameStore};
 pub use key::{ClipKey, FrameId};
-pub use player::{PixelBox, Player, color_rgba_in, light_rgba_in};
+pub use player::{Clip, PixelBox, Player, color_rgba_in, light_rgba_in};
 pub use render::{Rendered, edge_fade, render_frames};
 pub use screen::{Ripple, flash, ripple};
 pub use sim::{

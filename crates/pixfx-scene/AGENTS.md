@@ -5,9 +5,21 @@ anything here; this file only says what this crate holds.
 
 ## Job
 
-What a stage shows and where, decided once in Rust for every shell. `Scene` holds the effects playing, their
-placement and margins, the scale, the order their layers are drawn in, when finished ones go, which frames are drawn
-and shared (under `FRAME_BUDGET`), which effects the host can see (a `View`: the rest play on undrawn), the game's answer to their cues (a `Feel`), and events (`StageEvent`).
+What a stage shows and where, decided once in Rust for every shell. `Scene` holds the effects playing (each a
+`Clip` and its `Clock`), their placement and margins, the scale, the order their layers are drawn in, when finished
+ones go, which frame each shows, which effects the host can see (a `View`: the rest play on undrawn), the game's
+answer to their cues (a `Feel`), and events (`StageEvent`).
+
+`Frames` is game-wide and shared by every `Scene` of the game (a canvas, a Phaser scene, a gpui window each, made
+with `Frames::scene`): the shared frames under one budget (`FRAME_BUDGET`) and the `Painter` that paints them. A
+frame one scene painted shows in every scene. The host ends each of its frames with `Frames::end_frame` once every
+scene drew.
+
+A `Painter` paints a `Job` (an effect's state brought to a frame, drawn placed and faded): `InlinePainter` on the
+spot (Canvas 2D, gpui, files, tests), or another painter elsewhere (a worker), whose frames come back through
+`Frames::deliver` (shared) and `Scene::deliver_own` (a fading effect's own). Until then the effect shows its last
+frame. The painter keeps each effect's state (`Sim`) between paints; `Scene` keeps only clocks, so deciding stays
+cheap on the thread that runs it.
 
 It drives the `Shell` contract, which every shell implements:
 
@@ -15,6 +27,9 @@ It drives the `Shell` contract, which every shell implements:
 - `refill(surface, frame)`: a new frame in a surface;
 - `show(pass, surface)`: draw a surface at `pass.rect`, colour normally, then light additively;
 - `free(surface)`: let go of a surface the scene dropped.
+
+Every draw call takes the `Frames` it draws from: `scene.draw(&mut frames, &mut shell)`, then
+`frames.end_frame(&mut shell)`.
 
 ## Belongs here
 
@@ -47,10 +62,14 @@ only when every shell needs it, and say so in the commit.
 - Past `FRAME_BUDGET`, least recently shown frames are dropped and their surfaces freed; a shell's surface count
   returns to 0 after every effect ends.
 - After `setScale`, no surface is shown at its old size.
+- A frame painted elsewhere is asked of the painter once, however many effects or scenes wait for it; each shows its
+  last frame until the frame is delivered. `Frames::end_frame` runs once per host frame, after every scene drew:
+  ending it per scene would drop a frame another scene shows in the same host frame.
 
 `tests/scene.rs` covers the hit-stop (`an_effects_hit_freezes_every_effect_and_tells_the_host_how_long`) and the
 budget (`frames_dropped_over_the_budget_come_back_the_same`, `every_surface_a_scene_drops_is_freed`,
-`clearing_a_scene_frees_everything_it_holds`). Follow-then-stop and `setScale` have no test yet (Task 3 of
+`clearing_a_scene_frees_everything_it_holds`); `tests/frames.rs` covers frames shared by several scenes and painters
+that paint elsewhere. Follow-then-stop and `setScale` have no test yet (Task 3 of
 `docs/superpowers/plans/2026-11-14-render-engine-boundary.md`); a change that touches them adds the test first.
 
 ## Before you finish

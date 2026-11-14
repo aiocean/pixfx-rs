@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `pixfx-scene`: painting leaves `Scene`. `Frames` holds the shared frames and a `Painter` for every scene of a game
+  (`Frames::scene`), so a frame one scene painted shows in all of them; hosts end each frame with
+  `Frames::end_frame`, and draw calls take the frames (`scene.draw(&mut frames, &mut shell)`). `InlinePainter`
+  paints on the spot; a painter on another thread hands frames back with `Frames::deliver` and
+  `Scene::deliver_own`, and an effect shows its last frame until then. `Scene::play` takes a `Clip`;
+  `Scene::load`, `set_frame_budget` and `frame_bytes` are `Frames::deliver`, `set_budget` and `bytes`.
+  `pixfx-core`: `Instance` is a `Clock` (time, stop, cues, fade, end) and a `Sim` (the effect's state, brought to a
+  frame on demand); `Clip` is what an effect draws and how big. Every `frame_hash` is unchanged.
 - `pixfx-scene`: `Scene::set_draw_budget(Some(n))` draws at most `n` layers per host frame (time-slicing); effects
   left over show their last frame and are drawn in a later host frame, the one waiting longest first, skipping to the
   frame their clock is on. `None` (the default) draws every layer whose frame changed, as before.

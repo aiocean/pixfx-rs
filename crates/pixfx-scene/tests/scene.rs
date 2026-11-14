@@ -6,14 +6,18 @@ use std::error::Error;
 use std::num::NonZeroU32;
 
 use pixfx_core::{
-    Canvas, Effect, EffectState, Layer, Meta, OptValue, Options, Placement, Player, render_frames,
+    Canvas, Clip, Effect, EffectState, Layer, Meta, OptValue, Options, Placement, Player,
+    render_frames,
 };
 use pixfx_draw::math::js_round;
 use pixfx_draw::{Frame, Painter, Rgba};
 use pixfx_effects::effect;
-use pixfx_scene::{Pass, Rect, Scene, Shell, StageEvent, color_rgba};
+use pixfx_scene::{Frames, InlinePainter, Pass, Rect, Scene, Shell, StageEvent, color_rgba};
 
 type Res = Result<(), Box<dyn Error>>;
+
+/// The shared frames a test scene draws from, painted on the spot.
+type Shared = Frames<Frame, InlinePainter>;
 
 /// A shell that keeps each drawn layer as a frame and records what it draws and shows.
 #[derive(Default)]
@@ -49,9 +53,11 @@ impl Shell for Recorder {
 }
 
 /// What `layer` of every instance shows, oldest first.
-fn shown(scene: &mut Scene<Frame>, layer: Layer) -> Vec<Frame> {
+/// One host frame.
+fn shown(frames: &mut Shared, scene: &mut Scene<Frame>, layer: Layer) -> Vec<Frame> {
     let mut r = Recorder::default();
-    assert_eq!(scene.draw_layer(layer, &mut r), Ok(()));
+    assert_eq!(scene.draw_layer(layer, frames, &mut r), Ok(()));
+    assert_eq!(frames.end_frame(&mut r), Ok(()));
     r.shown.into_iter().map(|(_, f)| f).collect()
 }
 
@@ -130,9 +136,9 @@ impl Effect for Layered {
     }
 }
 
-fn player(id: &str) -> Result<Player, Box<dyn Error>> {
+fn player(id: &str) -> Result<Clip, Box<dyn Error>> {
     let fx = effect(id).ok_or_else(|| format!("{id} not registered"))?;
-    Ok(Player::live(fx, Options::default()))
+    Ok(Clip::live(fx, Options::default()))
 }
 
 fn scale(n: u32) -> Result<NonZeroU32, Box<dyn Error>> {
@@ -141,8 +147,9 @@ fn scale(n: u32) -> Result<NonZeroU32, Box<dyn Error>> {
 
 #[test]
 fn finished_one_shot_is_removed() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    let shot = scene.play(Player::live(&BLIP, Options::default()), 0.0, 0.0)?;
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
+    let shot = scene.play(Clip::live(&BLIP, Options::default()), 0.0, 0.0)?;
     let fire = scene.play(player("fire/candle")?, 0.0, 0.0)?;
     scene.update(0.05)?;
     assert_eq!(scene.handles().collect::<Vec<_>>(), vec![shot, fire]);
@@ -157,8 +164,9 @@ fn finished_one_shot_is_removed() -> Res {
 
 #[test]
 fn a_host_draw_between_the_layers_lands_over_back_and_under_front() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    scene.play(Player::live(&LAYERED, Options::default()), 20.0, 20.0)?;
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
+    scene.play(Clip::live(&LAYERED, Options::default()), 20.0, 20.0)?;
     scene.update(0.1)?;
     let (red, blue) = (0xff00_00ff_u32, 0xffff_0000_u32);
     // (what happened, red shown, blue shown): the host's draw is the middle event
@@ -170,11 +178,11 @@ fn a_host_draw_between_the_layers_lands_over_back_and_under_front() -> Res {
             frame.color.contains(&blue),
         )
     };
-    for f in shown(&mut scene, Layer::Back) {
+    for f in shown(&mut frames, &mut scene, Layer::Back) {
         events.push(seen("back", &f));
     }
     events.push(("host", false, false));
-    for f in shown(&mut scene, Layer::Front) {
+    for f in shown(&mut frames, &mut scene, Layer::Front) {
         events.push(seen("front", &f));
     }
     assert_eq!(
@@ -224,7 +232,7 @@ fn a_sized_instance_gets_its_own_canvas_and_rect() -> Res {
         ]),
         ..Options::default()
     };
-    let live = Player::live(fx, opts);
+    let live = Clip::live(fx, opts);
     assert_eq!(
         live.canvas(),
         Canvas {
@@ -232,11 +240,9 @@ fn a_sized_instance_gets_its_own_canvas_and_rect() -> Res {
             origin: (50, 40)
         }
     );
-    assert_eq!(
-        (live.frame().w, live.frame().h),
-        (100 + 2 * 160, 50 + 2 * 160)
-    );
-    let mut scene: Scene<Frame> = Scene::new(scale(2)?);
+    assert_eq!(live.size(), (100 + 2 * 160, 50 + 2 * 160));
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(2)?);
     let h = scene.play(live, 200.0, 120.0)?;
     assert_eq!(
         scene.rect(h),
@@ -291,8 +297,8 @@ fn a_sized_player_draws_where_render_frames_does() -> Res {
 }
 
 /// The front frame of every instance, oldest first.
-fn fronts(scene: &mut Scene<Frame>) -> Vec<Vec<u32>> {
-    shown(scene, Layer::Front)
+fn fronts(frames: &mut Shared, scene: &mut Scene<Frame>) -> Vec<Vec<u32>> {
+    shown(frames, scene, Layer::Front)
         .into_iter()
         .map(|f| f.color)
         .collect()
@@ -300,15 +306,16 @@ fn fronts(scene: &mut Scene<Frame>) -> Vec<Vec<u32>> {
 
 #[test]
 fn setting_flip_mid_play_draws_it_flipped_without_restarting() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    let plain = scene.play(Player::live(&LAYERED, Options::default()), 10.0, 10.0)?;
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
+    let plain = scene.play(Clip::live(&LAYERED, Options::default()), 10.0, 10.0)?;
     let flipped = Options {
         flip: true,
         ..Options::default()
     };
-    scene.play(Player::live(&LAYERED, flipped), 10.0, 10.0)?;
+    scene.play(Clip::live(&LAYERED, flipped), 10.0, 10.0)?;
     scene.update(0.25)?;
-    let before = fronts(&mut scene);
+    let before = fronts(&mut frames, &mut scene);
     assert_ne!(
         before[0], before[1],
         "the test effect must look different flipped"
@@ -318,7 +325,7 @@ fn setting_flip_mid_play_draws_it_flipped_without_restarting() -> Res {
     assert!(scene.set(plain, Placement { flip: true, ..p })?);
 
     assert_eq!(scene.t(plain), Some(0.25), "set keeps the time");
-    let after = fronts(&mut scene);
+    let after = fronts(&mut frames, &mut scene);
     assert_eq!(after[0], after[1], "drawn as one played flipped");
     assert_eq!(scene.placement(plain), Some(Placement { flip: true, ..p }));
     Ok(())
@@ -326,10 +333,11 @@ fn setting_flip_mid_play_draws_it_flipped_without_restarting() -> Res {
 
 #[test]
 fn ended_effects_are_drained_once_in_order() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    let blip = scene.play(Player::live(&BLIP, Options::default()), 0.0, 0.0)?;
-    let held = scene.play(Player::live(&LAYERED, Options::default()), 0.0, 0.0)?;
-    let kept = scene.play(Player::live(&LAYERED, Options::default()), 0.0, 0.0)?;
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
+    let blip = scene.play(Clip::live(&BLIP, Options::default()), 0.0, 0.0)?;
+    let held = scene.play(Clip::live(&LAYERED, Options::default()), 0.0, 0.0)?;
+    let kept = scene.play(Clip::live(&LAYERED, Options::default()), 0.0, 0.0)?;
     assert!(scene.remove(held));
     scene.update(0.2)?;
 
@@ -398,8 +406,9 @@ const FRAME: f64 = 1.0 / 60.0;
 
 #[test]
 fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
-    let hitter = scene.play(Player::live(&HITTER, Options::default()), 0.0, 0.0)?;
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
+    let hitter = scene.play(Clip::live(&HITTER, Options::default()), 0.0, 0.0)?;
     let candle = scene.play(player("fire/candle")?, 0.0, 0.0)?;
     // play until the hit lands
     let mut played = 0.0;
@@ -428,14 +437,15 @@ fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
 
 #[test]
 fn cues_come_out_as_events_where_they_fire_on_the_stage() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     scene.set_screen_w(100.0);
-    let mirrored = scene.play(Player::live(&HITTER, Options::default()), 50.0, 20.0)?;
+    let mirrored = scene.play(Clip::live(&HITTER, Options::default()), 50.0, 20.0)?;
     scene.set(
         mirrored,
         Placement {
             flip: true,
-            ..Player::live(&HITTER, Options::default()).placement()
+            ..Clip::live(&HITTER, Options::default()).placement()
         },
     )?;
     scene.move_to(mirrored, 50.0, 20.0)?;
@@ -475,9 +485,10 @@ fn cues_come_out_as_events_where_they_fire_on_the_stage() -> Res {
 
 #[test]
 fn a_host_with_its_own_answer_gets_the_cues_and_every_second() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     scene.set_feel(None);
-    scene.play(Player::live(&HITTER, Options::default()), 0.0, 0.0)?;
+    scene.play(Clip::live(&HITTER, Options::default()), 0.0, 0.0)?;
     let mut played = 0.0;
     for _ in 0..20 {
         played += scene.update(FRAME)?;
@@ -497,20 +508,22 @@ fn a_host_with_its_own_answer_gets_the_cues_and_every_second() -> Res {
 }
 
 /// Draw both layers once with a fresh recorder: what it drew and showed.
-fn draw_once(scene: &mut Scene<Frame>) -> Recorder {
+fn draw_once(frames: &mut Shared, scene: &mut Scene<Frame>) -> Recorder {
     let mut r = Recorder::default();
-    assert_eq!(scene.draw(&mut r), Ok(()));
+    assert_eq!(scene.draw(frames, &mut r), Ok(()));
+    assert_eq!(frames.end_frame(&mut r), Ok(()));
     r
 }
 
 #[test]
 fn identical_effects_draw_each_frame_once_and_share_it() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     for i in 0..50 {
         scene.play(player("fire/candle")?, f64::from(i * 3), 40.0)?;
     }
     scene.update(0.1)?;
-    let r = draw_once(&mut scene);
+    let r = draw_once(&mut frames, &mut scene);
     assert_eq!(
         r.made, 2,
         "one frame, back and front, drawn once for fifty effects"
@@ -525,39 +538,45 @@ fn identical_effects_draw_each_frame_once_and_share_it() -> Res {
 
 #[test]
 fn nothing_is_drawn_again_until_the_frame_changes() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     scene.play(player("fire/candle")?, 20.0, 40.0)?;
     scene.update(0.1)?;
-    assert_eq!(draw_once(&mut scene).made, 2);
+    assert_eq!(draw_once(&mut frames, &mut scene).made, 2);
     // display refreshes at 120 Hz: a quarter of a 30 fps frame passes, nothing new to draw
     scene.update(1.0 / 120.0)?;
-    let r = draw_once(&mut scene);
+    let r = draw_once(&mut frames, &mut scene);
     assert_eq!((r.made, r.shown.len()), (0, 2), "shown again, not drawn");
     scene.update(1.0 / 30.0)?;
-    assert_eq!(draw_once(&mut scene).made, 2, "a new frame is drawn");
+    assert_eq!(
+        draw_once(&mut frames, &mut scene).made,
+        2,
+        "a new frame is drawn"
+    );
     Ok(())
 }
 
 #[test]
 fn a_fading_effect_redraws_its_own_frame_once_per_clock_frame() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let h = scene.play(player("fire/candle")?, 20.0, 40.0)?;
     scene.update(0.1)?;
     scene.stop(h);
     assert_eq!(
-        draw_once(&mut scene).made,
+        draw_once(&mut frames, &mut scene).made,
         2,
         "its own fade frame, back and front"
     );
     scene.update(1.0 / 120.0)?;
-    let r = draw_once(&mut scene);
+    let r = draw_once(&mut frames, &mut scene);
     assert_eq!(
         (r.made, r.refilled),
         (0, 0),
         "same clock frame: shown, not drawn"
     );
     scene.update(1.0 / 30.0)?;
-    let r = draw_once(&mut scene);
+    let r = draw_once(&mut frames, &mut scene);
     assert_eq!(
         (r.made, r.refilled),
         (0, 2),
@@ -568,17 +587,18 @@ fn a_fading_effect_redraws_its_own_frame_once_per_clock_frame() -> Res {
 
 #[test]
 fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     scene.play(player("fire/candle")?, 20.0, 40.0)?;
     scene.update(0.1)?;
-    let before = draw_once(&mut scene).shown;
-    let held = scene.frame_bytes();
+    let before = draw_once(&mut frames, &mut scene).shown;
+    let held = frames.bytes();
     assert!(held > 0);
     // a budget below one frame keeps only what the current draw shows
-    scene.set_frame_budget(1);
+    frames.set_budget(1);
     scene.update(1.0 / 30.0)?;
-    draw_once(&mut scene);
-    assert!(scene.frame_bytes() <= held, "the older frame went");
+    draw_once(&mut frames, &mut scene);
+    assert!(frames.bytes() <= held, "the older frame went");
     // come round to the first frame again: one whole loop of the candle
     let loop_s = effect("fire/candle").ok_or("candle")?.meta().duration;
     let mut left = loop_s - 1.0 / 30.0;
@@ -587,7 +607,7 @@ fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
         scene.update(dt)?;
         left -= dt;
     }
-    let again = draw_once(&mut scene);
+    let again = draw_once(&mut frames, &mut scene);
     assert_eq!(again.made, 2, "the dropped frame is drawn again");
     assert_eq!(
         again.shown.iter().map(|(_, f)| f).collect::<Vec<_>>(),
@@ -601,21 +621,25 @@ fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
 fn a_baked_clip_is_shown_without_drawing() -> Res {
     let fx = effect("fire/candle").ok_or("no candle")?;
     let clip = pixfx_export::bake(fx, Options::default())?;
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let mut loader = Recorder::default();
     for (k, [back, front]) in (0..).zip(&clip.frames) {
         let id = pixfx_core::FrameId {
             key: clip.key.clone(),
             index: k,
         };
-        assert_eq!(scene.load(&id, Layer::Back, back, &mut loader), Ok(()));
-        assert_eq!(scene.load(&id, Layer::Front, front, &mut loader), Ok(()));
+        assert_eq!(frames.deliver(&id, Layer::Back, back, &mut loader), Ok(()));
+        assert_eq!(
+            frames.deliver(&id, Layer::Front, front, &mut loader),
+            Ok(())
+        );
     }
     scene.play(player("fire/candle")?, 20.0, 40.0)?;
     // a whole loop at uneven steps: every frame shown comes from the bake
     for step in [0.013, 0.021, 0.034, 0.008].iter().cycle().take(100) {
         scene.update(*step)?;
-        let r = draw_once(&mut scene);
+        let r = draw_once(&mut frames, &mut scene);
         assert_eq!((r.made, r.shown.len()), (0, 2), "shown, not drawn");
     }
     // other options are another clip: drawn live
@@ -623,20 +647,26 @@ fn a_baked_clip_is_shown_without_drawing() -> Res {
         seed: Some(7),
         ..Options::default()
     };
-    scene.play(Player::live(fx, other), 60.0, 40.0)?;
+    scene.play(Clip::live(fx, other), 60.0, 40.0)?;
     scene.update(0.0)?;
-    assert_eq!(draw_once(&mut scene).made, 2);
+    assert_eq!(draw_once(&mut frames, &mut scene).made, 2);
     Ok(())
 }
 
 /// Run `scene` in 1/30 s steps, drawing after each with `shell`, until no instance plays; at most `steps` steps.
-fn run_out(scene: &mut Scene<Frame>, shell: &mut Recorder, steps: usize) -> Res {
+fn run_out(
+    frames: &mut Shared,
+    scene: &mut Scene<Frame>,
+    shell: &mut Recorder,
+    steps: usize,
+) -> Res {
     for _ in 0..steps {
         if scene.handles().next().is_none() {
             break;
         }
         scene.update(1.0 / 30.0)?;
-        assert_eq!(scene.draw(shell), Ok(()));
+        assert_eq!(scene.draw(frames, shell), Ok(()));
+        assert_eq!(frames.end_frame(shell), Ok(()));
     }
     assert_eq!(scene.handles().count(), 0, "every instance ended");
     Ok(())
@@ -644,43 +674,47 @@ fn run_out(scene: &mut Scene<Frame>, shell: &mut Recorder, steps: usize) -> Res 
 
 #[test]
 fn every_surface_a_scene_drops_is_freed() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let mut shell = Recorder::default();
     let fading = scene.play(player("fire/candle")?, 20.0, 40.0)?;
     scene.play(player("fire/candle")?, 60.0, 40.0)?;
     scene.update(0.1)?;
-    assert_eq!(scene.draw(&mut shell), Ok(()));
+    assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
     scene.stop(fading);
     let other = scene.handles().nth(1).ok_or("second candle")?;
     // the fading one draws into its own surfaces; the other keeps sharing frames, then goes
     scene.update(1.0 / 30.0)?;
-    assert_eq!(scene.draw(&mut shell), Ok(()));
+    assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
     assert!(scene.remove(other));
     // a budget below one frame drops every shared frame not shown in the current draw
-    scene.set_frame_budget(1);
-    run_out(&mut scene, &mut shell, 600)?;
-    // one more draw hands over what the last update released
-    assert_eq!(scene.draw(&mut shell), Ok(()));
-    assert_eq!(scene.frame_bytes(), 0, "no shared frame left");
+    frames.set_budget(1);
+    run_out(&mut frames, &mut scene, &mut shell, 600)?;
+    // one more host frame hands over what the last update released
+    assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
+    assert_eq!(frames.end_frame(&mut shell), Ok(()));
+    assert_eq!(frames.bytes(), 0, "no shared frame left");
     assert_eq!(shell.freed, shell.made, "every surface made was freed");
     Ok(())
 }
 
 #[test]
 fn clearing_a_scene_frees_everything_it_holds() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let mut shell = Recorder::default();
     let h = scene.play(player("fire/candle")?, 20.0, 40.0)?;
     scene.play(player("fire/candle")?, 60.0, 40.0)?;
     scene.update(0.1)?;
-    assert_eq!(scene.draw(&mut shell), Ok(()));
+    assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
     scene.stop(h);
     scene.update(1.0 / 30.0)?;
-    assert_eq!(scene.draw(&mut shell), Ok(()));
+    assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
     assert!(shell.made > 0);
-    assert_eq!(scene.clear(&mut shell), Ok(()));
+    assert_eq!(scene.clear(&mut frames, &mut shell), Ok(()));
+    assert_eq!(frames.clear(&mut shell), Ok(()));
     assert_eq!(shell.freed, shell.made, "every surface made was freed");
-    assert_eq!(scene.frame_bytes(), 0);
+    assert_eq!(frames.bytes(), 0);
     assert_eq!(scene.handles().count(), 0);
     let ends = scene
         .drain_events()
@@ -735,7 +769,7 @@ fn distinct_tickers(scene: &mut Scene<Frame>, n: u64) -> Res {
             seed: Some(100 + i),
             ..Options::default()
         };
-        scene.play(Player::live(&TICKER, opts), 0.0, (i * 10) as f64)?;
+        scene.play(Clip::live(&TICKER, opts), 0.0, (i * 10) as f64)?;
     }
     Ok(())
 }
@@ -746,7 +780,8 @@ fn budget(n: u32) -> Option<NonZeroU32> {
 
 #[test]
 fn a_draw_budget_draws_at_most_that_many_frames_per_host_frame() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     distinct_tickers(&mut scene, 6)?;
     scene.set_draw_budget(budget(2));
     scene.update(0.1)?;
@@ -755,7 +790,7 @@ fn a_draw_budget_draws_at_most_that_many_frames_per_host_frame() -> Res {
     for _ in 0..4 {
         let mut r = Recorder::default();
         scene
-            .draw_layer(Layer::Front, &mut r)
+            .draw_layer(Layer::Front, &mut frames, &mut r)
             .map_err(|()| "draw")?;
         seen.push((r.made, r.shown.len()));
     }
@@ -765,7 +800,8 @@ fn a_draw_budget_draws_at_most_that_many_frames_per_host_frame() -> Res {
 
 #[test]
 fn under_a_draw_budget_every_effect_gets_its_turn_and_shows_its_last_frame_meanwhile() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     distinct_tickers(&mut scene, 6)?;
     scene.set_draw_budget(budget(2));
     scene.update(0.1)?;
@@ -773,7 +809,7 @@ fn under_a_draw_budget_every_effect_gets_its_turn_and_shows_its_last_frame_meanw
     for _ in 0..3 {
         let mut r = Recorder::default();
         scene
-            .draw_layer(Layer::Front, &mut r)
+            .draw_layer(Layer::Front, &mut frames, &mut r)
             .map_err(|()| "draw")?;
         last.extend(r.shown.into_iter().map(|(p, f)| (p.handle, f)));
     }
@@ -783,7 +819,7 @@ fn under_a_draw_budget_every_effect_gets_its_turn_and_shows_its_last_frame_meanw
         scene.update(1.0 / 30.0)?;
         let mut r = Recorder::default();
         scene
-            .draw_layer(Layer::Front, &mut r)
+            .draw_layer(Layer::Front, &mut frames, &mut r)
             .map_err(|()| "draw")?;
         assert_eq!(r.made, 2, "never more than the budget");
         assert_eq!(
@@ -806,30 +842,32 @@ fn under_a_draw_budget_every_effect_gets_its_turn_and_shows_its_last_frame_meanw
 
 #[test]
 fn a_frame_drawn_late_is_the_one_its_effect_shows_now() -> Res {
-    let (mut capped, mut free): (Scene<Frame>, Scene<Frame>) =
-        (Scene::new(scale(1)?), Scene::new(scale(1)?));
+    let (mut capped_frames, mut free_frames) = (Shared::default(), Shared::default());
+    let mut capped: Scene<Frame> = capped_frames.scene(scale(1)?);
+    let mut free: Scene<Frame> = free_frames.scene(scale(1)?);
     distinct_tickers(&mut capped, 3)?;
     distinct_tickers(&mut free, 3)?;
     capped.set_draw_budget(budget(1));
     for _ in 0..3 {
         capped.update(1.0 / 30.0)?;
         free.update(1.0 / 30.0)?;
-        shown(&mut capped, Layer::Front);
+        shown(&mut capped_frames, &mut capped, Layer::Front);
     }
     // the clock stops: the capped scene catches up one effect per host frame, to what the free one shows
     for _ in 0..3 {
-        shown(&mut capped, Layer::Front);
+        shown(&mut capped_frames, &mut capped, Layer::Front);
     }
     assert_eq!(
-        shown(&mut capped, Layer::Front),
-        shown(&mut free, Layer::Front)
+        shown(&mut capped_frames, &mut capped, Layer::Front),
+        shown(&mut free_frames, &mut free, Layer::Front)
     );
     Ok(())
 }
 
 #[test]
 fn fading_effects_redraw_their_own_frames_within_the_budget() -> Res {
-    let mut scene: Scene<Frame> = Scene::new(scale(1)?);
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     distinct_tickers(&mut scene, 3)?;
     scene.update(0.1)?;
     for h in scene.handles().collect::<Vec<_>>() {
@@ -839,7 +877,7 @@ fn fading_effects_redraw_their_own_frames_within_the_budget() -> Res {
     let mut r = Recorder::default();
     for _ in 0..3 {
         scene
-            .draw_layer(Layer::Front, &mut r)
+            .draw_layer(Layer::Front, &mut frames, &mut r)
             .map_err(|()| "draw")?;
     }
     assert_eq!(
@@ -850,7 +888,7 @@ fn fading_effects_redraw_their_own_frames_within_the_budget() -> Res {
     scene.update(1.0 / 30.0)?;
     let mut r = Recorder::default();
     scene
-        .draw_layer(Layer::Front, &mut r)
+        .draw_layer(Layer::Front, &mut frames, &mut r)
         .map_err(|()| "draw")?;
     assert_eq!(
         (r.refilled, r.shown.len()),

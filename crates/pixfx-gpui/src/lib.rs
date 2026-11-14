@@ -17,9 +17,9 @@ use gpui::{
     Bounds, Corners, Pixels, Point, RenderImage, SpriteBlend, SpriteFilter, Window, point, px, size,
 };
 use image::{Frame as ImageFrame, RgbaImage};
-use pixfx_core::{Effect, Layer, Options, Player};
+use pixfx_core::{Clip, Effect, Layer, Options};
 use pixfx_draw::Frame;
-use pixfx_scene::{Pass, Scene, Shell};
+use pixfx_scene::{Frames, InlinePainter, Pass, Scene, Shell};
 
 /// A rectangle of source pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -138,6 +138,8 @@ impl Painted {
 /// when one leaves the atlas; this crate only uploads, paints and drops images. Paint each effect with
 /// [`FxScene::paint`], then call [`FxScene::end_frame`] once per window frame.
 pub struct FxScene {
+    /// The frames the scene shares, painted on the spot.
+    frames: Frames<Painted, InlinePainter>,
     scene: Scene<Painted>,
     /// Images no effect paints any more, dropped from the atlas at the end of the frame.
     retired: Vec<Arc<RenderImage>>,
@@ -146,10 +148,12 @@ pub struct FxScene {
 impl Default for FxScene {
     fn default() -> Self {
         // effects sit at their view's origin in effect pixels; the view scales them as it paints
-        let mut scene = Scene::new(NonZeroU32::MIN);
+        let mut frames = Frames::default();
+        let mut scene = frames.scene(NonZeroU32::MIN);
         // a gpui app answers cues with its own feel, if any
         scene.set_feel(None);
         Self {
+            frames,
             scene,
             retired: Vec::new(),
         }
@@ -166,7 +170,7 @@ impl FxScene {
     pub fn play(&mut self, effect: &'static dyn Effect, opts: Options) -> Result<FxHandle> {
         let handle = self
             .scene
-            .play(Player::live(effect, opts), 0.0, 0.0)
+            .play(Clip::live(effect, opts), 0.0, 0.0)
             .map_err(|e| anyhow!(e))?;
         Ok(FxHandle(handle))
     }
@@ -195,7 +199,7 @@ impl FxScene {
 
     /// Bytes the shared frames may hold ([`pixfx_core::FRAME_BUDGET`] unless set).
     pub fn set_budget(&mut self, bytes: u64) {
-        self.scene.set_frame_budget(bytes);
+        self.frames.set_budget(bytes);
     }
 
     /// Draw at most `layers` layers per window frame, or every changed one with `None` (the default); effects
@@ -207,7 +211,7 @@ impl FxScene {
 
     /// Bytes the shared frames hold.
     pub fn bytes(&self) -> u64 {
-        self.scene.frame_bytes()
+        self.frames.bytes()
     }
 
     /// Paint `layer` of `fx` with the effect's origin at `origin`, each effect pixel `scale` x `scale` logical
@@ -228,7 +232,8 @@ impl FxScene {
             scale: scale.max(1) as f32,
             retired: &mut self.retired,
         };
-        self.scene.draw_handle(fx.0, layer, &mut shell)
+        self.scene
+            .draw_handle(fx.0, layer, &mut self.frames, &mut shell)
     }
 
     /// Call once after every effect is painted: drops from `window`'s atlas the images replaced or released this
@@ -240,7 +245,8 @@ impl FxScene {
             scale: 1.0,
             retired: &mut self.retired,
         };
-        self.scene.end_frame(&mut shell)?;
+        self.scene.end_frame(&mut self.frames, &mut shell)?;
+        self.frames.end_frame(&mut shell)?;
         let mut dropping = Ok(());
         for image in self.retired.drain(..) {
             // every image goes even if one fails, so a failing drop cannot leak the rest
