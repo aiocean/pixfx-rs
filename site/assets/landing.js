@@ -17,9 +17,10 @@ export async function mount() {
   const off = new AbortController();
   setupTabs(document.getElementById("targets"));
 
-  await init();
+  // the skill icon atlases (site/art/skill-icons.sh), by icon size; the hero waits for them, as for the engine
+  const [, icons] = await Promise.all([init(), loadIcons([32, 24])]);
 
-  const hero = createHero(document.getElementById("scene"), off.signal);
+  const hero = createHero(document.getElementById("scene"), off.signal, icons);
   let last = null;
   let running = true;
   // the hero plays only while it is on screen; scrolled away, it waits where it was
@@ -56,8 +57,8 @@ export async function mount() {
 
 // ---------- hero ----------
 
-function createHero(canvas, signal) {
-  const view = { canvas, stage: null, duel: null, feel: null, sprites: null, lights: null, layout: null, handles: new Map() };
+function createHero(canvas, signal, icons) {
+  const view = { canvas, icons, stage: null, duel: null, feel: null, sprites: null, lights: null, layout: null, handles: new Map() };
   const have = new Set(effects());
   let seed = 1 + Math.floor(Math.random() * 1e6);
 
@@ -159,8 +160,10 @@ function createHero(canvas, signal) {
       ctx.fillRect(0, (h - band) * scale, w * scale, band * scale);
     }
     drawBars(ctx, view.sprites, view.duel, scale, view.layout.barTop);
-    // each fighter's skills, on the floor under its own side
-    drawSkills(ctx, view.duel, scale, ground, h);
+    // each fighter's skills, on the floor under its own side: bigger icons where the floor has the room, from the
+    // atlas whose pixels land on whole screen pixels
+    const icon = h - ground >= 20 ? 16 : 12;
+    drawSkills(ctx, view.duel, scale, h, icon, (icon * scale) % 32 === 0 ? view.icons[32] : view.icons[24]);
   };
 
   let pending = null;
@@ -179,6 +182,17 @@ function createHero(canvas, signal) {
 
   build();
   return view;
+}
+
+/** Each skill icon atlas, by the size of its icons: `{ [size]: { image, size } }`. */
+async function loadIcons(sizes) {
+  const atlases = await Promise.all(sizes.map(async (size) => {
+    const image = new Image();
+    image.src = new URL(`skills-${size}.png`, import.meta.url).href;
+    await image.decode();
+    return [size, { image, size }];
+  }));
+  return Object.fromEntries(atlases);
 }
 
 // ---------- proof ----------

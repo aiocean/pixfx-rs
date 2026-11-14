@@ -23,7 +23,8 @@
 - `pixfx-core`, `pixfx-wasm`: `HitFlash` fills a struck sprite for a few frames on play time, held through a hit-stop.
 - `site/`: the hero's duel shows each fighter's skill bar on the dais floor: slots 1, 2 and 3 and the ultimate. The
   spells in a slot share one cooldown, which darkens the slot and sweeps back as it runs out; the ultimate's slot
-  fills with rage.
+  fills with rage. The icons are generated (OpenRouter `bytedance-seed/seedream-5-5`, with a frame of the duel as
+  reference) and pixelated to 32 and 24 px atlases by `site/art/skill-icons.sh`.
 - `site/`: the effect page picks a palette preset, an outline and (for impact effects) the feel, and copies the call.
 - `pixfx-core`: the trauma shake follows the usual model on every axis: `Feel::roll(strength)` tilts the screen
   (radians, `FeelSpec::roll`) next to `shake`'s x and y, each axis is the most it can move times trauma squared times

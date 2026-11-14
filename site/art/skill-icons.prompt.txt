@@ -1,0 +1,17 @@
+Skill icons for the pixel-art fighting game in the reference images. Reference 1 is a frame of the game: a night duel between a gold Thunder cultivator and an ice-blue Frost cultivator. Reference 2 is its HUD: bronze frames, chunky square pixels, a dark night-purple field. Match the game's pixel size, palette and bronze-and-glow look exactly.
+
+Make one sheet of 8 icons in a strict grid of 4 columns and 2 rows on a plain black (#000000) background, with a wide black gap between icons. Each icon is a square drawn on a 32 by 32 grid of hard-edged, perfectly square pixels (every pixel the same size, no anti-aliasing, no blur, no soft glow), so it reads clearly at 32 x 32 pixels.
+
+Each icon: a dark night-purple (#1a1424) square field, and on it ONE bold, simple, centred silhouette that fills most of the field, a 1-pixel dark outline round it, and only 3 shades of one colour plus white for the highlight. No small details, no particles, no scenery, no text, numbers or letters, no frame or border.
+
+Top row, Thunder, gold (#6a4410, #e8b030, #ffd84a, white):
+1. A single thick zigzag lightning bolt.
+2. A round gold seal disc seen from the front, a short bolt striking up from its centre.
+3. A temple bell.
+4. Ultimate: a dark cloud with three short bolts falling from it, the boldest of the row.
+
+Bottom row, Frost, ice blue (#2c58aa, #62c8f4, #a6ecff, white):
+5. A single long ice shard pointing up-right.
+6. A six-pointed burst of ice shards.
+7. A tall hexagonal ice shield.
+8. Ultimate: an ice crystal cage, the boldest of the row.

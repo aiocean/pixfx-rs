@@ -240,13 +240,8 @@ function medallion(f, x, top, size, box, c, faces) {
 
 // ---------- the skill bars ----------
 
-/** Each slot's mark, 5 by 5, in slot order: a strike, a seal, a guard, and the ultimate's burst. */
-const GLYPH = [
-  ["..##.", ".##..", "#####", "..##.", ".##.."],
-  [".###.", "#...#", "#.#.#", "#...#", ".###."],
-  ["#####", "#...#", "#...#", ".#.#.", "..#.."],
-  ["#.#.#", ".###.", "#####", ".###.", "#.#.#"],
-];
+/** Each school's row in the skill icon atlases (site/art/skill-icons.sh); its slots are the columns, in order. */
+const ICON_ROW = { thunder: 0, frost: 1 };
 /** The numbers on slots 1, 2 and 3, 3 by 5. */
 const DIGIT = [
   [".#.", "##.", ".#.", ".#.", "###"],
@@ -261,23 +256,23 @@ const glints = new WeakMap();
 
 /**
  * Each fighter's skill bar on the floor of the dais, under its own side: slots 1, 2 and 3 and the ultimate, the
- * ultimate nearest the middle. A slot's mark is lit while a spell in it can be cast; a cooldown darkens it and
+ * ultimate nearest the middle. A slot's icon is lit while a spell in it can be cast; a cooldown darkens it and
  * sweeps back clockwise as it runs out; a cast flashes it and the end of a cooldown glints its frame. The
- * ultimate's slot fills with rage and blazes once full. The floor runs from row `ground` to row `bottom`.
+ * ultimate's slot fills with rage and blazes once full. The slots stand on row `bottom`, the foot of the scene.
+ * Each icon is `n` game pixels square, drawn from `icons`, a skill icon atlas: its `image` and the `size` of each
+ * icon in it, in the atlas's own pixels (finer than the game's, so an icon keeps its detail).
  */
-export function drawSkills(ctx, duel, s, ground, bottom) {
+export function drawSkills(ctx, duel, s, bottom, n, icons) {
   const box = (x, y, w, h, col, a = 1) => {
     ctx.globalAlpha = a;
     ctx.fillStyle = col;
     ctx.fillRect(x * s, y * s, w * s, h * s);
     ctx.globalAlpha = 1;
   };
-  // under the slab's lip, centred in what is left of the floor
-  const room = bottom - ground - 3;
-  const size = Math.max(9, Math.min(15, room - 2));
-  const top = ground + 3 + Math.floor((room - size) / 2);
-  const n = size - 4;
-  const dot = Math.max(1, Math.floor(n / 5));
+  // an icon in a two-pixel bronze frame, standing on the foot of the scene
+  const size = n + 4;
+  const top = bottom - size;
+  ctx.imageSmoothingEnabled = false;
   for (const f of duel.fighters) {
     const c = colors(f.school);
     const seen = glints.get(f) ?? { left: [], at: [] };
@@ -293,16 +288,14 @@ export function drawSkills(ctx, duel, s, ground, bottom) {
       box(x + 1, top + 1, size - 2, 1, full && blaze ? "#ffffff" : BRONZE.light);
       box(x + 2, top + 2, n, n, SLOT.field);
       if (slot.empty) return;
+      // a slot that cannot be cast (its cooldown, too little qi, a silence) keeps its icon, faint
+      ctx.globalAlpha = slot.ready ? 1 : 0.3;
+      const k = icons.size;
+      ctx.drawImage(icons.image, i * k, ICON_ROW[f.school] * k, k, k, (x + 2) * s, (top + 2) * s, n * s, n * s);
+      ctx.globalAlpha = 1;
       // the ultimate's rage, rising from the foot of the slot
       const rage = Math.round(n * slot.charge);
-      if (slot.ultimate) box(x + 2, top + 2 + n - rage, n, rage, c.glow, full ? (blaze ? 0.45 : 0.25) : 0.3);
-      const gx = x + 2 + Math.floor((n - 5 * dot) / 2);
-      const gy = top + 2 + Math.floor((n - 5 * dot) / 2);
-      GLYPH[i].forEach((row, r) => {
-        // a slot that cannot be cast (its cooldown, too little qi, a silence) keeps its mark, faint
-        for (let k = 0; k < 5; k++) if (row[k] === "#") box(gx + k * dot, gy + r * dot, dot, dot, c.glow, slot.ready ? 1 : 0.3);
-      });
-      if (slot.ready) box(gx, gy, 5 * dot, 1, "#ffffff", 0.25);
+      if (slot.ultimate) box(x + 2, top + 2 + n - rage, n, rage, c.glow, full ? (blaze ? 0.3 : 0.1) : 0.3);
       // the cooldown: the share still to run stays dark, sweeping clockwise from twelve o'clock
       if (slot.left > 0 && slot.full > 0) {
         const dark = slot.left / slot.full;
