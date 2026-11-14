@@ -45,8 +45,9 @@ pub fn kit() -> Vec<Skill> {
     ]
 }
 
+/// The site's duel's body (pixfx-fighter's `BodySpec::default`).
 pub fn body() -> BodySize {
-    BodySize { half_width: 6.0, chest: 14.0, body: 24.0, duck: 14.0, walk: 60.0 }
+    BodySize { half_width: 6.0, chest: 20.0, body: 34.0, duck: 16.0, walk: 52.0 }
 }
 
 pub fn profile() -> Profile {

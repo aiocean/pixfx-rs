@@ -5,9 +5,11 @@
 
 #![forbid(unsafe_code)]
 
+mod candidates;
 mod choice;
 mod curve;
 mod habits;
+mod pick;
 mod posture;
 mod reading;
 mod rng;
@@ -16,9 +18,11 @@ mod skill;
 mod view;
 mod yomi;
 
+pub use candidates::{candidates, Candidate, Ctx};
 pub use choice::{Choice, Outcome, Posture, Thought, Why};
 pub use habits::{foe_move, FoeMove, Habits};
 pub use curve::{score, Consideration, Curve, Input, Inputs};
+pub use pick::{pick, Read};
 pub use posture::{choose_posture, Category, Held, PostureDef, POSTURES};
 pub use reading::{is_area, is_close, is_ranged, punisher, Reading};
 pub use rng::Rng;
