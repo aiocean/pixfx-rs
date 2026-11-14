@@ -30,7 +30,7 @@ use js_sys::{Array, Uint8Array, Uint8ClampedArray};
 use pixfx_core::{Feel, Layer, Meta, Options, Player};
 use pixfx_draw::Frame;
 use pixfx_effects::effect;
-use pixfx_scene::{Pass, PlacementChange, Scene, Shell, View, color_rgba, light_rgba};
+use pixfx_scene::{Pass, PlacementChange, Scene, Shell, StageError, View, color_rgba, light_rgba};
 use pixfx_wasm::js::{pair, parse, to_js};
 use pixfx_wasm::parse_options;
 use wasm_bindgen::Clamped;
@@ -287,10 +287,12 @@ impl Stage {
     }
 
     /// How hard the stage's own loop (`start`, `tick`) shakes the view: 1 as designed (the default), 0 not at
-    /// all, for a player who turns shake off.
+    /// all, for a player who turns shake off. Throws if `strength` is not finite.
     #[wasm_bindgen(js_name = setShakeStrength)]
-    pub fn set_shake_strength(&mut self, strength: f64) {
-        self.renderer.borrow_mut().shake_strength = if strength > 0.0 { strength } else { 0.0 };
+    pub fn set_shake_strength(&mut self, strength: f64) -> Result<(), JsError> {
+        self.renderer.borrow_mut().shake_strength =
+            shake_strength(strength).map_err(|e| JsError::new(&e.to_string()))?;
+        Ok(())
     }
 
     /// How shaken the view is, 0 to 1.
@@ -393,6 +395,21 @@ impl Stage {
     }
 }
 
+/// The shake strength a player setting gives: `input` itself above 0, 0 at or below 0. A strength that is not finite
+/// is refused: it would shake the view without end.
+pub fn shake_strength(input: f64) -> Result<f64, StageError> {
+    if !input.is_finite() {
+        return Err(StageError::NotFinite);
+    }
+    Ok(if input > 0.0 { input } else { 0.0 })
+}
+
+/// How far, in game pixels, the own loop's shake can move the view: the feel's `shake` times the player's
+/// `strength`, or 0 with the feel off.
+pub fn shake_reach(feel: Option<&Feel>, strength: f64) -> f64 {
+    feel.map_or(0.0, |f| f.spec().shake * strength)
+}
+
 /// What the stage's own loop can show: its canvas (`canvas_w` x `canvas_h` canvas pixels, `scale` per game pixel)
 /// in game pixels, grown by `shake_px` game pixels on every side because the shake moves the view that far.
 pub fn own_view(canvas_w: u32, canvas_h: u32, scale: NonZeroU32, shake_px: f64) -> View {
@@ -435,10 +452,7 @@ impl Renderer {
         let canvas = ctx.canvas().ok_or("the 2d context has no canvas")?;
         let (w, h) = (f64::from(canvas.width()), f64::from(canvas.height()));
         // draw only what the canvas can show, however far the shake moves it
-        let shake_px = self
-            .scene
-            .feel()
-            .map_or(0.0, |f| f.spec().shake * self.shake_strength);
+        let shake_px = shake_reach(self.scene.feel(), self.shake_strength);
         let view = own_view(
             canvas.width(),
             canvas.height(),
