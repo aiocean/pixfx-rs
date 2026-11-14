@@ -9,7 +9,7 @@ export const cpuProfileSchema = z.object({
 
 export type CpuProfile = z.infer<typeof cpuProfileSchema>;
 
-export const CATEGORIES = ["engine (wasm)", "copy out of wasm", "pixel convert", "texture upload", "pixfx-phaser", "phaser", "gc", "browser (program)", "idle", "other"] as const;
+export const CATEGORIES = ["engine (wasm)", "copy out of wasm", "texture upload", "pixfx-phaser", "phaser", "gc", "browser (program)", "idle", "other"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 const UPLOAD = new Set(["putImageData", "getImageData", "texImage2D", "texSubImage2D", "drawImage"]);
@@ -21,7 +21,6 @@ export function categorize(functionName: string, url: string): Category {
   if (functionName === "(program)") return "browser (program)";
   if (url.endsWith(".wasm")) return "engine (wasm)";
   if (url.includes("pixfx_wasm.js")) return "copy out of wasm";
-  if (url.includes("/src/pixels.ts")) return "pixel convert";
   if (UPLOAD.has(functionName)) return "texture upload";
   if (url.includes("/src/")) return "pixfx-phaser";
   if (url.includes("phaser")) return "phaser";
@@ -34,7 +33,6 @@ export function categoryTimes(p: CpuProfile): Record<Category, number> {
   const out: Record<Category, number> = {
     "engine (wasm)": 0,
     "copy out of wasm": 0,
-    "pixel convert": 0,
     "texture upload": 0,
     "pixfx-phaser": 0,
     phaser: 0,

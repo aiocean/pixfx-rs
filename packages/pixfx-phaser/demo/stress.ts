@@ -1,14 +1,14 @@
-// Stress page: many effects at once, measured per frame. Open `stress.html?n=100&mix=mixed&mode=objects`, or
+// Stress page: many effects at once, measured per frame. Open `stress.html?n=100&mix=mixed`, or
 // `stress.html?sweep=10,25,50,100` to step through counts and print a table (also on `window.pixfxStress`).
-// `workers=N` sets the effect workers (0: draw on the main thread; default: the package default) and
-// `slowdown=K` stretches each worker batch K times (phone emulation: Chrome cannot CPU-throttle workers).
+// `workers=N` sets the painting workers (0: paint on the main thread; default: the package default) and
+// `slowdown=K` stretches each worker message K times (phone emulation: Chrome cannot CPU-throttle workers).
 // `seeds=shared` gives every effect of one id the same seed, so identical effects share frames; the default gives
 // each its own.
-// Frame cost is main-thread time from Phaser's PRE_STEP to POST_RENDER (update, inline effect drawing, layer
-// uploads and the render submission; uploads of frames arriving from workers happen between steps and are not
-// in it); fps is game steps per second, which also drops when the GPU falls behind.
+// Frame cost is main-thread time from Phaser's PRE_STEP to POST_RENDER (update, painting on the main thread, uploads
+// and the render submission; uploads of frames arriving from workers happen between steps and are not in it); fps is
+// game steps per second, which also drops when the GPU falls behind.
 import Phaser from "phaser";
-import type { Counts, PixfxEffect, PixfxLayer } from "../src";
+import type { Counts, PixfxEffect } from "../src";
 import { PixfxPlugin, loadPixfx } from "../src";
 import { defaultWorkers } from "../src/load";
 import type { Seeds } from "./seeds";
@@ -19,12 +19,10 @@ const HEIGHT = 360;
 const IDS = ["fire/candle", "fire/campfire", "fire/brazier"] as const;
 
 type Mix = "candle" | "campfire" | "brazier" | "mixed";
-type Mode = "objects" | "layer";
 
 interface Config {
   n: number;
   mix: Mix;
-  mode: Mode;
   /** Share of effects (0..1) that follow a moving sprite. */
   follow: number;
   /** Effects stopped and replaced per second. */
@@ -72,7 +70,6 @@ function mixParam(): Mix {
 const base: Config = {
   n: num("n", 50),
   mix: mixParam(),
-  mode: params.get("mode") === "layer" ? "layer" : "objects",
   follow: Math.min(1, Math.max(0, num("follow", 0))),
   churn: Math.max(0, num("churn", 0)),
   seeds: seedsParam(params.get("seeds")),
@@ -99,7 +96,6 @@ class StressScene extends Phaser.Scene {
   cfg: Config = base;
   private rand = rng(1);
   private live: PixfxEffect[] = [];
-  private layer: PixfxLayer | null = null;
   private churnDebt = 0;
   private spawned = 0;
 
@@ -113,7 +109,6 @@ class StressScene extends Phaser.Scene {
     this.churnDebt = 0;
     this.spawned = 0;
     this.add.rectangle(0, 0, WIDTH, HEIGHT, 0x1a1a24).setOrigin(0, 0).setDepth(-10);
-    this.layer = this.cfg.mode === "layer" ? this.pixfx.createLayer({ bounds: { x: 0, y: 0, width: WIDTH, height: HEIGHT } }) : null;
     const followers = Math.round(this.cfg.n * this.cfg.follow);
     for (let i = 0; i < this.cfg.n; i++) {
       const effect = this.spawn();
@@ -148,7 +143,7 @@ class StressScene extends Phaser.Scene {
     const id = IDS[i] ?? IDS[0];
     const opts = { seed: stressSeed(this.cfg.seeds, this.spawned, i) };
     this.spawned += 1;
-    const fx = this.layer ? this.layer.play(id, x, y, opts) : this.pixfx.play(id, x, y, { ...opts, depth: { back: y, front: y + 0.5 } });
+    const fx = this.pixfx.play(id, x, y, { ...opts, depth: { back: y, front: y + 0.5 } });
     this.live.push(fx);
     const forget = (): void => {
       this.live = this.live.filter((e) => e !== fx);
@@ -175,7 +170,7 @@ function rendererType(): number {
 }
 
 function row(r: Result): string {
-  return [r.mode, r.mix, r.n, r.follow, r.churn, r.seeds, r.workers, r.slowdown, r.fps, r.cpuMedian, r.cpuP95, r.stats.textures].map(String).join("\t");
+  return [r.mix, r.n, r.follow, r.churn, r.seeds, r.workers, r.slowdown, r.fps, r.cpuMedian, r.cpuP95, r.stats.textures].map(String).join("\t");
 }
 
 async function main(): Promise<void> {
@@ -207,7 +202,7 @@ async function main(): Promise<void> {
 
   const hud = document.getElementById("hud");
   const results: Result[] = [];
-  const header = "mode\tmix\tn\tfollow\tchurn\tseeds\tworkers\tslowdown\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
+  const header = "mix\tn\tfollow\tchurn\tseeds\tworkers\tslowdown\tfps\tcpu-med-ms\tcpu-p95-ms\ttextures";
 
   async function run(cfg: Config): Promise<Result> {
     game.loop.wake();

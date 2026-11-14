@@ -24,17 +24,15 @@ const POOLS = [
   { name: "default worker pool", query: "" },
 ];
 const SCENARIOS = [
-  { name: "fires, one object each", query: "mix=mixed&mode=objects" },
-  { name: "fires, one object each, shared seeds (identical fires share frames)", query: "mix=mixed&mode=objects&seeds=shared" },
-  { name: "fires, one shared layer", query: "mix=mixed&mode=layer" },
-  { name: "game-like: half follow sprites, 10 replaced/s", query: "mix=mixed&mode=objects&follow=0.5&churn=10" },
+  { name: "fires, one object each", query: "mix=mixed" },
+  { name: "fires, one object each, shared seeds (identical fires share frames)", query: "mix=mixed&seeds=shared" },
+  { name: "game-like: half follow sprites, 10 replaced/s", query: "mix=mixed&follow=0.5&churn=10" },
 ];
 
 const resultSchema = z.object({
   n: z.number(),
   workers: z.number(),
   slowdown: z.number(),
-  mode: z.string(),
   mix: z.string(),
   follow: z.number(),
   churn: z.number(),
@@ -104,7 +102,7 @@ async function sweep(b: Browser, query: string): Promise<Result[]> {
 }
 
 async function profile(b: Browser, throttle: number, pool: { name: string; query: string }, workerQuery: string): Promise<ProfileRow> {
-  await open(b, `n=${PROFILE_N}&mix=mixed&mode=objects&warm=0&measure=600000&${workerQuery}`);
+  await open(b, `n=${PROFILE_N}&mix=mixed&warm=0&measure=600000&${workerQuery}`);
   await Bun.sleep(1500);
   const frame = (): Promise<number> => b.evaluate("window.pixfxStress.game.loop.frame").then((v) => z.number().parse(v));
   await b.send("Profiler.enable");

@@ -66,11 +66,16 @@ only when every shell needs it, and say so in the commit.
 - A frame painted elsewhere is asked of the painter once, however many effects or scenes wait for it; each shows its
   last frame until the frame is delivered. `Frames::end_frame` runs once per host frame, after every scene drew:
   ending it per scene would drop a frame another scene shows in the same host frame.
+- A painter elsewhere has at most one frame in flight per layer of an effect (`Entry::awaiting`, `asked` for its own
+  frames): while it is out, the effect asks for no newer one, so a slow worker never builds a backlog. A frame that
+  comes back after the clock moved on still shows once, then the current one is asked for.
 
 `tests/scene.rs` covers the hit-stop (`an_effects_hit_freezes_every_effect_and_tells_the_host_how_long`) and the
 budget (`frames_dropped_over_the_budget_come_back_the_same`, `every_surface_a_scene_drops_is_freed`,
 `clearing_a_scene_frees_everything_it_holds`); `tests/frames.rs` covers frames shared by several scenes and painters
-that paint elsewhere. Follow-then-stop and `setScale` have no test yet (Task 3 of
+that paint elsewhere, including one that falls behind
+(`a_painter_that_falls_behind_is_asked_for_one_frame_per_layer_at_a_time`,
+`a_frame_that_comes_back_after_its_clock_moved_on_still_shows`). Follow-then-stop and `setScale` have no test yet (Task 3 of
 `docs/superpowers/plans/2026-11-14-render-engine-boundary.md`); a change that touches them adds the test first.
 
 ## Before you finish

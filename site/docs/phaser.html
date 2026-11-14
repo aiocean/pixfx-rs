@@ -61,7 +61,7 @@ class MyScene extends Phaser.Scene {
 <p><code>play()</code> before <code>loadPixfx()</code> has resolved throws <code>pixfx: call await loadPixfx() before play()</code>.</p>
 
 <h3>Worker threads</h3>
-<p><code>loadPixfx()</code> starts worker threads that draw the effects, one per core the main thread leaves free (1 to 4), each with its own copy of the engine. The pixels are exactly those the engine draws on the main thread. A new frame shows one display frame after the scene step that asked for it, and <code>"complete"</code> fires when the worker reports the effect finished. Each effect stays in one worker for its life. <code>play()</code> still checks the id and options on the main thread and throws at once.</p>
+<p><code>loadPixfx()</code> starts worker threads that draw the effects, one per core the main thread leaves free (1 to 4), each with its own copy of the engine. The main thread only decides and uploads; a worker simulates, paints, crops and converts each frame, and transfers the bytes. The pixels are exactly those the engine paints on the main thread. Until a worker sends a frame back the effect shows its last one, with at most one frame out per effect, so a slow phone drops frames instead of falling behind. Each effect stays in one worker for its life. <code>play()</code> still checks the id and options on the main thread and throws at once; <code>"complete"</code> and cues come from the main thread's clock. On WebGL every frame is a region of a few atlas pages, so the images go out in few batches.</p>
 <pre><code>await loadPixfx({ workers: 2 }); // a fixed number of workers
 await loadPixfx({ workers: 0 }); // draw on the main thread</code></pre>
 <p>Without <code>Worker</code> support, effects draw on the main thread. Options apply to the first call; later calls return the loaded engine. Vite bundles the worker from <code>new Worker(new URL(...), { type: "module" })</code>, with no plugin.</p>
@@ -129,17 +129,6 @@ this.player.x += this.player.vx * feel.timeScale * delta / 1000;</code></pre>
 </table>
 </div>
 <p><code>"cue"</code> fires as <code>(cue, effect)</code> on <code>feel</code> for every effect, and on each <code>PixfxEffect</code> for its own, whether or not the answer is on. A ripple's <code>x</code>/<code>y</code> and a sound's <code>x</code> are world positions; <code>pan</code> is -1 to 1 across the screen.</p>
-
-<h2>Layer mode</h2>
-<p>Every per-effect object holds four textures. For many effects in one region, a layer shares four textures among them:</p>
-<pre><code>const layer = this.pixfx.createLayer({
-  bounds: { x: 290, y: 0, width: 110, height: 200 },
-  depths: { back: 0, front: 1 }, // optional
-  scrollFactor: 1,                // optional
-});
-layer.play("fire/brazier", 315, 180);
-layer.play("fire/brazier", 370, 160);</code></pre>
-<p><code>layer.play</code> returns a <code>PixfxEffect</code> with the same API and events. The layer owns the depths and scroll factor (<code>setDepths</code> on a member does nothing). Members are drawn clipped to <code>bounds</code>, glow included, so make the bounds cover the light you want to see. <code>layer.destroy()</code> destroys every member and the layer's textures.</p>
 
 <h2>Limitation: transparent render targets</h2>
 <p>Light images use Phaser's <code>BlendModes.ADD</code>. In Phaser 4.2.1's WebGL renderer that is <code>src·1 + dst·dstAlpha</code>: over an opaque scene it adds exactly the light, but over a transparent render target (a transparent canvas, or a transparent <code>RenderTexture</code>) it adds nothing. Draw effects over an opaque background.</p>

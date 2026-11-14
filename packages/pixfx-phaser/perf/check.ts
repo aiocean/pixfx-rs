@@ -23,64 +23,77 @@ async function screenshot(b: Browser): Promise<string> {
   return z.object({ data: z.string() }).parse(await b.send("Page.captureScreenshot", { format: "png" })).data;
 }
 
-/** Lit pixels in the demo's pixfx textures (their canvases hold the last upload). */
+/** Lit pixels in the demo's pixfx textures: the atlas pages read back through a framebuffer on WebGL, the canvases on Canvas. */
 const LIT_PIXELS = `(() => {
   const s = window.pixfxDemo.scene;
+  const gl = s.sys.game.renderer.gl;
   let lit = 0;
   for (const key of s.textures.getTextureKeys()) {
     if (!key.startsWith("pixfx:")) continue;
-    const canvas = s.textures.get(key).getSourceImage();
-    const px = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+    const source = s.textures.get(key).source[0];
+    let px;
+    if (gl && source.glTexture) {
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, source.glTexture.webGLTexture, 0);
+      px = new Uint8Array(source.width * source.height * 4);
+      gl.readPixels(0, 0, source.width, source.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteFramebuffer(fb);
+    } else {
+      const canvas = source.image;
+      px = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+    }
     for (let i = 3; i < px.length; i += 4) if (px[i] !== 0) lit++;
   }
   return lit;
 })()`;
 
 /**
- * Play fire/campfire (seed 3) through an EffectManager on the main thread and one on a worker pool, each with its
- * own frame cache and a Gfx that records every upload, step both by the same scene times, and compare the
- * uploaded sizes and bytes.
+ * Play fire/campfire (seed 3) in a game painting on the main thread and in one painting on a real worker, each
+ * with textures that record every fill, step both by the same scene times (the worker's game draws again once its
+ * frames are back), and compare the filled sizes and bytes.
  */
 const SAME_PIXELS = `(async () => {
-  const { EffectManager } = await import("${SRC}/effects.ts");
-  const { PixfxFeel } = await import("${SRC}/feel.ts");
-  const { InlineBackend } = await import("${SRC}/inline.ts");
-  const { WorkerPool, openWorkers, workerPort } = await import("${SRC}/pool.ts");
-  const engine = window.pixfxDemo.engine;
+  const wasm = await import("${SRC}/../wasm/pixfx_wasm.js");
+  const { memory } = await wasm.default();
+  const { Game } = await import("${SRC}/game.ts");
+  const { Stage } = await import("${SRC}/stage.ts");
+  const { openWorkers, workerPort } = await import("${SRC}/load.ts");
   const recorder = () => {
-    const uploads = [];
-    return {
-      uploads,
-      texture: (key, w, h) => ({ upload: (rgba) => uploads.push({ size: w + "x" + h, bytes: Array.from(rgba) }), destroy() {} }),
-      image: () => ({ setTexture() {}, setVisible() {}, setPosition() {}, setDepth() {}, destroy() {} }),
-    };
+    const fills = [];
+    const texture = () => ({
+      key: "k", color: "c", light: "l",
+      fill: (c, l, w, h) => fills.push(w + "x" + h + ":" + Array.from(c).join(",") + "|" + Array.from(l).join(",")),
+      destroy() {},
+    });
+    const image = () => ({ show() {}, hide() {}, destroy() {} });
+    return { fills, texture, image };
   };
   const workers = await openWorkers(1, 1);
-  const pool = new WorkerPool(engine, workers.map(workerPort));
-  const inline = new InlineBackend(engine);
   const a = recorder();
   const b = recorder();
-  const main = new EffectManager(a, () => inline, "a:", new PixfxFeel(() => engine));
-  const off = new EffectManager(b, () => pool, "b:", new PixfxFeel(() => engine));
-  main.play("fire/campfire", 50, 50, { seed: 3 });
-  off.play("fire/campfire", 50, 50, { seed: 3 });
-  const settle = async (n) => {
-    pool.flush();
-    const until = performance.now() + 300;
-    while (b.uploads.length < n && performance.now() < until) await new Promise((r) => setTimeout(r, 5));
-  };
-  await settle(4);
+  const inline = new Game(wasm, memory, []);
+  const off = new Game(wasm, memory, workers.map(workerPort));
+  inline.useTextures(a.texture);
+  off.useTextures(b.texture);
+  const sa = new Stage(inline, a.image, () => {});
+  const sb = new Stage(off, b.image, () => {});
+  sa.play("fire/campfire", 50, 50, { seed: 3 });
+  sb.play("fire/campfire", 50, 50, { seed: 3 });
+  const step = (game, stage, dt) => { stage.update(dt); stage.draw(); game.endFrame(); };
   for (let i = 0; i < 12; i++) {
-    main.update(83, 1);
-    off.update(83, 1);
-    await settle(a.uploads.length);
+    step(inline, sa, 1 / 12);
+    step(off, sb, 1 / 12);
+    const until = performance.now() + 500;
+    while (b.fills.length < a.fills.length && performance.now() < until) await new Promise((r) => setTimeout(r, 5));
+    step(off, sb, 0);
   }
   workers.forEach((w) => w.terminate());
-  const strip = (u) => u.map((x) => x.size + ":" + x.bytes.join(","));
-  const sa = strip(a.uploads);
-  const sb = strip(b.uploads);
-  const nonEmpty = a.uploads.filter((u) => u.bytes.some((v) => v !== 0)).length;
-  return { uploads: sa.length, workerUploads: sb.length, nonEmpty, equal: sa.length === sb.length && sa.every((s, i) => s === sb[i]) };
+  sa.clear();
+  sb.clear();
+  const nonEmpty = a.fills.filter((f) => /[1-9]/.test(f.split(":")[1])).length;
+  return { uploads: a.fills.length, workerUploads: b.fills.length, nonEmpty, equal: a.fills.length === b.fills.length && a.fills.every((f, i) => f === b.fills[i]) };
 })()`;
 
 async function main(): Promise<void> {

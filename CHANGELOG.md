@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- `pixfx-phaser`: a pure shell over the wasm `Scene`. Placement, timing, which frame shows, fading, follow-stop,
+  compositing and the frame cache come from Rust; workers simulate, paint, crop and convert, and transfer the bytes;
+  on WebGL every surface is a region of a few atlas pages, filled with `texSubImage2D`. Removed: `createLayer` and
+  `PixfxLayer` (no game needs layer groups; one atlas batch per layer costs less than re-merging a region whenever one
+  effect changes), `PALETTE_PRESETS` (use `(await loadPixfx()).palettePresets()`), and the `textureBudget` load
+  option. `loadBaked(url)` needs a scene with the plugin started. `pixfx-wasm`: `Frames.loadBaked(json, pages)`
+  replaces `bakedFrames`. `pixfx-scene`: an effect has at most one frame in flight per layer with a painter
+  elsewhere, and a frame that comes back late still shows once; a frame painted on the spot counts against the
+  budget as its lit box (what shells upload), not its whole canvas.
 - `pixfx-wasm`: the scene for JS shells (`src/scene.rs`). `new Frames(workers)` holds a game's shared frames;
   `frames.scene(scale)` makes a `Scene` per stage (`play`, `moveTo`, `set`, `stop`, `remove`, `update`, `events`,
   the feel, `setView`, `setDrawBudget`); `scene.draw(frames)` and `frames.endFrame()` return a draw list (an

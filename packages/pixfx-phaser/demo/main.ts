@@ -57,11 +57,9 @@ class DemoScene extends Phaser.Scene {
     this.tweens.add({ targets: this.walker, x: 100, duration: 3000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
     logged(this.pixfx.play("fire/candle", 40, 56, { seed: 5, depth: { back: 1.5, front: 3 } }), "follower").follow(this.walker, 0, -4);
 
-    // Two braziers in one scene-wide layer at the right: four textures between them. A brazier's glow
-    // reaches 130 px left of its origin (56 + glow margin 74), so the bounds start at x 180 to keep it whole.
-    const layer = this.pixfx.createLayer({ bounds: { x: 180, y: 0, width: WIDTH - 180, height: HEIGHT } });
-    logged(layer.play("fire/brazier", 315, GROUND_Y + 60, { seed: 11 }), "layer-brazier-1");
-    logged(layer.play("fire/brazier", 370, GROUND_Y + 40, { seed: 12 }), "layer-brazier-2");
+    // Two more braziers at the right, with seeds of their own.
+    logged(this.pixfx.play("fire/brazier", 315, GROUND_Y + 60, { seed: 11 }), "brazier-2");
+    logged(this.pixfx.play("fire/brazier", 370, GROUND_Y + 40, { seed: 12 }), "brazier-3");
 
     events.push("create");
   }

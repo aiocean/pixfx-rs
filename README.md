@@ -118,7 +118,7 @@ stage.play("explosions/small-explosion", x, y, { palette: "poison" });
 cargo run -p pixfx-cli -- render fire/campfire --gif --palette ice
 ```
 
-In Phaser, `PALETTE_PRESETS` lists the names.
+In Phaser, `(await loadPixfx()).palettePresets()` lists the names.
 
 ## Ripples and hit flash
 

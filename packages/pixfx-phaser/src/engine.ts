@@ -1,44 +1,16 @@
 import { z } from "zod";
 import type * as Wasm from "../wasm/pixfx_wasm.js";
-import type { EngineOptions, PlayOptions } from "./options";
-import { engineOptions, parsePlayOptions } from "./options";
-import type { Box, TimedCue } from "./protocol";
-import { timedCueSchema } from "./protocol";
 
-export type { EngineOptions };
+export type WasmModule = typeof Wasm;
 
-/** One engine instance of an effect. */
-export interface FxLike {
-  update(dt: number): void;
-  stop(): void;
-  done(): boolean;
-  t(): number;
-  width(): number;
-  height(): number;
-  originX(): number;
-  originY(): number;
-  /** Frames of `1 / fps` its clock has passed: what it draws changes only when this does. */
-  clockFrame(): number;
-  /** The shared frame it shows now (`"{key}:{index}"`), or undefined while it fades after `stop()`. */
-  shown(): string | undefined;
-  draw(layer: "back" | "front"): void;
-  /** The box holding every pixel the last `draw` showed; `w` and `h` 0 when it showed nothing. */
-  litBox(): Box;
-  /** The colour of the pixels in `box` as RGBA bytes (straight alpha); a view valid until the next call on this instance. */
-  colorRgba(box: Box): Uint8ClampedArray;
-  /** The light of the pixels in `box` as RGBA bytes (lit pixels opaque, unlit `0,0,0,0`); valid until the next call. */
-  lightRgba(box: Box): Uint8ClampedArray;
-  /** The cues fired since the last call, oldest first; clears them. */
-  takeCues(): TimedCue[];
-  free(): void;
-}
-
-/** One body's squash and stretch: it lands, time passes, it is scaled for its velocity. */
+/** One body's squash and stretch: it lands, and each step it is scaled for how it moves. */
 export interface SquashLike {
   land(strength: number): void;
-  advance(dt: number): void;
-  /** `[sx, sy]` for a body moving at `(vx, vy)` px/s: its stretch along its velocity, upright; the area is kept. */
-  scale(vx: number, vy: number): [number, number];
+  /**
+   * Let `dt` seconds pass for a body now at `(x, y)`, moving at `(vx, vy)` px/s when known (else worked out from
+   * how far it moved); returns `[sx, sy]`. With no time passing (a hit-stop) it holds its scale.
+   */
+  step(dt: number, x: number, y: number, vx?: number, vy?: number): [number, number];
   free(): void;
 }
 
@@ -48,26 +20,6 @@ export interface BlinkLike {
   advance(dt: number): void;
   active(): boolean;
   alpha(): number;
-  free(): void;
-}
-
-/** The engine's answer to impacts: trauma and shake, hit-stop, slow motion, flash. */
-export interface FeelLike {
-  /** Take in cues effects fired (sounds are skipped). */
-  take(cues: readonly TimedCue[]): void;
-  addTrauma(k: number): void;
-  freeze(secs: number): void;
-  slow(secs: number, speed: number): void;
-  /** Let `dt` real seconds pass; returns the seconds play runs for them. */
-  advance(dt: number): number;
-  /** Where the view sits, `[dx, dy]` in game pixels, at `strength` (1 as designed, 0 still). */
-  shake(strength: number): [number, number];
-  /** How far the view tilts, in radians (positive is clockwise), at `strength`. */
-  roll(strength: number): number;
-  trauma(): number;
-  frozen(): boolean;
-  /** How white the view is lifted, 0 to 1. */
-  flash(): number;
   free(): void;
 }
 
@@ -90,73 +42,41 @@ export type EffectMeta = z.infer<typeof effectMetaSchema>;
 export interface Engine {
   effects(): readonly string[];
   meta(id: string): EffectMeta;
-  create(id: string, opts: EngineOptions): FxLike;
-  /** A fresh answer to impacts, with the default spec. */
-  feel(): FeelLike;
+  /** The palette presets every effect takes by name. */
+  palettePresets(): readonly string[];
+  /** The outline presets every effect takes by name. */
+  outlinePresets(): readonly string[];
   /** A body's squash and stretch and its blink, with the default spec. */
   squash(): SquashLike;
   blink(): BlinkLike;
 }
 
-/** The engine over an initialised wasm module (`memory` is what its default init resolved to). */
-export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engine {
-  const ids = z.array(z.string()).parse(wasm.effects());
-  const isEffectId = (id: string): id is Wasm.EffectId => ids.includes(id);
-  const effectId = (id: string): Wasm.EffectId => {
-    if (!isEffectId(id)) throw new Error(`pixfx: unknown effect "${id}"`);
-    return id;
+/** The effect ids the engine knows, as it types them. */
+export function effectIds(wasm: WasmModule): (id: string) => Wasm.EffectId {
+  const ids = wasm.effects();
+  const known = new Map<string, Wasm.EffectId>(ids.map((id) => [id, id]));
+  return (id) => {
+    const found = known.get(id);
+    if (found === undefined) throw new Error(`pixfx: unknown effect "${id}"`);
+    return found;
   };
+}
+
+/** The engine over an initialised wasm module. */
+export function wasmEngine(wasm: WasmModule): Engine {
+  const ids = z.array(z.string()).parse(wasm.effects());
+  const effectId = effectIds(wasm);
+  const names = z.array(z.string());
   return {
     effects: () => ids,
     meta: (id) => effectMetaSchema.parse(wasm.meta(effectId(id))),
-    create: (id, opts) => {
-      const fx = new wasm.Fx(effectId(id), opts);
-      // A view on wasm memory, made after the call: a call may grow the memory and detach older buffers.
-      const view = (ptr: number, box: Box): Uint8ClampedArray => new Uint8ClampedArray(memory.buffer, ptr, box.w * box.h * 4);
-      return {
-        update: (dt) => fx.update(dt),
-        stop: () => fx.stop(),
-        done: () => fx.done(),
-        t: () => fx.t(),
-        width: () => fx.width(),
-        height: () => fx.height(),
-        originX: () => fx.originX(),
-        originY: () => fx.originY(),
-        clockFrame: () => fx.clockFrame(),
-        shown: () => fx.shown(),
-        draw: (layer) => fx.draw(layer),
-        litBox: () => {
-          const [x = 0, y = 0, w = 0, h = 0] = fx.litBox();
-          return { x, y, w, h };
-        },
-        colorRgba: (b) => view(fx.colorRgbaBoxPtr(b.x, b.y, b.w, b.h), b),
-        lightRgba: (b) => view(fx.lightRgbaBoxPtr(b.x, b.y, b.w, b.h), b),
-        takeCues: () => z.array(timedCueSchema).parse(fx.takeCues()),
-        free: () => fx.free(),
-      };
-    },
-    feel: () => {
-      const f = new wasm.Feel(undefined);
-      return {
-        take: (cues) => f.take([...cues]),
-        addTrauma: (k) => f.addTrauma(k),
-        freeze: (secs) => f.freeze(secs),
-        slow: (secs, speed) => f.slow(secs, speed),
-        advance: (dt) => f.advance(dt),
-        shake: (strength) => pair.parse(f.shake(strength)),
-        roll: (strength) => f.roll(strength),
-        trauma: () => f.trauma(),
-        frozen: () => f.frozen(),
-        flash: () => f.flash(),
-        free: () => f.free(),
-      };
-    },
+    palettePresets: () => names.parse(wasm.palettePresets()),
+    outlinePresets: () => names.parse(wasm.outlinePresets()),
     squash: () => {
       const s = new wasm.Squash(undefined);
       return {
         land: (strength) => s.land(strength),
-        advance: (dt) => s.advance(dt),
-        scale: (vx, vy) => pair.parse(s.scale(vx, vy)),
+        step: (dt, x, y, vx, vy) => pair.parse(s.step(dt, x, y, vx, vy)),
         free: () => s.free(),
       };
     },
@@ -171,18 +91,4 @@ export function wasmEngine(wasm: typeof Wasm, memory: WebAssembly.Memory): Engin
       };
     },
   };
-}
-
-/** A validated play: what to hand the engine, and the Phaser-side options. */
-export interface Prepared {
-  id: string;
-  play: PlayOptions;
-  engineOpts: EngineOptions;
-}
-
-/** Validate `opts` and `id` for `engine`; throws on an unknown id or invalid options. Creates nothing. */
-export function prepare(engine: Engine, id: string, opts: unknown): Prepared {
-  const play = parsePlayOptions(opts);
-  if (!engine.effects().includes(id)) throw new Error(`pixfx: unknown effect "${id}"`);
-  return { id, play, engineOpts: engineOptions(play, engine.meta(id).glowMargin) };
 }

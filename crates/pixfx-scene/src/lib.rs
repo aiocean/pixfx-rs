@@ -214,6 +214,10 @@ struct Entry<S> {
     asked: [Option<(u64, Placement)>; 3],
     /// The shared frame each layer showed last: what it shows again while it waits for a draw.
     last: [Option<FrameId>; 3],
+    /// The shared frame each layer waits on from a painter elsewhere. One at a time: until it comes back the layer
+    /// asks for no newer frame, so a painter that falls behind gets no backlog, and when it comes back it shows
+    /// even if the clock has moved past it.
+    awaiting: [Option<FrameId>; 3],
     /// The host frame each layer first waited for a draw in, past the draw budget; `None` while it is up to date.
     waiting: [Option<u64>; 3],
     /// Plays real time through a hit-stop instead of freezing with the rest ([`Scene::set_plays_through_hitstop`]).
@@ -339,6 +343,7 @@ impl<S> Scene<S> {
             own: [None, None, None],
             asked: [None, None, None],
             last: [None, None, None],
+            awaiting: [None, None, None],
             waiting: [None, None, None],
             through_hitstop: false,
         });
@@ -726,8 +731,31 @@ impl<S> Scene<S> {
                     pending,
                     ..
                 } = frames;
+                // a frame on its way from a painter elsewhere: wait for it, then show it once it is here
+                if let Some(f) = e.awaiting[slot].clone().filter(|f| *f != id) {
+                    if store.show(&f, layer, shown_at, || Err(())).is_ok() {
+                        e.last[slot] = Some(f);
+                        e.awaiting[slot] = None;
+                    } else if pending.contains(&(f, layer)) {
+                        e.waiting[slot].get_or_insert(now);
+                        if let Some(last) = e.last[slot].as_ref()
+                            && let Ok(surface) = store.show(last, layer, shown_at, || Err(()))
+                        {
+                            shell.show(pass, surface)?;
+                        }
+                        return Ok(());
+                    } else {
+                        // dropped or forgotten on its way: ask for the frame the clock is on
+                        e.awaiting[slot] = None;
+                    }
+                }
+                let awaiting = &mut e.awaiting[slot];
                 let got = store.show(&id, layer, shown_at, || {
-                    if !may_draw || pending.contains(&(id.clone(), layer)) {
+                    if !may_draw {
+                        return Err(Fill::Wait);
+                    }
+                    if pending.contains(&(id.clone(), layer)) {
+                        *awaiting = Some(id.clone());
                         return Err(Fill::Wait);
                     }
                     drew = true;
@@ -746,6 +774,7 @@ impl<S> Scene<S> {
                         }
                         None => {
                             pending.insert((id.clone(), layer));
+                            *awaiting = Some(id.clone());
                             Err(Fill::Wait)
                         }
                     }
@@ -754,6 +783,7 @@ impl<S> Scene<S> {
                     Ok(surface) => {
                         shell.show(pass, surface)?;
                         e.last[slot] = Some(id);
+                        e.awaiting[slot] = None;
                         e.waiting[slot] = None;
                     }
                     Err(Fill::Shell(err)) => return Err(err),
@@ -771,7 +801,8 @@ impl<S> Scene<S> {
             None => {
                 let drawn = (e.clock.clock_frame(), e.place);
                 let stale = e.own[slot].as_ref().is_none_or(|o| o.drawn != drawn);
-                let asked = e.asked[slot] == Some(drawn);
+                // one own frame on its way at a time, as for shared frames
+                let asked = e.asked[slot].is_some();
                 if stale && may_draw && !asked {
                     drew = true;
                     let job = Job {

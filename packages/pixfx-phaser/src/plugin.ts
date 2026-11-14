@@ -1,84 +1,34 @@
 import Phaser from "phaser";
 import type { Counts, PixfxEffect } from "./effect";
-import { EffectManager } from "./effects";
 import { PixfxFeel } from "./feel";
-import { flushPixfx, getBackend, loadedEngine } from "./load";
+import type { Game } from "./game";
+import { loadedEngine, loadedGame } from "./load";
+import { parsePlayOptions } from "./options";
+import { phaserImages, phaserTextures } from "./phaser-gfx";
 import { type FeelSprite, PixfxSpriteFeel, SpriteFeelCore } from "./sprite-feel";
-import type { LayerConfig, PixfxLayer } from "./layer";
-import type { Gfx } from "./gfx";
+import { Stage } from "./stage";
 
-/**
- * Phaser-backed textures (canvas, nearest-filtered) and images (top-left origin) for one scene. Textures live in
- * the game's texture manager, so a texture made through one scene shows in every scene.
- */
-function phaserGfx(scene: Phaser.Scene): Gfx {
-  const textures = scene.textures;
-  return {
-    texture(key, width, height) {
-      const tex = textures.createCanvas(key, width, height);
-      if (!tex) throw new Error(`pixfx: texture key "${key}" is already in use`);
-      tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
-      return {
-        upload(rgba, w, h) {
-          tex.putData(new ImageData(rgba, w, h), 0, 0);
-          tex.refresh();
-        },
-        destroy() {
-          textures.remove(tex);
-        },
-      };
-    },
-    image(textureKey, blend, scrollFactor) {
-      const img = scene.add
-        .image(0, 0, textureKey ?? "__DEFAULT")
-        .setOrigin(0, 0)
-        .setScrollFactor(scrollFactor)
-        .setVisible(textureKey !== null);
-      if (blend === "add") img.setBlendMode(Phaser.BlendModes.ADD);
-      /** The crop last set: the image shows that top-left box of its texture. */
-      let crop = { w: -1, h: -1 };
-      return {
-        setTexture(key, w, h) {
-          // `setTexture` resizes the image to the texture; the top-left origin stays, and the crop shows the box
-          const changed = img.texture.key !== key;
-          if (changed) img.setTexture(key);
-          // a new texture re-crops too, so its UVs are worked out for its own size
-          if (changed || crop.w !== w || crop.h !== h) {
-            img.setCrop(0, 0, w, h);
-            crop = { w, h };
-          }
-        },
-        setVisible(visible) {
-          img.setVisible(visible);
-        },
-        setPosition(x, y) {
-          img.setPosition(x, y);
-        },
-        setDepth(depth) {
-          img.setDepth(depth);
-        },
-        destroy() {
-          img.destroy();
-        },
-      };
-    },
-  };
+/** Effect seconds for one scene update; anything not finite or not positive gives 0. */
+function stepSeconds(deltaMs: number, timeScale: number): number {
+  const s = (deltaMs / 1000) * timeScale;
+  return Number.isFinite(s) && s > 0 ? s : 0;
 }
 
 /**
  * Scene plugin: install with `{ key: "pixfx", plugin: PixfxPlugin, mapping: "pixfx" }` in the game's
- * `plugins.scene`, then `this.pixfx.play(id, x, y, opts)`. Effects advance on scene time (after the scene's `update()` and physics, so `follow` sees final positions) and are freed
- * when the scene shuts down or is destroyed. The work every scene queued is sent to the effect workers once per
- * game step, after all scenes updated.
+ * `plugins.scene`, then `this.pixfx.play(id, x, y, opts)`. The Rust scene plays, times and places every effect;
+ * workers paint their frames, and this plugin shows them with Phaser images. Effects advance on scene time (after
+ * the scene's `update()` and physics, so `follow` sees final positions) and are freed when the scene shuts down or
+ * is destroyed.
  *
  * Game feel: `this.pixfx.feel` answers the cues effects fire. A hit-stop freezes the scene's effects (the game
  * reads `feel.timeScale` to freeze its own world), the shake moves and tilts the main camera's view for the render
- * only (its scroll, follow and rotation are untouched), and the flash lifts the view toward white. `this.pixfx.squash(sprite)`
- * gives a sprite squash, stretch and a blink on the same clock.
+ * only (its scroll, follow and rotation are untouched), and the flash lifts the view toward white.
+ * `this.pixfx.squash(sprite)` gives a sprite squash, stretch and a blink on the same clock.
  */
 export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   private readonly host: Phaser.Scene;
-  private readonly effects: EffectManager;
+  private stageHeld: Stage | null = null;
   private destroyed = false;
   /** The scene's answer to impacts: camera shake, hit-stop, slow motion, flash, and every effect's cues. */
   readonly feel: PixfxFeel;
@@ -90,8 +40,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   constructor(scene: Phaser.Scene, pluginManager: Phaser.Plugins.PluginManager, pluginKey: string) {
     super(scene, pluginManager, pluginKey);
     this.host = scene;
-    this.feel = new PixfxFeel(loadedEngine);
-    this.effects = new EffectManager(phaserGfx(scene), getBackend, `pixfx:${scene.sys.settings.key}:`, this.feel);
+    this.feel = new PixfxFeel(() => this.stage()?.scene ?? null);
   }
 
   override boot(): void {
@@ -101,17 +50,15 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     events.on(Phaser.Scenes.Events.RENDER, this.onRender);
     events.on(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown);
     events.once(Phaser.Scenes.Events.DESTROY, this.onDestroy);
-    this.game.events.on(Phaser.Core.Events.POST_STEP, this.onPostStep);
+    this.game.events.on(Phaser.Core.Events.POST_RENDER, this.onPostRender);
   }
 
   /** Play effect `id` with its origin at world (x, y). Throws on an unknown id, invalid options, or before `loadPixfx()`. */
   play(id: string, x: number, y: number, opts?: unknown): PixfxEffect {
-    return this.effects.play(id, x, y, opts);
-  }
-
-  /** Create a scene-wide layer: effects played into it share four textures covering `cfg.bounds`. Throws on an invalid config. */
-  createLayer(cfg: LayerConfig): PixfxLayer {
-    return this.effects.createLayer(cfg);
+    const stage = this.stage();
+    if (!stage) throw new Error("pixfx: call await loadPixfx() before play()");
+    const p = parsePlayOptions(opts);
+    return stage.play(id, x, y, p.engine, p.depth, p.scrollFactor);
   }
 
   /**
@@ -130,16 +77,15 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     return s;
   }
 
-  /** Live engine instances, textures and images held by this scene's effects and layers. */
+  /** Effects playing in this scene, textures the game holds for every scene, and this scene's images. */
   stats(): Counts {
-    return this.effects.stats();
+    return this.stageHeld?.counts() ?? { engines: 0, textures: loadedGame()?.counts().textures ?? 0, images: 0 };
   }
 
   override destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.effects.destroyAll();
-    this.endSprites();
+    this.end();
     this.feel.free();
     const events = this.host.sys.events;
     events.off(Phaser.Scenes.Events.POST_UPDATE, this.onUpdate);
@@ -147,23 +93,38 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     events.off(Phaser.Scenes.Events.RENDER, this.onRender);
     events.off(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown);
     events.off(Phaser.Scenes.Events.DESTROY, this.onDestroy);
-    this.game.events.off(Phaser.Core.Events.POST_STEP, this.onPostStep);
+    this.game.events.off(Phaser.Core.Events.POST_RENDER, this.onPostRender);
     super.destroy();
   }
 
-  private readonly onUpdate = (_time: number, delta: number): void => {
-    const dt = this.effects.update(delta, this.host.time.timeScale);
-    for (const s of [...this.sprites]) s.step(dt);
-  };
+  /** The scene's stage, made the first time it is needed after `loadPixfx()` resolves. */
+  private stage(): Stage | null {
+    if (this.stageHeld) return this.stageHeld;
+    const game: Game | null = loadedGame();
+    if (!game || this.destroyed) return null;
+    game.useTextures(phaserTextures(this.host));
+    this.stageHeld = new Stage(game, phaserImages(this.host), (cue, effect) => this.feel.take(cue, effect));
+    this.stageHeld.scene.setFeel(this.feel.enabled);
+    return this.stageHeld;
+  }
 
-  /** Its own function per plugin: `off` removes every listener sharing a function, and each scene has a plugin. */
-  private readonly onPostStep = (): void => {
-    flushPixfx();
+  private readonly onUpdate = (_time: number, delta: number): void => {
+    const stage = this.stage();
+    if (!stage) return;
+    const dt = stepSeconds(delta, this.host.time.timeScale);
+    const played = stage.update(dt);
+    this.feel.played(dt, played);
+    for (const s of [...this.sprites]) s.step(played);
   };
 
   private readonly onPreRender = (): void => {
-    this.effects.flushLayers();
+    this.stageHeld?.draw();
     this.showFeel();
+  };
+
+  /** After every scene rendered: end the game's frame (once, however many scenes call it) and send work to workers. */
+  private readonly onPostRender = (): void => {
+    loadedGame()?.endFrame();
   };
 
   /** After the render: the camera goes back where the game put it. */
@@ -200,13 +161,15 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
       .setVisible(flash > 0);
   }
 
-  private endSprites(): void {
+  /** Free the scene's effects, images and sprites' feel. */
+  private end(): void {
+    this.stageHeld?.clear();
+    this.stageHeld = null;
     for (const s of [...this.sprites]) s.destroy();
   }
 
   private readonly onShutdown = (): void => {
-    this.effects.destroyAll();
-    this.endSprites();
+    this.end();
     this.flashRect = null;
   };
 

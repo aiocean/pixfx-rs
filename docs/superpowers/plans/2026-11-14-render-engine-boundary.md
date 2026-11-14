@@ -191,6 +191,15 @@ Done in two commits: 2a moves `Scene` and `Shell` (with `free` and `Scene::clear
 
 ### Task 4: `packages/pixfx-phaser` becomes a pure shell
 
+> **Shape as built.** The package follows the wasm draw list: `game.ts` holds the game-wide `Frames`, routes jobs
+> to workers (one per effect for its life) and painted frames back; `stage.ts` holds one Phaser scene's `Scene`;
+> `surfaces.ts` makes, refills and frees surfaces; `phaser-gfx.ts` puts every surface in a few WebGL atlas pages
+> (`texSubImage2D`, one batch per layer) or a canvas texture on the Canvas renderer. `pixels.ts`, `layout.ts`,
+> `lifecycle.ts`, `effects.ts`, `runner.ts`, `frames.ts`, `layer.ts` and the old pool and backends are gone, and so
+> are layer groups (`createLayer`): no game needs them, and re-merging a region whenever one effect in it changes
+> costs more than one atlas batch per layer. `Frames.loadBaked` replaces `bakedFrames`. `pixfx-scene` keeps one frame
+> in flight per layer of an effect, so a slow worker never builds a backlog.
+
 **Files:**
 - Delete: `packages/pixfx-phaser/src/{pixels,layout,lifecycle,effects,runner,frames}.ts` and their tests, except
   `tests/frames.test.ts`, which is kept and rewritten against the draw list (its cases are the fence for the move)

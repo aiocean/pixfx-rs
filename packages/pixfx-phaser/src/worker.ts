@@ -1,11 +1,10 @@
-// An effect worker: loads the engine, then runs each batch the pool sends and replies with the frames drawn.
-import init, * as wasm from "../wasm/pixfx_wasm.js";
-import { wasmEngine } from "./engine";
+// A painting worker: loads the engine, then paints each message's jobs and transfers the bytes back.
+import init, { Painting } from "../wasm/pixfx_wasm.js";
+import { paintAll } from "./paint";
 import type { FromWorker } from "./protocol";
 import { toWorkerSchema } from "./protocol";
-import { WorkerCore } from "./worker-core";
 
-let core: WorkerCore | null = null;
+let painting: Painting | null = null;
 let slowdown = 1;
 
 function reply(message: FromWorker, transfer: ArrayBuffer[] = []): void {
@@ -15,21 +14,21 @@ function reply(message: FromWorker, transfer: ArrayBuffer[] = []): void {
 async function handle(data: unknown): Promise<void> {
   const msg = toWorkerSchema.parse(data);
   if (msg.type === "init") {
-    const { memory } = await init();
-    core = new WorkerCore(wasmEngine(wasm, memory));
+    await init();
+    painting = new Painting();
     slowdown = msg.slowdown;
     reply({ type: "ready" });
     return;
   }
-  if (!core) throw new Error("batch before init");
+  if (!painting) throw new Error("paint before init");
   const start = performance.now();
-  const { reply: results, transfer } = core.run(msg);
-  // Phone emulation: Chrome cannot CPU-throttle a worker, so stretch the batch to `slowdown` times its cost.
+  const { reply: painted, transfer } = paintAll(painting, msg);
+  // Phone emulation: Chrome cannot CPU-throttle a worker, so stretch the work to `slowdown` times its cost.
   const until = start + (performance.now() - start) * slowdown;
   while (performance.now() < until) {
     // busy-wait
   }
-  reply(results, transfer);
+  reply(painted, transfer);
 }
 
 self.onmessage = (e: MessageEvent<unknown>) => {

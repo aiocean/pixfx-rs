@@ -1,29 +1,17 @@
 import { expect, test } from "bun:test";
-import { engineOptions, parsePlayOptions } from "../src/options";
+import { parsePlayOptions } from "../src/options";
 
-test("engineOptions strips scrollFactor/depth and adds margin", () => {
-  const p = parsePlayOptions({ seed: 7, depth: { back: 1, front: 2 }, scrollFactor: 0.5, density: 3 });
-  expect(engineOptions(p, 4)).toEqual({ seed: 7, density: 3, margin: 4 });
+test("Phaser's options are read here; the rest go to the engine as given", () => {
+  const p = parsePlayOptions({ seed: 7, depth: { back: 1, front: 2 }, scrollFactor: 0.5, density: 3, palette: "ice" });
+  expect(p).toEqual({ scrollFactor: 0.5, depth: { back: 1, front: 2 }, engine: { seed: 7, density: 3, palette: "ice" } });
 });
 
-test("an effect's own option must be a number, colour, list of colours or flag, and is named when not", () => {
-  const p = parsePlayOptions({ stone: "#7a6a58", ramp: ["#000", "#fff"], width: 640, wet: true });
-  expect(engineOptions(p, 0)).toEqual({ stone: "#7a6a58", ramp: ["#000", "#fff"], width: 640, wet: true, margin: 0 });
-  expect(() => parsePlayOptions({ width: { px: 640 } })).toThrow(/width/);
+test("with no options an effect scrolls with the world and leaves its depths to the default", () => {
+  expect(parsePlayOptions(undefined)).toEqual({ scrollFactor: 1, depth: undefined, engine: {} });
 });
 
-test("every effect takes an outline: on or off, a word, or a ring, handed to the engine as given", () => {
-  for (const outline of [true, false, "off", "white", "#ff00aa", { color: "black", width: 2, corners: true }]) {
-    expect(engineOptions(parsePlayOptions({ outline }), 0)).toEqual({ outline, margin: 0 });
-  }
-  expect(() => parsePlayOptions({ outline: { width: 4 } })).toThrow(/outline/);
-  expect(() => parsePlayOptions({ outline: { colour: "#fff" } })).toThrow(/outline/);
-  expect(() => parsePlayOptions({ outline: 2 })).toThrow(/outline/);
-});
-
-test("a palette is a preset's name or a list of colours", () => {
-  expect(engineOptions(parsePlayOptions({ palette: "ice" }), 0)).toEqual({ palette: "ice", margin: 0 });
-  expect(engineOptions(parsePlayOptions({ palette: ["#000", "#fff"] }), 0)).toEqual({ palette: ["#000", "#fff"], margin: 0 });
-  expect(() => parsePlayOptions({ palette: 3 })).toThrow(/palette/);
-  expect(() => parsePlayOptions({ palette: "lava" })).toThrow(/palette/);
+test("a bad Phaser option throws, naming it", () => {
+  expect(() => parsePlayOptions({ scrollFactor: "fast" })).toThrow(/scrollFactor/);
+  expect(() => parsePlayOptions({ depth: { back: 1 } })).toThrow(/depth/);
+  expect(() => parsePlayOptions(5)).toThrow(/options/);
 });

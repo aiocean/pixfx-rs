@@ -404,6 +404,26 @@ impl Frames {
         Ok(self.rec.take())
     }
 
+    /// Hold the frames of a clip baked by `pixfx bake` (its index JSON and PNG pages) as shared frames, so effects
+    /// reaching them paint nothing; returns how many were loaded and the ops (makes, their pixels read like those
+    /// painted on the spot).
+    pub fn load_baked_ops(
+        &mut self,
+        json: &str,
+        pages: &[&[u8]],
+    ) -> Result<(u32, Vec<i32>), String> {
+        let layers = pixfx_export::decode(json, pages)?;
+        for l in &layers {
+            self.inner
+                .deliver(&l.id, l.layer, &l.frame, &mut self.rec)
+                .map_err(|e| e.to_string())?;
+        }
+        Ok((
+            u32::try_from(layers.len()).unwrap_or(u32::MAX),
+            self.rec.take(),
+        ))
+    }
+
     /// The jobs for workers since the last call and the effects gone; empty when painting on the spot.
     pub fn take_jobs(&mut self) -> (Vec<PaintJob>, Vec<EffectKey>) {
         match self.inner.painter_mut() {
@@ -640,6 +660,24 @@ impl JsFrames {
         self.inner.rec.light(id).map_or(0, |b| b.as_ptr() as usize)
     }
 
+    /// Hold the frames of a clip baked by `pixfx bake` (its index JSON and PNG pages): effects playing that effect
+    /// with the same options show them instead of painting them. Returns a draw list (makes; read their pixels
+    /// with `colorPtr` / `lightPtr`). How many frames loaded is the number of makes.
+    #[wasm_bindgen(js_name = loadBaked)]
+    pub fn load_baked(
+        &mut self,
+        json: &str,
+        pages: Vec<Uint8Array>,
+    ) -> Result<Int32Array, JsError> {
+        let pages: Vec<Vec<u8>> = pages.iter().map(Uint8Array::to_vec).collect();
+        let refs: Vec<&[u8]> = pages.iter().map(Vec::as_slice).collect();
+        let (_, ops) = self
+            .inner
+            .load_baked_ops(json, &refs)
+            .map_err(|e| JsError::new(&e))?;
+        Ok(Int32Array::from(ops.as_slice()))
+    }
+
     /// The frames to paint on workers since the last call, and the effects gone.
     #[wasm_bindgen(js_name = takeJobs, unchecked_return_type = "Jobs")]
     pub fn take_jobs(&mut self) -> Result<JsValue, JsError> {
@@ -665,14 +703,16 @@ impl JsScene {
     }
 
     /// Play effect `id` with its origin at game pixel (`x`, `y`); returns its handle. `opts` as `new Fx` takes
-    /// them, without `margin`: the scene gives each effect room for its glow.
+    /// them, without `margin`: the scene gives each effect room for its glow. Any object is read strictly here, so
+    /// a shell hands on the game's options as they came.
     pub fn play(
         &mut self,
         frames: &mut JsFrames,
         #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
         x: f64,
         y: f64,
-        #[wasm_bindgen(unchecked_optional_param_type = "FxOptions")] opts: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "FxOptions | Record<string, unknown>")]
+        opts: JsValue,
     ) -> Result<u32, JsError> {
         let fx = find(id)?;
         let (o, margin) = parse_options(fx.meta(), &opts)?;
@@ -909,10 +949,10 @@ impl JsPainting {
         JsPainting::default()
     }
 
-    /// Paint `job`.
+    /// Paint `job`, a `PaintJob` from `frames.takeJobs()` as it came through a worker's message (read strictly).
     pub fn paint(
         &mut self,
-        #[wasm_bindgen(unchecked_param_type = "PaintJob")] job: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "PaintJob | unknown")] job: JsValue,
     ) -> Result<Painted, JsError> {
         let job: PaintJob = parse("job", &job)?;
         let mut bad = None;

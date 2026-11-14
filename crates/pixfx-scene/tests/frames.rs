@@ -253,3 +253,87 @@ fn the_painter_lets_go_of_every_effect_that_ends() -> Res {
     assert!(frames.painter().is_empty());
     Ok(())
 }
+
+#[test]
+fn a_painter_that_falls_behind_is_asked_for_one_frame_per_layer_at_a_time() -> Res {
+    let mut frames = Frames::new(Later::default());
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    let mut shell = Recorder::default();
+    let h = scene.play(candle()?, 20.0, 40.0)?;
+    for _ in 0..20 {
+        scene.update(1.0 / 30.0)?;
+        host_frame(&mut frames, &mut scene, &mut shell)?;
+    }
+    assert_eq!(
+        frames.painter().asked.len(),
+        2,
+        "back and front, once each, however far the clock moved"
+    );
+    // fading, its own frames are asked one at a time too
+    deliver(&mut frames, &mut scene, &mut shell)?;
+    scene.stop(h);
+    for _ in 0..10 {
+        scene.update(1.0 / 30.0)?;
+        host_frame(&mut frames, &mut scene, &mut shell)?;
+    }
+    assert!(frames.painter().asked.len() <= 2, "one own frame per layer");
+    Ok(())
+}
+
+#[test]
+fn a_frame_that_comes_back_after_its_clock_moved_on_still_shows() -> Res {
+    let mut frames = Frames::new(Later::default());
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    let mut shell = Recorder::default();
+    scene.play(candle()?, 20.0, 40.0)?;
+    scene.update(0.1)?;
+    host_frame(&mut frames, &mut scene, &mut shell)?;
+    // the clock moves on while the frame of 0.1 s is painted elsewhere
+    scene.update(0.5)?;
+    host_frame(&mut frames, &mut scene, &mut shell)?;
+    deliver(&mut frames, &mut scene, &mut shell)?;
+    let shown = host_frame(&mut frames, &mut scene, &mut shell)?;
+    // the frame of 0.1 s, as painted on the spot
+    let mut inline = Frames::default();
+    let mut twin: Scene<Frame> = inline.scene(one()?);
+    twin.play(candle()?, 20.0, 40.0)?;
+    twin.update(0.1)?;
+    assert!(!shown.is_empty());
+    assert_eq!(
+        shown,
+        host_frame(&mut inline, &mut twin, &mut Recorder::default())?
+    );
+    // and the frame the clock is on now is asked for
+    assert_eq!(frames.painter().asked.len(), 2);
+    deliver(&mut frames, &mut scene, &mut shell)?;
+    let now = host_frame(&mut frames, &mut scene, &mut shell)?;
+    twin.update(0.5)?;
+    assert_eq!(
+        now,
+        host_frame(&mut inline, &mut twin, &mut Recorder::default())?
+    );
+    Ok(())
+}
+
+#[test]
+fn a_shared_frame_counts_against_the_budget_as_the_lit_box_a_shell_holds() -> Res {
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    scene.play(candle()?, 30.0, 40.0)?;
+    let mut shell = Recorder::default();
+    scene.update(1.0 / 60.0)?;
+    let shown = host_frame(&mut frames, &mut scene, &mut shell)?;
+    assert!(!shown.is_empty());
+    let lit: u64 = shown
+        .iter()
+        .filter_map(pixfx_core::PixelBox::lit)
+        .map(|b| u64::from(b.w) * u64::from(b.h) * 8)
+        .sum();
+    let whole: u64 = shown
+        .iter()
+        .map(|f| u64::from(f.w) * u64::from(f.h) * 8)
+        .sum();
+    assert!(lit < whole, "a candle lights a small part of its frame");
+    assert_eq!(frames.bytes(), lit);
+    Ok(())
+}

@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use pixfx_core::{Clip, FrameId, FrameStore, Layer, Placement, Sim};
+use pixfx_core::{Clip, FrameId, FrameStore, Layer, PixelBox, Placement, Sim};
 use pixfx_draw::Frame;
 
 use crate::{Receive, Scene, Shell};
@@ -85,9 +85,10 @@ impl Painter for InlinePainter {
     }
 }
 
-/// Bytes a surface holding `frame` takes: its colour and light as RGBA.
+/// Bytes a surface holding `frame` takes: its colour and light as RGBA, cut to the box that holds anything (shells
+/// upload only that box; an effect lights a small part of its frame).
 pub(crate) fn frame_bytes(frame: &Frame) -> u64 {
-    u64::from(frame.w) * u64::from(frame.h) * 8
+    PixelBox::lit(frame).map_or(0, |b| u64::from(b.w) * u64::from(b.h) * 8)
 }
 
 /// The shared frames of a game and the painter that paints every frame its scenes show. The host ends each of

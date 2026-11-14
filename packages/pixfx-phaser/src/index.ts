@@ -1,14 +1,10 @@
 export { PixfxPlugin } from "./plugin";
 export { PixfxEffect } from "./effect";
+export type { Counts, FollowTarget } from "./effect";
 export { PixfxFeel } from "./feel";
 export type { WorldCue } from "./feel";
 export { PixfxSpriteFeel } from "./sprite-feel";
 export type { FeelSprite } from "./sprite-feel";
-export type { Counts } from "./effect";
-export { loadBaked, loadPixfx } from "./load";
-export { PALETTE_PRESETS } from "./options";
+export { defaultWorkers, loadBaked, loadPixfx } from "./load";
 export type { LoadOptions } from "./load";
 export type { EffectMeta, Engine } from "./engine";
-export type { FollowTarget } from "./lifecycle";
-export { PixfxLayer } from "./layer";
-export type { LayerConfig } from "./layer";

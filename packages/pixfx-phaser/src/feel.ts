@@ -1,28 +1,26 @@
 import Phaser from "phaser";
-import type { Engine, FeelLike } from "./engine";
-import type { TimedCue } from "./protocol";
+import type * as Wasm from "../wasm/pixfx_wasm.js";
+import type { WorldCue } from "./stage";
 
-/** A cue an effect fired, placed in the world: a ripple's `x`/`y` and a sound's `x` are world positions. */
-export type WorldCue = TimedCue;
+export type { WorldCue };
 
 /**
- * A scene's answer to impacts (`scene.pixfx.feel`): the cues every effect fires (shake, hit-stop, ripple, flash,
- * sound) and the game's own impacts (`addTrauma`, `freeze`, `slow`) become one camera shake, one hit-stop that
- * freezes the scene's effects, slow motion and a flash. The plugin moves and tilts the main camera by the shake
- * and shows the flash over it; a game freezes its own world with `timeScale`.
+ * A scene's answer to impacts (`scene.pixfx.feel`), worked out by the Rust scene: the cues every effect fires
+ * (shake, hit-stop, ripple, flash, sound) and the game's own impacts (`addTrauma`, `freeze`, `slow`) become one
+ * camera shake, one hit-stop that freezes the scene's effects, slow motion and a flash. The plugin moves and tilts
+ * the main camera by the shake and shows the flash over it; a game freezes its own world with `timeScale`.
  *
  * Emits `"cue"` with each cue any effect fires (`(cue: WorldCue, effect)`), whether or not the answer is on, so
- * the game plays sounds and reacts to anything else. No Phaser calls: the plugin does the drawing.
+ * the game plays sounds and reacts to anything else.
  */
 export class PixfxFeel extends Phaser.Events.EventEmitter {
-  private answer: FeelLike | null = null;
   private answering = true;
   private shakeK = 1;
   private flashK = 1;
   private scale = 1;
 
-  /** @internal Created by the plugin; `engine` gives the loaded engine, or null before `loadPixfx()` resolves. */
-  constructor(private readonly engine: () => Engine | null) {
+  /** @internal Created by the plugin; `scene` gives the scene's Rust scene, or null before `loadPixfx()` resolves. */
+  constructor(private readonly scene: () => Wasm.Scene | null) {
     super();
   }
 
@@ -32,6 +30,7 @@ export class PixfxFeel extends Phaser.Events.EventEmitter {
    */
   setEnabled(on: boolean): this {
     this.answering = on;
+    this.scene()?.setFeel(on);
     return this;
   }
 
@@ -53,19 +52,19 @@ export class PixfxFeel extends Phaser.Events.EventEmitter {
 
   /** The game's own impact shakes the camera: `k` (0 to 1) is added to the trauma. */
   addTrauma(k: number): this {
-    this.feel()?.addTrauma(k);
+    this.scene()?.addTrauma(k);
     return this;
   }
 
   /** The game's own hit-stop: freeze the scene's effects (and, through `timeScale`, the game) for `secs`. */
   freeze(secs: number): this {
-    this.feel()?.freeze(secs);
+    this.scene()?.freeze(secs);
     return this;
   }
 
   /** Slow motion: play runs at `speed` (0 to 1) of real time for `secs` seconds, after any freeze. */
   slow(secs: number, speed: number): this {
-    this.feel()?.slow(secs, speed);
+    this.scene()?.slow(secs, speed);
     return this;
   }
 
@@ -79,61 +78,46 @@ export class PixfxFeel extends Phaser.Events.EventEmitter {
 
   /** Where the camera sits this frame, `[dx, dy]` in game pixels, at the player's shake strength. */
   get shake(): [number, number] {
-    const f = this.answering ? this.answer : null;
-    return f ? f.shake(this.shakeK) : [0, 0];
+    const s = this.answering ? this.scene() : null;
+    if (!s) return [0, 0];
+    const [dx = 0, dy = 0] = s.shake(this.shakeK);
+    return [dx, dy];
   }
 
   /** How far the camera tilts this frame, in radians (positive is clockwise), at the player's shake strength. */
   get roll(): number {
-    const f = this.answering ? this.answer : null;
-    return f ? f.roll(this.shakeK) : 0;
+    const s = this.answering ? this.scene() : null;
+    return s ? s.roll(this.shakeK) : 0;
   }
 
   /** How white the view is lifted this frame, 0 to 1, at the player's flash strength. */
   get flash(): number {
-    const f = this.answering ? this.answer : null;
-    return f ? f.flash() * this.flashK : 0;
+    const s = this.answering ? this.scene() : null;
+    return s ? s.flash() * this.flashK : 0;
   }
 
   /** How shaken the camera is, 0 to 1. */
   get trauma(): number {
-    return this.answer?.trauma() ?? 0;
+    return this.scene()?.trauma() ?? 0;
   }
 
   /** Play is frozen by a hit-stop now. */
   get frozen(): boolean {
-    return this.answering && (this.answer?.frozen() ?? false);
+    return this.answering && (this.scene()?.frozen() ?? false);
   }
 
-  /** @internal Cues an effect fired, placed in the world: emitted, and answered when on. */
-  take(cues: readonly WorldCue[], effect: unknown): void {
-    for (const c of cues) this.emit("cue", c, effect);
-    if (this.answering) this.feel()?.take(cues);
+  /** @internal The scene's update: `dt` seconds passed and `played` of them played. */
+  played(dt: number, played: number): void {
+    this.scale = dt > 0 ? played / dt : 1;
   }
 
-  /** @internal Let `deltaMs` real milliseconds pass; returns the milliseconds the scene's effects play. */
-  advance(deltaMs: number): number {
-    if (!this.answering || !(deltaMs > 0)) {
-      this.scale = 1;
-      return deltaMs;
-    }
-    const f = this.feel();
-    if (!f) return deltaMs;
-    const real = deltaMs / 1000;
-    const run = f.advance(real);
-    this.scale = run / real;
-    return run * 1000;
+  /** @internal A cue an effect fired, placed in the world. */
+  take(cue: WorldCue, effect: unknown): void {
+    this.emit("cue", cue, effect);
   }
 
-  /** @internal Free the engine's side. */
+  /** @internal */
   free(): void {
-    this.answer?.free();
-    this.answer = null;
     this.removeAllListeners();
-  }
-
-  private feel(): FeelLike | null {
-    if (!this.answer) this.answer = this.engine()?.feel() ?? null;
-    return this.answer;
   }
 }

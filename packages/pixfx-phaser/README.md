@@ -66,54 +66,55 @@ class MyScene extends Phaser.Scene {
 
 ### Worker threads
 
-`loadPixfx()` starts worker threads that draw the effects, one per core the main thread leaves free (1 to 4),
-each with its own copy of the engine. The pixels are exactly those the engine draws on the main thread; a new
-frame shows one display frame after the scene step that asked for it, and `"complete"` fires when the worker
-reports the effect finished. Each effect stays in one worker for its life, and identical effects share one
-worker. `play()` still validates the id and options on the main thread and throws at once.
+`loadPixfx()` starts worker threads that paint the effects, one per core the main thread leaves free (1 to 4),
+each with its own copy of the engine. The main thread only decides (clocks, placement, which frame shows) and
+uploads; a worker simulates, paints, crops and turns a frame into RGBA, and transfers the bytes. The pixels are
+exactly those the engine paints on the main thread. A new frame shows once its worker sends it back; until then the
+effect shows its last one, and each effect has at most one frame out at a time, so a slow phone drops frames
+instead of falling behind. Each effect stays in one worker for its life. `play()` validates the id and options on
+the main thread and throws at once; `"complete"` and cues come from the main thread's clock.
 
 ```ts
 await loadPixfx({ workers: 2 }); // a fixed number of workers
-await loadPixfx({ workers: 0 }); // draw on the main thread
+await loadPixfx({ workers: 0 }); // paint on the main thread
 await loadPixfx({ frameBudget: 32 * 1024 * 1024 }); // bytes of shared frames held (default 64 MiB)
 ```
 
-Without `Worker` support effects draw on the main thread. Options apply to the first call; later calls return
+Without `Worker` support effects paint on the main thread. Options apply to the first call; later calls return
 the loaded engine. The worker is bundled by Vite from `new Worker(new URL(...), { type: "module" })`, with no
 plugin.
 
-### How frames are drawn
+### How frames are shown
 
 An effect plays its rendered frames: what it shows depends only on the effect, its options and the frame its
 clock is on. Effects with the same id and options (seed, flip, angle, light, palette, outline, their own
-options) show the same frames, so the game draws each frame once and every such effect shows it:
+options) show the same frames, so the game paints each frame once and every such effect, in every scene, shows it.
+The engine (`pixfx-scene`, through `pixfx-wasm`) decides all of this; the plugin follows its draw list:
 
-- A running effect reports the frame it is on. The first effect to reach a frame the game does not hold draws
-  it, cropped to the lit box of its back and of its front, and sends it once; the rest show the held frame.
-  Nothing is drawn or uploaded while the frame an effect shows stays the same.
-- A per-object effect shows a held frame through that frame's four textures, uploaded once for every effect on
-  it, each image placed at the frame's lit box. A layer composites its members from the held bytes.
-- The held frames are game-wide (they outlive a scene) and stay under `frameBudget` bytes: at each game step the
-  least recently shown go first, never a frame an effect shows now or showed this step. A frame dropped is drawn
-  again, byte for byte, by the next effect that reaches it.
-- A stopped effect's fade-out is its own: it draws into its own four textures (the whole canvas), only when its
-  clock reaches a new frame.
+- Each frame is cropped to the lit box of its colour and light, and held in one surface, uploaded once. Nothing is
+  painted or uploaded while the frame an effect shows stays the same.
+- On WebGL every surface is a region of a few 4096² atlas pages, so the images go out in few batches; on Phaser's
+  Canvas renderer each surface is a canvas texture.
+- The held frames are game-wide (they outlive a scene) and stay under `frameBudget` bytes: the least recently shown
+  go first, never one shown now. A frame dropped is painted again, byte for byte, by the next effect that reaches it.
+- A stopped effect's fade-out is its own frames, painted only when its clock reaches a new one.
 
-`stats()` counts what the scene itself holds: engine instances, images, and textures of fading effects and
-layers. Shared frames' textures belong to the game, not to a scene.
+`stats()` returns `{engines, textures, images}`: effects playing in the scene, the game's surface regions, and the
+scene's images.
 
 ### Baked frames
 
 `pixfx bake <id> [--palette WORD] [--outline WORD] --out public/fx` writes `<name>.bake.json` and its PNG pages:
-every frame of the effect as the game would draw it, cropped. Load it once after `loadPixfx()`:
+every frame of the effect as the game would paint it, cropped. Load it once a scene with the plugin has started:
 
 ```ts
 await loadPixfx();
+// in a scene's create():
 await loadBaked("fx/fire_campfire.bake.json"); // pages are fetched from the same folder
 ```
 
-Effects playing that effect with the same options then show the baked frames and draw nothing; other options
-draw live. Baked frames are held like drawn ones, under `frameBudget`: past it they go and are drawn again if
+Effects playing that effect with the same options then show the baked frames and paint nothing; other options
+paint live. Baked frames are held like painted ones, under `frameBudget`: past it they go and are painted again if
 shown.
 
 ## Play an effect
@@ -185,8 +186,8 @@ player.setVelocityX(speed * this.pixfx.feel.timeScale);
 | `shake`, `roll`, `flash`, `trauma`, `frozen`, `timeScale` | This frame's answer, read-only. |
 
 `"cue"` fires on the feel and on the effect (`effect.on("cue", ...)`) with `{t, pan, cue}`. A ripple's `x`/`y`
-and a sound's `x` are world positions. Ripples are data only; the plugin does not draw them. With worker
-threads, cues arrive one frame later, the same as frames do.
+and a sound's `x` are world positions. Ripples are data only; the plugin does not draw them. Cues fire
+on the frame their clock reaches, with or without worker threads.
 
 ### Squash, stretch and blink for sprites
 
@@ -205,25 +206,6 @@ flight at exactly 45° has none. On `land(strength)` it flattens the sprite to 0
 `setBase(scaleX, scaleY, alpha)` when the game changes them. In a hit-stop it holds its shape. The collision body
 keeps its size. It ends when the sprite is destroyed, on `destroy()` (the sprite returns to its base), or when the
 scene shuts down.
-
-## Layer mode
-
-Every per-effect object has four images. For many different effects in one region, a layer draws them all into
-four textures:
-
-```ts
-const layer = this.pixfx.createLayer({
-  bounds: { x: 290, y: 0, width: 110, height: 200 },
-  depths: { back: 0, front: 1 }, // optional
-  scrollFactor: 1,                // optional
-});
-layer.play("fire/brazier", 315, 180);
-layer.play("fire/brazier", 370, 160);
-```
-
-`layer.play` returns a `PixfxEffect` with the same API and events. The layer owns the depths and scroll factor
-(`setDepths` on a member does nothing). Members are drawn clipped to `bounds`, including their glow, so make
-the bounds cover the light you want to see. `layer.destroy()` destroys every member and the layer's textures.
 
 ## Limitation: transparent render targets
 

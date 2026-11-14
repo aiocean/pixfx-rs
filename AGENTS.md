@@ -130,21 +130,9 @@ Where a new piece of code goes:
 Each item is a refactor. Each lands with every test green, the parity gate passing and `frame_hash` unchanged; a
 change to a JS shell also shows `bun run perf` before and after.
 
-1. **`packages/pixfx-phaser` makes decisions in TypeScript.**
-   - `pixels.ts` (`compositeColor`, `compositeLight`, `snap`) copies the Rust compositing;
-   - `layer.ts` and `layout.ts` place and composite scene-wide layers;
-   - `lifecycle.ts` and `effects.ts` keep effect state (playing, stopping, destroyed), follow and per-scene ticking;
-   - `runner.ts` picks the frame to show from `floor(t × fps)`;
-   - `sprite-feel.ts` works out velocity from distance moved;
-   - `options.ts` copies the palette presets (`PALETTE_PRESETS`);
-   - `frames.ts` keeps its own frame cache (budget, what to drop, crops, sharing), which `Scene`'s frame store also
-     decides.
-
-   These move into `Scene` and the engine behind `pixfx-wasm`; the package keeps Phaser textures and images, the
-   camera, wasm loading, workers and boundary parsing.
-2. **No Pixi shell.** Add `packages/pixfx-pixi` once item 1 has left the Phaser package a pure shell, so the Pixi
-   shell is written against the same contract and stays as thin.
-3. **`pixfx-canvas` holds JS bindings and a decision.** `src/fighter.rs` and `src/light.rs` bind `pixfx-fighter` and
+1. **No Pixi shell.** Add `packages/pixfx-pixi` against the same contract as `packages/pixfx-phaser` (the wasm
+   `Scene`'s draw list, workers that paint, one atlas), so it stays as thin.
+2. **`pixfx-canvas` holds JS bindings and a decision.** `src/fighter.rs` and `src/light.rs` bind `pixfx-fighter` and
    `pixfx-light` for JS; bindings belong in `pixfx-wasm` so every JS shell gets them. `light.rs` also keeps the list
    of live lights, a decision for `pixfx-scene` (or the game). The crate keeps only its Canvas 2D shell.
 

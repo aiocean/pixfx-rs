@@ -14,12 +14,10 @@ export interface Velocity {
 }
 
 /**
- * One sprite's squash, stretch and blink, with no Phaser calls: each step it reads how fast and which way the
- * sprite moved (from its velocity when it has one, else from how far it moved) and says how to draw it.
+ * One sprite's squash, stretch and blink, with no Phaser calls: each step it hands the engine where the sprite is
+ * and its velocity when it has one (the engine works it out from movement otherwise) and says how to draw it.
  */
 export class SpriteFeelCore {
-  private last: { x: number; y: number } | null = null;
-
   constructor(
     private readonly squash: SquashLike,
     private readonly blinking: BlinkLike,
@@ -44,14 +42,8 @@ export class SpriteFeelCore {
    * physics body), and return how to draw it. A frame with no play time (a hit-stop) holds its shape.
    */
   step(dt: number, x: number, y: number, velocity: Velocity | null): Look {
-    const last = this.last;
-    const moved =
-      last === null || dt <= 0 ? { x: 0, y: 0 } : { x: (x - last.x) / dt, y: (y - last.y) / dt };
-    this.last = { x, y };
-    this.squash.advance(dt);
+    const [scaleX, scaleY] = this.squash.step(dt, x, y, velocity?.x, velocity?.y);
     this.blinking.advance(dt);
-    const v = velocity ?? moved;
-    const [scaleX, scaleY] = this.squash.scale(v.x, v.y);
     return { scaleX, scaleY, alpha: this.blinking.alpha() };
   }
 
@@ -141,8 +133,8 @@ export class PixfxSpriteFeel {
   }
 
   /**
-   * @internal Let `dt` seconds of play pass and draw the sprite for them; with none (a hit-stop) it keeps its
-   * shape. A sprite gone inactive (destroyed) ends it.
+   * @internal Let `dt` seconds of play pass and draw the sprite for them (the engine holds its shape when none
+   * pass: a hit-stop). A sprite gone inactive (destroyed) ends it.
    */
   step(dt: number): void {
     if (this.gone) return;
@@ -150,7 +142,6 @@ export class PixfxSpriteFeel {
       this.destroy();
       return;
     }
-    if (!(dt > 0)) return;
     const look = this.core.step(dt, this.sprite.x, this.sprite.y, velocityOf(this.sprite.body));
     this.sprite.setScale(this.base.scaleX * look.scaleX, this.base.scaleY * look.scaleY);
     this.sprite.setAlpha(this.base.alpha * look.alpha);
