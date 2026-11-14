@@ -7,16 +7,20 @@
 
 mod choice;
 mod curve;
+mod habits;
 mod reading;
 mod rng;
 mod sense;
 mod skill;
 mod view;
+mod yomi;
 
 pub use choice::{Choice, Outcome, Posture, Thought, Why};
+pub use habits::{foe_move, FoeMove, Habits};
 pub use curve::{score, Consideration, Curve, Input, Inputs};
 pub use reading::{is_area, is_close, is_ranged, punisher, Reading};
 pub use rng::Rng;
 pub use sense::{Arena, Doing, Foe, Me, Phase, Sense, Shape, Threat};
 pub use skill::{BodySize, Inflicts, Profile, Skill, SkillKind};
 pub use view::Delayed;
+pub use yomi::Yomi;
