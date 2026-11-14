@@ -7,4 +7,4 @@ export type { Counts, EffectMeta, Engine, FollowTarget, LoadOptions, WorldCue } 
 // the engine itself, usable once `loadPixfx()` resolved: its registry (`effects`, `meta`), an effect on its own
 // (`Fx`), and fighters and scene light for games that draw them (`Sprites`, `Lighting` give pictures to
 // `drawPicture`)
-export { Body, effects, FightFeel, Fx, Lighting, lookColors, meta, putOutLight, Sprites, stepLights } from "pixfx-web/wasm";
+export { Body, effects, FightFeel, Fx, Lighting, lookColors, meta, Mind, putOutLight, Sprites, stepLights } from "pixfx-web/wasm";

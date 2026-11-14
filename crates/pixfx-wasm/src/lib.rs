@@ -10,6 +10,8 @@ mod hit_flash;
 pub mod js;
 #[cfg(feature = "light")]
 pub mod light;
+#[cfg(feature = "mind")]
+pub mod mind;
 mod options;
 #[cfg(any(feature = "fighter", feature = "light"))]
 mod picture;

@@ -16,6 +16,7 @@ pixfx-effects = { path = "../pixfx-effects", default-features = false }
 pixfx-export = { path = "../pixfx-export" }
 pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"], optional = true }
 pixfx-light = { path = "../pixfx-light", features = ["ts"], optional = true }
+pixfx-mind = { path = "../pixfx-mind", features = ["ts"], optional = true }
 pixfx-scene = { path = "../pixfx-scene", features = ["ts"] }
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
@@ -29,7 +30,7 @@ wasm-bindgen.workspace = true
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
 
 [features]
-default = ["all", "fighter", "light"]
+default = ["all", "fighter", "light", "mind"]
 # every effect. For fewer, build with --no-default-features and name the effects or categories of pixfx-effects:
 # --features pixfx-effects/fire-candle,pixfx-effects/explosions (EffectId then lists only those)
 all = ["pixfx-effects/all"]
@@ -37,6 +38,8 @@ all = ["pixfx-effects/all"]
 fighter = ["dep:pixfx-fighter"]
 # pixfx-light for JS: `stepLights`, `putOutLight`, `Lighting`. A game without scene light builds without it.
 light = ["dep:pixfx-light"]
+# pixfx-mind for JS: `Mind`, a fighter's brain. A game whose fighters a player alone drives builds without it.
+mind = ["dep:pixfx-mind"]
 
 # wasm-pack's wasm-opt pass tuned for speed: -O3 runs effects 3 to 23% faster than its default -O (interleaved
 # benchmark of all 25 effects) at the same size.
