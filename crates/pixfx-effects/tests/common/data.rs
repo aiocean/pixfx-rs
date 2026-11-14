@@ -6,8 +6,8 @@
 //! (`critters__bloater-hurt__from=-1,hits=2`), or `<id as __>` alone when there are no options.
 //!
 //! Shape: `{cues: [{t, type, ...}], state: null | {set, name, order, next, carry}}`. Only these fields are
-//! compared, and a field the golden leaves out is null (a sound's `x`). A golden's `act` stays out: an attack's
-//! timing is `pixfx_fighter::act`, not part of an effect. Numbers match within 1e-9.
+//! compared, and a field the golden leaves out is null (a sound's `x`). A golden's `act` stays out: pixfx has no
+//! acting yet. Numbers match within 1e-9.
 
 use pixfx_core::cue::{Cue, TimedCue, cues_of};
 use pixfx_core::effect::{OptValue, Options};

@@ -4,7 +4,6 @@
 //! with the game. Pure like `pixfx-core`: no I/O, no clock; randomness comes in from the caller.
 #![forbid(unsafe_code)]
 
-pub mod act;
 pub mod body;
 pub mod feel;
 pub mod look;

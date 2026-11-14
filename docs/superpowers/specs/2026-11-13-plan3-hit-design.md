@@ -54,7 +54,7 @@ pixfx's pieces win and the port adapts.
 
 1. **Port pixelfx as it is.** Cues, states, acting with pixelfx's own stick hero and dummy, every piece checked against
    its JS. Cheapest to verify, but pixfx ends with two character rigs and two answers to a hit.
-2. **Build on pixfx's own pieces (chosen).** Port what pixfx lacks (cues, states, act timing, effect pictures), check
+2. **Build on pixfx's own pieces (chosen).** Port what pixfx lacks (cues, states, effect pictures), check
    those against their JS, and route everything a game sees through pixfx-fighter's `Feel` and body. The attacker's
    timing drives the fighter's poses, so melee and moves are no longer compared with pixelfx as whole scenes, only as
    effect pictures. The owner chose development over a faithful port.
@@ -92,28 +92,23 @@ pixfx's pieces win and the port adapts.
   around growing rings) and `flash` (lift toward white by k). Pure functions over a `Frame`.
 - Touching pixfx-fighter: check `ListAgents` for a session working in that crate first and coordinate if one is.
 
-### Acting (`pixfx-fighter`, module `act`)
+### Acting
 
-- `Act { windup, recovery, contacts: Vec<Contact { t, freeze, shake, amp, push, at }>, dust: Vec<Puff { t, x, n, dir }>,
-  targets: Vec<f64> }`, the data `actTiming` returns, minus the rig pose track.
-- An attack's timing is the attacker's, so it lives in `pixfx-fighter` with the poses, and `pixfx-core`'s `Effect`
-  knows nothing of it: the `Act` of each melee and moves effect is kept there by effect id (values from their JS
-  `act` exports).
-- `Performance` (pure): `new(act)`, `step(dt) -> Vec<ActEvent>` with `Contact(i)` and `Dust(i)`; time stands still
-  while a contact's freeze runs; `phase()` is `Windup | Strike | Recover | Done`.
-- The attacker's look: a fighter `Pose` per phase. The default mapping per category (melee: guard, draw, slash, guard;
-  moves: cast pose family) lives in pixfx-fighter next to its poses; a game may pass its own.
+Not in the engine until a game plays an attack effect. A pixelfx `act` has two halves: the hit timing tied to the
+effect's own picture (when the blow lands, its freeze, shake, push and dust), which every game playing the effect
+shares, and the caster's pose track, which is each game's own sprite. When a game needs it, the timing comes with the
+effect it times, and the game draws its caster.
 
 ### Effects (`pixfx-effects`)
 
 - `critters/bloater-{idle,hurt,swell,burst,remains}` and their shared `_bloater` drawing, with `cues` and `state`,
   checked against game-factory's copy.
-- `melee/*` (12) and `moves/*` (12), pictures and `act` data, checked against pixelfx 044e12a. A move that needs an
+- `melee/*` (12) and `moves/*` (12), pictures, checked against pixelfx 044e12a. A move that needs an
   effect not yet ported (a projectile, an explosion) gets it in the same task.
 
 ### Browser (`pixfx-canvas`) and the site
 
-- Bindings: cues drained from a `Stage` effect as plain JS objects; `Creature`; `Performance`; `Feel.take`.
+- Bindings: cues drained from a `Stage` effect as plain JS objects; `Creature`; `Feel.take`.
 - A site page, "hit lab": a fighter with a chosen melee or move, a Bloater, strike buttons for each side; Bloater rules
   as in `demo/bloater.js` (two hurts, the third sets it swelling).
 
