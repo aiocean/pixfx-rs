@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `pixfx-canvas`: a shared frame is held cut to the box that holds anything, so it takes the bytes the frame budget
+  counts for it; what the stage shows is unchanged.
 - `pixfx-phaser`: a pure shell over the wasm `Scene`. Placement, timing, which frame shows, fading, follow-stop,
   compositing and the frame cache come from Rust; workers simulate, paint, crop and convert, and transfer the bytes;
   on WebGL every surface is a region of a few atlas pages, filled with `texSubImage2D`. Removed: `createLayer` and

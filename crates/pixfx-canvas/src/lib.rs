@@ -27,7 +27,7 @@ use std::num::NonZeroU32;
 use std::rc::{Rc, Weak};
 
 use js_sys::{Array, Uint8Array, Uint8ClampedArray};
-use pixfx_core::{Clip, Feel, Layer, Meta, Options};
+use pixfx_core::{Clip, Feel, Layer, Meta, Options, PixelBox, color_rgba_in, light_rgba_in};
 use pixfx_draw::Frame;
 use pixfx_effects::effect;
 use pixfx_scene::{
@@ -569,11 +569,17 @@ fn stage_options(meta: &Meta, v: &JsValue) -> Result<Options, JsError> {
     Ok(opts)
 }
 
-/// Drawn once, then shown by every effect on that frame.
+/// Drawn once, then shown by every effect on that frame: the frame cut to the box that holds anything.
 struct Held {
     color: Option<OffscreenCanvas>,
     light: Option<OffscreenCanvas>,
+    /// Where the canvases sit on the frame, and the frame's width, to place them within a pass.
+    crop: PixelBox,
+    frame_w: u32,
 }
+
+/// The pixels of a frame inside a box, as RGBA bytes.
+type Cut = for<'a> fn(&Frame, PixelBox, &'a mut [u8]) -> &'a [u8];
 
 /// The stage's side of [`Shell`]: drawn layers onto scratch canvases, scratch canvases onto the stage.
 struct CanvasShell<'a> {
@@ -582,18 +588,24 @@ struct CanvasShell<'a> {
 }
 
 impl CanvasShell<'_> {
-    /// `frame` converted by `convert` on a new scratch canvas of its size, or none when nothing shows.
+    /// `frame`'s pixels in `crop`, cut by `cut`, on a new scratch canvas of the crop's size, or none when nothing
+    /// shows.
     fn canvas(
         &mut self,
         frame: &Frame,
-        convert: Convert,
+        crop: PixelBox,
+        cut: Cut,
     ) -> Result<Option<OffscreenCanvas>, String> {
-        self.bytes
-            .resize(frame.w as usize * frame.h as usize * 4, 0);
-        if !convert(frame, self.bytes) {
+        self.bytes.resize(crop.w as usize * crop.h as usize * 4, 0);
+        let shows = cut(frame, crop, self.bytes)
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|p| p[3] != 0);
+        if !shows {
             return Ok(None);
         }
-        let canvas = OffscreenCanvas::new(frame.w, frame.h)
+        let canvas = OffscreenCanvas::new(crop.w, crop.h)
             .map_err(|e| js_message("could not create an OffscreenCanvas", &e))?;
         let ctx = canvas
             .get_context("2d")
@@ -602,7 +614,7 @@ impl CanvasShell<'_> {
             .dyn_into::<OffscreenCanvasRenderingContext2d>()
             .map_err(|_| "OffscreenCanvas 2d context has an unexpected type".to_string())?;
         let image =
-            ImageData::new_with_u8_clamped_array_and_sh(Clamped(self.bytes), frame.w, frame.h)
+            ImageData::new_with_u8_clamped_array_and_sh(Clamped(self.bytes), crop.w, crop.h)
                 .map_err(|e| js_message("could not create ImageData", &e))?;
         ctx.put_image_data(&image, 0.0, 0.0)
             .map_err(|e| js_message("putImageData failed", &e))?;
@@ -615,9 +627,19 @@ impl Shell for CanvasShell<'_> {
     type Error = String;
 
     fn make(&mut self, frame: &Frame) -> Result<Held, String> {
+        let Some(crop) = PixelBox::lit(frame) else {
+            return Ok(Held {
+                color: None,
+                light: None,
+                crop: PixelBox::default(),
+                frame_w: frame.w,
+            });
+        };
         Ok(Held {
-            color: self.canvas(frame, color_rgba)?,
-            light: self.canvas(frame, light_rgba)?,
+            color: self.canvas(frame, crop, color_rgba_in)?,
+            light: self.canvas(frame, crop, light_rgba_in)?,
+            crop,
+            frame_w: frame.w,
         })
     }
 
@@ -627,8 +649,15 @@ impl Shell for CanvasShell<'_> {
     }
 
     fn show(&mut self, pass: Pass, surface: &Held) -> Result<(), String> {
+        // the rect spans the whole frame in stage pixels; the canvases hold the crop
         let r = pass.rect;
-        let (x, y, w, h) = (r.x as f64, r.y as f64, r.w as f64, r.h as f64);
+        let unit = r.w as f64 / f64::from(surface.frame_w.max(1));
+        let c = surface.crop;
+        let (x, y) = (
+            r.x as f64 + f64::from(c.x) * unit,
+            r.y as f64 + f64::from(c.y) * unit,
+        );
+        let (w, h) = (f64::from(c.w) * unit, f64::from(c.h) * unit);
         for (canvas, op) in [(&surface.color, "source-over"), (&surface.light, "lighter")] {
             let Some(canvas) = canvas else { continue };
             self.stage
