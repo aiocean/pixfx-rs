@@ -47,7 +47,7 @@ Every shell is equal. None is the main one:
 
 | Shell | Where | Status |
 |---|---|---|
-| Canvas 2D | `crates/pixfx-canvas` | shipped |
+| Canvas 2D | `packages/pixfx-canvas2d` | shipped |
 | Phaser 4 | `packages/pixfx-phaser` | shipped |
 | gpui | `crates/pixfx-gpui` | shipped (own workspace, needs the gpui fork) |
 | Files (PNG sheets, beanfx JSON, GIF) | `crates/pixfx-export`, `crates/pixfx-cli` | shipped |
@@ -92,7 +92,9 @@ the number of effects, so they leave it:
   they never go back through wasm there; Rust gets only what it decides with (size, crop, which halves hold pixels).
 - WebGL shells (Phaser, Pixi) show frames from one texture atlas, so every effect of a layer goes out in one batch.
   The engine has no layer groups: merging a region again whenever one effect in it changes costs more than the atlas.
-- Canvas 2D shows frames as `ImageBitmap`s a worker made; it needs no atlas.
+- Canvas 2D fills a small canvas per frame with the bytes a worker transferred (`putImageData`) and draws from it; it
+  needs no atlas. Handing it `ImageBitmap`s a worker made would save only that copy: 28 ms/s on the landing duel at
+  6× CPU throttling.
 - A new output (a terminal in ASCII, an OLED screen, the DOM) is a new shell; deciding and painting stay as they are.
   Embedded targets would also need `no_std` crates, room for frames, and a way round `f64` maths, which parity keeps.
 
@@ -102,7 +104,7 @@ Dependencies point one way, top to bottom. A lower layer never depends on a high
 
 | Layer | Crate (target) | Holds | Rules |
 |---|---|---|---|
-| Shells | `pixfx-canvas`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-gpui`, `pixfx-export`, `pixfx-cli` | Host objects, the host loop, workers, surface caches | No decisions. Thin enough that a second shell for the same host would be the same code. |
+| Shells | `pixfx-canvas2d`, `pixfx-canvas`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-gpui`, `pixfx-export`, `pixfx-cli` | Host objects, the host loop, workers, surface caches | No decisions. Thin enough that a second shell for the same host would be the same code. |
 | JS runtime | `packages/pixfx-web` (TypeScript) | Loading the wasm, painting workers, the game-wide frames and their surfaces, a stage per host scene following the draw list, effect handles, the feel's JS face | Host-neutral: no Phaser, no Pixi. A JS shell adds only its host objects and its loop. |
 | JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it, by way of `pixfx-web`. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
@@ -137,7 +139,10 @@ change to a JS shell also shows `bun run perf` before and after.
    Task 6) has landed; until then a fix to one goes into both.
 2. **`pixfx-canvas` holds JS bindings and a decision.** `src/fighter.rs` and `src/light.rs` bind `pixfx-fighter` and
    `pixfx-light` for JS; bindings belong in `pixfx-wasm` so every JS shell gets them. `light.rs` also keeps the list
-   of live lights, a decision for `pixfx-scene` (or the game). The crate keeps only its Canvas 2D shell.
+   of live lights, a decision for `pixfx-scene` (or the game).
+3. **`crates/pixfx-canvas` is a second Canvas 2D shell.** Its `Stage` paints on the main thread, and the site still
+   draws with it. The site moves to `packages/pixfx-canvas2d` once the duel's bindings are in `pixfx-wasm` (item 2)
+   and `pixfx-web` shows screen ripples (the effect pages bend the view with them); then the crate goes.
 
 ## Rules
 

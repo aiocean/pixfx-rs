@@ -43,6 +43,7 @@ export class Stage<P> implements EffectHost<P>, Delivering {
   private readonly effects = new Map<number, PixfxEffect<P>>();
   private readonly follows = new Map<number, Follow>();
   private readonly pairs: Pair<P>[] = [];
+  private cleared = false;
 
   /** @param place how images of an effect the stage no longer knows are placed (never in practice). */
   constructor(
@@ -54,6 +55,11 @@ export class Stage<P> implements EffectHost<P>, Delivering {
     this.scene = game.frames.scene(1);
     this.id = this.scene.id();
     game.add(this);
+  }
+
+  /** The Rust scene while the stage runs, null once `clear()` let it go: what a feel reads (`new PixfxFeel(() => stage.live)`). */
+  get live(): Wasm.Scene | null {
+    return this.cleared ? null : this.scene;
   }
 
   /** Play effect `id` at world (`x`, `y`); throws on an unknown id or options the engine refuses. */
@@ -160,6 +166,7 @@ export class Stage<P> implements EffectHost<P>, Delivering {
     }
     this.pairs.length = 0;
     this.game.remove(this);
+    this.cleared = true;
     this.scene.free();
   }
 

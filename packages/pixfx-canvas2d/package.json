@@ -1,0 +1,32 @@
+{
+  "name": "pixfx-canvas2d",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build:wasm": "cd ../pixfx-web && bun run build:wasm",
+    "build": "vite build",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "check": "bun install && bun run typecheck && bun run lint && bun run test",
+    "check:browser": "bun check/browser.ts"
+  },
+  "dependencies": {
+    "pixfx-web": "file:../pixfx-web",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "eslint": "^10.14.0",
+    "typescript": "^6",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8"
+  }
+}

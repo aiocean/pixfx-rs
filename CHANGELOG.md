@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `pixfx-canvas2d` (new): pixfx on a Canvas 2D context over `pixfx-web`, painting on workers. `createPixfx(ctx, {
+  scale })`, `play(id, x, y, opts)`, and each frame `update(dt)` then `drawLayer("back")` / `drawLayer("front")` (or
+  `draw()`) in the context's transform. `bun run build` writes `dist/` for pages without a bundler.
+- `pixfx-web`: `Stage.live` is the Rust scene until `clear()`, then null; a feel built on it reads still after its
+  shell is destroyed instead of throwing.
 - `pixfx-pixi` (new): pixfx in a Pixi 8 application. `createPixfx(app, { container, camera })`, then `play(id, x, y,
   opts)` with the same effects, events and feel as Phaser; the shake moves and tilts a camera container, the flash
   covers the screen. On WebGL frames are regions of atlas pages filled with `texSubImage2D`.

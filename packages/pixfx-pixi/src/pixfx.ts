@@ -66,7 +66,7 @@ export class Pixfx {
     this.container.sortableChildren = true;
     this.camera = options.camera ?? app.stage;
     let stage: Stage<null> | null = null;
-    this.feel = new PixfxFeel(() => stage?.scene ?? null);
+    this.feel = new PixfxFeel(() => stage?.live ?? null);
     stage = new Stage<null>(game, pixiImages(this.container, textureOf), (cue, effect) => this.feel.take(cue, effect), null);
     this.stage = stage;
     app.ticker.add(this.step, undefined, STEP_PRIORITY);

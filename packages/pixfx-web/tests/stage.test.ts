@@ -26,7 +26,7 @@ function setup(ports: WorkerPort[] = []) {
 function scene(game: GameT, gfx: FakeGfx) {
   const cues: WorldCue[] = [];
   let stage: StageT | null = null;
-  const feel = new PixfxFeel(() => stage?.scene ?? null);
+  const feel = new PixfxFeel(() => stage?.live ?? null);
   feel.on("cue", (c: WorldCue) => cues.push(c));
   stage = new Stage<number>(game, gfx.image, (c, e) => feel.take(c, e), 1);
   return { stage, feel, cues };
@@ -205,4 +205,18 @@ test("shutting a scene down ends its effects; clearing the game lets go of every
   game.clear();
   expect(game.counts()).toEqual({ surfaces: 0, textures: 0 });
   expect(gfx.textures.every((t) => t.destroyed)).toBe(true);
+});
+
+test("a scene's feel reads still once the scene shut down, as a host loop may read it after destroy", () => {
+  const { game, stage, feel } = setup();
+  stage.play("explosions/small-explosion", 40, 40, {}, 1);
+  for (let i = 0; i < 10; i++) frame(game, stage);
+  expect(feel.trauma).toBeGreaterThan(0);
+  stage.clear();
+  expect(feel.shake).toEqual([0, 0]);
+  expect(feel.roll).toBe(0);
+  expect(feel.flash).toBe(0);
+  expect(feel.trauma).toBe(0);
+  expect(feel.frozen).toBe(false);
+  expect(() => feel.addTrauma(1).freeze(1).slow(1, 0.5)).not.toThrow();
 });
