@@ -7,6 +7,7 @@ mod feel;
 mod hit_flash;
 pub mod js;
 mod options;
+pub mod scene;
 mod squash;
 
 pub use feel::Feel;
@@ -32,6 +33,24 @@ pub fn effects() -> Array {
     EFFECTS
         .iter()
         .map(|e| JsValue::from_str(e.meta().id))
+        .collect()
+}
+
+/// The palette presets every effect takes by name (`palette: "fire"`), in the engine's order.
+#[wasm_bindgen(js_name = palettePresets)]
+pub fn palette_presets() -> Vec<String> {
+    pixfx_draw::palette::PRESETS
+        .iter()
+        .map(|(name, _)| (*name).to_string())
+        .collect()
+}
+
+/// The outline presets every effect takes by name (`outline: "..."`), in the engine's order.
+#[wasm_bindgen(js_name = outlinePresets)]
+pub fn outline_presets() -> Vec<String> {
+    pixfx_draw::outline::PRESETS
+        .iter()
+        .map(|(name, _)| (*name).to_string())
         .collect()
 }
 

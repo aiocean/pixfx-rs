@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- `pixfx-wasm`: the scene for JS shells (`src/scene.rs`). `new Frames(workers)` holds a game's shared frames;
+  `frames.scene(scale)` makes a `Scene` per stage (`play`, `moveTo`, `set`, `stop`, `remove`, `update`, `events`,
+  the feel, `setView`, `setDrawBudget`); `scene.draw(frames)` and `frames.endFrame()` return a draw list (an
+  `Int32Array` of make, refill, show and free ops), each surface cropped to what it holds. With `new Frames(true)`
+  frames are painted on workers: `frames.takeJobs()`, a worker's `Painting.paint(job)` paints, crops and turns the
+  frame into RGBA, the worker transfers the bytes, and `scene.deliver(frames, job, shape)` takes back only their
+  `Shape`, so pixels never pass through wasm on the main thread; they equal those painted on the spot. Painted on the
+  spot (`new Frames(false)`), the bytes are at `frames.colorPtr(id)` and `lightPtr(id)` until the next call.
+  `pixfx-scene`: `Frames::deliver` and `Scene::deliver_own` take a `Frame` or what the shell takes through
+  `Receive<D>`. `palettePresets()` and `outlinePresets()` read the engine's presets.
+  `Squash.step(dt, x, y, vx?, vy?)` scales a body for its velocity or, without one, for how far it moved, holding its
+  scale through a hit-stop (`pixfx-core`: `squash::Moving`).
 - `pixfx-scene`: painting leaves `Scene`. `Frames` holds the shared frames and a `Painter` for every scene of a game
   (`Frames::scene`), so a frame one scene painted shows in all of them; hosts end each frame with
   `Frames::end_frame`, and draw calls take the frames (`scene.draw(&mut frames, &mut shell)`). `InlinePainter`

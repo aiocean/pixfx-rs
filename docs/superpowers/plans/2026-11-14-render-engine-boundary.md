@@ -134,6 +134,20 @@ Done in two commits: 2a moves `Scene` and `Shell` (with `free` and `Scene::clear
 
 ### Task 3: a JS `Scene` in `pixfx-wasm` that returns a draw list
 
+> **Shape as built (owner's choice, option 3).** Painting leaves `Scene` (commit 1b2bc0e): `Scene` keeps clocks and
+> decides on the main thread; a game-wide `Frames` holds the shared frames and a `Painter` for every scene of the
+> game; `InlinePainter` paints on the spot, a worker painter hands frames back with `Frames::deliver` /
+> `Scene::deliver_own`. The JS side (`crates/pixfx-wasm/src/scene.rs`): `new Frames(workers)`,
+> `frames.scene(scale)`, `scene.draw(frames)` / `frames.endFrame()` returning an `Int32Array` draw list
+> (`OP_MAKE`, `OP_REFILL`, `OP_SHOW`, `OP_FREE`, `OP_STRIDE` numbers each) with pixels at `frames.colorPtr(id)` /
+> `lightPtr(id)`; `frames.takeJobs()`; a worker's `Painting.paint(job)` paints,
+> crops and turns the frame into RGBA, the worker transfers the bytes, and `scene.deliver(frames, job, shape)` takes
+> back only their `Shape`: pixels never pass through wasm on the main thread (`Receive<D>` in `pixfx-scene`).
+> `Squash.step(dt, x, y, vx?, vy?)` stands for `scaleMoved`. A followed effect is placed on the main thread each
+> frame, so it never lags its target; only new pixels arrive a frame later from a worker. Task 4's worker protocol
+> carries jobs and painted RGBA instead of batches of effects; the Phaser frame-cache invariants hold through
+> `Frames` (budget, least recently shown first, crops, one surface per frame shared by every scene).
+
 **Files:**
 - Create: `crates/pixfx-wasm/src/scene.rs`
 - Modify: `crates/pixfx-wasm/src/lib.rs`, `crates/pixfx-wasm/Cargo.toml` (depend on `pixfx-scene`)

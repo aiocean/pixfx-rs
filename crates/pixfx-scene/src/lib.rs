@@ -132,6 +132,8 @@ pub enum StageError {
     OutOfHandles,
     /// A time step was NaN, infinite or negative.
     BadStep,
+    /// A frame painted elsewhere came back at another size than the one asked for.
+    BadFrame,
 }
 
 impl fmt::Display for StageError {
@@ -140,6 +142,7 @@ impl fmt::Display for StageError {
             Self::NotFinite => "x and y must be finite numbers",
             Self::OutOfHandles => "every handle has been used",
             Self::BadStep => "dt must be a finite number of seconds, 0 or more",
+            Self::BadFrame => "a painted frame came back at another size than the one asked for",
         })
     }
 }
@@ -161,6 +164,32 @@ pub trait Shell {
     /// Let go of `surface`: the scene dropped it (past the frame budget, or its effect ended). A host whose
     /// surfaces hold host objects releases them here, or queues them to release once the frame is painted.
     fn free(&mut self, surface: Self::Surface) -> Result<(), Self::Error>;
+}
+
+/// How a shell takes a frame painted elsewhere ([`Frames::deliver`], [`Scene::deliver_own`]): from `D`, what the
+/// painter sent back. Every shell takes a [`Frame`]; a shell whose painter sends pixels straight to it (a worker
+/// posting RGBA to a JS shell) takes their shape instead, so the pixels never pass through the scene.
+pub trait Receive<D>: Shell {
+    /// A new surface holding `painted`.
+    fn make_from(&mut self, painted: &D) -> Result<Self::Surface, Self::Error>;
+    /// Put `painted` in `surface`, replacing what it held.
+    fn refill_from(&mut self, surface: &mut Self::Surface, painted: &D) -> Result<(), Self::Error>;
+    /// Bytes a surface holding `painted` takes, counted against the frame budget.
+    fn bytes_of(&self, painted: &D) -> u64;
+}
+
+impl<H: Shell> Receive<Frame> for H {
+    fn make_from(&mut self, painted: &Frame) -> Result<H::Surface, H::Error> {
+        self.make(painted)
+    }
+
+    fn refill_from(&mut self, surface: &mut H::Surface, painted: &Frame) -> Result<(), H::Error> {
+        self.refill(surface, painted)
+    }
+
+    fn bytes_of(&self, painted: &Frame) -> u64 {
+        frame_bytes(painted)
+    }
 }
 
 /// A layer's own frame: the surface an effect fading after `stop()` draws into, and what it last drew there.
@@ -280,6 +309,11 @@ impl<S> Scene<S> {
         }
         self.view = view;
         Ok(())
+    }
+
+    /// Which of the scenes sharing a [`Frames`] this is.
+    pub fn id(&self) -> u32 {
+        self.id
     }
 
     pub fn scale(&self) -> NonZeroU32 {
@@ -620,13 +654,13 @@ impl<S> Scene<S> {
     /// Put `frame`, painted elsewhere for layer `layer` of instance `handle` while it fades
     /// ([`Target::Own`]), in its own surface and show it from the next draw. A frame for an instance gone since,
     /// or older than the one it shows, is dropped. `Ok(false)` if it was dropped.
-    pub fn deliver_own<H: Shell<Surface = S>>(
+    pub fn deliver_own<D, H: Receive<D, Surface = S>>(
         &mut self,
         handle: u32,
         layer: Layer,
         clock: u64,
         place: Placement,
-        frame: &Frame,
+        frame: &D,
         shell: &mut H,
     ) -> Result<bool, H::Error> {
         let Some(e) = self.entries.iter_mut().find(|e| e.handle == handle) else {
@@ -640,11 +674,11 @@ impl<S> Scene<S> {
         match &mut e.own[slot] {
             Some(o) if o.drawn.0 > clock => return Ok(false),
             Some(o) => {
-                shell.refill(&mut o.surface, frame)?;
+                shell.refill_from(&mut o.surface, frame)?;
                 o.drawn = drawn;
             }
             None => {
-                let surface = shell.make(frame)?;
+                let surface = shell.make_from(frame)?;
                 e.own[slot] = Some(Own { surface, drawn });
             }
         }

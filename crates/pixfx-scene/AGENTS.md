@@ -17,8 +17,9 @@ scene drew.
 
 A `Painter` paints a `Job` (an effect's state brought to a frame, drawn placed and faded): `InlinePainter` on the
 spot (Canvas 2D, gpui, files, tests), or another painter elsewhere (a worker), whose frames come back through
-`Frames::deliver` (shared) and `Scene::deliver_own` (a fading effect's own). Until then the effect shows its last
-frame. The painter keeps each effect's state (`Sim`) between paints; `Scene` keeps only clocks, so deciding stays
+`Frames::deliver` (shared) and `Scene::deliver_own` (a fading effect's own). Both take a `Frame`, or whatever the
+shell takes from its painter through `Receive<D>` (a JS shell takes the shape of the RGBA a worker sent it, so pixels
+skip the scene). Until then the effect shows its last frame. The painter keeps each effect's state (`Sim`) between paints; `Scene` keeps only clocks, so deciding stays
 cheap on the thread that runs it.
 
 It drives the `Shell` contract, which every shell implements:

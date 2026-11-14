@@ -9,6 +9,15 @@ The engine for JavaScript. It translates and decides nothing: `effects()`, `meta
 `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`, `new Feel(spec?)`, `new Squash(spec?)`,
 `new Blink(spec?)`, and `parse_options`. Every JS shell (Canvas 2D, Phaser, Pixi) loads the engine through it.
 
+`src/scene.rs` is the `pixfx-scene` scene for JS shells: `new Frames(workers)` once per game, `frames.scene(scale)`
+per stage, `scene.play/moveTo/stop/update/events`, then `scene.draw(frames)` and `frames.endFrame()`, which return a
+draw list (`Int32Array`, `OP_STRIDE` numbers per op: make, refill, show, free) with the pixels at
+`frames.colorPtr(id)` / `lightPtr(id)` when painted on the spot. With workers (every JS shell), `frames.takeJobs()`
+gives the frames to paint, a worker's `new Painting()` paints, cuts and turns each into RGBA (`painted.shape()`,
+`color()`, `light()`), the worker transfers the bytes, and `scene.deliver(frames, job, shape)` takes back only the
+shape: the make or refill it returns uploads the worker's bytes, which never pass through wasm on the main thread.
+Presets come from `palettePresets()` and `outlinePresets()`; `Squash.step(dt, x, y, vx?, vy?)` works out velocity from movement.
+
 ## Belongs here
 
 - A `wasm-bindgen` wrapper over a Rust type that already exists in a lower crate.
@@ -28,7 +37,7 @@ The test: if a gpui game would need the same behaviour, it is not translation, a
 
 ## Dependencies
 
-`pixfx-core` (with `ts`), `pixfx-draw`, `pixfx-effects` (`default-features = false`; the `all` feature turns every
+`pixfx-core` (with `ts`), `pixfx-draw`, `pixfx-scene` (with `ts`), `pixfx-effects` (`default-features = false`; the `all` feature turns every
 effect on), `js-sys`, `wasm-bindgen`, `serde`, `serde-wasm-bindgen`, `serde_json`, `serde_path_to_error`, `tsify`.
 
 ## Known drift

@@ -182,6 +182,46 @@ impl Squash {
     }
 }
 
+/// A body's squash drawn by a host that cannot skew a sprite and may not know its velocity (a sprite without a
+/// physics body): each frame [`Moving::step`] takes where it is and, when the game knows it, how fast it moves, and
+/// says how to scale it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Moving {
+    pub squash: Squash,
+    /// Where it was at the last step that passed time.
+    last: Option<(f64, f64)>,
+    /// The scale it was given then: a step that passes no time (a hit-stop) holds it.
+    held: Option<(f64, f64)>,
+}
+
+impl Moving {
+    pub fn new(spec: SquashSpec) -> Self {
+        Self {
+            squash: Squash::new(spec),
+            last: None,
+            held: None,
+        }
+    }
+
+    /// Let `dt` seconds pass for a body now at `(x, y)`, moving at `velocity` px/s when the game knows it, else as
+    /// fast as it moved since the last step, and return its upright scale `(sx, sy)`. A step that passes no time
+    /// holds the last scale and moves nothing, so no speed spikes out of a hit-stop.
+    pub fn step(&mut self, dt: f64, x: f64, y: f64, velocity: Option<(f64, f64)>) -> (f64, f64) {
+        if !(dt.is_finite() && dt > 0.0) {
+            return self.held.unwrap_or((1.0, 1.0));
+        }
+        let moved = self
+            .last
+            .map_or((0.0, 0.0), |(lx, ly)| ((x - lx) / dt, (y - ly) / dt));
+        self.last = Some((x, y));
+        self.squash.advance(dt);
+        let (vx, vy) = velocity.unwrap_or(moved);
+        let scale = self.squash.shape(vx, vy).axis_scale();
+        self.held = Some(scale);
+        scale
+    }
+}
+
 /// One body's blink while it cannot be hurt: [`Blink::start`] for how long, [`Blink::advance`], then draw it at
 /// [`Blink::alpha`]. The protection itself is the game's rule; this only shows it.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

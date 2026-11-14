@@ -73,6 +73,29 @@ Games are made two ways, on the same engine:
 
 A new engine feature ships for both kinds of game.
 
+## How a frame is made, and where each cost goes
+
+Three parts, each on the thread that suits it:
+
+| Part | Holds | Runs |
+|---|---|---|
+| Decide (`Scene`) | clocks, placement, which frame shows, cues, events | the host's main thread; never touches pixels |
+| Paint (`Painter` into a `Frame`) | simulating an effect up to a frame, drawing it, cropping it, turning it into RGBA | workers for every JS shell (Canvas, Phaser, Pixi), native threads for gpui when it needs them, on the spot for files, tests and hosts without workers |
+| Show (`Shell`) | uploading pixels into host objects and placing them | the host's main thread |
+
+The main thread has 16 ms a frame and runs the game too; simulation and painting are the cost that grows with
+the number of effects, so they leave it:
+
+- A frame identical effects share is painted once for the whole game (`Frames` is shared by every `Scene`), and an
+  effect's state advances only when a frame of it is painted, so effects off screen cost nothing.
+- A worker does all the pixel work and transfers the buffer. Pixels reach the main thread once, to go to the GPU:
+  they never go back through wasm there; Rust gets only what it decides with (size, crop, which halves hold pixels).
+- WebGL shells (Phaser, Pixi) show frames from one texture atlas, so every effect of a layer goes out in one batch.
+  The engine has no layer groups: merging a region again whenever one effect in it changes costs more than the atlas.
+- Canvas 2D shows frames as `ImageBitmap`s a worker made; it needs no atlas.
+- A new output (a terminal in ASCII, an OLED screen, the DOM) is a new shell; deciding and painting stay as they are.
+  Embedded targets would also need `no_std` crates, room for frames, and a way round `f64` maths, which parity keeps.
+
 ## Layers and where code goes
 
 Dependencies point one way, top to bottom. A lower layer never depends on a higher one.

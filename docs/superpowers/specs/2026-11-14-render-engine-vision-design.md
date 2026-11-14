@@ -99,6 +99,15 @@ needs it.
 - **AI's call:** the first game that adopts the engine decides the order of new features; a shipped Phaser game is not
   migrated first.
 
+- **Owner:** computing and showing are separate. `Scene` decides on the main thread with clocks only; a `Painter`
+  paints, on workers for JS shells; a game-wide `Frames` is shared by every scene. Chosen by reasoning:
+  - pixel work leaves the main thread;
+  - pixels cross to the main thread once, straight to the GPU;
+  - WebGL shells use one atlas;
+  - layer groups (`createLayer`) are dropped.
+- **AI's call, owner agreed:** a terminal (ASCII) or an OLED screen is a new shell; embedded targets would add
+  `no_std`, frame memory and `f64` cost on top.
+
 ## Left to the builder
 
 - The drawing crate's name and the exact module split, keeping every `frame_hash` unchanged.

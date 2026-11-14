@@ -14,6 +14,7 @@ pixfx-core = { path = "../pixfx-core", features = ["ts"] }
 pixfx-draw = { path = "../pixfx-draw" }
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
 pixfx-export = { path = "../pixfx-export" }
+pixfx-scene = { path = "../pixfx-scene", features = ["ts"] }
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
 serde_json.workspace = true

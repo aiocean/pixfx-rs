@@ -363,6 +363,7 @@ dependencies = [
  "pixfx-draw",
  "pixfx-effects",
  "pixfx-export",
+ "pixfx-scene",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

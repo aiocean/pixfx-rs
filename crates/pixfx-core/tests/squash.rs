@@ -130,3 +130,33 @@ fn a_blink_shows_faint_on_every_other_beat_while_it_lasts() {
     assert!(!b.active());
     assert_eq!(b.alpha(), 1.0, "whole once it ends");
 }
+
+#[test]
+fn a_moving_body_holds_its_scale_through_a_step_with_no_time() {
+    let mut m = pixfx_core::Moving::new(SquashSpec::default());
+    m.step(1.0 / 60.0, 0.0, 0.0, None);
+    let fast = m.step(1.0 / 60.0, 6.0, 0.0, None);
+    assert_ne!(fast, (1.0, 1.0), "360 px/s stretches it");
+    // a hit-stop: no time passes and the body may even be moved; nothing spikes
+    assert_eq!(m.step(0.0, 500.0, 0.0, None), fast);
+    assert_eq!(m.step(-1.0, 500.0, 0.0, None), fast);
+}
+
+#[test]
+fn a_moving_body_without_velocity_reads_it_from_how_far_it_moved() {
+    let spec = SquashSpec::default();
+    let mut moved = pixfx_core::Moving::new(spec);
+    let mut told = pixfx_core::Moving::new(spec);
+    moved.step(0.1, 10.0, 10.0, None);
+    told.step(0.1, 0.0, 0.0, Some((0.0, 0.0)));
+    // 30 px down in 0.1 s is 300 px/s
+    assert_eq!(
+        moved.step(0.1, 10.0, 40.0, None),
+        told.step(0.1, 0.0, 0.0, Some((0.0, 300.0)))
+    );
+    // a velocity the game gives wins over the distance
+    assert_eq!(
+        moved.step(0.1, 10.0, 40.0, Some((0.0, 300.0))),
+        told.step(0.1, 0.0, 0.0, Some((0.0, 300.0)))
+    );
+}

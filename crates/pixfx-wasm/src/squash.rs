@@ -21,7 +21,7 @@ fn spec_of(v: &JsValue) -> Result<SquashSpec, JsError> {
 /// `scale(vx, vy)` where it cannot skew. Its area is kept.
 #[wasm_bindgen]
 pub struct Squash {
-    inner: squash::Squash,
+    inner: squash::Moving,
 }
 
 #[wasm_bindgen]
@@ -34,24 +34,38 @@ impl Squash {
         #[wasm_bindgen(unchecked_optional_param_type = "SquashSpec")] spec: JsValue,
     ) -> Result<Squash, JsError> {
         Ok(Squash {
-            inner: squash::Squash::new(spec_of(&spec)?),
+            inner: squash::Moving::new(spec_of(&spec)?),
         })
     }
 
     /// It lands with `strength` (0 to 1: how hard, a fall's speed over the fastest you expect).
     pub fn land(&mut self, strength: f64) {
-        self.inner.land(strength);
+        self.inner.squash.land(strength);
     }
 
     pub fn advance(&mut self, dt: f64) {
-        self.inner.advance(dt);
+        self.inner.squash.advance(dt);
+    }
+
+    /// For a host that cannot skew and may not know the body's velocity: let `dt` seconds pass for a body now at
+    /// `(x, y)`, moving at `(vx, vy)` px/s when given (both finite), else as fast as it moved since the last step;
+    /// returns its upright scale `[sx, sy]`. A step with no time (a hit-stop) holds the last scale. Use it instead
+    /// of `advance` and `scale`.
+    #[wasm_bindgen(unchecked_return_type = "[number, number]")]
+    pub fn step(&mut self, dt: f64, x: f64, y: f64, vx: Option<f64>, vy: Option<f64>) -> Array {
+        let velocity = match (vx, vy) {
+            (Some(vx), Some(vy)) if vx.is_finite() && vy.is_finite() => Some((vx, vy)),
+            _ => None,
+        };
+        let (sx, sy) = self.inner.step(dt, x, y, velocity);
+        pair(sx, sy)
     }
 
     /// The sprite's shape this frame, moving at `(vx, vy)` pixels a second (y down): `[a, b, c, d]` for a
     /// canvas `transform(a, b, c, d, feetX, feetY)` drawn with the feet at the origin.
     #[wasm_bindgen(unchecked_return_type = "[number, number, number, number]")]
     pub fn shape(&self, vx: f64, vy: f64) -> Array {
-        let s = self.inner.shape(vx, vy);
+        let s = self.inner.squash.shape(vx, vy);
         [s.a, s.b, s.c, s.d]
             .into_iter()
             .map(JsValue::from_f64)
@@ -62,7 +76,7 @@ impl Squash {
     /// without its lean, for a host that cannot skew a sprite.
     #[wasm_bindgen(unchecked_return_type = "[number, number]")]
     pub fn scale(&self, vx: f64, vy: f64) -> Array {
-        let (sx, sy) = self.inner.shape(vx, vy).axis_scale();
+        let (sx, sy) = self.inner.squash.shape(vx, vy).axis_scale();
         pair(sx, sy)
     }
 }

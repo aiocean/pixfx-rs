@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use pixfx_core::{Clip, FrameId, FrameStore, Layer, Placement, Sim};
 use pixfx_draw::Frame;
 
-use crate::{Scene, Shell};
+use crate::{Receive, Scene, Shell};
 use std::num::NonZeroU32;
 
 /// One effect among every scene sharing a [`Frames`]: the scene that plays it and its handle there.
@@ -134,20 +134,22 @@ impl<S, P: Painter> Frames<S, P> {
         self.draws + 1
     }
 
-    /// Hold `frame` as `layer` of frame `id`, painted elsewhere ([`Painter::paint`] gave `None`) or baked, so
+    /// Hold `frame` (a [`Frame`], or what the shell takes from a painter elsewhere: [`Receive`]) as `layer` of
+    /// frame `id`, painted elsewhere ([`Painter::paint`] gave `None`) or baked, so
     /// effects showing it paint nothing. Held like a painted frame: past the budget it goes, least recently shown
     /// first, and is painted again if shown again. A frame already held keeps what it has.
-    pub fn deliver<H: Shell<Surface = S>>(
+    pub fn deliver<D, H: Receive<D, Surface = S>>(
         &mut self,
         id: &FrameId,
         layer: Layer,
-        frame: &Frame,
+        frame: &D,
         shell: &mut H,
     ) -> Result<(), H::Error> {
         self.pending.remove(&(id.clone(), layer));
         let now = self.now();
         self.store.show(id, layer, now, || {
-            Ok((shell.make(frame)?, frame_bytes(frame)))
+            let bytes = shell.bytes_of(frame);
+            Ok((shell.make_from(frame)?, bytes))
         })?;
         Ok(())
     }

@@ -33,5 +33,5 @@ pub use sim::{
     Bit, BitKind, Bits, Blazes, CrystalOpts, Flags, Kind, Lights, Particle, Particles,
     ParticlesOpts, Piece, Spawn, band, crystal, flare, sparkle,
 };
-pub use squash::{Blink, Squash, SquashSpec};
+pub use squash::{Blink, Moving, Squash, SquashSpec};
 pub use state::{Creature, StateError, StateMeta};
