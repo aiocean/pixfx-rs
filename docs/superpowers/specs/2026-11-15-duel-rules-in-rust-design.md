@@ -86,6 +86,25 @@ Models researched and left (2026-11-15):
 - **Decision Transformer** needs data from strong play.
 - **DreamerV3 and TD-MPC2** pay to plan every step, which a cheap simulator does not need.
 
+Google's game agents (checked 2026-11-15):
+
+- **Dopamine's DQN, Rainbow and IQN, and the reincarnating-RL checkpoints, cannot be reused.** Each maps 84x84
+  Atari frames through a CNN to Atari's actions; our input is about 120 state floats and our actions are the duel's.
+- **SIMA 2, Genie 3, Gato and AlphaZero have no public weights.**
+- **What the newer work in that line adds to PPO, taken here:**
+  - HL-Gauss, a critic trained by classification ("Stop Regressing", Google DeepMind, arXiv 2403.03950; used with
+    PPO in arXiv 2608.02181);
+  - simplicial embeddings (Obando-Ceron, Castro et al., arXiv 2510.13704), which improve PPO with discrete actions
+    at no runtime cost;
+  - more parallel environments rather than longer rollouts (Mayor et al., ICML 2025).
+- **Left:**
+  - BBF, MR.Q and EfficientZero V2 save environment steps, which our fast simulator makes cheap. EfficientZero V2
+    also searches while playing.
+  - PQN's greedy policy cannot mix its moves, and the duel's guessing games reward mixing.
+  - Soft MoE pays off only at scale.
+- **No fighting-game agent** built on any of these was found. DareFightingICE 2024-2025 and DIAMBRA use PPO with
+  league self-play, or scripts.
+
 Evidence for the pick:
 
 - PPO with LSTM agents beat pro players 62% in Blade & Soul arena, with a reaction delay imposed (arXiv 1904.03821).
@@ -175,8 +194,10 @@ Until the JS rules are deleted, `site/tests/replay.test.js` runs `duel.js` and t
 
   Choices that cannot happen now (a slot not ready, not enough qi, silenced) are masked out. The choice maps to
   `pixfx_mind::Choice`.
-- **Network:** a SimBa-style MLP of two residual LayerNorm blocks, width about 128, with a policy head and a value
-  head, about 50-300K weights. A GRU layer is added only if the ladder shows it cannot read the foe's patterns.
+- **Network:** a SimBa-style MLP of two residual LayerNorm blocks, width about 128, then a simplicial embedding
+  layer, then a policy head and a value head, about 50-300K weights. The value head is trained by HL-Gauss
+  classification over a fixed set of value bins, with PPO's value clipping off. The value head is not shipped: the
+  page runs only the policy. A GRU layer is added only if the ladder shows it cannot read the foe's patterns.
 - **On the page:**
   - the policy samples its choice with the fighter's seeded dice, so fights vary and stay deterministic;
   - its weights ship as a plain data file;
@@ -186,7 +207,7 @@ Until the JS rules are deleted, `site/tests/replay.test.js` runs `duel.js` and t
 ### Training
 
 - **Env binding:** `crates/pixfx-duel-py`, a thin pyo3/maturin binding, the only Python-facing code. It runs many
-  `Duel`s in a batch and steps them all from arrays of actions, returning observations, masks, rewards and dones.
+  `Duel`s in a batch (training favours many parallel duels over long rollouts) and steps them all from arrays of actions, returning observations, masks, rewards and dones.
 - **Trainer:** a Python PPO trainer (CleanRL-style, PyTorch on MPS) in `train/` at the repo root, a `uv` project.
   It is scripts, not a CLI, the way each crate's `examples/` are.
 - **One policy for both schools and all styles** (user, 2026-11-15). The observation tells it its school and its
