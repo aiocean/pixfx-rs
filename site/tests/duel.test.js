@@ -162,3 +162,24 @@ describe("duel", () => {
     // twelve minutes of fighting, two brains thinking: about 4 s on an idle machine
   }, 30_000);
 });
+
+describe("whole ticks", () => {
+  /** Duel seed 5 stepped at `hz` frames a second for 60 s: what decides the fight. */
+  const fought = (hz) => {
+    const duel = arena(5);
+    for (let i = 0; i < 60 * hz; i++) step(duel, 1 / hz);
+    return { wins: duel.wins, round: duel.round, fighters: duel.fighters.map((f) => [f.hp, f.x]) };
+  };
+
+  test("a seed fights the same at 60 Hz and 144 Hz", () => {
+    expect(fought(144)).toEqual(fought(60));
+  });
+
+  test("step(0) moves nothing", () => {
+    const duel = arena(5);
+    for (let i = 0; i < 90; i++) step(duel, 1 / 60);
+    const before = { time: duel.time, x: duel.fighters.map((f) => f.x), hp: duel.fighters.map((f) => f.hp) };
+    expect(step(duel, 0)).toEqual([]);
+    expect({ time: duel.time, x: duel.fighters.map((f) => f.x), hp: duel.fighters.map((f) => f.hp) }).toEqual(before);
+  });
+});

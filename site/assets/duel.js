@@ -7,6 +7,29 @@
 //
 // Units are game pixels and seconds. x grows to the right; heights (`air`, effect y) are measured up from the ground.
 
+/**
+ * The maths the rules call whose last bit differs between JS engines and Rust's libm. The page keeps the JS ones; a
+ * test that replays the rules against their Rust port swaps in the port's (`useMath`), so both compute alike.
+ */
+const M = { sin: Math.sin, hypot: Math.hypot, sqrt: Math.sqrt };
+
+/** For replay tests only: the `sin`, `hypot` and `sqrt` the rules call. */
+export function useMath({ sin, hypot, sqrt }) {
+  Object.assign(M, { sin, hypot, sqrt });
+}
+
+/** `base` to the whole power `n` (n ≥ 0), by multiplying, so every engine and Rust get the same bits. */
+function powi(base, n) {
+  let out = 1;
+  for (let i = 0; i < n; i++) out *= base;
+  return out;
+}
+
+/** The rules advance in whole ticks of this many seconds, so a seed is one fight at any frame rate. */
+const TICK = 1 / 60;
+/** The most time one `step` adds, so a stalled tab does not run the fight on in a burst. */
+const STEP_MAX = 0.25;
+
 /** Effects the arena itself shows when they are in the registry. */
 export const DECOR = { lamp: "fire/brazier", night: "weather/fireflies" };
 
@@ -59,7 +82,7 @@ export function control(duel, f, kind, seconds) {
 
 /** Seconds between shock ticks with `stacks` stacks. */
 export function shockInterval(stacks) {
-  return SHOCK.every * SHOCK.fast ** (stacks - 1);
+  return SHOCK.every * powi(SHOCK.fast, stacks - 1);
 }
 
 /** f takes `n` chill stacks; the last one it can hold freezes it. */
@@ -207,7 +230,7 @@ const GUARD = 20;
 export function blockChance(power) {
   if (!(power > 0)) return 1;
   const r = GUARD / power;
-  return Math.min(1, 0.5 * r, 0.5 * Math.sqrt(r));
+  return Math.min(1, 0.5 * r, 0.5 * M.sqrt(r));
 }
 const KNOCKBACK = 130;
 const ROUND_PAUSE = 3.2;
@@ -363,7 +386,7 @@ for (const school of Object.values(SCHOOLS)) {
 /** ball-lightning's ball relative to its origin at time t (pixelfx lightning/ball-lightning.js `at`, P = 4). */
 export function orbOffset(t) {
   const a = (t / 4) * Math.PI * 2;
-  return [38 * Math.sin(a) + 9 * Math.sin(2 * a + 1), -42 + 13 * Math.sin(2 * a + 0.4) + 6 * Math.sin(3 * a + 0.5)];
+  return [38 * M.sin(a) + 9 * M.sin(2 * a + 1), -42 + 13 * M.sin(2 * a + 0.4) + 6 * M.sin(3 * a + 0.5)];
 }
 
 /** A small seeded generator (mulberry32), so a seed replays the same fight. */
@@ -388,7 +411,7 @@ function random(seed) {
 export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top, Body, Mind, minds = [] }) {
   // `sky`: how high above the ground a fighter may fly, below whatever hangs over the arena
   const top = Math.min(FLY.top, sky);
-  const duel = { seed, rng: random(seed), left, right, ground, has, top, arena: { left, right, top }, Body, time: 0, round: 0, wins: [0, 0], key: 0, shots: [], pause: 0, out: [] };
+  const duel = { seed, rng: random(seed), left, right, ground, has, top, arena: { left, right, top }, Body, time: 0, carry: 0, round: 0, wins: [0, 0], key: 0, shots: [], pause: 0, out: [] };
   const usable = (name) => {
     const fx = SPELLS[name].fx;
     return !fx || has(fx);
@@ -459,15 +482,17 @@ function startRound(duel) {
   for (const f of duel.fighters) for (let i = 0; i < BAR.slots; i++) draw(duel, f, i, i === 0);
 }
 
-/** Advance the duel by `dt` seconds; returns the effect commands for this step. */
+/**
+ * Advance the duel by `dt` seconds (at most `STEP_MAX`); returns the effect commands for this step. The rules run in
+ * whole ticks: what is left of `dt` waits for the next call.
+ */
 export function step(duel, dt) {
   duel.out = [];
-  // fixed sub-steps, so the fight does not depend on the frame rate
-  let left = Math.min(dt, 0.25);
-  while (left > 1e-9) {
-    const h = Math.min(left, 1 / 60);
-    tick(duel, h);
-    left -= h;
+  duel.carry += Math.min(dt, STEP_MAX);
+  // a hair under a whole tick counts as one, so 1/60 steps at 60 Hz never drift a tick behind
+  while (duel.carry >= TICK - 1e-9) {
+    tick(duel, TICK);
+    duel.carry = Math.max(0, duel.carry - TICK);
   }
   return duel.out;
 }
@@ -530,7 +555,7 @@ function body(duel, me, foe, dt) {
   // a dive drops straight at the foe's height
   const diving = me.act?.phase === "windup" && SPELLS[me.act.spell].dive;
   const motion = diving ? { dive: SPELLS.dive.speed, floor: foe.air } : me.fly ? { fly: me.hover } : "gravity";
-  const drive = { alive: me.hp > 0, acting: me.act !== null, meditating: me.medit, guarding: me.guard > 0, chilled: false, intent: me.intent.move * CHILL.slow ** me.chill, motion, foeX: foe.x };
+  const drive = { alive: me.hp > 0, acting: me.act !== null, meditating: me.medit, guarding: me.guard > 0, chilled: false, intent: me.intent.move * powi(CHILL.slow, me.chill), motion, foeX: foe.x };
   for (const e of me.body.step(dt, drive, duel.arena, duel.rng)) emit(duel, e);
 
   if (me.act) {
@@ -931,7 +956,7 @@ function shot(duel, s, dt) {
       }
       if (o.kind === "orb") {
         const [bx, by] = orbAt(o);
-        if (Math.hypot(bx - s.x, by + s.y) < 10) {
+        if (M.hypot(bx - s.x, by + s.y) < 10) {
           burst(duel, o.spell.hitFx, bx, g + by);
           endShot(duel, o);
           return endShot(duel, s);
