@@ -54,15 +54,55 @@ pub fn norm(v: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-/// Every effect the duel's rules ask for, as if the registry held them all.
+/// Every effect in the engine's registry, as the page has it.
 pub fn all_effects() -> Vec<String> {
-    use pixfx_duel::data::{CAST_CIRCLE, CLASH, DECOR, spells};
-    let mut out: Vec<String> = vec![CAST_CIRCLE.into(), CLASH.into(), "fire/spirit-flame".into()];
-    out.extend(DECOR.iter().map(|d| d.to_string()));
-    for s in spells() {
-        out.extend([s.fx, s.hit_fx, s.end_fx, s.slam_fx].into_iter().flatten().map(String::from));
+    pixfx_effects::EFFECTS.iter().map(|e| e.meta().id.to_string()).collect()
+}
+
+/// Whether effect `fx` loops (and so must be stopped).
+pub fn loops(fx: &str) -> bool {
+    pixfx_effects::EFFECTS.iter().any(|e| e.meta().id == fx && e.meta().looping)
+}
+
+/// The landing arena (0 to 220, ground 150) with effects `effects`.
+pub fn config(seed: u32, effects: Vec<String>) -> pixfx_duel::duel::DuelConfig {
+    pixfx_duel::duel::DuelConfig { seed, left: 0.0, right: 220.0, ground: 150.0, sky: 96.0, effects }
+}
+
+/// A duel of two brains with the whole registry.
+pub fn fight(seed: u32) -> pixfx_duel::duel::Duel {
+    pixfx_duel::duel::Duel::with_brains(config(seed, all_effects()))
+}
+
+/// A seat that never acts.
+pub fn idle() -> pixfx_duel::seat::MakeSeat {
+    Box::new(|_, _| Box::new(pixfx_duel::seat::Script(Box::new(|_, _| None))))
+}
+
+/// A seat that casts `skill` once, then never acts again.
+pub fn caster(skill: &'static str) -> pixfx_duel::seat::MakeSeat {
+    Box::new(move |_, _| {
+        let mut cast = false;
+        Box::new(pixfx_duel::seat::Script(Box::new(move |_, _| {
+            if cast {
+                return None;
+            }
+            cast = true;
+            Some(pixfx_mind::Choice::Cast { skill: skill.to_string(), target: None })
+        })))
+    })
+}
+
+/// A seat that casts `skill` every tick it is asked.
+pub fn always(skill: &'static str) -> pixfx_duel::seat::MakeSeat {
+    Box::new(move |_, _| Box::new(pixfx_duel::seat::Script(Box::new(move |_, _| Some(pixfx_mind::Choice::Cast { skill: skill.to_string(), target: None })))))
+}
+
+/// Step `duel` `seconds` at 60 Hz; returns everything it emitted.
+pub fn run(duel: &mut pixfx_duel::duel::Duel, seconds: f64) -> Vec<pixfx_duel::out::Out> {
+    let mut out = Vec::new();
+    for _ in 0..pixfx_draw::math::js_round(seconds * 60.0) as usize {
+        out.extend(duel.step(1.0 / 60.0));
     }
-    out.sort();
-    out.dedup();
     out
 }

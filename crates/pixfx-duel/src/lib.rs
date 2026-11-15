@@ -8,8 +8,11 @@
 pub mod act;
 pub mod bar;
 pub mod data;
+pub mod duel;
 pub mod fighter;
 pub mod out;
 pub mod rng;
+pub mod seat;
+pub mod sense;
 pub mod shot;
 pub mod status;
