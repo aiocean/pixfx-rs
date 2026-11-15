@@ -1,6 +1,7 @@
-//! The policy network, run in plain `f32` with one fixed loop order (no FMA, no SIMD), so every target computes the
-//! same bits: `relu(in · x)`, two residual blocks `h + down(relu(up(ln(h))))`, a final LayerNorm, a simplicial
-//! embedding (`sem`: 16 softmaxes of 8), and the policy head (`pi`). The trainer's value head is not shipped.
+//! The policy network, run in plain `f32` in one fixed order on every target (no FMA, each row summed in 8 partial
+//! sums joined in a fixed tree; `train/net.py` mirrors it), so every target computes the same bits: `relu(in · x)`,
+//! two residual blocks `h + down(relu(up(ln(h))))`, a final LayerNorm, a simplicial embedding (`sem`: 16 softmaxes
+//! of 8), and the policy head (`pi`). The trainer's value head is not shipped.
 //!
 //! The weights file: magic `PXNET1\0\0`, a little-endian `u32` tensor count, then per tensor its `u32` name length,
 //! UTF-8 name, `u32` rank, `u32` dims and `f32` data, row-major.
@@ -16,6 +17,8 @@ pub const HIDDEN: usize = 256;
 /// The size of each simplex of the simplicial embedding.
 pub const GROUP: usize = 8;
 const BLOCKS: usize = 2;
+/// The partial sums of a row.
+const LANES: usize = 8;
 const MAGIC: &[u8; 8] = b"PXNET1\0\0";
 const EPS: f32 = 1e-5;
 
@@ -63,14 +66,25 @@ struct Dense {
 }
 
 impl Dense {
+    /// `out = w · x + b`. Each row is summed in `LANES` partial sums, lane `k` taking every `LANES`-th product from
+    /// `k`, then joined in a fixed tree: one order on every target, and no chain of dependent adds.
     fn apply(&self, x: &[f32], out: &mut [f32]) {
         for (o, y) in out.iter_mut().enumerate() {
             let row = self.w.get(o * self.inp..(o + 1) * self.inp).unwrap_or(&[]);
-            let mut s = self.b.get(o).copied().unwrap_or(0.0);
-            for (w, v) in row.iter().zip(x) {
-                s += w * v;
+            let mut acc = [0.0_f32; LANES];
+            let (rows, rest) = row.as_chunks::<LANES>();
+            let (xs, xrest) = x.get(..row.len()).unwrap_or(&[]).as_chunks::<LANES>();
+            for (w, v) in rows.iter().zip(xs) {
+                for k in 0..LANES {
+                    acc[k] += w[k] * v[k];
+                }
             }
-            *y = s;
+            for (k, (w, v)) in rest.iter().zip(xrest).enumerate() {
+                acc[k] += w * v;
+            }
+            let s =
+                ((acc[0] + acc[1]) + (acc[2] + acc[3])) + ((acc[4] + acc[5]) + (acc[6] + acc[7]));
+            *y = s + self.b.get(o).copied().unwrap_or(0.0);
         }
     }
 }
@@ -190,7 +204,12 @@ impl Net {
             }
             let n: usize = dims.iter().map(|&d| d as usize).product();
             let raw = r.take(n.saturating_mul(4), &name)?;
-            let data = raw.as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)).collect();
+            let data = raw
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|b| f32::from_le_bytes(*b))
+                .collect();
             found.push((name, dims, data));
         }
         let mut take = |name: &str, want: &[u32]| -> Result<Vec<f32>, NetError> {
