@@ -150,6 +150,9 @@ const costOf = (me, name) => SPELLS[name].cost * (has(slotOf(me, name), "cheap")
 /** How many of its school's pool a fighter plays in one fight, drawn when the fight is made. */
 export const POOL_SIZE = 8;
 const BAR = { slots: 3, casts: 4, wait: 3, spread: 2 };
+/** Seconds a bar skill may sit ready and uncast before it leaves for another draw, so a skill the fighter will not use
+ *  never holds a slot for the rest of the round. Longer than any cooldown, and a cooldown does not count. */
+export const STALE = 6;
 const CAST_POWER = [1.4, 1.2, 1.1, 1.0];
 /**
  * The pairs that evolve, per school: a spent skill whose partner is on the bar refills at once as its evolved form,
@@ -507,7 +510,12 @@ function body(duel, me, foe, dt) {
   me.guard = Math.max(0, me.guard - dt);
   for (const k of Object.keys(me.cool)) me.cool[k] = Math.max(0, me.cool[k] - dt);
   me.bar.forEach((slot, i) => {
-    if (slot.empty === undefined) return;
+    if (slot.empty === undefined) {
+      if (me.cool[slot.spell] > 0) return;
+      slot.idle = (slot.idle ?? 0) + dt;
+      if (slot.idle >= STALE) draw(duel, me, i, false, slot.spell);
+      return;
+    }
     slot.empty = Math.max(0, slot.empty - dt);
     if (slot.empty === 0) draw(duel, me, i);
   });
@@ -1048,7 +1056,7 @@ export const ready = (me, name) =>
 export function skillBar(f) {
   const slots = f.bar.map((slot) =>
     slot.empty !== undefined
-      ? { spell: null, empty: true, ultimate: false, ready: false, left: slot.empty, full: slot.full, charge: 1, casts: 0, power: 1, evolved: false, rarity: "common", traits: [] }
+      ? { spell: null, empty: true, ultimate: false, ready: false, left: slot.empty, full: slot.full, charge: 1, casts: 0, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 }
       : {
         spell: slot.spell,
         empty: false,
@@ -1062,22 +1070,23 @@ export function skillBar(f) {
         evolved: slot.evolved,
         rarity: slot.rarity ?? "common",
         traits: slot.traits ?? [],
+        stale: Math.min(1, (slot.idle ?? 0) / STALE),
       });
-  while (slots.length < BAR.slots) slots.push({ spell: null, empty: true, ultimate: false, ready: false, left: 0, full: 0, charge: 1, casts: 0, power: 1, evolved: false, rarity: "common", traits: [] });
+  while (slots.length < BAR.slots) slots.push({ spell: null, empty: true, ultimate: false, ready: false, left: 0, full: 0, charge: 1, casts: 0, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 });
   const ult = SCHOOLS[f.school].ultimate;
   const owned = f.spells.includes(ult);
-  slots.push({ spell: owned ? ult : null, empty: !owned, ultimate: true, ready: owned && f.hp > 0 && ready(f, ult), left: f.cool[ult] ?? 0, full: f.coolFull[ult] ?? 0, charge: f.rage / RAGE, casts: 0, power: 1, evolved: false, rarity: "common", traits: [] });
+  slots.push({ spell: owned ? ult : null, empty: !owned, ultimate: true, ready: owned && f.hp > 0 && ready(f, ult), left: f.cool[ult] ?? 0, full: f.coolFull[ult] ?? 0, charge: f.rage / RAGE, casts: 0, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 });
   return slots;
 }
 
 /**
  * Fill slot `i` of f's bar with a skill from its pool that is not on the bar, with 1 to 4 casts. A round's first
  * draw is of the school's signature kind; while the foe carries a status, one draw in `PAY_DRAW` is a skill that
- * spends it.
+ * spends it. A stale skill's replacement is never that skill (`gone`).
  */
-export function draw(duel, f, i, first = false) {
+export function draw(duel, f, i, first = false, gone = null) {
   const held = f.bar.filter((slot, j) => j !== i && slot.spell).map((slot) => slot.spell);
-  let free = f.pool.filter((name) => !held.includes(name));
+  let free = f.pool.filter((name) => !held.includes(name) && name !== gone);
   const foe = duel.fighters[1 - f.index];
   const carried = (status) => (status === "shock" ? (foe.shock?.stacks ?? 0) : foe.chill) > 0;
   const want = first
@@ -1113,6 +1122,7 @@ export function spend(duel, f, i) {
   const slot = f.bar[i];
   if (!slot || slot.empty !== undefined) return;
   slot.left--;
+  slot.idle = 0;
   if (slot.left > 0) return;
   const pair = EVOLVES[f.school]?.find((names) => names.includes(slot.spell));
   const partner = pair?.find((name) => name !== slot.spell);

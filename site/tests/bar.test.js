@@ -1,7 +1,7 @@
 // The rotating skill bar: three slots, each a skill drawn from the school's pool with its own casts and power; a
 // spent skill empties its slot, which counts down and draws a new one.
 import { describe, expect, test } from "bun:test";
-import { PAYOFF, POOL_SIZE, SCHOOLS, SPELLS, slotPower, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
+import { PAYOFF, POOL_SIZE, SCHOOLS, STALE, SPELLS, slotPower, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
 import { ICON_CELLS, ICON_COLUMNS } from "../assets/skill-icons.js";
 import { Body, Mind, effects } from "./engine.js";
 
@@ -100,6 +100,51 @@ describe("the bar", () => {
     duel.fighters[0].hp = 0;
     step(duel, 1 / 60);
     for (const f of duel.fighters) clean(f);
+  });
+});
+
+describe("a stale skill", () => {
+  /** A duel where both minds hold still, fighter 0's bar set to `spells`, each with qi and casts to spare. */
+  const still = (spells) => {
+    const duel = arena(9);
+    for (const g of duel.fighters) g.mind.hold(1e9);
+    const f = duel.fighters[0];
+    for (const name of spells) if (!f.pool.includes(name)) f.pool.push(name);
+    f.bar = spells.map((spell) => ({ spell, casts: 3, left: 3, power: castsPower(3), evolved: false, rarity: "common", traits: [] }));
+    return { duel, f };
+  };
+  const run = (duel, seconds) => {
+    for (let i = 0; i < Math.round(seconds * 60); i++) step(duel, 1 / 60);
+  };
+
+  test("a skill left ready and uncast for STALE seconds leaves the bar for another", () => {
+    const { duel, f } = still(["orb", "bell", "heal"]);
+    run(duel, STALE - 0.5);
+    expect(onBar(f)).toEqual(["orb", "bell", "heal"]);
+    run(duel, 1);
+    for (const [i, was] of ["orb", "bell", "heal"].entries()) {
+      expect(f.bar[i].empty).toBeUndefined();
+      expect(f.bar[i].spell).not.toBe(was);
+    }
+    expect(new Set(onBar(f)).size).toBe(3);
+  });
+
+  test("a cast restarts the clock, and a skill cooling down does not go stale", () => {
+    const { duel, f } = still(["orb", "bell", "heal"]);
+    run(duel, STALE - 1);
+    spend(duel, f, 0);
+    f.cool.bell = STALE * 2;
+    run(duel, 2);
+    expect(f.bar[0].spell).toBe("orb");
+    expect(f.bar[1].spell).toBe("bell");
+    expect(f.bar[2].spell).not.toBe("heal");
+  });
+
+  test("the screen's bar shows how stale each skill is, 0 to 1", () => {
+    const { duel, f } = still(["orb", "bell", "heal"]);
+    run(duel, STALE / 2);
+    expect(skillBar(f)[0].stale).toBeCloseTo(0.5, 1);
+    expect(skillBar(f)[3].stale).toBe(0);
   });
 });
 

@@ -266,12 +266,14 @@ const TRAIT_MARK = {
   heavy: [".###.", "..#..", "#####", "#####", "#####"],
   piercing: ["..#..", ".###.", "#.#.#", "..#..", "..#.."],
   lingering: ["..#..", ".###.", "#####", "#####", ".###."],
-  cheap: [".###.", "#...#", "#####", "#...#", ".###."],
+  cheap: ["..#..", ".#.#.", "#...#", ".#.#.", "..#.."],
 };
 /** A rare skill's frame, and an epic one's (pulsing to white): the same on both schools, apart from their glows. */
 const RARE = "#4fa3ff";
 const EPIC = "#c36bff";
 const TRAIT_COLOR = { swift: "#8dffa8", heavy: "#ff9a3a", piercing: "#ffffff", lingering: "#c89bff", cheap: "#ffd84a" };
+/** How stale a bar skill is (0 to 1) when its icon starts to flicker before it leaves the bar. */
+const STALE_FLICKER = 2 / 3;
 /** The word a lucky cast floats over its slot. */
 const LUCKY_WORD = { double: "DOUBLE", free: "FREE", again: "AGAIN" };
 /** How long a lucky word floats, in seconds. */
@@ -367,8 +369,10 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
         if (lit > size - 2) box(x, top + size - 2, size, 2, blaze ? "#ffffff" : c.glow);
         box(x + 2, top + 2, n, n, SLOT.field);
       }
-      // an icon that cannot be cast now (short of qi, silenced) is dimmer; a cooldown shows as its sweep
-      ctx.globalAlpha = slot.ready || slot.left > 0 ? 1 : 0.6;
+      // an icon that cannot be cast now (short of qi, silenced) is dimmer; a cooldown shows as its sweep; a skill
+      // about to leave the bar unused flickers through its last stretch
+      const leaving = (slot.stale ?? 0) > STALE_FLICKER && Math.floor(duel.time * 6) % 2 === 1;
+      ctx.globalAlpha = (slot.ready || slot.left > 0 ? 1 : 0.6) * (leaving ? 0.35 : 1);
       const k = icons.size;
       ctx.drawImage(icons.image, (cell % ICON_COLUMNS) * k, Math.floor(cell / ICON_COLUMNS) * k, k, k, (x + 2) * s, (top + 2) * s, n * s, n * s);
       ctx.globalAlpha = 1;
