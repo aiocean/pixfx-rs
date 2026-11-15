@@ -271,38 +271,55 @@ html[aria-busy="true"], html[aria-busy="true"] * { cursor: progress; }
 }
 
 /* the duel's tooltips: what a skill or a buff under the pointer is */
+/* The duel's tooltip, in the duel's own pixels (--px is one of them): a stepped bronze frame like the bars', a header
+   band in the tier's or buff's colour, flat fills and dotted rules. */
 .duel-tip {
-  --tone: #c8c8c8;
-  position: fixed; z-index: 30; min-width: 220px; max-width: 300px;
-  background: rgba(6, 5, 9, 0.94); border: 1px solid color-mix(in srgb, var(--tone) 55%, #000);
-  box-shadow: 0 0 0 1px #000, 0 10px 26px rgba(0, 0, 0, 0.6);
-  font: 400 0.9rem/1.4 "Fontin SmallCaps", "Cormorant SC", Georgia, "Times New Roman", serif; font-variant: small-caps;
-  text-align: center; color: #c8c8c8; pointer-events: none;
+  --px: 3px; --tone: #c8c8c8; --deep: #2a1c0e; --bronze: #b8893c;
+  position: fixed; z-index: 30; min-width: 200px; max-width: 290px; margin: calc(var(--px) * 2);
+  background: #120d18; color: #c8c0d4; text-align: center; pointer-events: none;
+  font: 500 0.85rem/1.4 var(--display); letter-spacing: 0.02em;
+  /* a bronze ring with its corners cut, then a dark outline stepped round them */
+  box-shadow:
+    calc(var(--px) * -1) 0 0 0 var(--bronze), var(--px) 0 0 0 var(--bronze),
+    0 calc(var(--px) * -1) 0 0 var(--bronze), 0 var(--px) 0 0 var(--bronze),
+    calc(var(--px) * -2) 0 0 0 var(--deep), calc(var(--px) * 2) 0 0 0 var(--deep),
+    0 calc(var(--px) * -2) 0 0 var(--deep), 0 calc(var(--px) * 2) 0 0 var(--deep),
+    calc(var(--px) * -1) calc(var(--px) * -1) 0 0 var(--deep), var(--px) calc(var(--px) * -1) 0 0 var(--deep),
+    calc(var(--px) * -1) var(--px) 0 0 var(--deep), var(--px) var(--px) 0 0 var(--deep),
+    inset 0 var(--px) 0 0 #f0cf7a40;
 }
 .duel-tip[data-tone="common"] { --tone: #f0cf7a; }
 .duel-tip[data-tone="rare"] { --tone: #6fb3ff; }
 .duel-tip[data-tone="epic"] { --tone: #c88bff; }
 .duel-tip[data-tone="legendary"] { --tone: #ff9a1a; }
 .duel-tip[data-tone="ultimate"] { --tone: #3fd1c6; }
-.duel-tip[data-tone="good"] { --tone: #6fd77a; }
-.duel-tip[data-tone="bad"] { --tone: #ee5a4c; }
+.duel-tip[data-tone="good"] { --tone: #6fd77a; --bronze: #3fae5a; }
+.duel-tip[data-tone="bad"] { --tone: #ee5a4c; --bronze: #c8322a; }
 .duel-tip .tip-head {
-  position: relative; padding: 5px 22px 6px; color: var(--tone);
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--tone) 22%, transparent) 20%, color-mix(in srgb, var(--tone) 22%, transparent) 80%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  position: relative; padding: calc(var(--px) * 2) calc(var(--px) * 9); color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 18%, #120d18);
+  border-bottom: var(--px) solid color-mix(in srgb, var(--tone) 55%, #120d18);
 }
-/* the header's end pieces: a small diamond either side */
+/* the header's end pieces: a pixel diamond either side */
 .duel-tip .tip-head::before, .duel-tip .tip-head::after {
-  content: ""; position: absolute; top: 50%; width: 6px; height: 6px; background: var(--tone); transform: translateY(-50%) rotate(45deg);
+  --p: var(--px); --n: calc(var(--px) * -1); --p2: calc(var(--px) * 2); --n2: calc(var(--px) * -2);
+  content: ""; position: absolute; top: calc(50% - var(--px) / 2); width: var(--px); height: var(--px); background: var(--tone);
+  box-shadow:
+    var(--p) 0 var(--tone), var(--n) 0 var(--tone), 0 var(--p) var(--tone), 0 var(--n) var(--tone),
+    var(--p2) 0 var(--tone), var(--n2) 0 var(--tone), 0 var(--p2) var(--tone), 0 var(--n2) var(--tone),
+    var(--p) var(--p) var(--tone), var(--n) var(--p) var(--tone), var(--p) var(--n) var(--tone), var(--n) var(--n) var(--tone);
 }
-.duel-tip .tip-head::before { left: 7px; }
-.duel-tip .tip-head::after { right: 7px; }
-.duel-tip h3 { margin: 0; font: inherit; font-size: 1.12rem; line-height: 1.2; color: inherit; letter-spacing: 0.02em; }
-.duel-tip .tip-type { margin: 0; font-size: 0.95rem; line-height: 1.2; }
-.duel-tip .tip-body { padding: 6px 12px 8px; }
+.duel-tip .tip-head::before { left: calc(var(--px) * 4); }
+.duel-tip .tip-head::after { right: calc(var(--px) * 4); }
+.duel-tip h3 { margin: 0; font: inherit; font-size: 1.05rem; line-height: 1.2; color: inherit; text-shadow: 0 2px 0 #000; }
+.duel-tip .tip-type { margin: 0; font-size: 0.75rem; color: color-mix(in srgb, var(--tone) 70%, #c8c0d4); }
+.duel-tip .tip-body { padding: calc(var(--px) * 2) calc(var(--px) * 4) calc(var(--px) * 3); }
 .duel-tip p { margin: 0; }
-.duel-tip hr { height: 1px; margin: 5px auto; width: 70%; border: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--tone) 70%, transparent), transparent); }
-.duel-tip .tip-prop { color: #7f7f7f; }
+.duel-tip hr {
+  height: var(--px); width: 60%; margin: calc(var(--px) * 2) auto; border: 0;
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--tone) 60%, #120d18) 0 var(--px), transparent var(--px) calc(var(--px) * 2));
+}
+.duel-tip .tip-prop { color: #7f7890; }
 .duel-tip .tip-prop span { color: #fff; }
-.duel-tip .tip-text { color: #c8c8c8; }
-.duel-tip .tip-mod { color: #8888ff; }
+.duel-tip .tip-text { color: #c8c0d4; }
+.duel-tip .tip-mod { color: #8a8cff; }

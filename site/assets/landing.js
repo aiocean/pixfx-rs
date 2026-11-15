@@ -299,6 +299,9 @@ function createTip(view, signal) {
       el.replaceChildren(...tipNodes(info));
       el.dataset.tone = info.tone ?? "plain";
     }
+    // drawn in the duel's own pixels: one of its pixels, in page pixels
+    const r = canvas.getBoundingClientRect();
+    el.style.setProperty("--px", `${Math.max(2, Math.round((view.layout.scale * r.width) / canvas.width))}px`);
     el.hidden = false;
     // beside the pointer, kept on the screen
     const pad = 14;
