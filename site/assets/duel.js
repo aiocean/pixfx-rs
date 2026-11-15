@@ -417,7 +417,7 @@ function fighter(duel, index, school, usable, body) {
   const pool = fightPool(duel, school, usable);
   // every spell it may cast this fight: the brain is told them all once; one off the bar is never ready
   const spells = [...basics, ...pool, ultimate].filter(usable);
-  const f = { index, school, spells, pool, bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
+  const f = { index, school, spells, pool, bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, lucky: null, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
   for (const k of BODY_FIELDS) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
@@ -433,7 +433,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 } });
+    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, lucky: null, cool: {}, coolFull: {}, intent: { move: 0 } });
     f.mind.reset();
     f.bar = [];
     f.body.startRound(duel.left + span * (f.index === 0 ? 0.22 : 0.78));
@@ -559,6 +559,7 @@ function begin(duel, me, name, target) {
     if (kind === "double") me.act.power *= 2;
     else if (kind === "free") me.qi += cost;
     else me.cool[name] = 0;
+    me.lucky = { kind, spell: name, at: duel.time };
     emit(duel, { type: "lucky", by: me.index, kind, x: me.x, y: me.air + me.spec.chest + 10 });
   }
   setMeditating(duel, me, false);
