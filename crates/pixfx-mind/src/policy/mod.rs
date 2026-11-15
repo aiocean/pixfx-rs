@@ -3,9 +3,11 @@
 //! tag that says who the fighter is.
 
 mod action;
+mod net;
 mod observe;
 
 pub use action::{ACTIONS, Act, Aim, SLOTS, choice, legal};
+pub use net::{GROUP, HIDDEN, Net, NetError, Tensor, WIDTH, sample};
 pub use observe::{OBS, TAG, observe};
 
 use crate::sense::{Foe, Me};
