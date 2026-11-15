@@ -116,8 +116,10 @@ describe("duel", () => {
           const fresh = spell !== null && spell !== was[f.index] && f.act.t < 1 / 30;
           was[f.index] = spell;
           if (!fresh) continue;
-          expect(f.coolFull[spell]).toBeCloseTo(SPELLS[spell].cooldown + SPELLS[spell].windup, 5);
           const j = before[f.index].findIndex((slot) => slot.spell === spell);
+          // a swift skill's cooldown is cut to 60%
+          const swift = j >= 0 && before[f.index][j].traits?.includes("swift") ? 0.6 : 1;
+          expect(f.coolFull[spell]).toBeCloseTo(SPELLS[spell].cooldown * swift + SPELLS[spell].windup, 5);
           if (j < 0) continue;
           const after = f.bar[j];
           const prior = before[f.index][j];

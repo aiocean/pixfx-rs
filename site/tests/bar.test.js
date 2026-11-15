@@ -1,7 +1,7 @@
 // The rotating skill bar: three slots, each a skill drawn from the school's pool with its own casts and power; a
 // spent skill empties its slot, which counts down and draws a new one.
 import { describe, expect, test } from "bun:test";
-import { PAYOFF, POOL_SIZE, SCHOOLS, SPELLS, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
+import { PAYOFF, POOL_SIZE, SCHOOLS, SPELLS, slotPower, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
 import { ICON_CELLS, ICON_COLUMNS } from "../assets/skill-icons.js";
 import { Body, Mind, effects } from "./engine.js";
 
@@ -26,7 +26,7 @@ describe("the bar", () => {
           expect(s.casts).toBeGreaterThanOrEqual(1);
           expect(s.casts).toBeLessThanOrEqual(4);
           expect(s.left).toBe(s.casts);
-          expect(s.power).toBe(castsPower(s.casts));
+          expect(s.power).toBeCloseTo(slotPower(s.casts, s.rarity, s.traits, false), 9);
         }
       }
     }

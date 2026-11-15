@@ -1,0 +1,140 @@
+// Chance on the bar: each draw rolls a rarity (a little more power) and traits that change how its skill plays.
+import { describe, expect, test } from "bun:test";
+import { RARITY, SPELLS, TRAITS, castsPower, createDuel, draw, fits, ready, slotPower, step } from "../assets/duel.js";
+import { Body, Mind, effects } from "./engine.js";
+
+const all = new Set(effects());
+const idle = () => ({ think: () => null, tell() {}, reset() {}, hold() {} });
+
+/** A duel whose fighter `index` casts `spell` once, from a bar slot set by `slot`; the other stands still. */
+function castOnce(seed, index, spell, slot, setup = () => {}) {
+  let cast = false;
+  const caster = () => ({
+    think: () => (cast ? null : ((cast = true), { type: "cast", skill: spell })),
+    tell() {}, reset() {}, hold() {},
+  });
+  const minds = index === 0 ? [caster, idle] : [idle, caster];
+  const duel = createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind, minds });
+  const me = duel.fighters[index];
+  const foe = duel.fighters[1 - index];
+  for (const g of duel.fighters) g.stats = { ...g.stats, dodge: 0, crit: 0 };
+  const casts = slot.casts ?? 2;
+  const traits = slot.traits ?? [];
+  me.bar = [
+    { spell, casts, left: casts, rarity: "common", evolved: false, ...slot, traits, power: slotPower(casts, slot.rarity ?? "common", traits, !!slot.evolved) },
+    { empty: 9, full: 9 },
+    { empty: 9, full: 9 },
+  ];
+  if (!me.pool.includes(spell)) me.pool.push(spell);
+  if (!me.spells.includes(spell)) me.spells.push(spell);
+  foe.x = me.x + (index === 0 ? 30 : -30);
+  me.face = Math.sign(foe.x - me.x);
+  setup(duel, me, foe);
+  return { duel, me, foe };
+}
+
+describe("rarity", () => {
+  test("draws are common 70%, rare 22% and epic 8%, and rarer hits harder", () => {
+    const duel = createDuel({ seed: 3, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind });
+    const f = duel.fighters[0];
+    const seen = { common: 0, rare: 0, epic: 0 };
+    const n = 3000;
+    for (let k = 0; k < n; k++) {
+      f.bar[1] = { empty: 1, full: 1 };
+      draw(duel, f, 1);
+      const slot = f.bar[1];
+      seen[slot.rarity]++;
+      expect(slot.power).toBeCloseTo(slotPower(slot.casts, slot.rarity, slot.traits, false), 9);
+    }
+    expect(Math.abs(seen.common / n - 0.7)).toBeLessThan(0.03);
+    expect(Math.abs(seen.rare / n - 0.22)).toBeLessThan(0.03);
+    expect(Math.abs(seen.epic / n - 0.08)).toBeLessThan(0.03);
+    expect(slotPower(2, "rare", [], false)).toBeCloseTo(castsPower(2) * RARITY.rare.power, 9);
+    expect(slotPower(2, "epic", ["heavy"], true)).toBeCloseTo(1.5 * castsPower(2) * RARITY.epic.power * TRAITS.heavy.power, 9);
+  });
+});
+
+describe("traits", () => {
+  test("only traits that fit a skill are rolled: a common has at most one, a rare one, an epic two", () => {
+    const duel = createDuel({ seed: 8, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind });
+    let commonWith = 0;
+    let commons = 0;
+    for (const f of duel.fighters) {
+      for (let k = 0; k < 1500; k++) {
+        f.bar[2] = { empty: 1, full: 1 };
+        draw(duel, f, 2);
+        const { spell, rarity, traits } = f.bar[2];
+        for (const t of traits) expect([spell, t, fits(t, spell)]).toEqual([spell, t, true]);
+        expect(new Set(traits).size).toBe(traits.length);
+        const fitting = Object.keys(TRAITS).filter((t) => fits(t, spell)).length;
+        if (rarity === "common") {
+          commons++;
+          if (traits.length) commonWith++;
+          expect(traits.length).toBeLessThanOrEqual(1);
+        }
+        if (rarity === "rare") expect(traits.length).toBe(Math.min(1, fitting));
+        if (rarity === "epic") expect(traits.length).toBe(Math.min(2, fitting));
+      }
+    }
+    expect(Math.abs(commonWith / commons - 0.4)).toBeLessThan(0.05);
+  });
+
+  test("heavy and piercing fit only skills that hurt; lingering only skills that chill or shock", () => {
+    expect(fits("heavy", "heal")).toBe(false);
+    expect(fits("piercing", "ward")).toBe(false);
+    expect(fits("heavy", "palm")).toBe(true);
+    expect(fits("lingering", "jet")).toBe(true);
+    expect(fits("lingering", "lotus")).toBe(false);
+    expect(fits("swift", "heal")).toBe(true);
+    expect(fits("cheap", "hex")).toBe(true);
+  });
+
+  test("swift cuts the skill's cooldown to 60%", () => {
+    const { duel, me } = castOnce(1, 0, "spark", { traits: ["swift"] });
+    step(duel, 1 / 60);
+    expect(me.coolFull.spark).toBeCloseTo(SPELLS.spark.cooldown * TRAITS.swift.cooldown + SPELLS.spark.windup, 9);
+  });
+
+  test("cheap halves the qi a cast costs, and the skill is ready on half the qi", () => {
+    const { duel, me } = castOnce(1, 0, "burst", { traits: ["cheap"] }, (d, f) => {
+      f.qi = SPELLS.burst.cost * 0.5 + 0.1;
+    });
+    expect(ready(me, "burst")).toBe(true);
+    step(duel, 1 / 60);
+    expect(me.act?.spell).toBe("burst");
+    expect(me.qi).toBeLessThan(1);
+  });
+
+  test("piercing goes through a guard every time", () => {
+    const landed = (traits) => {
+      let n = 0;
+      for (let seed = 1; seed <= 20; seed++) {
+        const { duel, foe } = castOnce(seed, 0, "palm", { traits }, (d, me, f) => {
+          f.face = Math.sign(me.x - f.x);
+          f.guard = 5;
+        });
+        let hit = false;
+        for (let i = 0; i < 60 && !hit; i++) {
+          foe.guard = 5;
+          hit = step(duel, 1 / 60).some((c) => c.type === "hit" && c.spell === "palm");
+        }
+        if (hit) n++;
+      }
+      return n;
+    };
+    expect(landed(["piercing"])).toBe(20);
+    expect(landed([])).toBeLessThan(18);
+  });
+
+  test("lingering adds a stack, on top of evolution's", () => {
+    const chill = (() => {
+      const { duel, foe } = castOnce(4, 1, "jet", { traits: ["lingering"] });
+      for (let i = 0; i < 60 && foe.chill === 0; i++) step(duel, 1 / 60);
+      return foe.chill;
+    })();
+    expect(chill).toBe(2);
+    const { duel, foe } = castOnce(4, 0, "spark", { traits: ["lingering"], evolved: true });
+    for (let i = 0; i < 60 && !foe.shock; i++) step(duel, 1 / 60);
+    expect(foe.shock?.stacks).toBe(3);
+  });
+});
