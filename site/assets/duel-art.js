@@ -204,7 +204,7 @@ export function drawBars(ctx, sprites, show, duel, s, top) {
       if (on) box(x + 1, top + 16, 2, 1, "#ffffff", 0.7);
     }
   }
-  // the plaque in the middle: a diamond per round won, each side in its fighter's colour
+  // the plaque in the middle: the rounds each fighter has won, as a number in its own colour on its own half
   const mid = Math.round((duel.left + duel.right) / 2);
   top += narrow ? 13 : 0;
   box(mid - 18, top + 2, 36, 9, BRONZE.deep);
@@ -212,14 +212,15 @@ export function drawBars(ctx, sprites, show, duel, s, top) {
   box(mid - 17, top + 3, 34, 1, BRONZE.mid);
   box(mid, top + 4, 1, 5, BRONZE.mid);
   for (const f of duel.fighters) {
-    const won = Math.min(3, duel.wins[f.index]);
-    for (let i = 0; i < 3; i++) {
-      const x = f.index === 0 ? mid - 6 - i * 5 : mid + 4 + i * 5;
-      const col = i < won ? colors(f.school).glow : BRONZE.deep;
-      box(x + 1, top + 4, 1, 1, col);
-      box(x, top + 5, 3, 2, col);
-      box(x + 1, top + 7, 1, 1, col);
-    }
+    const digits = String(Math.min(999, duel.wins[f.index])).split("").map(Number);
+    const w = digits.length * 4 - 1;
+    // centred in its half, which is 17 pixels wide
+    const x0 = f.index === 0 ? mid - 17 + Math.floor((17 - w) / 2) : mid + 1 + Math.ceil((17 - w) / 2);
+    const col = colors(f.school).glow;
+    digits.forEach((d, i) =>
+      DIGIT[d].forEach((row, r) => {
+        for (let k = 0; k < 3; k++) if (row[k] === "#") box(x0 + i * 4 + k, top + 4 + r, 1, 1, col);
+      }));
   }
   sprites.begin();
   for (const m of faces) {
@@ -260,7 +261,7 @@ const DIGIT = [
   ["###", "#.#", "###", "..#", "##."],
 ];
 /** A trait's mark in the corner of its icon, 5 by 5: swift chevrons, a heavy weight, a piercing arrow, a lingering
- * drop, a cheap coin. */
+ * drop, a cheap gem. */
 const TRAIT_MARK = {
   swift: ["#..#.", ".#..#", "..#..", ".#..#", "#..#."],
   heavy: [".###.", "..#..", "#####", "#####", "#####"],
