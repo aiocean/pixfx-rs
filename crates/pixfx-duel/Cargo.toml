@@ -1,0 +1,26 @@
+[package]
+name = "pixfx-duel"
+description = "The landing duel's rules: two cultivators, their skills, bars, statuses and rounds, deterministic from a seed"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm.workspace = true
+pixfx-draw = { path = "../pixfx-draw" }
+serde = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+[dev-dependencies]
+# exact float parsing and JS key order, to compare with the fixture duel.js writes
+serde_json = { version = "=1.0.154", features = ["float_roundtrip", "preserve_order"] }
+
+[features]
+# serde for the commands, events and views, in the shapes JS reads them (camelCase, tagged with "type")
+serde = ["dep:serde"]
+# TypeScript declarations for the wasm bindings
+ts = ["serde", "dep:tsify", "dep:wasm-bindgen"]
+
+[lints]
+workspace = true

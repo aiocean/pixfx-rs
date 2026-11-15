@@ -1,0 +1,2019 @@
+{
+ "rng": {
+  "0": [
+   0.26642920868471265,
+   0.0003297457005828619,
+   0.2232720274478197,
+   0.1462021479383111,
+   0.46732782293111086,
+   0.5450490827206522,
+   0.6152513844426721,
+   0.6489853798411787,
+   0.45600721263326705,
+   0.581218967679888,
+   0.24625753005966544,
+   0.09785169479437172,
+   0.9034309543203562,
+   0.40820372267626226,
+   0.7202955442480743,
+   0.6599067240022123,
+   0.8058585098478943,
+   0.6261914535425603,
+   0.5696913106366992,
+   0.12123633874580264,
+   0.24193100933916867,
+   0.8153759187553078,
+   0.323521607555449,
+   0.08783002896234393,
+   0.7895766077563167,
+   0.9079886567778885,
+   0.551719788229093,
+   0.4687971824314445,
+   0.3561653404030949,
+   0.09744705795310438,
+   0.752272559562698,
+   0.52662223437801,
+   0.2047672572080046,
+   0.12937693274579942,
+   0.32869906700216234,
+   0.25051057478412986,
+   0.34877196745947003,
+   0.2612062278203666,
+   0.17744940402917564,
+   0.3384289578534663,
+   0.8167456462979317,
+   0.43362422985956073,
+   0.47775731328874826,
+   0.7313624455127865,
+   0.7565535784233361,
+   0.9641769591253251,
+   0.5183873120695353,
+   0.5354834103491157,
+   0.3848155541345477,
+   0.4018378141336143
+  ],
+  "1": [
+   0.6270739405881613,
+   0.002735721180215478,
+   0.5274470399599522,
+   0.9810509674716741,
+   0.9683778982143849,
+   0.281103502959013,
+   0.6128388606011868,
+   0.7207431411370635,
+   0.425796952098608,
+   0.9948229456786066,
+   0.45527112716808915,
+   0.48878831742331386,
+   0.13893358339555562,
+   0.40374476509168744,
+   0.24752389639616013,
+   0.15449313493445516,
+   0.48914389545097947,
+   0.0673698834143579,
+   0.3946193160954863,
+   0.7671080259606242,
+   0.28586167353205383,
+   0.19087357842363417,
+   0.042729709995910525,
+   0.42738195578567684,
+   0.590382493333891,
+   0.7986842156387866,
+   0.29486987087875605,
+   0.2054697866551578,
+   0.6581296445801854,
+   0.5460823616012931,
+   0.758442840538919,
+   0.19281403115019202,
+   0.7209477317519486,
+   0.4541360163129866,
+   0.770413824589923,
+   0.9945340014528483,
+   0.23933332320302725,
+   0.7570012940559536,
+   0.15327094192616642,
+   0.3233316196128726,
+   0.41319697513245046,
+   0.2492126589640975,
+   0.15208827191963792,
+   0.7261048289947212,
+   0.5763414488174021,
+   0.1272108720149845,
+   0.2646576233673841,
+   0.04872346459887922,
+   0.6222200409974903,
+   0.8657720659393817
+  ],
+  "2": [
+   0.7342509443406016,
+   0.32499843230471015,
+   0.28529605525545776,
+   0.5379551574587822,
+   0.8752879470121115,
+   0.6308333419729024,
+   0.4992015736643225,
+   0.3572446557227522,
+   0.7815889057237655,
+   0.11403172370046377,
+   0.7858669895213097,
+   0.20154535141773522,
+   0.42422566725872457,
+   0.8349974474404007,
+   0.5813204094301909,
+   0.14100669883191586,
+   0.6722272289916873,
+   0.3666982688009739,
+   0.971613448113203,
+   0.039201128063723445,
+   0.9151977864094079,
+   0.062183088855817914,
+   0.1280244740191847,
+   0.19193362118676305,
+   0.007105563767254353,
+   0.9401024971157312,
+   0.45207437709905207,
+   0.6346521824598312,
+   0.9884103999938816,
+   0.23279935983009636,
+   0.4679630333557725,
+   0.3482415771577507,
+   0.05263609322719276,
+   0.5212198328226805,
+   0.09536325954832137,
+   0.05781813757494092,
+   0.9602927498053759,
+   0.8050266958307475,
+   0.0006261211819946766,
+   0.9820793268736452,
+   0.07251844787970185,
+   0.9723730375990272,
+   0.5273911911062896,
+   0.19475854956544936,
+   0.6778920909855515,
+   0.05147860595025122,
+   0.7779713058844209,
+   0.911587618291378,
+   0.8271304324734956,
+   0.4456692119129002
+  ],
+  "7": [
+   0.011704753153026104,
+   0.06195825757458806,
+   0.97690763277933,
+   0.6990287057124078,
+   0.5214452685322613,
+   0.4055216880515218,
+   0.4662326325196773,
+   0.23992518591694534,
+   0.5533256039489061,
+   0.729822089895606,
+   0.2578155610244721,
+   0.15594836394302547,
+   0.7640898865647614,
+   0.5184025457128882,
+   0.19713726011104882,
+   0.3679585934150964,
+   0.2932473379187286,
+   0.5347395255230367,
+   0.29633024823851883,
+   0.9779461044818163,
+   0.2475335942581296,
+   0.877779595553875,
+   0.19079170934855938,
+   0.14365738607011735,
+   0.1546440301463008,
+   0.2909512131009251,
+   0.5479014315642416,
+   0.7618736950680614,
+   0.07451809011399746,
+   0.912940707989037,
+   0.5537107479758561,
+   0.6216248339042068,
+   0.6800909077282995,
+   0.9659897037781775,
+   0.624380644178018,
+   0.9212048600893468,
+   0.8276284842286259,
+   0.03997847391292453,
+   0.17494154698215425,
+   0.35698101413436234,
+   0.4253157244529575,
+   0.020176114281639457,
+   0.08810623525641859,
+   0.7680158556904644,
+   0.3689693051856011,
+   0.42671570368111134,
+   0.4686626282054931,
+   0.946221170714125,
+   0.7032810859382153,
+   0.6882974675390869
+  ],
+  "2147483653": [
+   0.5801103678531945,
+   0.08632027637213469,
+   0.9113832253497094,
+   0.7611181102693081,
+   0.923633924452588,
+   0.8135923384688795,
+   0.42001221026293933,
+   0.5320033133029938,
+   0.7148858800064772,
+   0.1806675500702113,
+   0.2254063335712999,
+   0.4752862451132387,
+   0.058695601765066385,
+   0.7201076583005488,
+   0.6942429267801344,
+   0.2319936454296112,
+   0.3864123176317662,
+   0.10432752990163863,
+   0.37903836369514465,
+   0.9604694112204015,
+   0.5826039139647037,
+   0.8501334646716714,
+   0.5243757518474013,
+   0.24764234409667552,
+   0.22366507281549275,
+   0.17754423688165843,
+   0.084915183018893,
+   0.2843802631832659,
+   0.9273503748700023,
+   0.7083485228940845,
+   0.40839775977656245,
+   0.6592689491808414,
+   0.22289081336930394,
+   0.2827534540556371,
+   0.8156255260109901,
+   0.29465764993801713,
+   0.9261400476098061,
+   0.2358696940355003,
+   0.8677199454978108,
+   0.5924633659888059,
+   0.1694954582490027,
+   0.1504930444061756,
+   0.4427437209524214,
+   0.9636526016984135,
+   0.6514244789723307,
+   0.652288218261674,
+   0.20111603033728898,
+   0.6122500286437571,
+   0.7060819922480732,
+   0.2394977652002126
+  ],
+  "4294967295": [
+   0.8964226141106337,
+   0.189478256739676,
+   0.7156526781618595,
+   0.9440599093213677,
+   0.8452364315744489,
+   0.5391399988438934,
+   0.6804977387655526,
+   0.4755720964167267,
+   0.13585773925296962,
+   0.9884445976931602,
+   0.8714674517977983,
+   0.18934845877811313,
+   0.3436866346746683,
+   0.7386848733294755,
+   0.4759919897187501,
+   0.7567116804420948,
+   0.9159235202241689,
+   0.10207696096040308,
+   0.1436101261060685,
+   0.3921705954708159,
+   0.9202409950084984,
+   0.9238722093869001,
+   0.7916392679326236,
+   0.8520552832633257,
+   0.1153229579795152,
+   0.09125144220888615,
+   0.5151041666977108,
+   0.2751815707888454,
+   0.3076603573281318,
+   0.01972890179604292,
+   0.4548310365062207,
+   0.2538063288666308,
+   0.5144624633248895,
+   0.4345122929662466,
+   0.2099072653800249,
+   0.3966394728049636,
+   0.5396128965076059,
+   0.6065731556154788,
+   0.14838816551491618,
+   0.26715306425467134,
+   0.8875240164343268,
+   0.7962313089519739,
+   0.028675136156380177,
+   0.27624681894667447,
+   0.29593162541277707,
+   0.7472640245687217,
+   0.6291584454011172,
+   0.7526657804846764,
+   0.16520738089457154,
+   0.9613309928681701
+  ]
+ },
+ "orbOffset": [
+  [
+   0,
+   7.573238863271069,
+   -34.061008318362326
+  ],
+  [
+   0.37,
+   28.333347388054314,
+   -24.30793401881223
+  ],
+  [
+   0.74,
+   33.23520790234429,
+   -41.227074766151226
+  ],
+  [
+   1.1099999999999999,
+   28.661451674191326,
+   -53.96769067835026
+  ],
+  [
+   1.48,
+   22.37215495507878,
+   -48.695263091099186
+  ],
+  [
+   1.85,
+   13.411100038272274,
+   -41.69300509047453
+  ],
+  [
+   2.2199999999999998,
+   -3.93714527117446,
+   -36.463459165355104
+  ],
+  [
+   2.59,
+   -27.831243275135904,
+   -31.084383169706037
+  ],
+  [
+   2.96,
+   -44.82907677722136,
+   -39.81056412775056
+  ],
+  [
+   3.33,
+   -41.04863789895714,
+   -57.67682917817355
+  ],
+  [
+   3.7,
+   -16.734224602109503,
+   -53.46205161928248
+  ],
+  [
+   4.07,
+   12.621524237316823,
+   -30.02042889797722
+  ],
+  [
+   4.4399999999999995,
+   30.4177836636639,
+   -26.061290818481847
+  ],
+  [
+   4.81,
+   32.78971032047682,
+   -44.99393645233415
+  ],
+  [
+   5.18,
+   27.491286921109158,
+   -54.01463738409025
+  ],
+  [
+   5.55,
+   21.060888815621023,
+   -47.041868037390095
+  ],
+  [
+   5.92,
+   10.88866503828152,
+   -40.810562000717056
+  ],
+  [
+   6.29,
+   -8.23369375960839,
+   -35.175464897438786
+  ],
+  [
+   6.66,
+   -32.09539799450238,
+   -31.236392980449455
+  ],
+  [
+   7.03,
+   -45.95506625786759,
+   -43.35914953173886
+  ],
+  [
+   7.4,
+   -37.70762755634631,
+   -59.315025546257985
+  ],
+  [
+   7.77,
+   -10.96704869090757,
+   -49.428459026792964
+  ]
+ ],
+ "blockChance": [
+  [
+   0,
+   1
+  ],
+  [
+   1,
+   1
+  ],
+  [
+   5,
+   1
+  ],
+  [
+   20,
+   0.5
+  ],
+  [
+   33.3,
+   0.3003003003003003
+  ],
+  [
+   80,
+   0.125
+  ]
+ ],
+ "shockInterval": [
+  [
+   1,
+   0.6
+  ],
+  [
+   2,
+   0.5124
+  ],
+  [
+   3,
+   0.43758959999999997
+  ],
+  [
+   4,
+   0.37370151839999993
+  ],
+  [
+   5,
+   0.31914109671359997
+  ]
+ ],
+ "slotPower": [
+  [
+   "common",
+   [],
+   false,
+   1
+  ],
+  [
+   "common",
+   [],
+   true,
+   1.5
+  ],
+  [
+   "common",
+   [
+    "heavy"
+   ],
+   false,
+   1.3
+  ],
+  [
+   "common",
+   [
+    "heavy"
+   ],
+   true,
+   1.9500000000000002
+  ],
+  [
+   "rare",
+   [],
+   false,
+   1.15
+  ],
+  [
+   "rare",
+   [],
+   true,
+   1.7249999999999999
+  ],
+  [
+   "rare",
+   [
+    "heavy"
+   ],
+   false,
+   1.4949999999999999
+  ],
+  [
+   "rare",
+   [
+    "heavy"
+   ],
+   true,
+   2.2424999999999997
+  ],
+  [
+   "epic",
+   [],
+   false,
+   1.3
+  ],
+  [
+   "epic",
+   [],
+   true,
+   1.9500000000000002
+  ],
+  [
+   "epic",
+   [
+    "heavy"
+   ],
+   false,
+   1.6900000000000002
+  ],
+  [
+   "epic",
+   [
+    "heavy"
+   ],
+   true,
+   2.535
+  ],
+  [
+   "legendary",
+   [],
+   false,
+   1.5
+  ],
+  [
+   "legendary",
+   [],
+   true,
+   2.25
+  ],
+  [
+   "legendary",
+   [
+    "heavy"
+   ],
+   false,
+   1.9500000000000002
+  ],
+  [
+   "legendary",
+   [
+    "heavy"
+   ],
+   true,
+   2.9250000000000003
+  ]
+ ],
+ "fits": [
+  [
+   "swift",
+   "slash",
+   true
+  ],
+  [
+   "swift",
+   "step",
+   true
+  ],
+  [
+   "swift",
+   "seal",
+   true
+  ],
+  [
+   "swift",
+   "lotus",
+   true
+  ],
+  [
+   "swift",
+   "frostfire",
+   true
+  ],
+  [
+   "swift",
+   "shatter",
+   true
+  ],
+  [
+   "swift",
+   "dive",
+   true
+  ],
+  [
+   "swift",
+   "bolt",
+   true
+  ],
+  [
+   "swift",
+   "orb",
+   true
+  ],
+  [
+   "swift",
+   "icicle",
+   true
+  ],
+  [
+   "swift",
+   "collapse",
+   true
+  ],
+  [
+   "swift",
+   "palm",
+   true
+  ],
+  [
+   "swift",
+   "tribulation",
+   true
+  ],
+  [
+   "swift",
+   "prison",
+   true
+  ],
+  [
+   "swift",
+   "void",
+   true
+  ],
+  [
+   "swift",
+   "heal",
+   true
+  ],
+  [
+   "swift",
+   "ward",
+   true
+  ],
+  [
+   "swift",
+   "bell",
+   true
+  ],
+  [
+   "swift",
+   "mirror",
+   true
+  ],
+  [
+   "swift",
+   "blink",
+   true
+  ],
+  [
+   "swift",
+   "spark",
+   true
+  ],
+  [
+   "swift",
+   "burst",
+   true
+  ],
+  [
+   "swift",
+   "quake",
+   true
+  ],
+  [
+   "swift",
+   "hex",
+   true
+  ],
+  [
+   "swift",
+   "shard",
+   true
+  ],
+  [
+   "swift",
+   "jet",
+   true
+  ],
+  [
+   "swift",
+   "flurry",
+   true
+  ],
+  [
+   "heavy",
+   "slash",
+   true
+  ],
+  [
+   "heavy",
+   "step",
+   true
+  ],
+  [
+   "heavy",
+   "seal",
+   true
+  ],
+  [
+   "heavy",
+   "lotus",
+   true
+  ],
+  [
+   "heavy",
+   "frostfire",
+   true
+  ],
+  [
+   "heavy",
+   "shatter",
+   true
+  ],
+  [
+   "heavy",
+   "dive",
+   true
+  ],
+  [
+   "heavy",
+   "bolt",
+   true
+  ],
+  [
+   "heavy",
+   "orb",
+   true
+  ],
+  [
+   "heavy",
+   "icicle",
+   true
+  ],
+  [
+   "heavy",
+   "collapse",
+   true
+  ],
+  [
+   "heavy",
+   "palm",
+   true
+  ],
+  [
+   "heavy",
+   "tribulation",
+   true
+  ],
+  [
+   "heavy",
+   "prison",
+   true
+  ],
+  [
+   "heavy",
+   "void",
+   true
+  ],
+  [
+   "heavy",
+   "heal",
+   false
+  ],
+  [
+   "heavy",
+   "ward",
+   false
+  ],
+  [
+   "heavy",
+   "bell",
+   false
+  ],
+  [
+   "heavy",
+   "mirror",
+   false
+  ],
+  [
+   "heavy",
+   "blink",
+   false
+  ],
+  [
+   "heavy",
+   "spark",
+   true
+  ],
+  [
+   "heavy",
+   "burst",
+   true
+  ],
+  [
+   "heavy",
+   "quake",
+   true
+  ],
+  [
+   "heavy",
+   "hex",
+   false
+  ],
+  [
+   "heavy",
+   "shard",
+   true
+  ],
+  [
+   "heavy",
+   "jet",
+   true
+  ],
+  [
+   "heavy",
+   "flurry",
+   true
+  ],
+  [
+   "piercing",
+   "slash",
+   true
+  ],
+  [
+   "piercing",
+   "step",
+   true
+  ],
+  [
+   "piercing",
+   "seal",
+   false
+  ],
+  [
+   "piercing",
+   "lotus",
+   true
+  ],
+  [
+   "piercing",
+   "frostfire",
+   false
+  ],
+  [
+   "piercing",
+   "shatter",
+   false
+  ],
+  [
+   "piercing",
+   "dive",
+   true
+  ],
+  [
+   "piercing",
+   "bolt",
+   true
+  ],
+  [
+   "piercing",
+   "orb",
+   true
+  ],
+  [
+   "piercing",
+   "icicle",
+   false
+  ],
+  [
+   "piercing",
+   "collapse",
+   false
+  ],
+  [
+   "piercing",
+   "palm",
+   true
+  ],
+  [
+   "piercing",
+   "tribulation",
+   false
+  ],
+  [
+   "piercing",
+   "prison",
+   false
+  ],
+  [
+   "piercing",
+   "void",
+   false
+  ],
+  [
+   "piercing",
+   "heal",
+   false
+  ],
+  [
+   "piercing",
+   "ward",
+   false
+  ],
+  [
+   "piercing",
+   "bell",
+   false
+  ],
+  [
+   "piercing",
+   "mirror",
+   false
+  ],
+  [
+   "piercing",
+   "blink",
+   false
+  ],
+  [
+   "piercing",
+   "spark",
+   true
+  ],
+  [
+   "piercing",
+   "burst",
+   true
+  ],
+  [
+   "piercing",
+   "quake",
+   false
+  ],
+  [
+   "piercing",
+   "hex",
+   false
+  ],
+  [
+   "piercing",
+   "shard",
+   true
+  ],
+  [
+   "piercing",
+   "jet",
+   true
+  ],
+  [
+   "piercing",
+   "flurry",
+   false
+  ],
+  [
+   "lingering",
+   "slash",
+   false
+  ],
+  [
+   "lingering",
+   "step",
+   false
+  ],
+  [
+   "lingering",
+   "seal",
+   true
+  ],
+  [
+   "lingering",
+   "lotus",
+   false
+  ],
+  [
+   "lingering",
+   "frostfire",
+   true
+  ],
+  [
+   "lingering",
+   "shatter",
+   false
+  ],
+  [
+   "lingering",
+   "dive",
+   false
+  ],
+  [
+   "lingering",
+   "bolt",
+   true
+  ],
+  [
+   "lingering",
+   "orb",
+   true
+  ],
+  [
+   "lingering",
+   "icicle",
+   false
+  ],
+  [
+   "lingering",
+   "collapse",
+   false
+  ],
+  [
+   "lingering",
+   "palm",
+   true
+  ],
+  [
+   "lingering",
+   "tribulation",
+   false
+  ],
+  [
+   "lingering",
+   "prison",
+   false
+  ],
+  [
+   "lingering",
+   "void",
+   false
+  ],
+  [
+   "lingering",
+   "heal",
+   false
+  ],
+  [
+   "lingering",
+   "ward",
+   false
+  ],
+  [
+   "lingering",
+   "bell",
+   false
+  ],
+  [
+   "lingering",
+   "mirror",
+   false
+  ],
+  [
+   "lingering",
+   "blink",
+   false
+  ],
+  [
+   "lingering",
+   "spark",
+   true
+  ],
+  [
+   "lingering",
+   "burst",
+   false
+  ],
+  [
+   "lingering",
+   "quake",
+   false
+  ],
+  [
+   "lingering",
+   "hex",
+   false
+  ],
+  [
+   "lingering",
+   "shard",
+   true
+  ],
+  [
+   "lingering",
+   "jet",
+   true
+  ],
+  [
+   "lingering",
+   "flurry",
+   true
+  ],
+  [
+   "cheap",
+   "slash",
+   true
+  ],
+  [
+   "cheap",
+   "step",
+   true
+  ],
+  [
+   "cheap",
+   "seal",
+   true
+  ],
+  [
+   "cheap",
+   "lotus",
+   true
+  ],
+  [
+   "cheap",
+   "frostfire",
+   true
+  ],
+  [
+   "cheap",
+   "shatter",
+   true
+  ],
+  [
+   "cheap",
+   "dive",
+   true
+  ],
+  [
+   "cheap",
+   "bolt",
+   true
+  ],
+  [
+   "cheap",
+   "orb",
+   true
+  ],
+  [
+   "cheap",
+   "icicle",
+   true
+  ],
+  [
+   "cheap",
+   "collapse",
+   true
+  ],
+  [
+   "cheap",
+   "palm",
+   true
+  ],
+  [
+   "cheap",
+   "tribulation",
+   true
+  ],
+  [
+   "cheap",
+   "prison",
+   true
+  ],
+  [
+   "cheap",
+   "void",
+   true
+  ],
+  [
+   "cheap",
+   "heal",
+   true
+  ],
+  [
+   "cheap",
+   "ward",
+   true
+  ],
+  [
+   "cheap",
+   "bell",
+   true
+  ],
+  [
+   "cheap",
+   "mirror",
+   true
+  ],
+  [
+   "cheap",
+   "blink",
+   true
+  ],
+  [
+   "cheap",
+   "spark",
+   true
+  ],
+  [
+   "cheap",
+   "burst",
+   true
+  ],
+  [
+   "cheap",
+   "quake",
+   true
+  ],
+  [
+   "cheap",
+   "hex",
+   true
+  ],
+  [
+   "cheap",
+   "shard",
+   true
+  ],
+  [
+   "cheap",
+   "jet",
+   true
+  ],
+  [
+   "cheap",
+   "flurry",
+   true
+  ]
+ ],
+ "spells": {
+  "slash": {
+   "kind": "melee",
+   "type": "physical",
+   "cost": 0,
+   "windup": 0.2,
+   "recover": 0.32,
+   "cooldown": 0.7,
+   "range": 24,
+   "damage": 5
+  },
+  "step": {
+   "kind": "dash",
+   "type": "physical",
+   "fx": "spawn/poof",
+   "cost": 24,
+   "windup": 0.26,
+   "recover": 0.32,
+   "cooldown": 3.4,
+   "distance": 72,
+   "damage": 15
+  },
+  "seal": {
+   "kind": "zone",
+   "type": "magic",
+   "fx": "explosions/plasma-explosion",
+   "cost": 30,
+   "windup": 0.3,
+   "recover": 0.3,
+   "cooldown": 2.4,
+   "sigil": 0.4,
+   "impact": 0.08,
+   "radius": 16,
+   "damage": 22,
+   "notice": 0,
+   "shock": true
+  },
+  "lotus": {
+   "kind": "blast",
+   "type": "magic",
+   "fx": "holy/feather-burst",
+   "cost": 24,
+   "windup": 0.3,
+   "recover": 0.3,
+   "cooldown": 2.2,
+   "range": 40,
+   "damage": 18,
+   "defDown": 3
+  },
+  "frostfire": {
+   "kind": "void",
+   "type": "magic",
+   "fx": "fire/spirit-flame",
+   "cost": 33,
+   "windup": 0.4,
+   "recover": 0.3,
+   "cooldown": 5,
+   "life": 2.6,
+   "height": 0,
+   "pull": 0,
+   "reach": 18,
+   "under": 18,
+   "tick": 5,
+   "damage": 8,
+   "chill": true
+  },
+  "shatter": {
+   "kind": "zone",
+   "type": "magic",
+   "fx": "explosions/plasma-explosion",
+   "cost": 33,
+   "windup": 0.35,
+   "recover": 0.3,
+   "cooldown": 3,
+   "sigil": 0.35,
+   "impact": 0.08,
+   "radius": 16,
+   "damage": 25,
+   "notice": 0,
+   "freeze": 0.6
+  },
+  "dive": {
+   "kind": "melee",
+   "type": "physical",
+   "dive": true,
+   "cost": 12,
+   "windup": 0.22,
+   "recover": 0.4,
+   "cooldown": 1.6,
+   "range": 26,
+   "damage": 11,
+   "speed": 260,
+   "slamFx": "explosions/dirt-explosion"
+  },
+  "bolt": {
+   "kind": "bolt",
+   "type": "magic",
+   "fx": "projectiles/laser-bolt",
+   "cost": 18,
+   "windup": 0.28,
+   "recover": 0.22,
+   "cooldown": 1.3,
+   "speed": 230,
+   "damage": 13,
+   "shock": true
+  },
+  "orb": {
+   "kind": "orb",
+   "type": "magic",
+   "fx": "lightning/ball-lightning",
+   "hitFx": "explosions/plasma-explosion",
+   "burn": true,
+   "shock": true,
+   "cost": 45,
+   "windup": 0.6,
+   "recover": 0.3,
+   "cooldown": 4.5,
+   "speed": 26,
+   "life": 5.5,
+   "damage": 14,
+   "radius": 10
+  },
+  "icicle": {
+   "kind": "zone",
+   "type": "magic",
+   "defDown": 4,
+   "fx": "ice/icicle-fall",
+   "cost": 33,
+   "windup": 0.42,
+   "recover": 0.28,
+   "cooldown": 2.2,
+   "impact": 0.944,
+   "radius": 16,
+   "damage": 28,
+   "notice": 0.3,
+   "grounded": true,
+   "freeze": 0.9
+  },
+  "collapse": {
+   "kind": "zone",
+   "type": "magic",
+   "silence": 1.5,
+   "fx": "explosions/implosion",
+   "cost": 39,
+   "windup": 0.5,
+   "recover": 0.3,
+   "cooldown": 2.4,
+   "impact": 1.02,
+   "radius": 18,
+   "damage": 25,
+   "notice": 0.15,
+   "pull": 60,
+   "reach": 52,
+   "pullUntil": 0.8
+  },
+  "palm": {
+   "kind": "blast",
+   "type": "physical",
+   "stealRage": 1,
+   "fx": "explosions/plasma-explosion",
+   "cost": 27,
+   "windup": 0.32,
+   "recover": 0.35,
+   "cooldown": 2.8,
+   "range": 38,
+   "damage": 20,
+   "shock": true
+  },
+  "tribulation": {
+   "kind": "zone",
+   "type": "magic",
+   "fx": "explosions/plasma-explosion",
+   "ultimate": true,
+   "cost": 0,
+   "windup": 0.7,
+   "recover": 0.5,
+   "cooldown": 0,
+   "impact": 0.08,
+   "radius": 12,
+   "damage": 14,
+   "notice": 0,
+   "strikes": 3,
+   "every": 0.7,
+   "aimAhead": 0.5
+  },
+  "prison": {
+   "kind": "zone",
+   "type": "magic",
+   "silence": 2,
+   "fx": "explosions/implosion",
+   "ultimate": true,
+   "cost": 0,
+   "windup": 0.7,
+   "recover": 0.5,
+   "cooldown": 0,
+   "impact": 1.02,
+   "radius": 26,
+   "damage": 31,
+   "notice": 0.1,
+   "pull": 70,
+   "reach": 110,
+   "pullUntil": 0.9,
+   "seals": true,
+   "freeze": 1.26
+  },
+  "void": {
+   "kind": "void",
+   "type": "magic",
+   "fx": "shadow/void-orb",
+   "endFx": "explosions/implosion",
+   "cost": 60,
+   "windup": 0.9,
+   "recover": 0.45,
+   "cooldown": 11,
+   "life": 3.2,
+   "height": 62,
+   "pull": 34,
+   "reach": 90,
+   "under": 22,
+   "tick": 4,
+   "damage": 14
+  },
+  "heal": {
+   "kind": "heal",
+   "fx": "holy/feather-burst",
+   "cost": 35,
+   "windup": 0.85,
+   "recover": 0.3,
+   "cooldown": 9,
+   "amount": 20
+  },
+  "ward": {
+   "kind": "ward",
+   "fx": "holy/feather-burst",
+   "cost": 45,
+   "windup": 0.5,
+   "recover": 0.25,
+   "cooldown": 8
+  },
+  "bell": {
+   "kind": "barrier",
+   "fx": "arcane/rune-circle",
+   "cost": 18,
+   "windup": 0.06,
+   "recover": 0.1,
+   "cooldown": 6.5,
+   "time": 2,
+   "counter": {
+    "damage": 9,
+    "stun": 0.6
+   }
+  },
+  "mirror": {
+   "kind": "barrier",
+   "fx": "arcane/rune-circle",
+   "cost": 18,
+   "windup": 0.06,
+   "recover": 0.1,
+   "cooldown": 6.5,
+   "time": 2.2,
+   "reflect": true
+  },
+  "blink": {
+   "kind": "blink",
+   "fx": "spawn/poof",
+   "cost": 20,
+   "windup": 0.06,
+   "recover": 0.12,
+   "cooldown": 1.8,
+   "distance": 56
+  },
+  "spark": {
+   "kind": "bolt",
+   "type": "magic",
+   "fx": "projectiles/laser-bolt",
+   "cost": 10,
+   "windup": 0.18,
+   "recover": 0.18,
+   "cooldown": 0.9,
+   "speed": 300,
+   "damage": 8,
+   "shock": true
+  },
+  "burst": {
+   "kind": "blast",
+   "type": "physical",
+   "fx": "explosions/plasma-explosion",
+   "cost": 30,
+   "windup": 0.36,
+   "recover": 0.4,
+   "cooldown": 3,
+   "range": 30,
+   "damage": 24
+  },
+  "quake": {
+   "kind": "zone",
+   "type": "physical",
+   "fx": "explosions/small-explosion",
+   "cost": 26,
+   "windup": 0.3,
+   "recover": 0.3,
+   "cooldown": 2.6,
+   "sigil": 0.3,
+   "impact": 0.05,
+   "radius": 14,
+   "damage": 18,
+   "notice": 0,
+   "grounded": true
+  },
+  "hex": {
+   "kind": "ward",
+   "fx": "arcane/hex-shield",
+   "feet": true,
+   "cost": 40,
+   "windup": 0.45,
+   "recover": 0.25,
+   "cooldown": 8
+  },
+  "shard": {
+   "kind": "bolt",
+   "type": "magic",
+   "fx": "projectiles/laser-bolt",
+   "cost": 10,
+   "windup": 0.18,
+   "recover": 0.18,
+   "cooldown": 0.9,
+   "speed": 300,
+   "damage": 7,
+   "chill": true
+  },
+  "jet": {
+   "kind": "blast",
+   "type": "magic",
+   "fx": "water/water-jet",
+   "spray": 0.6,
+   "cost": 22,
+   "windup": 0.3,
+   "recover": 0.3,
+   "cooldown": 2.4,
+   "range": 56,
+   "damage": 14,
+   "chill": true
+  },
+  "flurry": {
+   "kind": "void",
+   "type": "magic",
+   "fx": "weather/snow",
+   "cost": 30,
+   "windup": 0.4,
+   "recover": 0.3,
+   "cooldown": 5,
+   "life": 1.2,
+   "height": 0,
+   "pull": 0,
+   "reach": 22,
+   "under": 22,
+   "tick": 3,
+   "damage": 10,
+   "chill": true
+  }
+ },
+ "schools": {
+  "thunder": {
+   "name": "Thunder",
+   "basics": [
+    "slash",
+    "dive",
+    "blink"
+   ],
+   "pool": [
+    "bolt",
+    "palm",
+    "step",
+    "seal",
+    "orb",
+    "bell",
+    "heal",
+    "spark",
+    "burst",
+    "quake",
+    "hex"
+   ],
+   "ultimate": "tribulation",
+   "signature": "blast",
+   "postures": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "range": 64,
+   "dry": 20,
+   "aggression": 1.15,
+   "tempo": 0.8,
+   "sky": 22,
+   "bolt": [
+    "#2a1a08",
+    "#6a4410",
+    "#b07a1a",
+    "#e8b030",
+    "#ffd84a",
+    "#ffe98a",
+    "#fff6c4",
+    "#ffffff"
+   ],
+   "circle": [
+    "#2a1a08",
+    "#6a4410",
+    "#b07a1a",
+    "#e8b030",
+    "#ffd84a",
+    "#fff6c4",
+    "#ffffff"
+   ],
+   "tint": {
+    "explosions/plasma-explosion": {
+     "palette": [
+      "#1a0e04",
+      "#4a2a08",
+      "#9a5a10",
+      "#e0a020",
+      "#ffd84a",
+      "#fff3b0",
+      "#ffffff"
+     ],
+     "accent": [
+      "#2a1408",
+      "#7a3a10",
+      "#e07a1a",
+      "#ffc23d",
+      "#fff0b0"
+     ]
+    },
+    "spawn/poof": {
+     "palette": [
+      "#3a2a10",
+      "#7a5a20",
+      "#c09040",
+      "#ffd84a",
+      "#fff3b0",
+      "#ffffff"
+     ],
+     "stars": [
+      "#ffd84a",
+      "#fff3b0",
+      "#ffffff"
+     ]
+    },
+    "holy/feather-burst": {
+     "palette": [
+      "#6a4410",
+      "#b07a1a",
+      "#e8b030",
+      "#ffd84a",
+      "#fff6c4",
+      "#ffffff"
+     ]
+    },
+    "explosions/dirt-explosion": {
+     "fire": [
+      "#4a2a08",
+      "#9a5a10",
+      "#e0a020",
+      "#ffc23d",
+      "#ffd84a",
+      "#ffe98a",
+      "#fff6c4",
+      "#ffffff"
+     ]
+    },
+    "arcane/rune-circle": {
+     "palette": [
+      "#2a1a08",
+      "#6a4410",
+      "#b07a1a",
+      "#e8b030",
+      "#ffd84a",
+      "#fff6c4",
+      "#ffffff"
+     ]
+    },
+    "impacts/parry": {
+     "palette": [
+      "#b07a1a",
+      "#e8b030",
+      "#ffd84a",
+      "#fff6c4",
+      "#ffffff"
+     ]
+    }
+   }
+  },
+  "frost": {
+   "name": "Frost",
+   "basics": [
+    "slash",
+    "dive",
+    "blink"
+   ],
+   "pool": [
+    "lotus",
+    "shatter",
+    "icicle",
+    "collapse",
+    "frostfire",
+    "void",
+    "mirror",
+    "ward",
+    "shard",
+    "jet",
+    "flurry"
+   ],
+   "ultimate": "prison",
+   "signature": "zone",
+   "postures": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "range": 100,
+   "dry": 80,
+   "aggression": 1.1,
+   "tempo": 2,
+   "sky": 48,
+   "bolt": [
+    "#151a3d",
+    "#212f6b",
+    "#2c58aa",
+    "#3a8bd8",
+    "#62c8f4",
+    "#a6ecff",
+    "#dcfbff",
+    "#ffffff"
+   ],
+   "circle": [
+    "#151a3d",
+    "#212f6b",
+    "#2c58aa",
+    "#3a8bd8",
+    "#62c8f4",
+    "#dcfbff",
+    "#ffffff"
+   ],
+   "tint": {
+    "explosions/plasma-explosion": {
+     "palette": [
+      "#0a1430",
+      "#16306a",
+      "#2c58aa",
+      "#4a9ae0",
+      "#8fd8ff",
+      "#dcfbff",
+      "#ffffff"
+     ],
+     "accent": [
+      "#0a1830",
+      "#1a4a80",
+      "#3a8bd8",
+      "#a6ecff",
+      "#ffffff"
+     ]
+    },
+    "explosions/implosion": {
+     "palette": [
+      "#060a18",
+      "#10224a",
+      "#1e4a8a",
+      "#3a8bd8",
+      "#8fd8ff",
+      "#dcfbff",
+      "#ffffff"
+     ]
+    },
+    "holy/feather-burst": {
+     "palette": [
+      "#1e3f80",
+      "#2c58aa",
+      "#62c8f4",
+      "#a6ecff",
+      "#dcfbff",
+      "#ffffff"
+     ],
+     "glow": "#a6ecff"
+    },
+    "fire/spirit-flame": {
+     "palette": [
+      "#0a1430",
+      "#16306a",
+      "#2c58aa",
+      "#3a8bd8",
+      "#62c8f4",
+      "#a6ecff",
+      "#dcfbff",
+      "#ffffff"
+     ]
+    },
+    "spawn/poof": {
+     "palette": [
+      "#16306a",
+      "#2c58aa",
+      "#62c8f4",
+      "#a6ecff",
+      "#dcfbff",
+      "#ffffff"
+     ],
+     "stars": [
+      "#a6ecff",
+      "#dcfbff",
+      "#ffffff"
+     ]
+    },
+    "weather/snow": {
+     "width": 48,
+     "height": 72
+    },
+    "arcane/rune-circle": {
+     "palette": [
+      "#151a3d",
+      "#212f6b",
+      "#2c58aa",
+      "#3a8bd8",
+      "#62c8f4",
+      "#dcfbff",
+      "#ffffff"
+     ]
+    },
+    "impacts/parry": {
+     "palette": [
+      "#2c58aa",
+      "#3a8bd8",
+      "#62c8f4",
+      "#dcfbff",
+      "#ffffff"
+     ]
+    }
+   }
+  }
+ },
+ "stats": {
+  "thunder": {
+   "hp": 2500,
+   "atk": 345,
+   "pdef": 130,
+   "mdef": 110,
+   "crit": 0.18,
+   "critDamage": 1.6,
+   "dodge": 0.05,
+   "fury": true,
+   "unyielding": true,
+   "attuned": false
+  },
+  "frost": {
+   "hp": 3300,
+   "atk": 520,
+   "pdef": 145,
+   "mdef": 165,
+   "crit": 0.15,
+   "critDamage": 1.7,
+   "dodge": 0.11,
+   "fury": false,
+   "unyielding": false,
+   "attuned": true
+  }
+ },
+ "rarity": {
+  "common": {
+   "odds": 0.7,
+   "power": 1,
+   "traits": 0,
+   "chance": 0.4
+  },
+  "rare": {
+   "odds": 0.22,
+   "power": 1.15,
+   "traits": 1
+  },
+  "epic": {
+   "odds": 0.08,
+   "power": 1.3,
+   "traits": 2
+  },
+  "legendary": {
+   "odds": 0,
+   "power": 1.5,
+   "traits": 3
+  }
+ },
+ "traits": {
+  "swift": {
+   "cooldown": 0.6
+  },
+  "heavy": {
+   "power": 1.3
+  },
+  "piercing": {},
+  "lingering": {
+   "stacks": 1
+  },
+  "cheap": {
+   "cost": 0.5
+  }
+ },
+ "lucky": {
+  "chance": 0.08,
+  "kinds": [
+   "double",
+   "free",
+   "again"
+  ]
+ },
+ "payoff": {
+  "palm": {
+   "status": "shock",
+   "per": 0.12
+  },
+  "burst": {
+   "status": "shock",
+   "per": 0.12
+  },
+  "shatter": {
+   "status": "chill",
+   "per": 0.15
+  },
+  "lotus": {
+   "status": "chill",
+   "per": 0.15
+  }
+ },
+ "constants": {
+  "RAGE": 4,
+  "STALE": 6,
+  "POOL_SIZE": 8,
+  "DECOR": {
+   "lamp": "fire/brazier",
+   "night": "weather/fireflies"
+  },
+  "TIERS": [
+   "common",
+   "rare",
+   "epic",
+   "legendary"
+  ]
+ }
+}

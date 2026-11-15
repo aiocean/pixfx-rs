@@ -390,7 +390,7 @@ export function orbOffset(t) {
 }
 
 /** A small seeded generator (mulberry32), so a seed replays the same fight. */
-function random(seed) {
+export function random(seed) {
   let s = seed >>> 0;
   return () => {
     s = (s + 0x6d2b79f5) >>> 0;
