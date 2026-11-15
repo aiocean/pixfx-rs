@@ -24,8 +24,10 @@ describe("tooltips", () => {
     expect(tip.title).toBe(SPELL_INFO.palm.name);
     expect(tip.tier).toBe("epic");
     const text = tip.lines.join("\n");
-    expect(text).toContain("Epic");
-    expect(text).toContain("Evolved");
+    // the tier line is the tier and nothing else
+    expect(tip.lines[0]).toBe("Epic · Evolved");
+    expect(text).not.toContain("Tiers");
+    expect(text).not.toContain("One cast");
     expect(text).toContain(TRAIT_INFO.heavy);
     expect(text).toContain(TRAIT_INFO.swift);
     expect(text).toContain("Power 254%");
@@ -38,7 +40,7 @@ describe("tooltips", () => {
     const f = fresh().fighters[1];
     f.bar[2] = { empty: 1.4, full: 2 };
     expect(skillInfo(f, 2).title).toBe("Empty slot");
-    expect(skillInfo(f, 2).lines.join(" ")).toContain("1.4 s");
+    expect(skillInfo(f, 2).lines).toEqual(["Draws a new skill in 1.4 s."]);
     f.rage = 2;
     const ult = skillInfo(f, 3);
     expect(ult.title).toBe(SPELL_INFO[SCHOOLS.frost.ultimate].name);

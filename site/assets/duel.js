@@ -167,7 +167,7 @@ const EVOLVES = {
   thunder: [["bolt", "seal"], ["palm", "step"], ["quake", "burst"]],
   frost: [["shard", "icicle"], ["shatter", "flurry"], ["lotus", "jet"]],
 };
-export const EVOLVED = 1.5;
+const EVOLVED = 1.5;
 
 /**
  * Each school's fighter: full life, attack, the two defences, crit chance and crit damage, dodge, and its passives.

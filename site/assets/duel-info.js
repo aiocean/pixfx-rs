@@ -1,6 +1,6 @@
 // What the duel's tooltips say: each skill's name and what it does, each trait and buff, and the tooltip for a slot
 // of a fighter's skill bar or a buff under its bars (lines of plain text; the page lays them out).
-import { EVOLVED, RAGE, RARITY, SPELLS, TRAITS, skillBar } from "./duel.js";
+import { RAGE, SPELLS, TRAITS, skillBar } from "./duel.js";
 
 /** Each skill's name and what it does, in a line. */
 export const SPELL_INFO = {
@@ -69,7 +69,7 @@ export function skillInfo(f, i) {
   const slot = skillBar(f)[i];
   if (!slot) return null;
   if (!slot.spell) {
-    return { title: "Empty slot", tier: null, lines: [`Draws a new skill in ${Math.max(0, slot.left).toFixed(1)} s.`, "A skill already on the bar drawn again lifts its tier."] };
+    return { title: "Empty slot", tier: null, lines: [`Draws a new skill in ${Math.max(0, slot.left).toFixed(1)} s.`] };
   }
   const spell = SPELLS[slot.spell];
   const info = SPELL_INFO[slot.spell];
@@ -77,16 +77,12 @@ export function skillInfo(f, i) {
   const cheap = slot.traits.includes("cheap") ? TRAITS.cheap.cost : 1;
   const lines = [];
   if (slot.ultimate) lines.push(`Ultimate · Rage ${Math.min(RAGE, Math.round(slot.charge * RAGE))}/${RAGE}`);
-  else {
-    lines.push(`${TIER_NAME[slot.rarity]}${slot.evolved ? " · Evolved" : ""} · Power ${Math.round(slot.power * 100)}%`);
-    lines.push("One cast, then the slot draws again.");
-  }
+  else lines.push(`${TIER_NAME[slot.rarity]}${slot.evolved ? " · Evolved" : ""}`);
   lines.push(info.does);
+  if (!slot.ultimate) lines.push(`Power ${Math.round(slot.power * 100)}%`);
   const cost = Math.round(spell.cost * cheap);
   lines.push(`${cost > 0 ? `${cost} qi` : "Free"} · cooldown ${(spell.cooldown * swift).toFixed(1)} s`);
   for (const t of slot.traits) lines.push(TRAIT_INFO[t]);
-  if (slot.evolved) lines.push(`Evolved: power ×${EVOLVED} and +1 stack of what it inflicts.`);
-  if (!slot.ultimate) lines.push(`Tiers: ${Object.keys(RARITY).map((r) => TIER_NAME[r]).join(" → ")}.`);
   return { title: info.name, tier: slot.ultimate ? null : slot.rarity, lines };
 }
 
