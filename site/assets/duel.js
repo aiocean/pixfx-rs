@@ -162,12 +162,13 @@ export function castsPower(casts) {
 /**
  * Each school's fighter: full life, attack, the two defences, crit chance and crit damage, dodge, and its passives.
  * Thunder is a body and sword cultivator: tough, hits harder the longer it fights (fury), and once a round stands
- * up from a killing blow with 1 life (unyielding). Frost is a spell cultivator: frailer, harder to pin down, crits
- * harder, shields itself, and every second spell it casts charges its rage (attuned).
+ * up from a killing blow with 1 life (unyielding). Frost is a spell cultivator: it lands fewer blows than Thunder's
+ * blade, so each hits harder and it holds out longer; it is harder to pin down, crits harder, shields itself, and
+ * every second spell it casts charges its rage (attuned).
  */
 export const STATS = {
   thunder: { hp: 2500, atk: 345, pdef: 130, mdef: 110, crit: 0.18, critDamage: 1.6, dodge: 0.05, fury: true, unyielding: true, attuned: false },
-  frost: { hp: 2450, atk: 370, pdef: 105, mdef: 165, crit: 0.15, critDamage: 1.7, dodge: 0.11, fury: false, unyielding: false, attuned: true },
+  frost: { hp: 3300, atk: 520, pdef: 145, mdef: 165, crit: 0.15, critDamage: 1.7, dodge: 0.11, fury: false, unyielding: false, attuned: true },
 };
 
 const QI_REGEN = 3;
