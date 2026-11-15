@@ -1,7 +1,7 @@
 // The rotating skill bar: three slots, each a skill drawn from the school's pool with its own casts and power; a
 // spent skill empties its slot, which counts down and draws a new one.
 import { describe, expect, test } from "bun:test";
-import { SCHOOLS, SPELLS, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
+import { PAYOFF, POOL_SIZE, SCHOOLS, SPELLS, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
 import { ICON_CELLS, ICON_COLUMNS } from "../assets/skill-icons.js";
 import { Body, Mind, effects } from "./engine.js";
 
@@ -38,6 +38,9 @@ describe("the bar", () => {
       const f = duel.fighters[seed % 2];
       f.mind.hold(1e9);
       duel.fighters[1 - f.index].mind.hold(1e9);
+      // three skills with no evolution partner among them, so the spent one empties its slot
+      const plain = f.school === "thunder" ? ["orb", "bell", "heal"] : ["mirror", "void", "frostfire"];
+      f.bar = plain.map((spell) => ({ spell, casts: 2, left: 2, power: castsPower(2), evolved: false }));
       const casts = f.bar[0].casts;
       for (let k = 0; k < casts; k++) spend(duel, f, 0);
       expect(f.bar[0].empty).toBeGreaterThanOrEqual(3);
@@ -127,6 +130,31 @@ describe("the pools", () => {
   }, 300_000);
 });
 
+describe("a fight's pool", () => {
+  test("each fight plays 8 of its school's skills, with its signature kind and a skill that pays off its status", () => {
+    expect(POOL_SIZE).toBe(8);
+    for (let seed = 1; seed <= 30; seed++) {
+      for (const f of arena(seed).fighters) {
+        const school = SCHOOLS[f.school];
+        expect(f.pool.length).toBe(8);
+        expect(new Set(f.pool).size).toBe(8);
+        for (const name of f.pool) expect(school.pool).toContain(name);
+        expect(f.pool.some((name) => SPELLS[name].kind === school.signature)).toBe(true);
+        expect(f.pool.some((name) => PAYOFF[name])).toBe(true);
+        expect(f.spells.filter((name) => school.pool.includes(name)).sort()).toEqual([...f.pool].sort());
+      }
+    }
+  });
+
+  test("the same seed plays the same pools, and seeds differ", () => {
+    const pools = (seed) => arena(seed).fighters.map((f) => [...f.pool].sort().join(",")).join("|");
+    expect(pools(5)).toBe(pools(5));
+    const seen = new Set();
+    for (let seed = 1; seed <= 10; seed++) seen.add(pools(seed));
+    expect(seen.size).toBeGreaterThanOrEqual(5);
+  });
+});
+
 describe("draw rules", () => {
   test("a round's first slot is the school's signature kind", () => {
     for (let seed = 1; seed <= 15; seed++) {
@@ -140,6 +168,10 @@ describe("draw rules", () => {
       const n = 600;
       const duel = arena(9);
       const [thunder, frost] = duel.fighters;
+      // the whole pool, so both payoff skills can be drawn whatever this fight's pool holds
+      thunder.pool = [...SCHOOLS.thunder.pool];
+      thunder.bar[0] = { spell: "orb", casts: 1, left: 1, power: 1.4, evolved: false };
+      thunder.bar[2] = { spell: "bell", casts: 1, left: 1, power: 1.4, evolved: false };
       for (let k = 0; k < n; k++) {
         set(duel, thunder, frost);
         thunder.bar[1] = { empty: 1, full: 1 };

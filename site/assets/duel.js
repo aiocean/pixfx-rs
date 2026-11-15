@@ -30,7 +30,7 @@ const SHOCK = { max: 5, every: 0.6, fast: 0.854, share: 0.03, hold: 0.12 };
 /** Skills that spend the foe's stacks of a status to hit harder: this much more power per stack. */
 /** While the foe carries a status, the share of draws that come from the skills that spend it. */
 const PAY_DRAW = 1 / 3;
-const PAYOFF = { palm: { status: "shock", per: 0.12 }, burst: { status: "shock", per: 0.12 }, shatter: { status: "chill", per: 0.15 }, lotus: { status: "chill", per: 0.15 } };
+export const PAYOFF = { palm: { status: "shock", per: 0.12 }, burst: { status: "shock", per: 0.12 }, shatter: { status: "chill", per: 0.15 }, lotus: { status: "chill", per: 0.15 } };
 
 /**
  * Grit (after Vampire Survivors' freeze resistance and Valhalla's stagger cap): each hard control a fighter takes
@@ -103,6 +103,8 @@ const WARD = { charges: 3, time: 6 };
  * equal odds). A skill drawn with fewer casts hits harder (CAST_POWER, by casts). A spent skill empties its slot,
  * which counts down `wait + spread × roll` seconds and then draws a skill not on the bar.
  */
+/** How many of its school's pool a fighter plays in one fight, drawn when the fight is made. */
+export const POOL_SIZE = 8;
 const BAR = { slots: 3, casts: 4, wait: 3, spread: 2 };
 const CAST_POWER = [1.4, 1.2, 1.1, 1.0];
 /**
@@ -341,7 +343,7 @@ export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top, 
     const fx = SPELLS[name].fx;
     return !fx || has(fx);
   };
-  duel.fighters = [fighter(0, "thunder", usable, new Body(0)), fighter(1, "frost", usable, new Body(0))];
+  duel.fighters = [fighter(duel, 0, "thunder", usable, new Body(0)), fighter(duel, 1, "frost", usable, new Body(0))];
   for (const f of duel.fighters) {
     const make = minds[f.index] ?? ((d, me) => brain(d, me, Mind));
     f.mind = make(duel, f);
@@ -354,12 +356,30 @@ export function createDuel({ seed = 1, left, right, ground, has, sky = FLY.top, 
 /** The body's fields, read and written on the fighter as if they were its own. */
 const BODY_FIELDS = ["x", "air", "vx", "vy", "face", "stun", "wake", "land", "squat", "leap", "duck", "flash", "hitT", "hitPower", "frozen", "shocked", "poseT"];
 
+/**
+ * The `POOL_SIZE` skills of `school` a fighter plays this fight, by the duel's dice: always one of the school's
+ * signature kind and one that pays off its status, where it has them, then the rest at random.
+ */
+function fightPool(duel, school, usable) {
+  const { pool, signature } = SCHOOLS[school];
+  const left = pool.filter(usable);
+  for (let i = left.length - 1; i > 0; i--) {
+    const j = Math.floor(duel.rng() * (i + 1));
+    [left[i], left[j]] = [left[j], left[i]];
+  }
+  const must = [left.find((name) => SPELLS[name].kind === signature), left.find((name) => PAYOFF[name])].filter(Boolean);
+  const kept = [...new Set(must)];
+  for (const name of left) if (kept.length < POOL_SIZE && !kept.includes(name)) kept.push(name);
+  return kept;
+}
+
 /** Fighter `index` of `school`, with the school's spells that are `usable`. */
-function fighter(index, school, usable, body) {
-  const { basics, pool, ultimate } = SCHOOLS[school];
+function fighter(duel, index, school, usable, body) {
+  const { basics, ultimate } = SCHOOLS[school];
+  const pool = fightPool(duel, school, usable);
   // every spell it may cast this fight: the brain is told them all once; one off the bar is never ready
   const spells = [...basics, ...pool, ultimate].filter(usable);
-  const f = { index, school, spells, pool: pool.filter(usable), bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
+  const f = { index, school, spells, pool, bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
   for (const k of BODY_FIELDS) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
