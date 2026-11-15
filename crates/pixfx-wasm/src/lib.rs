@@ -3,6 +3,8 @@
 //! which other Rust crates use directly.
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "duel")]
+pub mod duel;
 mod feel;
 #[cfg(feature = "fighter")]
 pub mod fighter;

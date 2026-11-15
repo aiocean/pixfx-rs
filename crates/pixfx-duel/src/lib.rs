@@ -17,3 +17,4 @@ pub mod seat;
 pub mod sense;
 pub mod shot;
 pub mod status;
+pub mod view;

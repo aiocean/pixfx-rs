@@ -10,6 +10,8 @@ use pixfx_mind::Outcome;
 
 /// Where a cast is: gathering before it lands, or recovering after.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Phase {
     Windup,
     Recover,

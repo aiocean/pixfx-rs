@@ -10,8 +10,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 js-sys = "=0.3.107"
+libm = { workspace = true, optional = true }
 pixfx-core = { path = "../pixfx-core", features = ["ts"] }
 pixfx-draw = { path = "../pixfx-draw" }
+pixfx-duel = { path = "../pixfx-duel", features = ["serde"], optional = true }
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
 pixfx-export = { path = "../pixfx-export" }
 pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"], optional = true }
@@ -30,7 +32,7 @@ wasm-bindgen.workspace = true
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
 
 [features]
-default = ["all", "fighter", "light", "mind"]
+default = ["all", "fighter", "light", "mind", "duel"]
 # every effect. For fewer, build with --no-default-features and name the effects or categories of pixfx-effects:
 # --features pixfx-effects/fire-candle,pixfx-effects/explosions (EffectId then lists only those)
 all = ["pixfx-effects/all"]
@@ -40,6 +42,8 @@ fighter = ["dep:pixfx-fighter"]
 light = ["dep:pixfx-light"]
 # pixfx-mind for JS: `Mind`, a fighter's brain. A game whose fighters a player alone drives builds without it.
 mind = ["dep:pixfx-mind"]
+# pixfx-duel for JS: `Duel`, the landing duel's rules, and the libm maths a replay of the JS rules computes with.
+duel = ["dep:pixfx-duel", "dep:libm"]
 
 # wasm-pack's wasm-opt pass tuned for speed: -O3 runs effects 3 to 23% faster than its default -O (interleaved
 # benchmark of all 25 effects) at the same size.

@@ -6,4 +6,4 @@ const dir = new URL("../../packages/pixfx-web/wasm/", import.meta.url);
 const pkg = await import(new URL("pixfx_wasm.js", dir).href);
 pkg.initSync({ module: readFileSync(new URL("pixfx_wasm_bg.wasm", dir)) });
 
-export const { Body, Fx, Mind, effects } = pkg;
+export const { Body, Duel, Fx, Mind, damageOf, duelConstants, duelSpells, duelStats, duelTraits, effects, libmHypot, libmSin, libmSqrt, orbOffset } = pkg;

@@ -1,7 +1,7 @@
 //! Statuses that stack, hard controls cut by grit, burns, life lost and damage dealt, as `duel.js` has them. Each
 //! takes the state and the index of the fighter it touches, and emits what it did in `duel.js`'s order.
 
-use crate::data::{BURN, Blow, CHILL, DEF_DOWN, DEFENCE, FREEZE, FURY, GRIT, RAGE, SHOCK, SPREAD, shock_interval};
+use crate::data::{BURN, Blow, CHILL, DEF_DOWN, DEFENCE, FREEZE, FURY, GRIT, RAGE, SHOCK, SPREAD, Stats, shock_interval};
 use crate::fighter::{Fighter, Shocked, State};
 use crate::out::Out;
 use pixfx_draw::math::{js_max, js_min, js_round};
@@ -135,14 +135,16 @@ pub fn gain_rage(f: &mut Fighter, n: f64) {
 
 /// The damage `by` does to `f` with a blow of `power` and `blow`; `roll` in [0, 1) spreads it.
 pub fn damage_of(by: &Fighter, f: &Fighter, power: f64, blow: Blow, crit: bool, roll: f64) -> f64 {
-    let atk = by.stats.atk * (1.0 + FURY.per * by.fury);
-    let def = (if blow == Blow::Physical { f.stats.pdef } else { f.stats.mdef })
-        * (if f.def_down > 0.0 { 1.0 - DEF_DOWN } else { 1.0 });
+    damage(&by.stats, by.fury, &f.stats, f.def_down, power, blow, crit, roll)
+}
+
+/// [`damage_of`] from only what it reads: the striker's stats and fury, the target's stats and defence-down.
+#[allow(clippy::too_many_arguments)]
+pub fn damage(by: &Stats, fury: f64, f: &Stats, def_down: f64, power: f64, blow: Blow, crit: bool, roll: f64) -> f64 {
+    let atk = by.atk * (1.0 + FURY.per * fury);
+    let def = (if blow == Blow::Physical { f.pdef } else { f.mdef }) * (if def_down > 0.0 { 1.0 - DEF_DOWN } else { 1.0 });
     let spread = 1.0 - SPREAD / 2.0 + SPREAD * roll;
-    js_max(
-        1.0,
-        js_round(atk * (power / 10.0) * (DEFENCE / (DEFENCE + def)) * (if crit { by.stats.crit_damage } else { 1.0 }) * spread),
-    )
+    js_max(1.0, js_round(atk * (power / 10.0) * (DEFENCE / (DEFENCE + def)) * (if crit { by.crit_damage } else { 1.0 }) * spread))
 }
 
 /// A heal or a ward washes off what clings to fighter `f`: burn, silence, defence-down, chill and shock.

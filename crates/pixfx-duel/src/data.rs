@@ -282,6 +282,8 @@ impl School {
 
 /// Each school's fighter: full life, attack, the two defences, crit chance and damage, dodge, and its passives.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
 pub struct Stats {
     pub hp: f64,
     pub atk: f64,
@@ -354,6 +356,8 @@ pub const CLASH: &str = "impacts/parry";
 
 /// What a spell does when it lands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Kind {
     Melee,
     Dash,
@@ -388,6 +392,8 @@ impl Kind {
 
 /// Which defence a blow is cut by.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Blow {
     Physical,
     Magic,
@@ -404,6 +410,7 @@ impl Blow {
 
 /// A golden bell's answer to a close blow.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Counter {
     pub damage: f64,
     pub stun: f64,
@@ -412,52 +419,95 @@ pub struct Counter {
 /// A spell: what it costs, how long the fighter is committed before (`windup`) and after (`recover`) it lands, its
 /// cooldown, and its own numbers. Fields `duel.js` leaves out are `None` or `false`.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Spell {
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub name: &'static str,
     pub kind: Kind,
+    #[cfg_attr(feature = "serde", serde(rename = "type", skip_serializing_if = "Option::is_none"))]
     pub blow: Option<Blow>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub fx: Option<&'static str>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub hit_fx: Option<&'static str>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub end_fx: Option<&'static str>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub slam_fx: Option<&'static str>,
     pub cost: f64,
     pub windup: f64,
     pub recover: f64,
     pub cooldown: f64,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub range: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub distance: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub damage: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub sigil: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub impact: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub radius: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub notice: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub def_down: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub life: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub height: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub pull: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub reach: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub under: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub tick: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub freeze: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub speed: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub silence: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub pull_until: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub steal_rage: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub strikes: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub every: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub aim_ahead: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub amount: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub time: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub spray: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub shock: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub chill: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub dive: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub burn: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub grounded: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub ultimate: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub seals: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub reflect: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "is_false"))]
     pub feet: bool,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub counter: Option<Counter>,
 }
 
@@ -597,6 +647,12 @@ static SPELLS: [Spell; 27] = [
 /// Every spell, in `duel.js`'s order.
 pub fn spells() -> &'static [Spell] {
     &SPELLS
+}
+
+/// Whether `b` is false: a spell's flag JS leaves out when it is off.
+#[cfg(feature = "serde")]
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 /// The spell called `name`.
