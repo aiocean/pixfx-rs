@@ -1,7 +1,7 @@
 //! A fighter's body: where it stands, how it moves, and how it takes a blow the way fighting games do (hitstun,
-//! launch, one juggle, knockdown, getting up, a quick roll, ducking, landing recovery). Port of the body half of the
-//! site's `duel.js`; every float operation runs in the same order as there, so a duel stepped through this body
-//! plays the same fight step for step.
+//! launch, one juggle, knockdown, getting up, a quick roll, ducking, landing recovery). The landing duel
+//! (`pixfx-duel`) steps its fighters through it; every float operation runs in a fixed order, so a seed plays the same
+//! fight step for step.
 //!
 //! The rules of a fight (qi, moves, damage, the AI) stay with the game. Each step the game calls, in this order:
 //! [`Body::tick`] (the body's clocks and getting up), its own timers, [`Body::step`] (feet and flight), its own

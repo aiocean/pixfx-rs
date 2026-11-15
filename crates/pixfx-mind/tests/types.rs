@@ -17,7 +17,7 @@ fn rng_replays_a_seed() {
     assert!(differs);
 }
 
-/// The duel's own generator (`random` in site/assets/duel.js), bit for bit.
+/// The duel's own generator (`pixfx_duel::rng`), bit for bit.
 #[test]
 fn rng_matches_mulberry32() {
     assert_eq!(Rng::new(1).next(), 0.6270739405881613);

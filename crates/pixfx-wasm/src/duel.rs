@@ -1,5 +1,5 @@
-//! `pixfx-duel` for JS: the landing duel's rules ([`Duel`]), its tables in the shapes `duel.js` exported them, and the
-//! libm maths a replay of the JS rules computes with. It translates only: every rule is the crate's.
+//! `pixfx-duel` for JS: the landing duel's rules ([`Duel`]) and the tables the page reads. It translates only: every
+//! rule is the crate's.
 
 use crate::js::{parse, to_js};
 use pixfx_duel::data::{Blow, DECOR, RAGE, Rarity, STALE, School, Stats, TRAITS, spells, stats};
@@ -73,11 +73,13 @@ impl Duel {
         to_js(&pixfx_duel::view::view(&self.inner.state))
     }
 
-    /// Fighter `me`'s seat thinks nothing for `seconds`.
-    pub fn hold(&mut self, me: usize, seconds: f64) {
-        if me < 2 {
-            self.inner.hold(me, seconds);
+    /// Fighter `me`'s seat (0 or 1) thinks nothing for `seconds`.
+    pub fn hold(&mut self, me: usize, seconds: f64) -> Result<(), JsError> {
+        if me >= 2 {
+            return Err(JsError::new(&format!("hold: no corner {me}, a duel has corners 0 and 1")));
         }
+        self.inner.hold(me, seconds);
+        Ok(())
     }
 }
 
@@ -116,24 +118,6 @@ pub fn duel_constants() -> Result<JsValue, JsError> {
     to_js(&serde_json::json!({ "RAGE": RAGE, "STALE": STALE, "DECOR": { "lamp": lamp, "night": night }, "TIERS": Rarity::ALL }))
 }
 
-/// libm's `sin`, which the Rust rules compute with: a replay hands it to `duel.js` (`useMath`).
-#[wasm_bindgen(js_name = libmSin)]
-pub fn libm_sin(x: f64) -> f64 {
-    libm::sin(x)
-}
-
-/// libm's `hypot`.
-#[wasm_bindgen(js_name = libmHypot)]
-pub fn libm_hypot(a: f64, b: f64) -> f64 {
-    libm::hypot(a, b)
-}
-
-/// libm's `sqrt`.
-#[wasm_bindgen(js_name = libmSqrt)]
-pub fn libm_sqrt(x: f64) -> f64 {
-    libm::sqrt(x)
-}
-
 /// Each school's fighter stats, as `duel.js`'s `STATS`.
 #[wasm_bindgen(js_name = duelStats)]
 pub fn duel_stats() -> Result<JsValue, JsError> {
@@ -142,6 +126,7 @@ pub fn duel_stats() -> Result<JsValue, JsError> {
 
 /// A striker as `damageOf` reads it.
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Striker {
     stats: Stats,
     #[serde(default)]
@@ -150,7 +135,7 @@ struct Striker {
 
 /// A target as `damageOf` reads it.
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Target {
     stats: Stats,
     #[serde(default)]

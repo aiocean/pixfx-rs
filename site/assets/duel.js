@@ -6,6 +6,12 @@
 /** The engine's duel bindings, set by `useEngine`. */
 let engine = null;
 
+/** The engine, or a clear error when the page forgot `useEngine`. */
+function loaded() {
+  if (!engine) throw new Error("duel.js: call useEngine(pkg) after loadPixfx() first");
+  return engine;
+}
+
 /** Every spell by name, each school's fighter stats, what each trait does: the rules' own tables. */
 export let SPELLS = {};
 export let STATS = {};
@@ -35,8 +41,9 @@ export function useEngine(pkg) {
  * `["brain" | "first", "brain" | "first"]` (brains when left out).
  */
 export function createDuel({ seed = 1, left, right, ground, has, sky, seats }) {
-  const effects = engine.effects().filter((id) => has(id));
-  const rs = new engine.Duel({ seed, left, right, ground, sky, effects }, seats);
+  const pkg = loaded();
+  const effects = pkg.effects().filter((id) => has(id));
+  const rs = new pkg.Duel({ seed, left, right, ground, sky, effects }, seats);
   return { rs, seed, ...rs.view() };
 }
 
@@ -60,8 +67,8 @@ export const buffsOf = (f) => f.buffs;
 
 /** The damage `by` (`{stats, fury}`) deals `f` (`{stats, defDown}`) with a blow of `power` and `type`. */
 export function damageOf(by, f, power, type, crit, roll) {
-  return engine.damageOf({ stats: by.stats, fury: by.fury }, { stats: f.stats, defDown: f.defDown }, power, type, crit, roll);
+  return loaded().damageOf({ stats: by.stats, fury: by.fury }, { stats: f.stats, defDown: f.defDown }, power, type, crit, roll);
 }
 
 /** Where an orb bobs `t` seconds after it was cast, from its line: `[dx, dy]`. */
-export const orbOffset = (t) => engine.orbOffset(t);
+export const orbOffset = (t) => loaded().orbOffset(t);

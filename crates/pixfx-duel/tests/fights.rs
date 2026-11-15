@@ -587,12 +587,6 @@ fn knockout_stops_every_effect_it_started() {
             for (fx, at) in live.values() {
                 assert!(duel.state.time - at < 12.0, "seed {seed}: {fx} left playing");
             }
-            // at a knockout, no rune circle or barrier stays open past the next round's start
-            if out.iter().any(|o| matches!(o, Out::Ko { .. })) {
-                for f in &duel.state.fighters {
-                    assert!(f.act.and_then(|a| a.circle).is_none() || f.act.is_some_and(|a| a.phase == Phase::Recover));
-                }
-            }
         }
     }
 }

@@ -24,8 +24,7 @@ CPU. Behind the `fighter`, `light` and `mind` features (all default): `src/fight
 `src/mind.rs` (`Mind`, a fighter's brain: `meet(foeSkills)`, `think(sense, dt)`, `tell`, `reset`, `hold`, `explain`, `posture`).
 Behind `duel` (default): `src/duel.rs`, the landing duel's rules from `pixfx-duel`: `new Duel(config, seats?)`
 (`seats`: `["brain" | "first", ...]`), `step(dt)` (commands and events), `view()`, `hold(me, seconds)`; its tables as
-`duel.js` exported them (`duelSpells()`, `duelTraits()`, `duelConstants()`); and `libmSin`, `libmHypot`, `libmSqrt`
-for a replay of the JS rules.
+the page reads (`duelSpells()`, `duelTraits()`, `duelStats()`, `duelConstants()`), `damageOf` and `orbOffset`.
 `Sprites.picture()` and `Lighting.paint()` return a `Picture` (`src/picture.rs`: the lit box's colour and light
 RGBA) that a shell draws. `Squash.step(dt, x, y, vx?, vy?)` works out velocity from movement.
 
@@ -50,7 +49,7 @@ The test: if a gpui game would need the same behaviour, it is not translation, a
 
 `pixfx-core` (with `ts`), `pixfx-draw`, `pixfx-scene` (with `ts`), `pixfx-effects` (`default-features = false`; the `all` feature turns every
 effect on), `js-sys`, `wasm-bindgen`, `serde`, `serde-wasm-bindgen`, `serde_json`, `serde_path_to_error`, `tsify`;
-optional behind their features: `pixfx-fighter`, `pixfx-light`, `pixfx-mind`, and `pixfx-duel` with `libm` (`duel`).
+optional behind their features: `pixfx-fighter`, `pixfx-light`, `pixfx-mind`, and `pixfx-duel` (`duel`).
 
 ## Known drift
 

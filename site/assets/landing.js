@@ -231,6 +231,8 @@ function createHero(canvas, signal, icons, engine) {
     view.sprites?.free();
     view.feel?.free();
     view.lighting?.free();
+    if (view.duel) freeDuel(view.duel);
+    view.duel = null;
   };
   view.playing = () => view.stage?.stats().engines ?? 0;
 

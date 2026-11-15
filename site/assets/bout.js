@@ -1,13 +1,13 @@
 // A bout: the hero duel's two fighters staging one effect on its own page, the way a real fight would use it. Each
 // take walks the two to where the effect's role wants them, has the caster gather with the matching pose, plays the
 // effect where it would appear in a fight, makes the one it reaches react when it lands, then lets both settle back
-// to rest. The fighters' bodies are pixfx-fighter's `Body`, driven the way duel.js drives them; this module draws
-// nothing. `step` returns what duel.js's `step` returns: effect commands (`play`, `move`, `stop`) and the events
+// to rest. The fighters' bodies are pixfx-fighter's `Body`, driven the way pixfx-duel drives them; this module
+// draws nothing. `step` returns what the duel's `step` returns: effect commands (`play`, `move`, `stop`) and the events
 // the screen feels (`hit`, `tick`, `block`, `clash`, `land`, `bump`, `streak`), so the page plays and feels them as
 // the hero does.
 //
 // Units are game pixels and seconds. x grows to the right; heights (`air`, event y) are measured up from the ground,
-// effect y in screen rows like duel.js's play commands.
+// effect y in screen rows like the duel's play commands.
 import { SPELLS, STATS, damageOf, orbOffset } from "./duel.js";
 
 /** How high a fighter may fly. */
@@ -27,10 +27,10 @@ const DISTANCE = {
   strike: 72, projectile: 112, stream: 88, ward: 100, buff: 60, "ground-self": 40, "ground-foe": 70,
   clash: 26, flight: 64, ambient: 30, blink: 70, death: 60,
 };
-/** Knockback two blades that meet give each other (duel.js KNOCKBACK). */
+/** Knockback two blades that meet give each other (pixfx-duel `KNOCKBACK`). */
 const KNOCKBACK = 130;
 
-/** A small seeded generator (mulberry32, as duel.js), so a seed replays the same bout. */
+/** A small seeded generator (mulberry32, as pixfx-duel's dice), so a seed replays the same bout. */
 function random(seed) {
   let s = seed >>> 0;
   return () => {
@@ -42,7 +42,7 @@ function random(seed) {
   };
 }
 
-/** The body's fields, read and written on the fighter as if they were its own (duel.js BODY_FIELDS). */
+/** The body's fields, read and written on the fighter as if they were its own (named as the duel view names them). */
 const BODY_FIELDS = ["x", "air", "vx", "vy", "face", "stun", "wake", "land", "squat", "leap", "duck", "flash", "hitT", "hitPower", "frozen", "shocked", "poseT"];
 
 /** Fighter `index` of `school`, standing on `body`, with every field duel-art.js reads off a duel's fighter. */
@@ -177,7 +177,7 @@ function tick(bout, dt) {
   if (!a.dead && !b.dead) bout.Body.separate(a.body, b.body, bout.arena);
 }
 
-/** One step of fighter me's body, driven as duel.js drives it, and its act's clock. */
+/** One step of fighter me's body, driven as pixfx-duel drives it, and its act's clock. */
 function move(bout, me, foe, dt, out) {
   me.body.tick(dt, true);
   me.rang = Math.max(0, me.rang - dt);
@@ -428,7 +428,7 @@ const SCRIPTS = {
     }
     if (struck) {
       stopFx(T, s.key, out);
-      // an orb of lightning leaves the foe burning (duel.js SPELLS.orb)
+      // an orb of lightning leaves the foe burning (`SPELLS.orb`)
       if (hit(bout, T, me, foe, tune.power ?? 13, s.dir, out, { ranged: true }) && tune.mark === "burn") foe.burn = { t: 2 };
       return go(T, "rest");
     }
@@ -719,7 +719,7 @@ function ambientProp(bout, T, out = bout.queued) {
   else playFx(bout, T, mid - 160, 170, by, out, false);
 }
 
-/** Does a point (x, height above ground) touch fighter f, give or take r? (duel.js overlaps) */
+/** Does a point (x, height above ground) touch fighter f, give or take r? (pixfx-duel `shot::overlaps`) */
 function overlaps(f, x, y, r) {
   if (f.body.untouchable()) return false;
   return Math.abs(x - f.x) < f.spec.halfWidth + r && y > f.air - r && y < f.air + (f.duck > 0 ? f.spec.duck : f.spec.body) + r;

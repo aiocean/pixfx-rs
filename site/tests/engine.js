@@ -8,4 +8,5 @@ const pkg = await import(new URL("pixfx_wasm.js", dir).href);
 pkg.initSync({ module: readFileSync(new URL("pixfx_wasm_bg.wasm", dir)) });
 
 useEngine(pkg);
+export { pkg };
 export const { Body, Fx, Mind, effects } = pkg;
