@@ -14,7 +14,7 @@ function castOnce(spell) {
   const caster = () => ({ think: () => (cast ? null : ((cast = true), { type: "cast", skill: spell })), tell() {}, reset() {}, hold() {} });
   const duel = createDuel({ seed: 3, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind, minds: [caster, idle] });
   const [me, foe] = duel.fighters;
-  me.bar = [{ spell, casts: 2, left: 2, rarity: "common", evolved: false, traits: [], power: slotPower(2, "common", [], false) }, { empty: 9, full: 9 }, { empty: 9, full: 9 }];
+  me.bar = [{ spell, rarity: "common", evolved: false, traits: [], power: slotPower("common", [], false) }, { empty: 9, full: 9 }, { empty: 9, full: 9 }];
   if (!me.pool.includes(spell)) me.pool.push(spell);
   if (!me.spells.includes(spell)) me.spells.push(spell);
   me.qi = 100;
@@ -51,6 +51,30 @@ describe("looping effects", () => {
       }
     }
   }, 120_000);
+});
+
+describe("a knockout ends what was under way", () => {
+  /** Fighter 0 casts `spell`; once its `fx` plays, the foe falls. Whether that effect is stopped by the next round. */
+  const stoppedAfterKnockout = (spell, fx) => {
+    const { duel, foe } = castOnce(spell);
+    let key = null;
+    for (let i = 0; i < 2 * 60 && key === null; i++) for (const c of step(duel, 1 / 60)) if (c.type === "play" && c.fx === fx) key = c.key;
+    expect(key).not.toBeNull();
+    foe.hp = 0;
+    const round = duel.round;
+    let stopped = false;
+    for (let i = 0; i < 10 * 60 && duel.round === round; i++) for (const c of step(duel, 1 / 60)) if (c.type === "stop" && c.key === key) stopped = true;
+    expect(duel.round).toBe(round + 1);
+    return stopped;
+  };
+
+  test("a cast still gathering in its rune circle when the foe falls: the circle goes", () => {
+    expect(stoppedAfterKnockout("quake", "arcane/rune-circle")).toBe(true);
+  });
+
+  test("a barrier standing when the round ends: its dome goes", () => {
+    expect(stoppedAfterKnockout("bell", SPELLS.bell.fx)).toBe(true);
+  });
 });
 
 describe("where effects stand", () => {

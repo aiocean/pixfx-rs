@@ -292,7 +292,7 @@ function medallion(f, x, top, size, box, c, faces) {
 
 // ---------- the skill bars ----------
 
-/** Digits 0 to 9, 3 by 5: the casts a slot has left, and the seconds an empty one still waits. */
+/** Digits 0 to 9, 3 by 5: the seconds an empty slot still waits, a buff's stacks and the rounds won. */
 const DIGIT = [
   ["###", "#.#", "#.#", "#.#", "###"],
   [".#.", "##.", ".#.", ".#.", "###"],
@@ -317,13 +317,18 @@ const TRAIT_MARK = {
 /** A rare skill's frame, and an epic one's (pulsing to white): the same on both schools, apart from their glows. */
 const RARE = "#4fa3ff";
 const EPIC = "#c36bff";
+/** A legendary skill's frame, pulsing from orange to pale gold, and the word a tier-up floats per tier. */
+const LEGENDARY = ["#ff8a1a", "#ffe08a"];
+const TIER_WORD = { rare: "RARE", epic: "EPIC", legendary: "LEGENDARY" };
+const TIER_COLOR = { rare: RARE, epic: "#e2a8ff", legendary: "#ffb040" };
 const TRAIT_COLOR = { swift: "#8dffa8", heavy: "#ff9a3a", piercing: "#ffffff", lingering: "#c89bff", cheap: "#ffd84a" };
 /** How stale a bar skill is (0 to 1) when its icon starts to flicker before it leaves the bar. */
 const STALE_FLICKER = 2 / 3;
 /** The word a lucky cast floats over its slot. */
 const LUCKY_WORD = { double: "DOUBLE", free: "FREE", again: "AGAIN" };
-/** How long a lucky word floats, in seconds. */
+/** How long a lucky word floats, in seconds, and a tier-up's. */
 const LUCKY_TIME = 1.2;
+const TIER_TIME = 1.2;
 const SLOT = { field: "#1a1424", shade: "#06050c" };
 /** How long a slot flashes when a spell in it is cast, and glints when its cooldown ends, in seconds. */
 const GLINT = 0.25;
@@ -346,13 +351,13 @@ function sweep(box, x, y, n, share, col, alpha) {
 
 /**
  * Each fighter's skill bar on the floor of the dais, under its own side: slots 1, 2 and 3 and the ultimate, the
- * ultimate nearest the middle. A slot shows its skill's icon, the casts it has left on a tab at its foot, its traits'
- * marks in the icon's corner, and its rarity in its frame (bronze, blue, purple and pulsing); an evolved
+ * ultimate nearest the middle. A slot holds one cast: it shows its skill's icon, its traits' marks in the icon's
+ * corner, and its tier in its frame (bronze, blue, purple pulsing, orange pulsing for legendary); an evolved
  * skill's icon is ringed in white. An icon is full while it can be cast and dimmer while short of qi or silenced; a
  * cooldown darkens it and sweeps back clockwise as it runs out; a cast flashes it and the end of a cooldown glints its
  * frame. An empty slot shows the seconds until its next skill while its frame lights clockwise. The ultimate's frame
  * fills with the school's glow as rage builds, and blazes once full. A lucky cast flashes its slot gold and floats
- * its word above it. The slots stand on row `bottom`, the foot of the scene. Each icon is `n` game pixels square,
+ * its word above it; a skill a duplicate draw lifts a tier flashes in its new tier's colour and floats its name. The slots stand on row `bottom`, the foot of the scene. Each icon is `n` game pixels square,
  * drawn from `icons`, a skill icon atlas: its `image` and the `size` of each icon in it, in the atlas's own pixels.
  */
 export function drawSkills(ctx, duel, s, bottom, n, icons) {
@@ -373,25 +378,39 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
   ctx.imageSmoothingEnabled = false;
   for (const f of duel.fighters) {
     const c = colors(f.school);
-    const seen = glints.get(f) ?? { left: [], at: [] };
+    const seen = glints.get(f) ?? { left: [], at: [], spell: [], tier: [], up: [] };
     glints.set(f, seen);
+    /** A word floating up over slot i, `since` seconds into its `time`, kept inside the arena. */
+    const float = (word, color, i, since, time) => {
+      const x = f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2);
+      ctx.font = `700 ${8 * s}px "Pixelify Sans", monospace`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      const half = ctx.measureText(word).width / 2 + s;
+      const tx = Math.min(Math.max((x + size / 2) * s, duel.left * s + half), duel.right * s - half);
+      const ty = (top - 3 - since * 8) * s;
+      ctx.globalAlpha = 1 - since / time;
+      ctx.fillStyle = "#13101b";
+      for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) ctx.fillText(word, tx + ox * s, ty + oy * s);
+      ctx.fillStyle = color;
+      ctx.fillText(word, tx, ty);
+      ctx.globalAlpha = 1;
+    };
     skillBar(f).forEach((slot, i) => {
       const x = f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2);
       if (seen.left[i] > 0 && slot.left === 0) seen.at[i] = duel.time;
       seen.left[i] = slot.left;
+      // the same skill a tier higher than last frame: a duplicate draw lifted it
+      if (slot.spell && slot.spell === seen.spell[i] && TIER_WORD[slot.rarity] && slot.rarity !== seen.tier[i]) seen.up[i] = duel.time;
+      seen.spell[i] = slot.spell;
+      seen.tier[i] = slot.rarity;
       const pulse = Math.sin(duel.time * 6) > 0;
-      // the frame: bronze, or the rarity's colour
-      const ring = slot.rarity === "epic" ? (pulse ? "#f4e0ff" : EPIC) : slot.rarity === "rare" ? RARE : BRONZE.mid;
+      // the frame: bronze, or the tier's colour
+      const ring = slot.rarity === "legendary" ? LEGENDARY[pulse ? 1 : 0] : slot.rarity === "epic" ? (pulse ? "#f4e0ff" : EPIC) : slot.rarity === "rare" ? RARE : BRONZE.mid;
       box(x, top, size, size, BRONZE.deep);
       frame(box, x + 1, top + 1, size - 2, ring);
       box(x + 1, top + 1, size - 2, 1, slot.rarity === "common" || slot.empty ? BRONZE.light : "#ffffff", slot.rarity === "common" || slot.empty ? 1 : 0.6);
       box(x + 2, top + 2, n, n, SLOT.field);
-      const tab = (value, col) => {
-        if (size < 13) return;
-        const tx = f.index === 0 ? x + size - 5 : x;
-        box(tx, top + size - 7, 5, 7, BRONZE.deep);
-        glyph(DIGIT[Math.max(0, Math.min(9, value))], tx + 1, top + size - 6, col);
-      };
       const cell = ICON_CELLS[f.school]?.[slot.spell];
       if (slot.empty || cell === undefined) {
         // the wait for the next skill: its frame lights clockwise, and the seconds left stand in the middle
@@ -425,7 +444,7 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
       if (slot.ultimate && !slot.ready && slot.left === 0) box(x + 2, top + 2, n, n, SLOT.shade, 0.35);
       // an evolved skill: a white ring round its icon
       if (slot.evolved) frame(box, x + 2, top + 2, n, "#ffffff", 0.8);
-      // its traits' marks, in the corner away from the tab
+      // its traits' marks, in its top corner
       (n >= 16 ? slot.traits : slot.traits.slice(0, 1)).forEach((t, j) => {
         const gx = f.index === 0 ? x + 2 + j * 6 : x + 2 + n - 5 - j * 6;
         box(gx - 1, top + 1, 7, 7, SLOT.shade, 0.75);
@@ -439,7 +458,15 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
       }
       const ago = duel.time - (seen.at[i] ?? -Infinity);
       if (ago < GLINT && slot.ready) frame(box, x, top, size, "#ffffff", 0.8 * (1 - ago / GLINT));
-      if (!slot.ultimate) tab(slot.casts, slot.evolved ? "#ffffff" : c.glow);
+      // a tier-up: the frame flashes in the new tier's colour, and the tier's name floats over the slot
+      const up = duel.time - (seen.up[i] ?? -Infinity);
+      if (up < TIER_TIME) {
+        if (up < 0.4) {
+          frame(box, x, top, size, TIER_COLOR[slot.rarity], 1 - up / 0.4);
+          box(x + 2, top + 2, n, n, "#ffffff", 0.5 * (1 - up / 0.4));
+        }
+        float(TIER_WORD[slot.rarity], TIER_COLOR[slot.rarity], i, up, TIER_TIME);
+      }
     });
     // a lucky cast: its slot flashes gold, and its word floats up over the bar
     const luck = f.lucky;
@@ -447,21 +474,8 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
     if (since < LUCKY_TIME) {
       const i = luck.slot ?? 0;
       const x = f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2);
-      const a = 1 - since / LUCKY_TIME;
       if (since < 0.3) frame(box, x, top, size, "#ffd84a", 1 - since / 0.3);
-      ctx.font = `700 ${8 * s}px "Pixelify Sans", monospace`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      // centred over its slot, but kept inside the arena
-      const half = ctx.measureText(LUCKY_WORD[luck.kind]).width / 2 + s;
-      const tx = Math.min(Math.max((x + size / 2) * s, duel.left * s + half), duel.right * s - half);
-      const ty = (top - 3 - since * 8) * s;
-      ctx.globalAlpha = a;
-      ctx.fillStyle = "#13101b";
-      for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) ctx.fillText(LUCKY_WORD[luck.kind], tx + ox * s, ty + oy * s);
-      ctx.fillStyle = "#ffd84a";
-      ctx.fillText(LUCKY_WORD[luck.kind], tx, ty);
-      ctx.globalAlpha = 1;
+      float(LUCKY_WORD[luck.kind], "#ffd84a", i, since, LUCKY_TIME);
     }
   }
 }

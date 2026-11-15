@@ -99,16 +99,22 @@ const BURN = { time: 3, every: 0.5, share: 0.05 };
 /** A ward (after Valhalla's hit shields) holds 1 to `charges` charges for `time` seconds; each erases one whole blow. */
 const WARD = { charges: 3, time: 6 };
 /**
- * The rotating skill bar: `slots` skills at a time, each drawn from the school's pool with its own casts (1 to 4,
- * equal odds). A skill drawn with fewer casts hits harder (CAST_POWER, by casts). A spent skill empties its slot,
- * which counts down `wait + spread × roll` seconds and then draws a skill not on the bar.
+ * The rotating skill bar: `slots` skills at a time, each drawn from the fight's pool for one cast. A cast empties its
+ * slot, which counts down `wait + spread × roll` seconds and then draws again; a draw of a skill already on the bar
+ * raises that skill's tier and the slot draws another.
  */
-/** A draw's rarity: how likely, how much more power, and how many traits it brings (a common one: `chance` of one). */
+/**
+ * A skill's tier is its rarity: how likely a draw is to bring it, how much more power, and how many traits it brings
+ * (a common one: `chance` of one). A legendary is never drawn: a skill reaches it only by duplicates.
+ */
 export const RARITY = {
   common: { odds: 0.7, power: 1, traits: 0, chance: 0.4 },
   rare: { odds: 0.22, power: 1.15, traits: 1 },
   epic: { odds: 0.08, power: 1.3, traits: 2 },
+  legendary: { odds: 0, power: 1.5, traits: 3 },
 };
+/** The tiers, lowest first: a duplicate draw lifts a skill one step, up to the last. */
+export const TIERS = Object.keys(RARITY);
 /** What each trait does to the skill it is drawn on. */
 export const TRAITS = {
   swift: { cooldown: 0.6 },
@@ -136,24 +142,23 @@ export function fits(trait, name) {
   return true;
 }
 
-/** The power a bar skill strikes with: its casts, its rarity, heavy, and evolution. */
-export function slotPower(casts, rarity, traits, evolved) {
-  return castsPower(casts) * RARITY[rarity].power * (traits.includes("heavy") ? TRAITS.heavy.power : 1) * (evolved ? EVOLVED : 1);
+/** The power a bar skill strikes with: its tier, heavy, and evolution. */
+export function slotPower(rarity, traits, evolved) {
+  return RARITY[rarity].power * (traits.includes("heavy") ? TRAITS.heavy.power : 1) * (evolved ? EVOLVED : 1);
 }
 
-/** The bar slot holding `name` with casts left, if any. */
-const slotOf = (me, name) => me.bar.find((slot) => slot.spell === name && slot.left > 0);
+/** The bar slot holding `name`, if any. */
+const slotOf = (me, name) => me.bar.find((slot) => slot.spell === name);
 const has = (slot, trait) => !!slot?.traits?.includes(trait);
 /** What casting `name` costs `me` in qi: a cheap skill half. */
 const costOf = (me, name) => SPELLS[name].cost * (has(slotOf(me, name), "cheap") ? TRAITS.cheap.cost : 1);
 
 /** How many of its school's pool a fighter plays in one fight, drawn when the fight is made. */
 export const POOL_SIZE = 8;
-const BAR = { slots: 3, casts: 4, wait: 3, spread: 2 };
+const BAR = { slots: 3, wait: 1.5, spread: 1 };
 /** Seconds a bar skill may sit ready and uncast before it leaves for another draw, so a skill the fighter will not use
  *  never holds a slot for the rest of the round. Longer than any cooldown, and a cooldown does not count. */
 export const STALE = 6;
-const CAST_POWER = [1.4, 1.2, 1.1, 1.0];
 /**
  * The pairs that evolve, per school: a spent skill whose partner is on the bar refills at once as its evolved form,
  * `EVOLVED` times as strong and inflicting one more stack. An evolved skill, once spent, empties its slot.
@@ -163,11 +168,6 @@ const EVOLVES = {
   frost: [["shard", "icicle"], ["shatter", "flurry"], ["lotus", "jet"]],
 };
 const EVOLVED = 1.5;
-
-/** How hard a skill drawn with `casts` casts hits, as a multiple of its power. */
-export function castsPower(casts) {
-  return CAST_POWER[casts - 1] ?? 1;
-}
 
 /**
  * Each school's fighter: full life, attack, the two defences, crit chance and crit damage, dodge, and its passives.
@@ -445,6 +445,9 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
+    // what the last round left standing goes with it
+    breakAct(duel, f);
+    dropBarrier(duel, f);
     Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, lucky: null, cool: {}, coolFull: {}, intent: { move: 0 } });
     f.mind.reset();
     f.bar = [];
@@ -563,7 +566,7 @@ function begin(duel, me, name, target) {
     emit(duel, { type: "ultimate", by: me.index, x: me.x, y: me.air + me.spec.chest });
   }
   me.cool[name] = me.coolFull[name] = spell.cooldown * (has(slot, "swift") ? TRAITS.swift.cooldown : 1) + spell.windup;
-  // a bar skill spends a cast, and strikes with the power it was drawn with even if that empties its slot
+  // a bar skill's one cast empties its slot, and strikes with the power it was drawn with
   const power = slot?.power ?? 1;
   // an evolved or lingering skill inflicts one more stack of what it inflicts, each
   const stacks = 1 + (slot?.evolved ? 1 : 0) + (has(slot, "lingering") ? TRAITS.lingering.stacks : 0);
@@ -571,13 +574,16 @@ function begin(duel, me, name, target) {
   const at = me.bar.indexOf(slot);
   if (slot) spend(duel, me, at);
   me.act = { spell: name, phase: "windup", t: 0, target, power, stacks, pierce };
-  // luck smiles on a bar skill now and then; Again only while the skill is still on the bar to cast again
+  // luck smiles on a bar skill now and then; Again keeps it on its slot, ready at once, for another cast
   if (slot && duel.rng() < LUCKY.chance) {
-    const kinds = me.bar[at]?.spell === name ? LUCKY.kinds : LUCKY.kinds.filter((k) => k !== "again");
-    const kind = kinds[Math.floor(duel.rng() * kinds.length)];
+    const kind = LUCKY.kinds[Math.floor(duel.rng() * LUCKY.kinds.length)];
     if (kind === "double") me.act.power *= 2;
     else if (kind === "free") me.qi += cost;
-    else me.cool[name] = 0;
+    else {
+      me.cool[name] = 0;
+      // an evolved refill already holds the skill; otherwise it comes back as it was
+      if (me.bar[at]?.spell !== name) me.bar[at] = { ...slot, idle: 0 };
+    }
     me.lucky = { kind, spell: name, slot: at, at: duel.time };
     emit(duel, { type: "lucky", by: me.index, kind, x: me.x, y: me.air + me.spec.chest + 10 });
   }
@@ -790,8 +796,7 @@ function hurt(duel, f, power, dir, spell, stacks = 1) {
   // struck while recovering from a move: the move was punished, and its mind learns so
   if (f.act?.phase === "recover") f.mind.tell({ type: "punished", skill: f.act.spell });
   // a hit breaks a cast: what was gathering is lost
-  if (f.act?.circle !== undefined && f.act.phase === "windup") emit(duel, { type: "stop", key: f.act.circle });
-  f.act = null;
+  breakAct(duel, f);
   f.guard = 0;
   setMeditating(duel, f, false);
   // what the spell leaves behind
@@ -877,10 +882,16 @@ function knockOut(duel, f) {
   other.fly = false;
   duel.winner = other.index;
   duel.wins[other.index]++;
-  f.act = null;
+  breakAct(duel, f);
   setMeditating(duel, f, false);
-  other.act = null;
+  breakAct(duel, other);
   setMeditating(duel, other, false);
+}
+
+/** f stops what it was doing: a cast still gathering loses its rune circle. */
+function breakAct(duel, f) {
+  if (f.act?.circle !== undefined && f.act.phase === "windup") emit(duel, { type: "stop", key: f.act.circle });
+  f.act = null;
 }
 
 /** Between rounds: the loser falls and lies where it lands; the winner comes down and stands over it. */
@@ -1064,7 +1075,7 @@ export const ready = (me, name) =>
 export function skillBar(f) {
   const slots = f.bar.map((slot) =>
     slot.empty !== undefined
-      ? { spell: null, empty: true, ultimate: false, ready: false, left: slot.empty, full: slot.full, charge: 1, casts: 0, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 }
+      ? { spell: null, empty: true, ultimate: false, ready: false, left: slot.empty, full: slot.full, charge: 1, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 }
       : {
         spell: slot.spell,
         empty: false,
@@ -1073,17 +1084,16 @@ export function skillBar(f) {
         left: f.cool[slot.spell] ?? 0,
         full: f.coolFull[slot.spell] ?? 0,
         charge: 1,
-        casts: slot.left,
         power: slot.power,
         evolved: slot.evolved,
         rarity: slot.rarity ?? "common",
         traits: slot.traits ?? [],
         stale: Math.min(1, (slot.idle ?? 0) / STALE),
       });
-  while (slots.length < BAR.slots) slots.push({ spell: null, empty: true, ultimate: false, ready: false, left: 0, full: 0, charge: 1, casts: 0, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 });
+  while (slots.length < BAR.slots) slots.push({ spell: null, empty: true, ultimate: false, ready: false, left: 0, full: 0, charge: 1, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 });
   const ult = SCHOOLS[f.school].ultimate;
   const owned = f.spells.includes(ult);
-  slots.push({ spell: owned ? ult : null, empty: !owned, ultimate: true, ready: owned && f.hp > 0 && ready(f, ult), left: f.cool[ult] ?? 0, full: f.coolFull[ult] ?? 0, charge: f.rage / RAGE, casts: 0, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 });
+  slots.push({ spell: owned ? ult : null, empty: !owned, ultimate: true, ready: owned && f.hp > 0 && ready(f, ult), left: f.cool[ult] ?? 0, full: f.coolFull[ult] ?? 0, charge: f.rage / RAGE, power: 1, evolved: false, rarity: "common", traits: [], stale: 0 });
   return slots;
 }
 
@@ -1114,33 +1124,53 @@ export function buffsOf(f) {
 }
 
 /**
- * Fill slot `i` of f's bar with a skill from its pool that is not on the bar, with 1 to 4 casts. A round's first
- * draw is of the school's signature kind; while the foe carries a status, one draw in `PAY_DRAW` is a skill that
- * spends it. A stale skill's replacement is never that skill (`gone`).
+ * Fill slot `i` of f's bar with a skill from the fight's pool. A round's first draw is of the school's signature kind;
+ * while the foe carries a status, one draw in `PAY_DRAW` is a skill that spends it. A stale skill's replacement is
+ * never that skill (`gone`). A draw of a skill already on the bar raises that skill's tier, and the slot draws again
+ * from the skills not on the bar; with none left it waits.
  */
 export function draw(duel, f, i, first = false, gone = null) {
   const held = f.bar.filter((slot, j) => j !== i && slot.spell).map((slot) => slot.spell);
-  let free = f.pool.filter((name) => !held.includes(name) && name !== gone);
+  let pick = f.pool.filter((name) => name !== gone);
   const foe = duel.fighters[1 - f.index];
   const carried = (status) => (status === "shock" ? (foe.shock?.stacks ?? 0) : foe.chill) > 0;
   const want = first
-    ? free.filter((name) => SPELLS[name].kind === SCHOOLS[f.school].signature)
-    : duel.rng() < PAY_DRAW ? free.filter((name) => PAYOFF[name] && carried(PAYOFF[name].status)) : [];
-  if (want.length > 0) free = want;
-  if (free.length === 0) {
+    ? pick.filter((name) => SPELLS[name].kind === SCHOOLS[f.school].signature)
+    : duel.rng() < PAY_DRAW ? pick.filter((name) => PAYOFF[name] && carried(PAYOFF[name].status)) : [];
+  if (want.length > 0) pick = want;
+  let spell = pick.length > 0 ? pick[Math.floor(duel.rng() * pick.length)] : null;
+  if (spell !== null && held.includes(spell)) {
+    const twin = f.bar.findIndex((slot, j) => j !== i && slot.spell === spell);
+    f.bar[twin] = raise(duel, f.bar[twin]);
+    emit(duel, { type: "tier", by: f.index, slot: twin, rarity: f.bar[twin].rarity });
+    const free = f.pool.filter((name) => !held.includes(name) && name !== gone);
+    spell = free.length > 0 ? free[Math.floor(duel.rng() * free.length)] : null;
+  }
+  if (spell === null) {
     // nothing left to draw: wait and look again
     f.bar[i] = { empty: BAR.wait, full: BAR.wait };
     return;
   }
-  const spell = free[Math.floor(duel.rng() * free.length)];
-  const casts = 1 + Math.floor(duel.rng() * BAR.casts);
   const r = duel.rng();
   const rarity = r < RARITY.epic.odds ? "epic" : r < RARITY.epic.odds + RARITY.rare.odds ? "rare" : "common";
   const count = rarity === "common" ? (duel.rng() < RARITY.common.chance ? 1 : 0) : RARITY[rarity].traits;
-  const fitting = Object.keys(TRAITS).filter((t) => fits(t, spell));
-  const traits = [];
-  while (traits.length < count && fitting.length > 0) traits.push(...fitting.splice(Math.floor(duel.rng() * fitting.length), 1));
-  f.bar[i] = { spell, casts, left: casts, power: slotPower(casts, rarity, traits, false), evolved: false, rarity, traits };
+  const traits = addTraits(duel, spell, [], count);
+  f.bar[i] = { spell, power: slotPower(rarity, traits, false), evolved: false, rarity, traits };
+}
+
+/** `traits` and more that fit `spell`, rolled, up to `count` (or as many as fit). */
+function addTraits(duel, spell, traits, count) {
+  const fitting = Object.keys(TRAITS).filter((t) => fits(t, spell) && !traits.includes(t));
+  const out = [...traits];
+  while (out.length < count && fitting.length > 0) out.push(...fitting.splice(Math.floor(duel.rng() * fitting.length), 1));
+  return out;
+}
+
+/** A bar slot one tier up (a legendary stays legendary): more power, and the traits its new tier brings. */
+function raise(duel, slot) {
+  const rarity = TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(slot.rarity) + 1)];
+  const traits = addTraits(duel, slot.spell, slot.traits, RARITY[rarity].traits);
+  return { ...slot, rarity, traits, power: slotPower(rarity, traits, slot.evolved) };
 }
 
 /** A heal or a ward washes off what clings to the caster: burn, silence, defence-down, chill and shock. */
@@ -1149,20 +1179,16 @@ function cleanse(f) {
 }
 
 /**
- * One cast of slot `i`'s skill; the last empties the slot, which counts down before it draws again, unless the skill's
- * partner is on the bar: then it refills at once, evolved.
+ * The cast of slot `i`'s skill empties the slot, which counts down before it draws again, unless the skill's partner
+ * is on the bar: then it refills at once, evolved, for one more cast.
  */
 export function spend(duel, f, i) {
   const slot = f.bar[i];
   if (!slot || slot.empty !== undefined) return;
-  slot.left--;
-  slot.idle = 0;
-  if (slot.left > 0) return;
   const pair = EVOLVES[f.school]?.find((names) => names.includes(slot.spell));
   const partner = pair?.find((name) => name !== slot.spell);
   if (!slot.evolved && partner && f.bar.some((other, j) => j !== i && other.spell === partner)) {
-    const casts = 1 + Math.floor(duel.rng() * BAR.casts);
-    f.bar[i] = { ...slot, casts, left: casts, power: slotPower(casts, slot.rarity ?? "common", slot.traits ?? [], true), evolved: true };
+    f.bar[i] = { ...slot, idle: 0, power: slotPower(slot.rarity ?? "common", slot.traits ?? [], true), evolved: true };
     return;
   }
   const wait = BAR.wait + BAR.spread * duel.rng();

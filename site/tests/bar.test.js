@@ -1,7 +1,8 @@
-// The rotating skill bar: three slots, each a skill drawn from the school's pool with its own casts and power; a
-// spent skill empties its slot, which counts down and draws a new one.
+// The rotating skill bar: three slots, each a skill drawn from the school's pool for one cast, at its tier (rarity);
+// a cast empties its slot, which counts down and draws a new one, and a draw of a skill already on the bar raises
+// that skill's tier and draws again.
 import { describe, expect, test } from "bun:test";
-import { PAYOFF, POOL_SIZE, SCHOOLS, STALE, SPELLS, slotPower, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
+import { PAYOFF, POOL_SIZE, RARITY, SCHOOLS, STALE, SPELLS, TIERS, slotPower, addChill, addShock, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
 import { ICON_CELLS, ICON_COLUMNS } from "../assets/skill-icons.js";
 import { Body, Mind, effects } from "./engine.js";
 
@@ -10,8 +11,14 @@ const arena = (seed) => createDuel({ seed, left: 0, right: 220, ground: 150, has
 const onBar = (f) => f.bar.filter((s) => !s.empty).map((s) => s.spell);
 
 describe("the bar", () => {
-  test("fewer casts hit harder", () => {
-    expect([1, 2, 3, 4].map(castsPower)).toEqual([1.4, 1.2, 1.1, 1.0]);
+  test("a slot holds one cast: casting it empties the slot", () => {
+    const duel = arena(6);
+    const f = duel.fighters[0];
+    f.bar = ["orb", "bell", "heal"].map((spell) => ({ spell, power: 1, evolved: false, rarity: "common", traits: [] }));
+    spend(duel, f, 1);
+    expect(f.bar[1].empty).toBeGreaterThan(0);
+    expect(f.bar[1].spell).toBeUndefined();
+    expect(skillBar(f).some((slot) => "casts" in slot)).toBe(false);
   });
 
   test("a fresh round draws three different skills from the school's pool", () => {
@@ -23,16 +30,14 @@ describe("the bar", () => {
         expect(new Set(spells).size).toBe(3);
         for (const s of f.bar) {
           expect(SCHOOLS[f.school].pool).toContain(s.spell);
-          expect(s.casts).toBeGreaterThanOrEqual(1);
-          expect(s.casts).toBeLessThanOrEqual(4);
-          expect(s.left).toBe(s.casts);
-          expect(s.power).toBeCloseTo(slotPower(s.casts, s.rarity, s.traits, false), 9);
+          expect("casts" in s).toBe(false);
+          expect(s.power).toBeCloseTo(slotPower(s.rarity, s.traits, false), 9);
         }
       }
     }
   });
 
-  test("a spent skill empties its slot, which counts down 3 to 5 s and draws a skill not on the bar", () => {
+  test("a spent skill empties its slot, which counts down 1.5 to 2.5 s and draws a skill not on the bar", () => {
     for (let seed = 1; seed <= 6; seed++) {
       const duel = arena(seed);
       const f = duel.fighters[seed % 2];
@@ -40,11 +45,10 @@ describe("the bar", () => {
       duel.fighters[1 - f.index].mind.hold(1e9);
       // three skills with no evolution partner among them, so the spent one empties its slot
       const plain = f.school === "thunder" ? ["orb", "bell", "heal"] : ["mirror", "void", "frostfire"];
-      f.bar = plain.map((spell) => ({ spell, casts: 2, left: 2, power: castsPower(2), evolved: false }));
-      const casts = f.bar[0].casts;
-      for (let k = 0; k < casts; k++) spend(duel, f, 0);
-      expect(f.bar[0].empty).toBeGreaterThanOrEqual(3);
-      expect(f.bar[0].empty).toBeLessThanOrEqual(5);
+      f.bar = plain.map((spell) => ({ spell, power: 1, evolved: false, rarity: "common", traits: [] }));
+      spend(duel, f, 0);
+      expect(f.bar[0].empty).toBeGreaterThanOrEqual(1.5);
+      expect(f.bar[0].empty).toBeLessThanOrEqual(2.5);
       const wait = f.bar[0].empty;
       for (let i = 0; i < Math.ceil(wait * 60) + 1; i++) step(duel, 1 / 60);
       expect(f.bar[0].empty).toBeUndefined();
@@ -103,6 +107,64 @@ describe("the bar", () => {
   });
 });
 
+describe("tiers", () => {
+  const common = (spell) => ({ spell, power: 1, evolved: false, rarity: "common", traits: [] });
+
+  test("a skill's tier is its rarity, common to legendary; a legendary is never drawn, only reached", () => {
+    expect(TIERS).toEqual(["common", "rare", "epic", "legendary"]);
+    expect(RARITY.legendary.odds).toBe(0);
+    expect(RARITY.legendary.power).toBeGreaterThan(RARITY.epic.power);
+    expect(RARITY.legendary.traits).toBe(3);
+  });
+
+  test("drawing a skill already on the bar raises its tier, and the slot draws another skill", () => {
+    const duel = arena(11);
+    const f = duel.fighters[0];
+    f.pool = ["orb", "heal"];
+    let ups = 0;
+    for (let k = 0; k < 200; k++) {
+      f.bar = [common("orb"), { empty: 1, full: 1 }, { empty: 1, full: 1 }];
+      draw(duel, f, 1);
+      expect(f.bar[1].spell).toBe("heal");
+      const orb = f.bar[0];
+      if (orb.rarity === "rare") {
+        ups++;
+        expect(orb.traits.length).toBe(1);
+        expect(orb.power).toBeCloseTo(slotPower("rare", orb.traits, false), 9);
+      } else expect(orb.rarity).toBe("common");
+    }
+    expect(ups).toBeGreaterThan(60);
+    expect(ups).toBeLessThan(140);
+  });
+
+  test("tiers climb one step a duplicate, up to legendary, keeping the traits they had", () => {
+    const duel = arena(12);
+    const f = duel.fighters[0];
+    f.pool = ["palm"];
+    f.bar = [{ ...common("palm"), traits: ["swift"] }, { empty: 1, full: 1 }, { empty: 1, full: 1 }];
+    const seen = [];
+    for (let k = 0; k < 4; k++) {
+      draw(duel, f, 1);
+      seen.push(f.bar[0].rarity);
+      expect(f.bar[0].traits).toContain("swift");
+      expect(f.bar[0].traits.length).toBe(Math.min(RARITY[f.bar[0].rarity].traits, 5) || 1);
+      // nothing else to draw: the slot waits again
+      expect(f.bar[1].empty).toBeGreaterThan(0);
+    }
+    expect(seen).toEqual(["rare", "epic", "legendary", "legendary"]);
+  });
+
+  test("an evolved skill keeps its evolution when a duplicate raises its tier", () => {
+    const duel = arena(13);
+    const f = duel.fighters[0];
+    f.pool = ["palm"];
+    f.bar = [{ ...common("palm"), evolved: true, power: 1.5 }, { empty: 1, full: 1 }, { empty: 1, full: 1 }];
+    draw(duel, f, 2);
+    expect(f.bar[0].evolved).toBe(true);
+    expect(f.bar[0].power).toBeCloseTo(slotPower("rare", f.bar[0].traits, true), 9);
+  });
+});
+
 describe("a stale skill", () => {
   /** A duel where both minds hold still, fighter 0's bar set to `spells`, each with qi and casts to spare. */
   const still = (spells) => {
@@ -110,7 +172,7 @@ describe("a stale skill", () => {
     for (const g of duel.fighters) g.mind.hold(1e9);
     const f = duel.fighters[0];
     for (const name of spells) if (!f.pool.includes(name)) f.pool.push(name);
-    f.bar = spells.map((spell) => ({ spell, casts: 3, left: 3, power: castsPower(3), evolved: false, rarity: "common", traits: [] }));
+    f.bar = spells.map((spell) => ({ spell, power: 1, evolved: false, rarity: "common", traits: [] }));
     return { duel, f };
   };
   const run = (duel, seconds) => {
@@ -132,7 +194,8 @@ describe("a stale skill", () => {
   test("a cast restarts the clock, and a skill cooling down does not go stale", () => {
     const { duel, f } = still(["orb", "bell", "heal"]);
     run(duel, STALE - 1);
-    spend(duel, f, 0);
+    // a lucky Again keeps a cast skill on its slot: its clock starts over
+    f.bar[0].idle = 0;
     f.cool.bell = STALE * 2;
     run(duel, 2);
     expect(f.bar[0].spell).toBe("orb");
@@ -227,8 +290,8 @@ describe("draw rules", () => {
       const [thunder, frost] = duel.fighters;
       // the whole pool, so both payoff skills can be drawn whatever this fight's pool holds
       thunder.pool = [...SCHOOLS.thunder.pool];
-      thunder.bar[0] = { spell: "orb", casts: 1, left: 1, power: 1.4, evolved: false };
-      thunder.bar[2] = { spell: "bell", casts: 1, left: 1, power: 1.4, evolved: false };
+      thunder.bar[0] = { spell: "orb", power: 1, evolved: false, rarity: "common", traits: [] };
+      thunder.bar[2] = { spell: "bell", power: 1, evolved: false, rarity: "common", traits: [] };
       for (let k = 0; k < n; k++) {
         set(duel, thunder, frost);
         thunder.bar[1] = { empty: 1, full: 1 };
@@ -291,12 +354,12 @@ describe("the icons", () => {
 });
 
 describe("evolution", () => {
-  /** A still duel; fighter `f`'s bar set to `spells`, each with `casts` casts. */
-  function barOf(seed, index, spells, casts = 1) {
+  /** A still duel; fighter `f`'s bar set to `spells`, each a common skill. */
+  function barOf(seed, index, spells) {
     const duel = arena(seed);
     for (const g of duel.fighters) g.mind.hold(1e9);
     const f = duel.fighters[index];
-    f.bar = spells.map((spell) => ({ spell, casts, left: casts, power: castsPower(casts), evolved: false }));
+    f.bar = spells.map((spell) => ({ spell, power: 1, evolved: false, rarity: "common", traits: [] }));
     return { duel, f };
   }
 
@@ -307,8 +370,7 @@ describe("evolution", () => {
       const slot = f.bar[0];
       expect(slot.spell).toBe("palm");
       expect(slot.evolved).toBe(true);
-      expect(slot.left).toBe(slot.casts);
-      expect(slot.power).toBeCloseTo(1.5 * castsPower(slot.casts), 9);
+      expect(slot.power).toBeCloseTo(1.5, 9);
     }
   });
 
@@ -325,15 +387,14 @@ describe("evolution", () => {
   test("without its partner on the bar a spent skill counts down as usual", () => {
     const { duel, f } = barOf(2, 0, ["palm", "orb", "bell"]);
     spend(duel, f, 0);
-    expect(f.bar[0].empty).toBeGreaterThanOrEqual(3);
+    expect(f.bar[0].empty).toBeGreaterThanOrEqual(1.5);
   });
 
   test("an evolved skill, once spent, empties its slot: it does not evolve again", () => {
     const { duel, f } = barOf(3, 0, ["palm", "step", "orb"]);
     spend(duel, f, 0);
-    const casts = f.bar[0].casts;
-    for (let k = 0; k < casts; k++) spend(duel, f, 0);
-    expect(f.bar[0].empty).toBeGreaterThanOrEqual(3);
+    spend(duel, f, 0);
+    expect(f.bar[0].empty).toBeGreaterThanOrEqual(1.5);
   });
 
   test("an evolved skill inflicts one more stack of what it inflicts", () => {
@@ -347,7 +408,8 @@ describe("evolution", () => {
       const duel = createDuel({ seed: 4, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind, minds: [idle, caster] });
       const [thunder, frost] = duel.fighters;
       for (const g of duel.fighters) g.stats = { ...g.stats, dodge: 0, crit: 0 };
-      frost.bar = [{ spell: "jet", casts: 2, left: 2, power: 1, evolved }, { spell: "shard", casts: 1, left: 1, power: 1, evolved: false }, { spell: "mirror", casts: 1, left: 1, power: 1, evolved: false }];
+      const common = { power: 1, rarity: "common", traits: [] };
+      frost.bar = [{ ...common, spell: "jet", evolved }, { ...common, spell: "shard", evolved: false }, { ...common, spell: "mirror", evolved: false }];
       frost.x = thunder.x + 30;
       frost.face = -1;
       for (let i = 0; i < 60; i++) step(duel, 1 / 60);

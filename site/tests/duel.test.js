@@ -103,7 +103,7 @@ describe("duel", () => {
     for (const w of wins) expect(w / total).toBeGreaterThanOrEqual(0.35);
   }, 600_000);
 
-  test("a cast puts its spell on its own cooldown, and a bar skill spends a cast", () => {
+  test("a cast puts its spell on its own cooldown, and a bar skill's one cast empties its slot", () => {
     let checked = 0;
     for (const seed of [1, 2, 3, 4]) {
       const duel = arena(seed);
@@ -123,9 +123,10 @@ describe("duel", () => {
           if (j < 0) continue;
           const after = f.bar[j];
           const prior = before[f.index][j];
-          // the last cast of a skill whose partner is on the bar refills it at once, evolved
-          if (after.evolved && !prior.evolved) expect(prior.left).toBe(1);
-          else expect(after.empty !== undefined ? 0 : after.left).toBe(prior.left - 1);
+          // one cast empties its slot, unless its partner on the bar refills it evolved, or a lucky Again keeps it
+          const refilled = after.evolved && !prior.evolved;
+          const again = f.lucky?.kind === "again" && f.lucky.spell === spell && after.spell === spell;
+          expect(after.empty !== undefined || refilled || again).toBe(true);
           checked++;
         }
       }

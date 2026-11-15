@@ -1,10 +1,12 @@
 // Chance on the bar: each draw rolls a rarity (a little more power) and traits that change how its skill plays.
 import { describe, expect, test } from "bun:test";
-import { LUCKY, RARITY, SPELLS, TRAITS, castsPower, createDuel, draw, fits, ready, slotPower, step } from "../assets/duel.js";
+import { LUCKY, RARITY, SPELLS, TRAITS, createDuel, draw, fits, ready, slotPower, step } from "../assets/duel.js";
 import { Body, Mind, effects } from "./engine.js";
 
 const all = new Set(effects());
 const idle = () => ({ think: () => null, tell() {}, reset() {}, hold() {} });
+/** A skill that lives on the bar (not the blade, the dive, the blink or an ultimate). */
+const onBarSkill = (name) => !["slash", "dive", "blink"].includes(name) && !SPELLS[name].ultimate;
 
 /** A duel whose fighter `index` casts `spell` once, from a bar slot set by `slot`; the other stands still. */
 function castOnce(seed, index, spell, slot, setup = () => {}) {
@@ -18,10 +20,9 @@ function castOnce(seed, index, spell, slot, setup = () => {}) {
   const me = duel.fighters[index];
   const foe = duel.fighters[1 - index];
   for (const g of duel.fighters) g.stats = { ...g.stats, dodge: 0, crit: 0 };
-  const casts = slot.casts ?? 2;
   const traits = slot.traits ?? [];
   me.bar = [
-    { spell, casts, left: casts, rarity: "common", evolved: false, ...slot, traits, power: slotPower(casts, slot.rarity ?? "common", traits, !!slot.evolved) },
+    { spell, rarity: "common", evolved: false, ...slot, traits, power: slotPower(slot.rarity ?? "common", traits, !!slot.evolved) },
     { empty: 9, full: 9 },
     { empty: 9, full: 9 },
   ];
@@ -44,13 +45,13 @@ describe("rarity", () => {
       draw(duel, f, 1);
       const slot = f.bar[1];
       seen[slot.rarity]++;
-      expect(slot.power).toBeCloseTo(slotPower(slot.casts, slot.rarity, slot.traits, false), 9);
+      expect(slot.power).toBeCloseTo(slotPower(slot.rarity, slot.traits, false), 9);
     }
     expect(Math.abs(seen.common / n - 0.7)).toBeLessThan(0.03);
     expect(Math.abs(seen.rare / n - 0.22)).toBeLessThan(0.03);
     expect(Math.abs(seen.epic / n - 0.08)).toBeLessThan(0.03);
-    expect(slotPower(2, "rare", [], false)).toBeCloseTo(castsPower(2) * RARITY.rare.power, 9);
-    expect(slotPower(2, "epic", ["heavy"], true)).toBeCloseTo(1.5 * castsPower(2) * RARITY.epic.power * TRAITS.heavy.power, 9);
+    expect(slotPower("rare", [], false)).toBeCloseTo(RARITY.rare.power, 9);
+    expect(slotPower("epic", ["heavy"], true)).toBeCloseTo(1.5 * RARITY.epic.power * TRAITS.heavy.power, 9);
   });
 });
 
@@ -154,9 +155,9 @@ describe("lucky casts", () => {
       me.cool = {};
       me.qi = 50;
       me.hp = 100;
-      if (onBar) me.bar = [{ spell, casts: 4, left: 4, power: 1, evolved: false, rarity: "common", traits: [] }, { empty: 9, full: 9 }, { empty: 9, full: 9 }];
+      if (onBar) me.bar = [{ spell, power: 1, evolved: false, rarity: "common", traits: [] }, { empty: 9, full: 9 }, { empty: 9, full: 9 }];
       const lucky = step(duel, 1 / 600).find((c) => c.type === "lucky");
-      if (me.act?.spell === spell) out.push({ kind: lucky?.kind ?? null, power: me.act.power, qi: me.qi, cool: me.cool[spell] ?? 0 });
+      if (me.act?.spell === spell) out.push({ kind: lucky?.kind ?? null, power: me.act.power, qi: me.qi, cool: me.cool[spell] ?? 0, kept: me.bar[0].spell === spell });
     }
     return out;
   }
@@ -172,8 +173,9 @@ describe("lucky casts", () => {
       else expect(c.power).toBeCloseTo(1, 9);
       if (c.kind === "free") expect(c.qi).toBeGreaterThan(49.9);
       else expect(c.qi).toBeLessThan(45);
-      if (c.kind === "again") expect(c.cool).toBe(0);
-      else expect(c.cool).toBeGreaterThan(0);
+      // Again keeps the skill on its slot for another cast, its cooldown over; any other cast empties the slot
+      if (c.kind === "again") expect([c.cool, c.kept]).toEqual([0, true]);
+      else if (onBarSkill("spark")) expect([c.cool > 0, c.kept]).toEqual([true, false]);
     }
   });
 
@@ -188,32 +190,32 @@ describe("review fixes", () => {
     for (const name of ["palm", "burst", "spark", "shard", "jet", "orb", "bolt"]) expect([name, fits("piercing", name)]).toEqual([name, true]);
   });
 
-  test("a lucky last cast names its own slot, and is never Again (the slot is empty)", () => {
+  test("a lucky cast names its own slot, and Again puts the skill back on it", () => {
     const always = () => ({ think: () => ({ type: "cast", skill: "spark" }), tell() {}, reset() {}, hold() {} });
     const duel = createDuel({ seed: 21, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind, minds: [always, idle] });
     const me = duel.fighters[0];
     if (!me.pool.includes("spark")) me.pool.push("spark");
     if (!me.spells.includes("spark")) me.spells.push("spark");
     const kinds = new Set();
-    for (let k = 0; k < 4000 && kinds.size < 2; k++) {
+    for (let k = 0; k < 4000 && kinds.size < 3; k++) {
       me.act = null;
       me.cool = {};
       me.qi = 50;
       me.lucky = null;
-      me.bar = [{ empty: 9, full: 9 }, { spell: "spark", casts: 1, left: 1, power: 1, evolved: false, rarity: "common", traits: [] }, { empty: 9, full: 9 }];
+      me.bar = [{ empty: 9, full: 9 }, { spell: "spark", power: 1, evolved: false, rarity: "common", traits: [] }, { empty: 9, full: 9 }];
       step(duel, 1 / 600);
       if (me.lucky) {
         expect(me.lucky.slot).toBe(1);
-        expect(me.lucky.kind).not.toBe("again");
+        expect(me.bar[1].spell === "spark").toBe(me.lucky.kind === "again");
         kinds.add(me.lucky.kind);
       }
     }
-    expect([...kinds].sort()).toEqual(["double", "free"]);
+    expect([...kinds].sort()).toEqual(["again", "double", "free"]);
   });
 
   test("a heal on the bar heals by its power, as the AI is told", () => {
     const healed = (power) => {
-      const { duel, me } = castOnce(2, 0, "heal", { casts: 1 }, (d, f) => {
+      const { duel, me } = castOnce(2, 0, "heal", {}, (d, f) => {
         f.hp = 40;
         f.qi = 100;
       });
