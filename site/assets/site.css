@@ -272,13 +272,37 @@ html[aria-busy="true"], html[aria-busy="true"] * { cursor: progress; }
 
 /* the duel's tooltips: what a skill or a buff under the pointer is */
 .duel-tip {
-  position: fixed; z-index: 30; max-width: 280px; padding: 8px 11px;
-  background: rgba(19, 16, 27, 0.96); border: 2px solid #b8893c; box-shadow: 0 0 0 1px #2a1c0e, 0 8px 22px rgba(0, 0, 0, 0.55);
-  font: 400 0.8rem/1.45 var(--body); color: var(--wax); pointer-events: none;
+  --tone: #c8c8c8;
+  position: fixed; z-index: 30; min-width: 220px; max-width: 300px;
+  background: rgba(6, 5, 9, 0.94); border: 1px solid color-mix(in srgb, var(--tone) 55%, #000);
+  box-shadow: 0 0 0 1px #000, 0 10px 26px rgba(0, 0, 0, 0.6);
+  font: 400 0.9rem/1.4 "Fontin SmallCaps", "Cormorant SC", Georgia, "Times New Roman", serif; font-variant: small-caps;
+  text-align: center; color: #c8c8c8; pointer-events: none;
 }
-.duel-tip[data-good="true"] { border-color: #3fae5a; }
-.duel-tip[data-good="false"] { border-color: #c8322a; }
-.duel-tip h3 { margin: 0 0 4px; font: 400 1rem/1.2 var(--display); color: var(--flame); }
+.duel-tip[data-tone="common"] { --tone: #f0cf7a; }
+.duel-tip[data-tone="rare"] { --tone: #6fb3ff; }
+.duel-tip[data-tone="epic"] { --tone: #c88bff; }
+.duel-tip[data-tone="legendary"] { --tone: #ff9a1a; }
+.duel-tip[data-tone="ultimate"] { --tone: #3fd1c6; }
+.duel-tip[data-tone="good"] { --tone: #6fd77a; }
+.duel-tip[data-tone="bad"] { --tone: #ee5a4c; }
+.duel-tip .tip-head {
+  position: relative; padding: 5px 22px 6px; color: var(--tone);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--tone) 22%, transparent) 20%, color-mix(in srgb, var(--tone) 22%, transparent) 80%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+}
+/* the header's end pieces: a small diamond either side */
+.duel-tip .tip-head::before, .duel-tip .tip-head::after {
+  content: ""; position: absolute; top: 50%; width: 6px; height: 6px; background: var(--tone); transform: translateY(-50%) rotate(45deg);
+}
+.duel-tip .tip-head::before { left: 7px; }
+.duel-tip .tip-head::after { right: 7px; }
+.duel-tip h3 { margin: 0; font: inherit; font-size: 1.12rem; line-height: 1.2; color: inherit; letter-spacing: 0.02em; }
+.duel-tip .tip-type { margin: 0; font-size: 0.95rem; line-height: 1.2; }
+.duel-tip .tip-body { padding: 6px 12px 8px; }
 .duel-tip p { margin: 0; }
-.duel-tip p + p { margin-top: 2px; color: var(--ash); }
-.duel-tip p:first-of-type { color: var(--wax); }
+.duel-tip hr { height: 1px; margin: 5px auto; width: 70%; border: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--tone) 70%, transparent), transparent); }
+.duel-tip .tip-prop { color: #7f7f7f; }
+.duel-tip .tip-prop span { color: #fff; }
+.duel-tip .tip-text { color: #c8c8c8; }
+.duel-tip .tip-mod { color: #8888ff; }

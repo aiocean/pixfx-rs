@@ -35,11 +35,11 @@ export const SPELL_INFO = {
 
 /** What each trait does, in a line. */
 export const TRAIT_INFO = {
-  swift: `Swift: cooldown ${Math.round(TRAITS.swift.cooldown * 100)}%.`,
-  heavy: `Heavy: power ×${TRAITS.heavy.power}.`,
-  piercing: "Piercing: a guard cannot stop it.",
-  lingering: `Lingering: +${TRAITS.lingering.stacks} stack of chill or shock.`,
-  cheap: `Cheap: costs ${Math.round(TRAITS.cheap.cost * 100)}% qi.`,
+  swift: `Swift: ${Math.round((1 - TRAITS.swift.cooldown) * 100)}% reduced Cooldown`,
+  heavy: `Heavy: ${Math.round((TRAITS.heavy.power - 1) * 100)}% more Power`,
+  piercing: "Piercing: cannot be Guarded",
+  lingering: `Lingering: +${TRAITS.lingering.stacks} Chill or Shock stack`,
+  cheap: `Cheap: ${Math.round((1 - TRAITS.cheap.cost) * 100)}% reduced Qi Cost`,
 };
 
 /** Each buff's name and what it does, in a line (see `buffsOf`). */
@@ -62,34 +62,43 @@ export const BUFF_INFO = {
 const TIER_NAME = { common: "Common", rare: "Rare", epic: "Epic", legendary: "Legendary" };
 
 /**
- * The tooltip for slot `i` of fighter f's skill bar (0 to 2 the bar skills, 3 the ultimate): `{ title, tier, lines }`,
- * `tier` a rarity or null.
+ * The tooltip for slot `i` of fighter f's skill bar (0 to 2 the bar skills, 3 the ultimate), in a game tooltip's
+ * sections: `{ title, type, tone, props, text, mods }`. `type` is the line under the name (the tier, or "Ultimate"),
+ * `tone` what colours the header (a rarity, "ultimate" or null), `props` `[label, value]` pairs, `text` what it does,
+ * `mods` its traits.
  */
 export function skillInfo(f, i) {
   const slot = skillBar(f)[i];
   if (!slot) return null;
   if (!slot.spell) {
-    return { title: "Empty slot", tier: null, lines: [`Draws a new skill in ${Math.max(0, slot.left).toFixed(1)} s.`] };
+    return { title: "Empty Slot", type: null, tone: null, props: [], text: `Draws a new skill in ${Math.max(0, slot.left).toFixed(1)} s.`, mods: [] };
   }
   const spell = SPELLS[slot.spell];
-  const info = SPELL_INFO[slot.spell];
   const swift = slot.traits.includes("swift") ? TRAITS.swift.cooldown : 1;
   const cheap = slot.traits.includes("cheap") ? TRAITS.cheap.cost : 1;
-  const lines = [];
-  if (slot.ultimate) lines.push(`Ultimate · Rage ${Math.min(RAGE, Math.round(slot.charge * RAGE))}/${RAGE}`);
-  else lines.push(`${TIER_NAME[slot.rarity]}${slot.evolved ? " · Evolved" : ""}`);
-  lines.push(info.does);
-  if (!slot.ultimate) lines.push(`Power ${Math.round(slot.power * 100)}%`);
   const cost = Math.round(spell.cost * cheap);
-  lines.push(`${cost > 0 ? `${cost} qi` : "Free"} · cooldown ${(spell.cooldown * swift).toFixed(1)} s`);
-  for (const t of slot.traits) lines.push(TRAIT_INFO[t]);
-  return { title: info.name, tier: slot.ultimate ? null : slot.rarity, lines };
+  const props = [["Cost", cost > 0 ? `${cost} Qi` : "Free"], ["Cooldown", `${(spell.cooldown * swift).toFixed(1)} s`]];
+  if (slot.ultimate) props.push(["Rage", `${Math.min(RAGE, Math.round(slot.charge * RAGE))}/${RAGE}`]);
+  else props.push(["Power", `${Math.round(slot.power * 100)}%`]);
+  return {
+    title: SPELL_INFO[slot.spell].name,
+    type: slot.ultimate ? "Ultimate" : `${TIER_NAME[slot.rarity]}${slot.evolved ? " · Evolved" : ""}`,
+    tone: slot.ultimate ? "ultimate" : slot.rarity,
+    props,
+    text: SPELL_INFO[slot.spell].does,
+    mods: slot.traits.map((t) => TRAIT_INFO[t]),
+  };
 }
 
-/** The tooltip for a buff from `buffsOf`: `{ title, good, lines }`. */
+/** The tooltip for a buff from `buffsOf`, in the same sections as a skill's; `tone` is "good" or "bad". */
 export function buffInfo(b) {
   const info = BUFF_INFO[b.id];
-  const lines = [info.does];
-  if (b.stacks > 0) lines.push(`${b.stacks} ${b.stacks === 1 ? "stack" : "stacks"}`);
-  return { title: info.name, good: b.good, lines };
+  return {
+    title: info.name,
+    type: b.good ? "Buff" : "Debuff",
+    tone: b.good ? "good" : "bad",
+    props: b.stacks > 0 ? [["Stacks", String(b.stacks)]] : [],
+    text: info.does,
+    mods: [],
+  };
 }

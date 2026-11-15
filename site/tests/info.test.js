@@ -17,34 +17,36 @@ describe("tooltips", () => {
     for (const t of Object.keys(TRAITS)) expect([t, typeof TRAIT_INFO[t]]).toEqual([t, "string"]);
   });
 
-  test("a bar skill's tooltip names it, its tier, its traits, its power, cost and cooldown", () => {
+  test("a bar skill's tooltip: name and tier in the header, cost, cooldown and power as properties, traits as mods", () => {
     const f = fresh().fighters[0];
     f.bar[1] = { spell: "palm", rarity: "epic", traits: ["heavy", "swift"], evolved: true, power: 2.535 };
     const tip = skillInfo(f, 1);
     expect(tip.title).toBe(SPELL_INFO.palm.name);
-    expect(tip.tier).toBe("epic");
-    const text = tip.lines.join("\n");
-    // the tier line is the tier and nothing else
-    expect(tip.lines[0]).toBe("Epic · Evolved");
-    expect(text).not.toContain("Tiers");
-    expect(text).not.toContain("One cast");
-    expect(text).toContain(TRAIT_INFO.heavy);
-    expect(text).toContain(TRAIT_INFO.swift);
-    expect(text).toContain("Power 254%");
-    expect(text).toContain(`${SPELLS.palm.cost} qi`);
-    expect(text).toContain(`${(SPELLS.palm.cooldown * TRAITS.swift.cooldown).toFixed(1)} s`);
-    expect(text).toContain(SPELL_INFO.palm.does);
+    expect(tip.type).toBe("Epic · Evolved");
+    expect(tip.tone).toBe("epic");
+    expect(tip.props).toEqual([
+      ["Cost", `${SPELLS.palm.cost} Qi`],
+      ["Cooldown", `${(SPELLS.palm.cooldown * TRAITS.swift.cooldown).toFixed(1)} s`],
+      ["Power", "254%"],
+    ]);
+    expect(tip.text).toBe(SPELL_INFO.palm.does);
+    expect(tip.mods).toEqual([TRAIT_INFO.heavy, TRAIT_INFO.swift]);
   });
 
-  test("an empty slot says when it draws, and the ultimate says how much rage it needs", () => {
+  test("a free skill says so; an empty slot says when it draws; the ultimate shows the rage it holds", () => {
     const f = fresh().fighters[1];
+    f.bar[0] = { spell: "slash", rarity: "common", traits: [], evolved: false, power: 1 };
+    expect(SPELLS.slash.cost).toBe(0);
+    expect(skillInfo(f, 0).props[0]).toEqual(["Cost", "Free"]);
+    expect(skillInfo(f, 0).type).toBe("Common");
     f.bar[2] = { empty: 1.4, full: 2 };
-    expect(skillInfo(f, 2).title).toBe("Empty slot");
-    expect(skillInfo(f, 2).lines).toEqual(["Draws a new skill in 1.4 s."]);
+    expect(skillInfo(f, 2)).toEqual({ title: "Empty Slot", type: null, tone: null, props: [], text: "Draws a new skill in 1.4 s.", mods: [] });
     f.rage = 2;
     const ult = skillInfo(f, 3);
     expect(ult.title).toBe(SPELL_INFO[SCHOOLS.frost.ultimate].name);
-    expect(ult.lines.join(" ")).toContain("Rage 2/4");
+    expect(ult.type).toBe("Ultimate");
+    expect(ult.tone).toBe("ultimate");
+    expect(ult.props).toContainEqual(["Rage", "2/4"]);
   });
 
   test("every buff the HUD can show has a tooltip, with its stacks", () => {
@@ -55,9 +57,10 @@ describe("tooltips", () => {
     f.fury = 3;
     const fury = buffsOf(f).find((b) => b.id === "fury");
     const tip = buffInfo(fury);
-    expect(tip.title).toBe(BUFF_INFO.fury.name);
-    expect(tip.good).toBe(true);
-    expect(tip.lines.join(" ")).toContain("3 stacks");
+    expect(tip).toEqual({ title: BUFF_INFO.fury.name, type: "Buff", tone: "good", props: [["Stacks", "3"]], text: BUFF_INFO.fury.does, mods: [] });
+    f.chill = 2;
+    const chill = buffInfo(buffsOf(f).find((b) => b.id === "chill"));
+    expect([chill.type, chill.tone]).toEqual(["Debuff", "bad"]);
   });
 
   test("the tiers' names match the rarities", () => {

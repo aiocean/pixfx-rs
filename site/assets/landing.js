@@ -238,8 +238,27 @@ function createHero(canvas, signal, icons, engine) {
 
 // ---------- the hero's tooltips ----------
 
-/** A tooltip title's colour by its skill's tier, as the bar frames it. */
-const TIP_TIER = { common: "#f0cf7a", rare: "#4fa3ff", epic: "#c36bff", legendary: "#ff9a1a" };
+/** A tooltip's nodes, laid out as in Path of Exile: a header with the name and the type line, then the properties,
+ *  what it does and the mods, each part set off by a rule. */
+function tipNodes(info) {
+  const make = (tag, className, text) => Object.assign(document.createElement(tag), { className, textContent: text ?? "" });
+  const head = make("header", "tip-head");
+  head.append(make("h3", "", info.title));
+  if (info.type) head.append(make("p", "tip-type", info.type));
+  const parts = [];
+  if (info.props.length > 0) {
+    parts.push(info.props.map(([label, value]) => {
+      const line = make("p", "tip-prop", `${label}: `);
+      line.append(make("span", "", value));
+      return line;
+    }));
+  }
+  parts.push([make("p", "tip-text", info.text)]);
+  if (info.mods.length > 0) parts.push(info.mods.map((mod) => make("p", "tip-mod", mod)));
+  const body = make("div", "tip-body");
+  parts.forEach((nodes, i) => body.append(...(i > 0 ? [make("hr", "")] : []), ...nodes));
+  return [head, body];
+}
 
 /**
  * Hover a skill slot or a buff tile (or tap it) to see what it is: a panel by the pointer, kept up to date while the
@@ -277,11 +296,8 @@ function createTip(view, signal) {
     const key = JSON.stringify(info);
     if (key !== shown) {
       shown = key;
-      const title = document.createElement("h3");
-      title.textContent = info.title;
-      if (info.tier) title.style.color = TIP_TIER[info.tier];
-      el.replaceChildren(title, ...info.lines.map((line) => Object.assign(document.createElement("p"), { textContent: line })));
-      el.dataset.good = info.good === undefined ? "" : String(info.good);
+      el.replaceChildren(...tipNodes(info));
+      el.dataset.tone = info.tone ?? "plain";
     }
     el.hidden = false;
     // beside the pointer, kept on the screen
