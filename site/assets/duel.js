@@ -36,6 +36,18 @@ const DEF_DOWN = 0.3;
 const BURN = { time: 3, every: 0.5, share: 0.05 };
 /** A frost ward absorbs this share of full life, for this long. */
 const WARD = { share: 0.18, time: 6 };
+/**
+ * The rotating skill bar: `slots` skills at a time, each drawn from the school's pool with its own casts (1 to 4,
+ * equal odds). A skill drawn with fewer casts hits harder (CAST_POWER, by casts). A spent skill empties its slot,
+ * which counts down `wait + spread × roll` seconds and then draws a skill not on the bar.
+ */
+const BAR = { slots: 3, casts: 4, wait: 3, spread: 2 };
+const CAST_POWER = [1.4, 1.2, 1.1, 1.0];
+
+/** How hard a skill drawn with `casts` casts hits, as a multiple of its power. */
+export function castsPower(casts) {
+  return CAST_POWER[casts - 1] ?? 1;
+}
 
 /**
  * Each school's fighter: full life, attack, the two defences, crit chance and crit damage, dodge, and its passives.
@@ -143,9 +155,9 @@ export const SPELLS = {
 };
 
 /**
- * The two schools. A school's spells are its `basics` (the blade, the dive and the blink, each on its own cooldown)
- * and its skill `slots`, in the order its skill bar shows them: 1, 2, 3 and the ultimate. The spells in a slot share
- * one cooldown: casting any of them puts the whole slot on the cooldown of the one cast. Then the distance each
+ * The two schools. A school's spells are its `basics` (the blade, the dive and the blink, always at hand), its
+ * `pool`, from which its three bar slots draw at random, and its `ultimate`, charged by rage. Each spell runs on its
+ * own cooldown. Then the distance each
  * school likes to fight at, how eager it is, how long it takes a breath after each attack (`tempo`, seconds), the
  * distance it keeps when its qi runs low (`dry`: Thunder presses in to sword's length, Frost stays at middle distance
  * while its qi gathers again), the height it likes to hover at while it has the qi (`sky`; Frost casts from the air,
@@ -153,7 +165,7 @@ export const SPELLS = {
  */
 export const SCHOOLS = {
   thunder: {
-    name: "Thunder", basics: ["slash", "dive", "blink"], slots: [["bolt", "palm", "step"], ["seal", "orb"], ["bell", "heal"], ["tribulation"]], postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 64, dry: SPELLS.slash.range - 4, aggression: 1.15, tempo: 0.8, sky: 22,
+    name: "Thunder", basics: ["slash", "dive", "blink"], pool: ["bolt", "palm", "step", "seal", "orb", "bell", "heal"], ultimate: "tribulation", postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 64, dry: SPELLS.slash.range - 4, aggression: 1.15, tempo: 0.8, sky: 22,
     bolt: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#ffe98a", "#fff6c4", "#ffffff"],
     circle: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"],
     // every effect a Thunder spell plays is drawn in gold and white, so it is plain whose it is
@@ -168,7 +180,7 @@ export const SCHOOLS = {
     },
   },
   frost: {
-    name: "Frost", basics: ["slash", "dive", "blink"], slots: [["bolt", "lotus"], ["shatter", "icicle", "collapse", "frostfire", "void"], ["mirror", "ward"], ["prison"]], postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
+    name: "Frost", basics: ["slash", "dive", "blink"], pool: ["bolt", "lotus", "shatter", "icicle", "collapse", "frostfire", "void", "mirror", "ward"], ultimate: "prison", postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
     // every effect a Frost spell plays is drawn in ice blue and white
@@ -238,14 +250,10 @@ const BODY_FIELDS = ["x", "air", "vx", "vy", "face", "stun", "wake", "land", "sq
 
 /** Fighter `index` of `school`, with the school's spells that are `usable`. */
 function fighter(index, school, usable, body) {
-  const { basics, slots } = SCHOOLS[school];
-  const spells = [...basics, ...slots.flat()].filter(usable);
-  // the cooldown each spell runs on: its slot's, or its own for a basic
-  const timer = Object.fromEntries(spells.map((name) => {
-    const i = slots.findIndex((slot) => slot.includes(name));
-    return [name, i < 0 ? name : `slot${i}`];
-  }));
-  const f = { index, school, spells, timer, stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
+  const { basics, pool, ultimate } = SCHOOLS[school];
+  // every spell it may cast this fight: the brain is told them all once; one off the bar is never ready
+  const spells = [...basics, ...pool, ultimate].filter(usable);
+  const f = { index, school, spells, pool: pool.filter(usable), bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
   for (const k of BODY_FIELDS) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
@@ -263,6 +271,8 @@ function startRound(duel) {
   for (const f of duel.fighters) {
     Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, coolFull: {}, intent: { move: 0 } });
     f.mind.reset();
+    f.bar = [];
+    for (let i = 0; i < BAR.slots; i++) draw(duel, f, i);
     f.body.startRound(duel.left + span * (f.index === 0 ? 0.22 : 0.78));
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
@@ -321,6 +331,11 @@ function body(duel, me, foe, dt) {
   burning(duel, me, dt);
   me.guard = Math.max(0, me.guard - dt);
   for (const k of Object.keys(me.cool)) me.cool[k] = Math.max(0, me.cool[k] - dt);
+  me.bar.forEach((slot, i) => {
+    if (slot.empty === undefined) return;
+    slot.empty = Math.max(0, slot.empty - dt);
+    if (slot.empty === 0) draw(duel, me, i);
+  });
   me.qi = Math.min(100, me.qi + (me.medit ? MEDITATE_REGEN : me.fly ? -FLY.cost : QI_REGEN) * dt);
   // out of qi, or knocked out of the sky: flight ends and it falls
   if (me.fly && (me.qi <= 1 || me.body.reeling())) me.fly = false;
@@ -360,8 +375,12 @@ function begin(duel, me, name, target) {
     me.rage = 0;
     emit(duel, { type: "ultimate", by: me.index, x: me.x, y: me.air + me.spec.chest });
   }
-  me.cool[me.timer[name]] = me.coolFull[me.timer[name]] = spell.cooldown + spell.windup;
-  me.act = { spell: name, phase: "windup", t: 0, target };
+  me.cool[name] = me.coolFull[name] = spell.cooldown + spell.windup;
+  // a bar skill spends a cast, and strikes with the power it was drawn with even if that empties its slot
+  const i = me.bar.findIndex((slot) => slot.spell === name);
+  const power = i < 0 ? 1 : me.bar[i].power;
+  if (i >= 0) spend(duel, me, i);
+  me.act = { spell: name, phase: "windup", t: 0, target, power };
   setMeditating(duel, me, false);
   // longer casts stand in a rune circle while they gather
   if (spell.kind !== "melee" && spell.kind !== "blink" && spell.kind !== "dash" && spell.kind !== "barrier" && duel.has(CAST_CIRCLE)) {
@@ -372,6 +391,8 @@ function begin(duel, me, name, target) {
 /** The moment a spell lands: it hits, flies, falls or heals. */
 function release(duel, me, foe, spell) {
   const g = duel.ground;
+  // the blow, with the power of the bar skill it was cast from
+  const hit = (spell.damage ?? 0) * (me.act.power ?? 1);
   if (me.stats.attuned && spell.kind !== "melee" && !spell.ultimate && spell.cost > 0) {
     me.attune++;
     if (me.attune % 2 === 0) gainRage(me, 1);
@@ -388,21 +409,21 @@ function release(duel, me, foe, spell) {
     }
     const dx = Math.abs(foe.x - me.x);
     if (dx <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < me.spec.chest + 4 && foe.hp > 0) {
-      if (blocks(foe, me.x, spell.damage)) clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
+      if (blocks(foe, me.x, hit)) clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
       else if (foe.act?.spell === "slash" && foe.act.phase === "windup" && foe.act.t > SPELLS.slash.windup * 0.6) {
         // both blades swing at once: they meet
         clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
         foe.act = null;
-      } else hurt(duel, foe, spell.damage, me.face, me.act.spell);
+      } else hurt(duel, foe, hit, me.face, me.act.spell);
     }
   } else if (spell.kind === "bolt") {
     const y = me.air + me.spec.chest;
     const key = play(duel, spell.fx, me.x + me.face * 8, g - y, { palette: SCHOOLS[me.school].bolt, flip: me.face < 0, seed: me.index + 7 });
-    duel.shots.push({ kind: "bolt", owner: me.index, x: me.x + me.face * 8, y, vx: me.face * spell.speed, t: 0, key, spell });
+    duel.shots.push({ kind: "bolt", owner: me.index, x: me.x + me.face * 8, y, vx: me.face * spell.speed, t: 0, key, spell, power: hit });
   } else if (spell.kind === "orb") {
     const x = me.x + me.face * 10;
     const key = play(duel, spell.fx, x, g, { seed: me.index + 3 });
-    duel.shots.push({ kind: "orb", owner: me.index, x, t: 0, key, spell });
+    duel.shots.push({ kind: "orb", owner: me.index, x, t: 0, key, spell, power: hit });
   } else if (spell.kind === "zone") {
     const x = clamp(me.act.target, duel.left + 6, duel.right - 6);
     // what hangs in the air (a collapse) gathers at the foe's height; what falls (an icicle) hits the floor
@@ -412,20 +433,20 @@ function release(duel, me, foe, spell) {
     const sigil = spell.sigil ?? 0;
     const mark = sigil > 0 && duel.has(CAST_CIRCLE) ? play(duel, CAST_CIRCLE, x, g - air, { palette: SCHOOLS[me.school].circle, seed: me.index + 11 }) : null;
     for (let k = 0; k < (spell.strikes ?? 1); k++) {
-      duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, air, t: -k * (spell.every ?? 0) - sigil, lead: sigil, key: k === 0 ? mark : null, spell, follow: k > 0 });
+      duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, air, t: -k * (spell.every ?? 0) - sigil, lead: sigil, key: k === 0 ? mark : null, spell, follow: k > 0, power: hit });
     }
     streak(duel, me, x, air + zoneHeight(spell, foe));
   } else if (spell.kind === "blast") {
     const x = me.x + me.face * spell.range * 0.7;
     cast(duel, me, spell.fx, x, g - me.spec.chest - me.air);
     if (Math.abs(foe.x - me.x) <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
-      if (blocks(foe, me.x, spell.damage)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
-      else if (hurt(duel, foe, spell.damage, me.face, me.act.spell) && spell.shock) shock(duel, foe, SHOCK.chance);
+      if (blocks(foe, me.x, hit)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
+      else if (hurt(duel, foe, hit, me.face, me.act.spell) && spell.shock) shock(duel, foe, SHOCK.chance);
     }
   } else if (spell.kind === "void") {
     const x = clamp(foe.x, duel.left + 10, duel.right - 10);
     const key = cast(duel, me, spell.fx, x, g, { seed: me.index + 5 });
-    duel.shots.push({ kind: "void", name: me.act.spell, owner: me.index, x, t: 0, tick: 0, key, spell });
+    duel.shots.push({ kind: "void", name: me.act.spell, owner: me.index, x, t: 0, tick: 0, key, spell, power: hit });
     streak(duel, me, x, spell.height ? spell.height : 4);
   } else if (spell.kind === "dash") {
     // gone in a flash and back a stride past the foe, cutting through it on the way
@@ -438,8 +459,8 @@ function release(duel, me, foe, spell) {
     const lo = Math.min(from, to) - foe.spec.halfWidth;
     const hi = Math.max(from, to) + foe.spec.halfWidth;
     if (foe.x > lo && foe.x < hi && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
-      if (blocks(foe, from, spell.damage)) clash(duel, foe.x, g - foe.spec.chest - foe.air, [foe]);
-      else hurt(duel, foe, spell.damage, me.face, me.act.spell);
+      if (blocks(foe, from, hit)) clash(duel, foe.x, g - foe.spec.chest - foe.air, [foe]);
+      else hurt(duel, foe, hit, me.face, me.act.spell);
     }
   } else if (spell.kind === "heal") {
     const gained = Math.min(100 - me.hp, spell.amount);
@@ -686,8 +707,8 @@ function shot(duel, s, dt) {
       return;
     }
     if (overlaps(foe, s.x, s.y, 3)) {
-      if (blocks(foe, s.x - s.vx, spell.damage)) clash(duel, s.x, g - s.y, []);
-      else if (hurt(duel, foe, spell.damage, Math.sign(s.vx), "bolt")) shock(duel, foe, SHOCK.chance);
+      if (blocks(foe, s.x - s.vx, s.power)) clash(duel, s.x, g - s.y, []);
+      else if (hurt(duel, foe, s.power, Math.sign(s.vx), "bolt")) shock(duel, foe, SHOCK.chance);
       return endShot(duel, s);
     }
     if (s.x < duel.left - 40 || s.x > duel.right + 40) endShot(duel, s);
@@ -697,8 +718,8 @@ function shot(duel, s, dt) {
     emit(duel, { type: "move", key: s.key, x: s.x, y: g });
     const [bx, by] = orbAt(s);
     if (overlaps(foe, bx, -by, spell.radius)) {
-      if (blocks(foe, bx, spell.damage)) clash(duel, bx, g + by, []);
-      else hurt(duel, foe, spell.damage, Math.sign(foe.x - bx) || 1, "orb");
+      if (blocks(foe, bx, s.power)) clash(duel, bx, g + by, []);
+      else hurt(duel, foe, s.power, Math.sign(foe.x - bx) || 1, "orb");
       burst(duel, spell.hitFx, bx, g + by);
       return endShot(duel, s);
     }
@@ -727,7 +748,7 @@ function shot(duel, s, dt) {
     if (!s.fell && s.t >= spell.impact) {
       s.fell = true;
       const reaches = Math.abs(foe.x - s.x) < spell.radius + foe.spec.halfWidth && (spell.grounded ? foe.air < 10 : Math.abs(foe.air - s.air) < 22);
-      if (reaches && hurt(duel, foe, spell.damage, Math.sign(foe.x - s.x) || 1, s.name)) {
+      if (reaches && hurt(duel, foe, s.power, Math.sign(foe.x - s.x) || 1, s.name)) {
         if (spell.freeze) foe.frozen = spell.freeze;
         if (spell.shock) shock(duel, foe, spell.ultimate ? 1 : SHOCK.chance);
       }
@@ -752,7 +773,7 @@ function shot(duel, s, dt) {
     }
     if (s.t >= spell.life) {
       burst(duel, spell.endFx, s.x, g - spell.height);
-      if (Math.abs(dx) < spell.under) hurt(duel, foe, spell.damage, -Math.sign(dx) || 1, s.name);
+      if (Math.abs(dx) < spell.under) hurt(duel, foe, s.power, -Math.sign(dx) || 1, s.name);
       endShot(duel, s);
     }
   }
@@ -790,8 +811,9 @@ function stopShot(duel, s) {
 
 // ---------- minds ----------
 
-const ready = (me, name) =>
-  me.spells.includes(name) && !(me.cool[me.timer[name]] > 0) && me.qi >= SPELLS[name].cost && (!SPELLS[name].ultimate || me.rage >= RAGE) &&
+/** Can `me` cast `name` now: in its kit, on its bar if it is a bar skill, off cooldown, paid for. */
+export const ready = (me, name) =>
+  me.spells.includes(name) && (!me.pool.includes(name) || me.bar.some((slot) => slot.spell === name && slot.left > 0)) && !(me.cool[name] > 0) && me.qi >= SPELLS[name].cost && (!SPELLS[name].ultimate || me.rage >= RAGE) &&
   !(name === "blink" && me.sealed > 0) &&
   // silenced, only the blade answers
   !(me.silence > 0 && SPELLS[name].kind !== "melee");
@@ -802,18 +824,51 @@ const ready = (me, name) =>
  * with rage; a slot with none of its spells in the fight is `empty`).
  */
 export function skillBar(f) {
-  return SCHOOLS[f.school].slots.map((slot, i) => {
-    const owned = slot.filter((name) => f.spells.includes(name));
-    const ultimate = owned.some((name) => SPELLS[name].ultimate);
-    return {
-      empty: owned.length === 0,
-      ultimate,
-      ready: f.hp > 0 && owned.some((name) => ready(f, name)),
-      left: f.cool[`slot${i}`] ?? 0,
-      full: f.coolFull[`slot${i}`] ?? 0,
-      charge: ultimate ? f.rage / RAGE : 1,
-    };
-  });
+  const slots = f.bar.map((slot) =>
+    slot.empty !== undefined
+      ? { spell: null, empty: true, ultimate: false, ready: false, left: slot.empty, full: slot.full, charge: 1, casts: 0, power: 1, evolved: false }
+      : {
+        spell: slot.spell,
+        empty: false,
+        ultimate: false,
+        ready: f.hp > 0 && ready(f, slot.spell),
+        left: f.cool[slot.spell] ?? 0,
+        full: f.coolFull[slot.spell] ?? 0,
+        charge: 1,
+        casts: slot.left,
+        power: slot.power,
+        evolved: slot.evolved,
+      });
+  while (slots.length < BAR.slots) slots.push({ spell: null, empty: true, ultimate: false, ready: false, left: 0, full: 0, charge: 1, casts: 0, power: 1, evolved: false });
+  const ult = SCHOOLS[f.school].ultimate;
+  const owned = f.spells.includes(ult);
+  slots.push({ spell: owned ? ult : null, empty: !owned, ultimate: true, ready: owned && f.hp > 0 && ready(f, ult), left: f.cool[ult] ?? 0, full: f.coolFull[ult] ?? 0, charge: f.rage / RAGE, casts: 0, power: 1, evolved: false });
+  return slots;
+}
+
+/** Fill slot `i` of f's bar with a skill from its pool that is not on the bar, with 1 to 4 casts. */
+export function draw(duel, f, i) {
+  const held = f.bar.filter((slot, j) => j !== i && slot.spell).map((slot) => slot.spell);
+  const free = f.pool.filter((name) => !held.includes(name));
+  if (free.length === 0) {
+    // nothing left to draw: wait and look again
+    f.bar[i] = { empty: BAR.wait, full: BAR.wait };
+    return;
+  }
+  const spell = free[Math.floor(duel.rng() * free.length)];
+  const casts = 1 + Math.floor(duel.rng() * BAR.casts);
+  f.bar[i] = { spell, casts, left: casts, power: castsPower(casts), evolved: false };
+}
+
+/** One cast of slot `i`'s skill; the last empties the slot, which counts down before it draws again. */
+export function spend(duel, f, i) {
+  const slot = f.bar[i];
+  if (!slot || slot.empty !== undefined) return;
+  slot.left--;
+  if (slot.left <= 0) {
+    const wait = BAR.wait + BAR.spread * duel.rng();
+    f.bar[i] = { empty: wait, full: wait };
+  }
 }
 
 // ---------- the brain: what a fighter sees, and doing what it chose ----------

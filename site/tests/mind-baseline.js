@@ -3,7 +3,7 @@
 // here as it was: its numbers and rules are unchanged, only its state (when it next thinks, the breath after an
 // attack, what it has seen land) and its dice live on the mind instead of the fighter and the duel, and it hands
 // back a Choice for the duel to carry out instead of carrying it out. The page never loads it.
-import { RAGE, SCHOOLS, SPELLS, orbOffset } from "../assets/duel.js";
+import { RAGE, SCHOOLS, SPELLS, orbOffset, ready } from "../assets/duel.js";
 
 const REACTION = 0.16;
 const THINK = 0.12;
@@ -89,11 +89,6 @@ function mind(duel, me, foe, dt, st) {
   return choiceOf(me, best, st);
 }
 
-const ready = (me, name) =>
-  me.spells.includes(name) && !(me.cool[me.timer[name]] > 0) && me.qi >= SPELLS[name].cost && (!SPELLS[name].ultimate || me.rage >= RAGE) &&
-  !(name === "blink" && me.sealed > 0) &&
-  // silenced, only the blade answers
-  !(me.silence > 0 && SPELLS[name].kind !== "melee");
 
 /** What is coming at me, and the ways out of each. */
 function dangers(duel, me) {

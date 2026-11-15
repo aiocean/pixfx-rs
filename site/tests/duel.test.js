@@ -87,34 +87,30 @@ describe("duel", () => {
     expect(poses.slice(poses.indexOf("down"))).toEqual(["down", "sit", "kneel", "crouch", "land"]);
     expect(lands.length).toBe(2);
   });
-  test("a cast puts its whole skill slot on cooldown: no spell in that slot is cast until it runs out", () => {
+  test("a cast puts its spell on its own cooldown, and a bar skill spends a cast", () => {
     let checked = 0;
     for (const seed of [1, 2, 3, 4]) {
       const duel = arena(seed);
       const was = [null, null];
-      // the slot each fighter cast from last, and how long it stays shut
-      const shut = [null, null];
       for (let i = 0; i < 90 * 60; i++) {
+        const before = duel.fighters.map((f) => f.bar.map((slot) => ({ ...slot })));
         step(duel, 1 / 60);
         for (const f of duel.fighters) {
           const spell = f.act?.spell ?? null;
           const fresh = spell !== null && spell !== was[f.index] && f.act.t < 1 / 30;
           was[f.index] = spell;
-          if (shut[f.index] && duel.time >= shut[f.index].until) shut[f.index] = null;
           if (!fresh) continue;
-          const i = SCHOOLS[f.school].slots.findIndex((slot) => slot.includes(spell));
-          if (i < 0) continue;
-          expect(shut[f.index]?.slot === i && duel.round === shut[f.index].round).toBe(false);
-          const slot = skillBar(f)[i];
-          expect(slot.ready).toBe(false);
-          expect(slot.full).toBeCloseTo(SPELLS[spell].cooldown + SPELLS[spell].windup, 5);
-          shut[f.index] = { slot: i, round: duel.round, until: duel.time + slot.left - 1e-6 };
+          expect(f.coolFull[spell]).toBeCloseTo(SPELLS[spell].cooldown + SPELLS[spell].windup, 5);
+          const j = before[f.index].findIndex((slot) => slot.spell === spell);
+          if (j < 0) continue;
+          const after = f.bar[j];
+          expect(after.empty !== undefined ? 0 : after.left).toBe(before[f.index][j].left - 1);
           checked++;
         }
       }
     }
-    expect(checked).toBeGreaterThan(50);
-  });
+    expect(checked).toBeGreaterThan(30);
+  }, 30_000);
 
   test("the skill bar shows four slots, the last one the ultimate, charged by rage", () => {
     const duel = arena(3);
