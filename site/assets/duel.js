@@ -1174,6 +1174,8 @@ function senseOf(duel, me, foe) {
     arena: duel.arena,
     threats: threatsOf(duel, me),
     ready: me.spells.map((name) => ready(me, name)),
+    // a bar skill strikes at its power on the bar
+    power: me.spells.map((name) => slotOf(me, name)?.power ?? 1),
   };
 }
 

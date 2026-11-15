@@ -142,6 +142,7 @@ pub fn sense(time: f64, me: Me, foe: Foe) -> Sense {
         arena: arena(),
         threats: vec![],
         ready: vec![true; n],
+        power: vec![],
     }
 }
 

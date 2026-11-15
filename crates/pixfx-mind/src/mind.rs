@@ -126,13 +126,15 @@ impl Mind {
             return None;
         }
         self.clock = self.profile.think * (0.8 + 0.4 * self.rng.next());
+        // each skill as hard as it strikes now
+        let skills = powered(&self.skills, &sense.power);
 
         let reading = Reading::of(
             &sense.me,
             &foe,
             &threats,
             &sense.arena,
-            &self.skills,
+            &skills,
             &sense.ready,
             &self.body,
             &self.profile,
@@ -157,7 +159,7 @@ impl Mind {
             foe_skills: &self.foe_skills,
             threats: &threats,
             arena: &sense.arena,
-            skills: &self.skills,
+            skills: &skills,
             ready: &sense.ready,
             body: &self.body,
             profile: &self.profile,
@@ -247,4 +249,16 @@ impl Mind {
         }
         c.choice.clone()
     }
+}
+
+/// `skills` with each one's damage scaled by its share in `power`; a skill past the end of `power` keeps its damage.
+fn powered(skills: &[Skill], power: &[f64]) -> Vec<Skill> {
+    skills
+        .iter()
+        .enumerate()
+        .map(|(i, s)| Skill {
+            damage: s.damage * power.get(i).copied().unwrap_or(1.0),
+            ..s.clone()
+        })
+        .collect()
 }

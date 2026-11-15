@@ -249,3 +249,36 @@ fn explain_fills_why() {
     assert_eq!(why.postures.len(), 8);
     assert!(!why.top.is_empty());
 }
+
+/// How often a mind casts `name` over many calm moments, with each skill's power given by `power`.
+fn casts_of(name: &str, power: Vec<f64>) -> usize {
+    let mut n = 0;
+    for seed in 1..=30 {
+        let mut m = mind(seed);
+        let at = |t: f64| Sense {
+            power: power.clone(),
+            ..sense(t, me(40.0), foe(150.0))
+        };
+        n += run(&mut m, 0.0, 6.0, at)
+            .iter()
+            .filter(|th| matches!(&th.choice, Choice::Cast { skill, .. } if skill == name))
+            .count();
+    }
+    n
+}
+
+#[test]
+fn a_skill_with_more_power_on_the_bar_is_cast_more() {
+    let n = kit().len();
+    let bolt = kit().iter().position(|s| s.name == "bolt").unwrap_or(0);
+    let mut strong = vec![1.0; n];
+    strong[bolt] = 3.0;
+    let plain = casts_of("bolt", vec![1.0; n]);
+    let more = casts_of("bolt", strong);
+    assert!(more > plain + plain / 4 + 2, "bolt cast {plain} times at power 1, {more} at power 3");
+}
+
+#[test]
+fn no_power_reads_as_one() {
+    assert_eq!(casts_of("bolt", vec![]), casts_of("bolt", vec![1.0; kit().len()]));
+}

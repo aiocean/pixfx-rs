@@ -186,4 +186,8 @@ pub struct Sense {
     pub threats: Vec<Threat>,
     /// Whether each skill handed to `Mind::new` is ready now, in that order.
     pub ready: Vec<bool>,
+    /// How hard each skill handed to `Mind::new` strikes now, as a share of its `damage` (a game whose skills grow
+    /// or shrink in a fight says so here), in that order; a skill past the end of the list strikes at 1.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub power: Vec<f64>,
 }
