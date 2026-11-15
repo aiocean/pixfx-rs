@@ -2,7 +2,7 @@
 //! (`sense_of`).
 
 use crate::bar::{ready, slot_of};
-use crate::data::{Kind, RAGE, spell};
+use crate::data::{BAR, Kind, RAGE, school, spell};
 use crate::fighter::{Fighter, Phase, Slot, State};
 use crate::shot::{ShotKind, orb_at};
 use pixfx_mind::{ActPhase, Arena, Doing, Foe, Inflicts, Me, Sense, Skill, SkillKind, Threat, ThreatShape};
@@ -192,5 +192,15 @@ pub fn sense_of(state: &State, me: usize) -> Sense {
                 _ => 1.0,
             })
             .collect(),
+        slots: slots_of(f),
     }
+}
+
+/// Fighter `f`'s castable slots for a policy: its school's three basics, its bar's slots, then its ultimate, each
+/// the index of the spell in `f.spells` (`None` for an empty bar slot or a spell it cannot cast this fight).
+pub fn slots_of(f: &Fighter) -> Vec<Option<usize>> {
+    let d = school(f.school);
+    let at = |name: &str| f.spells.iter().position(|n| *n == name);
+    let bar = (0..BAR.slots).map(|i| f.bar.get(i).and_then(Slot::spell).and_then(at));
+    d.basics.iter().map(|n| at(n)).chain(bar).chain([at(d.ultimate)]).collect()
 }

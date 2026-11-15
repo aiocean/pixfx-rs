@@ -190,4 +190,8 @@ pub struct Sense {
     /// or shrink in a fight says so here), in that order; a skill past the end of the list strikes at 1.
     #[cfg_attr(feature = "serde", serde(default))]
     pub power: Vec<f64>,
+    /// The game's castable slots in its own fixed layout, each the index of a skill handed to `Mind::new` or `None`
+    /// for an empty slot. Only a policy reads it (`policy::observe`, `policy::legal`); the utility mind does not.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub slots: Vec<Option<usize>>,
 }

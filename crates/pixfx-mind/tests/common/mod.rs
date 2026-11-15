@@ -143,6 +143,7 @@ pub fn sense(time: f64, me: Me, foe: Foe) -> Sense {
         threats: vec![],
         ready: vec![true; n],
         power: vec![],
+        slots: vec![],
     }
 }
 

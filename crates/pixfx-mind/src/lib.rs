@@ -11,6 +11,7 @@ mod curve;
 mod habits;
 mod mind;
 mod pick;
+pub mod policy;
 mod posture;
 mod reading;
 mod rng;
