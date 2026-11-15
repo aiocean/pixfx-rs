@@ -16,6 +16,11 @@ pub fn arena(seed: u32) -> State {
         let spells = d.basics.iter().copied().chain(pool.iter().copied()).chain([d.ultimate]).collect();
         state.fighters[i] = Fighter::new(i, s, spells, pool);
     }
+    // startRound's places: 22% and 78% across the arena
+    let span = state.right - state.left;
+    for (i, at) in [(0, 0.22), (1, 0.78)] {
+        state.fighters[i].body.start_round(state.left + span * at);
+    }
     for f in 0..2 {
         for i in 0..3 {
             draw(&mut state, f, i, i == 0, None);
@@ -47,4 +52,17 @@ pub fn norm(v: &serde_json::Value) -> serde_json::Value {
         Value::Object(o) => Value::Object(o.iter().map(|(k, v)| (k.clone(), norm(v))).collect()),
         other => other.clone(),
     }
+}
+
+/// Every effect the duel's rules ask for, as if the registry held them all.
+pub fn all_effects() -> Vec<String> {
+    use pixfx_duel::data::{CAST_CIRCLE, CLASH, DECOR, spells};
+    let mut out: Vec<String> = vec![CAST_CIRCLE.into(), CLASH.into(), "fire/spirit-flame".into()];
+    out.extend(DECOR.iter().map(|d| d.to_string()));
+    for s in spells() {
+        out.extend([s.fx, s.hit_fx, s.end_fx, s.slam_fx].into_iter().flatten().map(String::from));
+    }
+    out.sort();
+    out.dedup();
+    out
 }

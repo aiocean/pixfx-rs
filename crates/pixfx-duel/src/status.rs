@@ -144,3 +144,13 @@ pub fn damage_of(by: &Fighter, f: &Fighter, power: f64, blow: Blow, crit: bool, 
         js_round(atk * (power / 10.0) * (DEFENCE / (DEFENCE + def)) * (if crit { by.stats.crit_damage } else { 1.0 }) * spread),
     )
 }
+
+/// A heal or a ward washes off what clings to fighter `f`: burn, silence, defence-down, chill and shock.
+pub fn cleanse(f: &mut Fighter) {
+    f.burn = None;
+    f.silence = 0.0;
+    f.def_down = 0.0;
+    f.chill = 0.0;
+    f.chill_t = 0.0;
+    f.shock = None;
+}

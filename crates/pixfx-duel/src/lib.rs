@@ -5,9 +5,11 @@
 
 #![forbid(unsafe_code)]
 
+pub mod act;
 pub mod bar;
 pub mod data;
 pub mod fighter;
 pub mod out;
 pub mod rng;
+pub mod shot;
 pub mod status;

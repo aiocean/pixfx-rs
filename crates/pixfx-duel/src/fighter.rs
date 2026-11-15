@@ -4,6 +4,7 @@
 use crate::data::{Luck, Rarity, School, Stats, Trait, stats};
 use crate::out::Out;
 use crate::rng::Rng;
+use crate::shot::Shot;
 use pixfx_fighter::body::{Arena, Body};
 use pixfx_mind::Outcome;
 
@@ -243,6 +244,12 @@ pub struct State {
     pub pause: f64,
     /// The last effect key handed out.
     pub key: u32,
+    /// Spells in flight, in the order they were cast.
+    pub shots: Vec<Shot>,
+    /// Shots taken out of `shots` during this tick: the tick still runs them, as `duel.js` runs a copy of its list.
+    pub gone: Vec<Shot>,
+    /// The last shot id handed out.
+    pub shot_id: u32,
     pub fighters: [Fighter; 2],
     pub out: Vec<Out>,
     /// The effects in the registry: a spell whose effect is missing is never cast.
@@ -269,6 +276,9 @@ impl State {
             winner: None,
             pause: 0.0,
             key: 0,
+            shots: Vec::new(),
+            gone: Vec::new(),
+            shot_id: 0,
             fighters,
             out: Vec::new(),
             effects,
