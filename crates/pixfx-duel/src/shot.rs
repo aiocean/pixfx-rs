@@ -1,10 +1,9 @@
-//! Spells in flight: bolts, orbs, zones (seals, icicles, collapses, barrages), sprays and voids, as `duel.js` moves
-//! them.
+//! Spells in flight: bolts, orbs, zones (seals, icicles, collapses, barrages), sprays and voids.
 //!
-//! `duel.js` runs each tick over a copy of its shot list, so a shot ended earlier in the tick (two bolts meeting)
-//! still runs, from where it was, as a ghost; a ghost that ends again removes the list's last shot
-//! (`splice(indexOf(s) = -1, 1)`). The port keeps that: every shot has an id, a removed shot moves to `State::gone`,
-//! and the duel loop runs a snapshot of ids, looking each up in `shots`, then in `gone`.
+//! Each tick runs over a copy of the shot list, so a shot ended earlier in the tick (two bolts meeting) still runs,
+//! from where it was, as a ghost; a ghost that ends again removes the list's last shot. So every shot has an id, a
+//! removed shot moves to `State::gone`, and the duel loop runs a snapshot of ids, looking each up in `shots`, then in
+//! `gone`.
 
 use crate::act::{blocks, burst, cast, clash, hurt, play, turn_aside, zone_height};
 use crate::data::{Blow, Spell, orb_offset, school, spell};
@@ -50,7 +49,7 @@ enum Place {
     Gone,
 }
 
-/// Move shot `id` on by `dt`. A shot not found in flight runs from `gone`, as `duel.js` runs its copy of the list.
+/// Move shot `id` on by `dt`. A shot not found in flight runs from `gone`, as from a copy of the list.
 pub fn shot(state: &mut State, id: u32, dt: f64) {
     let (mut s, place) = match state.shots.iter().find(|s| s.id == id) {
         Some(s) => (*s, Place::Live),

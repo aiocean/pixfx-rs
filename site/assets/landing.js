@@ -1,7 +1,8 @@
 // The landing page: a live duel in the hero, drawn by pixfx-canvas2d (workers paint the effects). The page owns the
 // animation-frame loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
-import { Body, FightFeel, Lighting, Mind, Sprites, createPixfx, loadPixfx, lookColors, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
-import { DECOR, RAGE, createDuel, step } from "./duel.js";
+import { FightFeel, Lighting, Sprites, createPixfx, loadPixfx, lookColors, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
+import * as pixfx from "../pkg/pixfx-canvas2d.js";
+import { DECOR, RAGE, createDuel, freeDuel, step, useEngine } from "./duel.js";
 import { BARS_TALL, actorOf, drawBars, drawNumbers, drawSkills, drawStreaks, hudAt, paintFighters } from "./duel-art.js";
 import { buffInfo, skillInfo } from "./duel-info.js";
 import { createScene, drawScene } from "./duel-scene.js";
@@ -25,6 +26,7 @@ export async function mount() {
 
   // the skill icon atlases (site/art/skill-icons.sh), by icon size; the hero waits for them, as for the engine
   const [engine, icons] = await Promise.all([loadPixfx(), loadIcons([32, 24])]);
+  useEngine(pixfx);
 
   const hero = createHero(document.getElementById("scene"), off.signal, icons, engine);
   let last = null;
@@ -109,7 +111,8 @@ function createHero(canvas, signal, icons, engine) {
     const barTop = Math.max(6, Math.ceil((topbar - rect.top) / scale) + 6);
     // fighters fly no higher than keeps their heads (about 44 pixels tall) under the bars
     const sky = ground - (barTop + BARS_TALL + 13) - 46;
-    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky, Body, Mind });
+    if (view.duel) freeDuel(view.duel);
+    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky });
     // each fighter's sprite as it was last painted, which the effects wrapped on it read
     view.wrapped = view.duel.fighters.map((f) => {
       return { body: null, rage: f.rage, surge: null, ring: null };

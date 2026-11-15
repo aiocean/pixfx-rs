@@ -1,5 +1,5 @@
 //! What a step of the duel hands the page: effect commands (`Play`, `Move`, `Stop`) and events to feel and show,
-//! with `duel.js`'s names and fields. Heights (`y`) are as `duel.js` gives them: up from the ground for a fighter's
+//! in the names and fields the page reads. Heights (`y`) are up from the ground for a fighter's
 //! event, screen y for an effect.
 
 use crate::data::{Luck, Rarity};

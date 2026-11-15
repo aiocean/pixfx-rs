@@ -33,13 +33,13 @@ export const SPELL_INFO = {
   prison: { name: "Ice Prison", does: "Ultimate: drags the foe in from far off, freezes and silences it, and locks blinking." },
 };
 
-/** What each trait does, in a line. */
+/** What each trait does, in a line, read from the rules' `TRAITS` once the engine has loaded. */
 export const TRAIT_INFO = {
-  swift: `Swift: ${Math.round((1 - TRAITS.swift.cooldown) * 100)}% reduced Cooldown`,
-  heavy: `Heavy: ${Math.round((TRAITS.heavy.power - 1) * 100)}% more Power`,
+  get swift() { return `Swift: ${Math.round((1 - TRAITS.swift.cooldown) * 100)}% reduced Cooldown`; },
+  get heavy() { return `Heavy: ${Math.round((TRAITS.heavy.power - 1) * 100)}% more Power`; },
   piercing: "Piercing: cannot be Guarded",
-  lingering: `Lingering: +${TRAITS.lingering.stacks} Chill or Shock stack`,
-  cheap: `Cheap: ${Math.round((1 - TRAITS.cheap.cost) * 100)}% reduced Qi Cost`,
+  get lingering() { return `Lingering: +${TRAITS.lingering.stacks} Chill or Shock stack`; },
+  get cheap() { return `Cheap: ${Math.round((1 - TRAITS.cheap.cost) * 100)}% reduced Qi Cost`; },
 };
 
 /** Each buff's name and what it does, in a line (see `buffsOf`). */

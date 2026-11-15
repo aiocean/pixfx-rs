@@ -1,6 +1,6 @@
 //! Casting and blows: a cast begins, gathers, lands (`release`) and recovers; a blow is guarded, turned aside by a
-//! barrier, erased by a ward, dodged or taken (`hurt`); knockouts; and the effect commands a cast plays. As
-//! `duel.js` has them, drawing its dice in its order.
+//! barrier, erased by a ward, dodged or taken (`hurt`); knockouts; and the effect commands a cast plays. Each draws its
+//! dice in a fixed order.
 
 use crate::bar::{has_trait, slot_of, spend};
 use crate::data::{

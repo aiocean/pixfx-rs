@@ -1,5 +1,5 @@
 //! What a brain is told: each spell as pixfx-mind reads it (`skill_of`), and what a fighter could perceive this tick
-//! (`sense_of`), as `duel.js` builds them.
+//! (`sense_of`).
 
 use crate::bar::{ready, slot_of};
 use crate::data::{Kind, RAGE, spell};

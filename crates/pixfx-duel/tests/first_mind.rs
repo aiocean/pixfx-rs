@@ -1,4 +1,4 @@
-//! The first mind thinks as `site/tests/mind-baseline.js` does: in the same duel, the same choices on the same ticks.
+//! The first mind makes the choices it was ported with (`firstMind` in the fixture): the same choices on the same ticks.
 
 mod common;
 

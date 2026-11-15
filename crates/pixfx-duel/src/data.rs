@@ -1,5 +1,5 @@
 //! The duel's tables and numbers: skills, schools, stats, tiers, traits, luck, and the constants every rule reads.
-//! Each is ported from `site/assets/duel.js` with the same values; `tests/data.rs` checks them against it.
+//! `tests/data.rs` pins each against `tests/fixtures/js_numbers.json`.
 
 use pixfx_draw::math::js_min;
 
@@ -161,7 +161,7 @@ pub enum Trait {
 }
 
 impl Trait {
-    /// In `duel.js`'s order: the order traits are rolled from.
+    /// In the order traits are rolled from.
     pub const ALL: [Trait; 5] = [Trait::Swift, Trait::Heavy, Trait::Piercing, Trait::Lingering, Trait::Cheap];
 
     pub fn name(self) -> &'static str {
@@ -315,7 +315,7 @@ pub fn stats(school: School) -> &'static Stats {
 pub const QI_REGEN: f64 = 3.0;
 pub const MEDITATE_REGEN: f64 = 16.0;
 
-/// Each fighter's temperament for pixfx-mind (see `duel.js` TEMPERAMENT).
+/// Each fighter's temperament for pixfx-mind.
 pub struct Temperament {
     pub spread: f64,
     pub risk: f64,
@@ -417,7 +417,7 @@ pub struct Counter {
 }
 
 /// A spell: what it costs, how long the fighter is committed before (`windup`) and after (`recover`) it lands, its
-/// cooldown, and its own numbers. Fields `duel.js` leaves out are `None` or `false`.
+/// cooldown, and its own numbers. Fields a spell does without are `None` or `false`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -562,7 +562,7 @@ const BASE: Spell = Spell {
 
 use Blow::{Magic, Physical};
 
-/// Every spell, in `duel.js`'s order.
+/// Every spell, in the duel's order.
 static SPELLS: [Spell; 27] = [
     Spell { name: "slash", kind: Kind::Melee, blow: Some(Physical), cost: 0.0, windup: 0.2, recover: 0.32, cooldown: 0.7, range: Some(24.0), damage: Some(5.0), ..BASE },
     // Thunder: a flash of lightning that carries the body through the foe and out the other side
@@ -644,7 +644,7 @@ static SPELLS: [Spell; 27] = [
     },
 ];
 
-/// Every spell, in `duel.js`'s order.
+/// Every spell, in the duel's order.
 pub fn spells() -> &'static [Spell] {
     &SPELLS
 }
@@ -808,7 +808,7 @@ pub fn orb_offset(t: f64) -> (f64, f64) {
     )
 }
 
-/// `base` to the whole power `n` (n ≥ 0), by multiplying, as `duel.js`'s `powi`.
+/// `base` to the whole power `n` (n ≥ 0), by multiplying.
 pub fn powi(base: f64, n: f64) -> f64 {
     let mut out = 1.0;
     let mut i = 0.0;

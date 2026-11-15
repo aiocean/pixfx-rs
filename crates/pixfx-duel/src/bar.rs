@@ -1,5 +1,5 @@
 //! The rotating skill bar: each fight's pool, draws with tiers and traits, spending a slot and evolving it, what a
-//! fighter can cast now, and what the HUD shows of the bar and of a fighter's buffs. As `duel.js` has them.
+//! fighter can cast now, and what the HUD shows of the bar and of a fighter's buffs.
 
 use crate::data::{
     BAR, Kind, PAY_DRAW, POOL_SIZE, RAGE, RARITY, Rarity, STALE, School, Status, TRAITS, Trait, evolves, fits, payoff,

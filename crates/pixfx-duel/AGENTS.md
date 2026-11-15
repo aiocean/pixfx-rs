@@ -6,10 +6,12 @@ here; this file only says what this crate holds. The design is
 
 ## Job
 
-The landing duel's rules, ported from `site/assets/duel.js` with the same numbers and the same dice: two cultivators,
-Thunder and Frost, their stats and skills (`data`), the seeded dice every roll comes from (`rng`), and, as the port
-lands, the fighters, statuses, the rotating bar, casts and shots, and the round loop. A seed replays the same fight
-on every target. The page plays the effect commands and feels the events the duel returns; it decides nothing.
+The landing duel's rules: two cultivators, Thunder and Frost, their stats and skills (`data`), the seeded dice every
+roll comes from (`rng`), the fighters (`fighter`), statuses (`status`), the rotating bar (`bar`), casts and blows
+(`act`), shots (`shot`), the round loop (`duel`), the seats that decide for each corner (`seat`: the brain from
+`pixfx-mind`, or `first_mind`, the yardstick a brain is measured against), what a mind senses (`sense`), and the duel
+as the page reads it (`view`). A seed replays the same fight on every target. The page (`site/assets/duel.js`, a
+wrapper over the wasm `Duel`) plays the effect commands and feels the events the duel returns; it decides nothing.
 
 ## Belongs here
 
@@ -27,16 +29,17 @@ on every target. The page plays the effect commands and feels the events the due
 
 ## Dependencies
 
-- Required: `libm`, `pixfx-draw` (JS-exact maths).
+- Required: `libm`, `pixfx-draw` (JS-exact maths), `pixfx-fighter` (bodies), `pixfx-mind` (the brain).
 - Optional, behind `serde` / `ts`: `serde`, `tsify`, `wasm-bindgen`.
 - Never `pixfx-scene`, `pixfx-wasm` or a shell.
 
 ## Traps
 
-- Parity with `duel.js` is the gate while the port lands: `tests/data.rs` checks every table and formula against
-  `tests/fixtures/js_numbers.json`, written by `site/tests/tools/dump-numbers.js`. Change a number in both, then
-  re-run the dump.
-- Dice are drawn in `duel.js`'s order. One extra or missing roll changes every fight after it.
+- `tests/goldens/event_hashes.json` pins every command and event of 120 s of seeds 1-20: a change that alters
+  fights fails it. When the change is meant, delete the file and run the test once to rewrite it.
+- `tests/fixtures/js_numbers.json` holds the tables, dice and first-mind choices the rules were ported against.
+  A deliberate change to a number updates the fixture's value with it.
+- One extra or missing roll of the dice changes every fight after it.
 - JS maths: `Math.sign(0)` is 0 (never `f64::signum`), `Math.round` rounds half up (`js_round`), `**` is `powi`.
 
 ## Before you finish

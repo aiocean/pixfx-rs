@@ -21,7 +21,7 @@ and yomi levels (`habits`, `yomi`), postures chosen by scored considerations wit
 
 | If the code... | It goes to |
 |---|---|
-| is the rules of a fight: damage, cooldowns, shots, statuses | the game (the site's `duel.js`) |
+| is the rules of a fight: damage, cooldowns, shots, statuses | the game (the landing duel's: `pixfx-duel`) |
 | names a game's skill or school | the game, as `Skill` and `Profile` data |
 | moves a body or poses it | `pixfx-fighter` |
 | is a JS binding of these types | `pixfx-wasm` (`mind` feature) |

@@ -1,5 +1,4 @@
-//! A fighter of the duel and the duel's whole state, with every field `duel.js`'s `fighter()`, `startRound` and
-//! `createDuel` set.
+//! A fighter of the duel and the duel's whole state.
 
 use crate::data::{Luck, Rarity, School, Stats, Trait, stats};
 use crate::out::Out;
@@ -248,7 +247,7 @@ pub struct State {
     pub key: u32,
     /// Spells in flight, in the order they were cast.
     pub shots: Vec<Shot>,
-    /// Shots taken out of `shots` during this tick: the tick still runs them, as `duel.js` runs a copy of its list.
+    /// Shots taken out of `shots` during this tick: the tick still runs them, as it runs a copy of its list.
     pub gone: Vec<Shot>,
     /// The last shot id handed out.
     pub shot_id: u32,

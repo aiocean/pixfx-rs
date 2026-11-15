@@ -1,4 +1,4 @@
-//! The mind's dice: mulberry32, the duel's own generator (`random` in `site/assets/duel.js`), bit for bit.
+//! The mind's dice: mulberry32, the duel's own generator (`pixfx_duel::rng`), bit for bit.
 
 /// A seeded generator: the same seed gives the same numbers on every target.
 #[derive(Clone, Debug, PartialEq)]

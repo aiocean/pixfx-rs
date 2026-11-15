@@ -1,5 +1,4 @@
-//! The duel: two fighters and their seats, stepped in whole ticks, round after round, as `duel.js`'s `createDuel`,
-//! `startRound`, `step`, `tick`, `body` and `apply`.
+//! The duel: two fighters and their seats, stepped in whole ticks, round after round.
 
 use crate::act::{advance, begin, break_act, drop_barrier, knock_out, set_meditating, settle};
 use crate::bar::{draw, fight_pool};

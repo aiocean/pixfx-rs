@@ -1,5 +1,5 @@
-//! The duel's first mind, the yardstick a brain is measured against: `site/tests/mind-baseline.js` as it is, its
-//! numbers, its rules, its dice and its quirks (its ward check reads a field fighters never had, so it never wards).
+//! The duel's first mind, the yardstick a brain is measured against, with its own dice and quirks (its ward check
+//! reads a field fighters never had, so it never wards).
 //! It scores what it could do every `THINK` seconds while it is free, seeing only what has shown for `REACTION`
 //! seconds, and does the best, with a little noise.
 

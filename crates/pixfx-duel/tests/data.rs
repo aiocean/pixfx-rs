@@ -1,5 +1,4 @@
-//! The duel's tables, dice and maths against what duel.js itself computes (`tests/fixtures/js_numbers.json`, written
-//! by `site/tests/tools/dump-numbers.js`).
+//! The duel's tables, dice and maths, pinned against `tests/fixtures/js_numbers.json`.
 
 use pixfx_duel::data::{
     self, Blow, Kind, LUCKY, PAYOFF, RARITY, Rarity, School, Status, TRAITS, Trait, block_chance, fits, orb_offset,
@@ -94,7 +93,7 @@ fn kind_name(k: Kind) -> &'static str {
     k.name()
 }
 
-/// A Rust spell in the shape duel.js writes it: fields left out when they are absent or false.
+/// A spell in the fixture's shape: fields left out when they are absent or false.
 fn spell_json(s: &data::Spell) -> Value {
     let mut o = Map::new();
     let mut put = |k: &str, v: Value| {
@@ -146,7 +145,7 @@ fn every_spell_is_ported_field_for_field() -> Result<(), String> {
     let f = fixture();
     let js = f["spells"].as_object().ok_or_else(|| "fixture has no spells".to_string())?;
     let names: Vec<&str> = data::spells().iter().map(|s| s.name).collect();
-    assert_eq!(names, js.keys().map(String::as_str).collect::<Vec<_>>(), "names in duel.js's order");
+    assert_eq!(names, js.keys().map(String::as_str).collect::<Vec<_>>(), "names in the fixture's order");
     for (name, want) in js {
         let s = data::spell(name).ok_or_else(|| format!("no spell {name}"))?;
         let got = spell_json(s);

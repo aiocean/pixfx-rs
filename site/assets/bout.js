@@ -56,6 +56,8 @@ function fighter(index, school, body) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
   for (const k of ["pose", "down"]) Object.defineProperty(f, k, { enumerable: true, get: () => body[k] });
+  // blows pass through it (a duel's fighter carries this as a field, read by duel-art.js appearance)
+  Object.defineProperty(f, "untouchable", { enumerable: true, get: () => body.untouchable() });
   return f;
 }
 

@@ -1,5 +1,5 @@
-//! Statuses that stack, hard controls cut by grit, burns, life lost and damage dealt, as `duel.js` has them. Each
-//! takes the state and the index of the fighter it touches, and emits what it did in `duel.js`'s order.
+//! Statuses that stack, hard controls cut by grit, burns, life lost and damage dealt. Each
+//! takes the state and the index of the fighter it touches, and emits what it did in a fixed order.
 
 use crate::data::{BURN, Blow, CHILL, DEF_DOWN, DEFENCE, FREEZE, FURY, GRIT, RAGE, SHOCK, SPREAD, Stats, shock_interval};
 use crate::fighter::{Fighter, Shocked, State};

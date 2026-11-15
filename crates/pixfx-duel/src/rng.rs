@@ -1,4 +1,4 @@
-//! The duel's dice: mulberry32, bit for bit as `duel.js`'s `random`, so a seed replays the same fight.
+//! The duel's dice: mulberry32, so a seed replays the same fight.
 
 /// A small seeded generator. Every roll of the rules comes from the duel's one `Rng`, in a fixed order.
 #[derive(Clone, Debug, PartialEq, Eq)]

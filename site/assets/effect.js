@@ -3,6 +3,8 @@
 // and Frost on the mountain dais, the effect staged by its role in a short take that ends at its impact), or alone
 // on a plain floor. One-shots and takes play, rest a moment, and play again.
 import { Body, FightFeel, Lighting, Sprites, createPixfx, effects, lightColor, loadPixfx, meta, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
+import * as pixfx from "../pkg/pixfx-canvas2d.js";
+import { useEngine } from "./duel.js";
 import { createBout, impact, step, take } from "./bout.js";
 import { roleFor } from "./effect-roles.js";
 import { TARGETS, codeFor } from "./effect-code.js";
@@ -45,6 +47,7 @@ const MODES = [{ value: "duel", label: "In a duel" }, { value: "alone", label: "
 /** Mount the effect page now in the document. Returns how to unmount it. */
 export async function mount() {
   await loadPixfx();
+  useEngine(pixfx);
   const id = new URLSearchParams(location.search).get("id");
   const root = document.getElementById("effect");
   const ids = effects();

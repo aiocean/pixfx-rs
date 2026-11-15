@@ -17,7 +17,7 @@ wasm-bindgen = { workspace = true, optional = true }
 [dev-dependencies]
 # the whole effect registry, as the page has it, and which effects loop
 pixfx-effects = { path = "../pixfx-effects" }
-# exact float parsing and JS key order, to compare with the fixture duel.js writes
+# exact float parsing and the fixture's key order
 serde_json = { version = "=1.0.154", features = ["float_roundtrip", "preserve_order"] }
 
 [features]

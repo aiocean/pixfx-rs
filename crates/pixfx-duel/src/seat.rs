@@ -23,7 +23,7 @@ pub trait Seat {
 /// Makes fighter `me`'s seat once the fighters exist (a brain is told both fighters' spells).
 pub type MakeSeat = Box<dyn FnOnce(&State, usize) -> Box<dyn Seat>>;
 
-/// pixfx-mind's brain with its school's skills and temperament, as `duel.js`'s `brain()` builds it.
+/// pixfx-mind's brain with its school's skills and temperament.
 pub struct Brain {
     mind: Mind,
     /// Its last thought.
