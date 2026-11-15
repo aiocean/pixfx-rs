@@ -1,11 +1,12 @@
 // pixfx in a Pixi 8 application: the Rust scene plays, times and places every effect, workers paint their frames
 // (`pixfx-web`), and this shows them with Pixi sprites, moves a camera container by the feel's shake and flashes
 // the screen.
-import type { Application, Container, Renderer } from "pixi.js";
+import type { Application, Container, Renderer, Sprite } from "pixi.js";
 import { Container as PixiContainer, Graphics, UPDATE_PRIORITY } from "pixi.js";
 import { z } from "zod";
-import type { Counts, Game, PixfxEffect } from "pixfx-web";
+import type { ActorSource, Counts, Game, PixfxEffect } from "pixfx-web";
 import { loadedGame, PixfxFeel, splitPlayOptions, Stage } from "pixfx-web";
+import { spriteActor } from "./actor";
 import type { PixiTextures } from "./pixi-gfx";
 import { pixiImages, pixiTextures } from "./pixi-gfx";
 
@@ -78,6 +79,15 @@ export class Pixfx {
     if (this.destroyed) throw new Error("pixfx: play() after destroy()");
     const { own, engine } = splitPlayOptions(OWN, opts);
     return this.stage.play(id, x, y, engine, null, own.depth);
+  }
+
+  /**
+   * `sprite` as the character an effect plays on: `effect.wrap(pixfx.actorOf(sprite))`. An effect that wraps its
+   * actor (as `feedback/power-up` does) grips the sprite's outline and follows each texture it shows. Its rotation
+   * is not read.
+   */
+  actorOf(sprite: Sprite): ActorSource {
+    return spriteActor(sprite, this.container);
   }
 
   /**

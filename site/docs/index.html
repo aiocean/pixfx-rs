@@ -28,7 +28,7 @@
 
 <h2>What you can do with it</h2>
 <ul>
-  <li><strong>Render.</strong> Run an effect natively and write sprite sheets (composite, colour and light PNGs plus a beanfx-layout JSON), or a looping GIF. See <a href="cli.html">Command line</a>.</li>
+  <li><strong>Render.</strong> Run an effect natively and write sprite sheets (composite, colour and light PNGs plus a beanfx-layout JSON), or a looping GIF. See <a href="scripts.html">Scripts</a>.</li>
   <li><strong>Play live.</strong> Run the same effect in a browser through a Canvas 2D renderer that owns its loop, through plain JS bindings, inside a Phaser 4 scene, or inside a gpui window.</li>
 </ul>
 <p>The effects are ports of <a href="https://github.com/patch-gg/pixelfx">pixelfx</a> (JavaScript). The ported effects match pixelfx exactly: <code>fire/candle</code>, <code>fire/campfire</code> and <code>fire/brazier</code> render with 0 differing pixels against pixelfx commit <code>044e12a</code>.</p>
@@ -38,7 +38,7 @@
 <table>
   <thead><tr><th>You want to</th><th>Use</th><th>Page</th></tr></thead>
   <tbody>
-    <tr><td>Export sheets or GIFs for an engine that plays sprite sheets</td><td><code>pixfx</code> CLI</td><td><a href="cli.html">Command line</a>, <a href="sheets.html">Sheet format</a></td></tr>
+    <tr><td>Export sheets or GIFs for an engine that plays sprite sheets</td><td>The <code>pixfx-export</code> scripts</td><td><a href="scripts.html">Scripts</a>, <a href="sheets.html">Sheet format</a></td></tr>
     <tr><td>Show effects on a web page or a canvas game</td><td><code>pixfx-canvas2d</code></td><td><a href="canvas.html">Canvas 2D shell</a></td></tr>
     <tr><td>Use effects in a Phaser 4 game</td><td><code>pixfx-phaser</code></td><td><a href="phaser.html">Phaser plugin</a></td></tr>
     <tr><td>Use effects in a Pixi 8 game</td><td><code>pixfx-pixi</code></td><td><a href="pixi.html">Pixi shell</a></td></tr>
@@ -56,7 +56,7 @@
   <tbody>
     <tr><td><code>crates/pixfx-core</code></td><td>The engine: frame with colour and additive light, painter, <code>Effect</code>/<code>Instance</code>, <code>render_frames</code>, <code>composite</code>, <code>frame_hash</code>.</td></tr>
     <tr><td><code>crates/pixfx-effects</code></td><td>The effects and their registry, <code>EFFECTS</code> and <code>effect(id)</code>.</td></tr>
-    <tr><td><code>crates/pixfx-cli</code></td><td>The <code>pixfx</code> binary: <code>sheet</code>, <code>render --gif</code>, <code>parity</code>.</td></tr>
+    <tr><td><code>crates/*/examples</code></td><td>Scripts over the library: <code>sprite_sheet</code>, <code>gif</code>, <code>bake</code>, <code>parity</code>, <code>bench</code>, <code>poses</code>, the pixel steps.</td></tr>
     <tr><td><code>crates/pixfx-export</code></td><td>Sprite sheets, beanfx-layout JSON and GIFs.</td></tr>
     <tr><td><code>crates/pixfx-wasm</code></td><td>The engine for JavaScript: <code>effects()</code>, <code>meta(id)</code>, <code>new Fx(id, opts)</code>.</td></tr>
     <tr><td><code>packages/pixfx-web</code></td><td>The JS runtime every JS shell shares: the wasm, painting workers, shared frames, a stage per scene.</td></tr>

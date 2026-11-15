@@ -100,8 +100,8 @@ fn nearest_cluster(centres: &[Lab], clusters: &[Cluster], i: usize) -> Option<(f
 /// The distinct painted colours, ordered by (count desc, RGB key asc), first join the nearest earlier leader within
 /// ΔE `threshold` or become a leader themselves; then the two clusters whose count-weighted OKLab centres are
 /// closest merge, ties to the lower cluster indexes, until at most `max_colors` are left. Each cluster is shown by
-/// its member nearest its centre (ties to the lower RGB key), so every colour out is one the picture had. The CLI
-/// passes 32 and 0.03.
+/// its member nearest its centre (ties to the lower RGB key), so every colour out is one the picture had. The `clean`
+/// step passes 32 and 0.03.
 pub fn reduce(img: &RgbaImage, max_colors: usize, threshold: f64) -> RgbaImage {
     let max_colors = max_colors.max(1);
     let mut colours: Vec<(u32, u64)> = count(img).into_iter().collect();

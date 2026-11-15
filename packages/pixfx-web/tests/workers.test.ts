@@ -6,6 +6,7 @@ import type { ToWorker } from "../src/protocol";
 import { toWorkerSchema } from "../src/protocol";
 import { FakeGfx } from "./fake-gfx";
 import { Stage } from "../src/stage";
+import type { ActorFrame } from "../src/actor";
 import { memory, wasm } from "./wasm";
 
 /**
@@ -132,6 +133,47 @@ test("an effect is painted by one worker, which lets go of its state when it end
   expect(new Set(ports.map((p) => p.posted.length > 0))).toEqual(new Set([true]));
   const ended = ports.flatMap((p) => p.posted.flatMap((m) => m.ended.map(([s, h]) => `${s}:${h}`)));
   expect(new Set(ended)).toEqual(new Set(painters.keys()));
+});
+
+/** A `w` x 20 block of one colour standing on (40, 60): a character's sprite frame. */
+function block(w: number): ActorFrame {
+  const rgba = new Uint8Array(w * 20 * 4);
+  for (let i = 0; i < rgba.length; i += 4) rgba.set([224, 192, 128, 255], i);
+  return { at: { x: 40 - Math.floor(w / 2), y: 40, w, h: 20 }, rgba };
+}
+
+/** Power-up on a character whose sprite turns thin and wide in turn (or on none), for `steps` frames of 1/30 s. */
+function wrapped(ports: LoopPort[], steps: number, actor: boolean) {
+  const { gfx, game, stage } = setup(ports);
+  const fx = stage.play("feedback/power-up", 40, 60, {}, 1);
+  let k = 0;
+  if (actor) fx.wrap(() => block(k % 6 < 3 ? 6 : 2));
+  const pictures: ReturnType<FakeGfx["picture"]>[] = [];
+  for (; k < steps; k++) {
+    stage.update(1 / 30);
+    stage.draw();
+    game.endFrame();
+    if (ports.length > 0) {
+      for (const p of ports) p.run();
+      stage.update(0);
+      stage.draw();
+      game.endFrame();
+    }
+    pictures.push(gfx.picture());
+  }
+  return pictures;
+}
+
+test("an effect wrapping a character grips its sprite the same on workers as on the spot", () => {
+  const inline = wrapped([], 24, true);
+  const port = new LoopPort();
+  expect(wrapped([port], 24, true)).toEqual(inline);
+  expect(wrapped([], 24, false)).not.toEqual(inline);
+  // the sprite's pixels go to the worker once per change of frame, not with every job
+  const jobs = port.posted.flatMap((m) => m.jobs);
+  const carrying = jobs.filter((j) => typeof j === "object" && j !== null && "actor" in j && j.actor != null);
+  expect(carrying.length).toBeGreaterThan(1);
+  expect(carrying.length).toBeLessThan(jobs.length / 2);
 });
 
 function jobKey(job: unknown): { scene: number; handle: number } {

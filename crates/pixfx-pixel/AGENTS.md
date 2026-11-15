@@ -12,6 +12,8 @@ drew:
 | Module | Holds |
 |---|---|
 | `recover` | The pixel grid of a picture drawn big (an image model's): period by autocorrelation, cuts by dynamic programming, a confidence per cell; `fit_height` resamples to a row count |
+| `frames` | The pixel grid shared by a sheet's frames (`recover_frames`): pitch from the gaps between edges of every frame, one pixel count for all, cuts per frame, a strength per frame; `grid_view` and `busiest` to check cuts by eye |
+| `register` | The frames of one drawing lined up on one origin: a whole-pixel shift per frame from its edges against the median of every frame's edges, taken only when the match is clear; `apply` moves a frame |
 | `cut`, `grid` | A picture out of its background; pixels as palette indices (`nearest`, `colors`), `shrink`, `rects`, `Map` |
 | `oklab`, `reduce` | Perceptual colour distance; colours merged down to a count, or snapped to a palette |
 | `show`, `view` | A map as text with a (named) legend and back (`text_named`, `parse`); as a picture sized to its token cost (`view`, `zoom`) |
@@ -19,9 +21,11 @@ drew:
 | `sheet` | Blank sheets for an image model, guides (pivot, ground, bones, a sprite), cells cut back; `sheet.json` and bones text |
 | `parts` | A sprite split into named parts with parents and pivots, from a spec the agent writes |
 | `diff` | Pixels two pictures differ by; `feet` stands two figures on the same spot first |
+| `tool` | The agent's steps as pure functions: `clean`, `read`, `draw`, `view`, `sheet`, `cut`, `parts`, `Palette` |
 
-`pixfx pixel <verb>` in `pixfx-cli` runs it; `examples/` holds scripts an agent copies when no verb fits. The skill
-`skills/pixfx-pixel/SKILL.md` is the agent's guide.
+`examples/` holds a script per step (`clean`, `read`, `draw`, `view`, `critique`, `sheet`, `cut`, `parts`, `diff`;
+`cargo run -p pixfx-pixel --example <step> -- ...`), sharing `examples/common/mod.rs`, and scripts an agent wrote
+when no step fit (`split_by_colour`). The skill `.claude/skills/pixfx-pixel/SKILL.md` is the agent's guide.
 
 ## Belongs here
 
@@ -33,18 +37,21 @@ drew:
 | If the code... | It goes to |
 |---|---|
 | paints pixels a game shows | `pixfx-draw` (primitives) or the crate that owns the thing drawn |
-| reads or writes files, parses arguments | `pixfx-cli` |
+| reads or writes files, parses arguments | a script in `examples/` |
 | is a generated table something in the engine paints from | nowhere: the agent writes painter code instead |
 
 ## Dependencies
 
-`pixfx-draw` (`Rgba`, `RgbaImage`, `to_hex`) and `libm`; `pixfx-export` for tests and examples only (reading
-PNGs). Nothing in the engine depends on this crate; only `pixfx-cli` does.
+`pixfx-draw` (`Rgba`, `RgbaImage`, `to_hex`) and `libm`; for tests and examples only, `pixfx-export` (PNGs) and
+`pixfx-fighter` (a look's named colours as a palette). The tool crates `pixfx-pose` and `pixfx-ref` depend on it;
+nothing in the engine does.
 
 ## Traps
 
 - Ties go to the first value met (`shrink`, `rects`), so the same picture gives the same grid on every run.
 - `text` refuses more colours than `LEGEND` has letters rather than reusing a letter: pass a palette, or `reduce`.
+- `recover` solves one picture alone: on a sheet's frames it gives each its own size, and none on a sparse frame.
+  Frames of one drawing go to `frames::recover_frames`.
 - `recover` may find no grid (a picture already one pixel a cell, or noise): pitch 1, and the picture comes back as
   it was. Low `total` confidence means the grid is doubtful.
 - `critique` reports every orphan cell in one issue, so one stray-pixel habit costs one warning, not the score.
@@ -53,5 +60,4 @@ PNGs). Nothing in the engine depends on this crate; only `pixfx-cli` does.
 
 ```
 cargo test -p pixfx-pixel
-cargo test -p pixfx-cli
 ```

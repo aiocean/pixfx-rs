@@ -64,7 +64,7 @@
   <li>Opaque colour, or colour over a background: light is added channel by channel, clamped to 255.</li>
   <li>Over transparency: the pixel's existing colour is premultiplied, the light added, and the result divided by the new alpha, which is at least the light's brightest channel. Light alone over nothing therefore becomes the straight-alpha pixel that adds that light when drawn additively.</li>
 </ul>
-<p>The composite sheet the CLI writes and <code>Fx.rgba()</code> in JS both use this.</p>
+<p>The composite sheet the <code>sprite_sheet</code> script writes and <code>Fx.rgba()</code> in JS both use this.</p>
 
 <h2>Back and front layers</h2>
 <p>An effect draws in two passes:</p>

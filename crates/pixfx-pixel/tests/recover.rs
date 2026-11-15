@@ -264,3 +264,25 @@ fn fit_height_halves() {
     let s = sprite();
     assert!(fit_height(&upscale(&s, 2.0), 24) == s);
 }
+
+#[test]
+fn a_recovered_picture_is_solid_or_empty() {
+    // A 4x4-pixel grid of 3x3 cells drawn at alpha 253, as image models often return.
+    let mut img = RgbaImage::new(12, 12);
+    for y in 0..12 {
+        for x in 0..12 {
+            if (x / 3 + y / 3) % 2 == 0 {
+                img.set(x, y, [200, 40, 40, 253]);
+            }
+        }
+    }
+    let found = recover(&img);
+    assert!(
+        found
+            .picture
+            .rgba
+            .chunks(4)
+            .all(|p| p.get(3) == Some(&255) || p.get(3) == Some(&0))
+    );
+    assert!(found.picture.rgba.chunks(4).any(|p| p.get(3) == Some(&255)));
+}

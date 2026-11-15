@@ -1,0 +1,28 @@
+{
+  "id": "shield/sword-ring",
+  "name": "Flying swords",
+  "look": "Flying-sword formation from cultivation fantasy. Eight slim glowing spirit swords orbit the character in a ring at chest height, points outward, trailing faint cyan light.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "the swords fan out from behind the character's back and spread into the ring"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the swords orbit steadily round the character, light trails behind each; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow comes from the right; the swords swing together to the right side, cross into a barrier and sparks burst where the blow meets them"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the swords stop, then fly off outward in every direction and vanish as streaks"
+    }
+  ]
+}

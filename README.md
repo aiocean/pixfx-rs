@@ -9,20 +9,51 @@ It has two modes:
 - **Play live.** Run the same effect in a browser, through plain JS bindings, a self-driving Canvas 2D
   renderer, or inside gpui.
 
-Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) and use the
-[beanfx](NOTICE.md) sheet layout. Every effect in `pixfx_effects::EFFECTS` is a port that passes the parity gate against pixelfx.
+Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS), or of
+[Sprite Fusion's pixel art VFX](https://www.spritefusion.com/pixel-art-vfx) (TypeScript) where pixelfx has no such
+effect, and use the [beanfx](NOTICE.md) sheet layout. Every effect in `pixfx_effects::EFFECTS` is a port that passes
+the parity gate against its source.
+
+## How you use it
+
+pixfx ships as source. There is no binary to install and no package to download: you clone this repo and work in it
+with your agent, which reads the code, imports it and runs it.
+
+The agent's guides are the skills in `.claude/skills/`: `pixfx` (start here: which skill, which crate, which
+test), `pixfx-effect`, `pixfx-play`, `pixfx-render`, `pixfx-perf`, `pixfx-pixel` and `pixfx-ref`.
+
+- **A Rust game** (gpui, a native tool) depends on the crates by path and calls them.
+- **A JS game** builds the wasm itself (`bun run build:wasm` in `packages/pixfx-web`) and plays through a JS shell:
+  `pixfx-canvas2d`, `pixfx-phaser` or `pixfx-pixi`.
+- **Files** (sprite sheets, gifs, baked clips, pose sheets) come from the scripts below. Each is a cargo example,
+  a short `main` over the library: run it as it is, or change it or copy it when its flags do not cover what you
+  need.
+
+| Script | Makes |
+|---|---|
+| `cargo run -p pixfx-export --example sprite_sheet -- <id>` | Composite, colour and light PNGs and the beanfx-layout JSON |
+| `cargo run -p pixfx-export --example gif -- <id>` | A looping gif |
+| `cargo run -p pixfx-export --example mp4 -- <id>` | A video (needs ffmpeg) |
+| `cargo run -p pixfx-export --example bake -- <id>` | A baked clip hosts play without drawing (`loadBaked`) |
+| `cargo run -p pixfx-export --example parity -- <id>` | The parity gate for one effect |
+| `cargo run --release -p pixfx-effects --example bench` | What a frame of effects costs natively |
+| `cargo run -p pixfx-fighter --example poses -- <look>` | Every pose of a fighter look on one sheet |
+| `cargo run -p pixfx-pixel --example <step> -- ...` | The agent's pixel steps: `clean`, `read`, `draw`, `view`, `critique`, `sheet`, `cut`, `parts`, `diff` (skill `.claude/skills/pixfx-pixel/SKILL.md`) |
+| `cargo run -p pixfx-ref --example <step> -- ...` | A new effect's reference from an image model: `template` (sheet and prompt from a spec), `generate` (the OpenRouter call), `extract` (colour and light layers per frame, a review page), `gallery` (skill `.claude/skills/pixfx-ref/SKILL.md`) |
+
+Each script's first lines say what it takes and writes.
 
 ## Crates
 
 | Crate | What it is |
 |---|---|
-| `crates/pixfx-draw` | Drawing, the lowest layer: frame with colour and additive light, painter, shapes, blending, `composite`, `frame_hash`, palette presets, outline rings, the JS-number maths (`math`). Knows nothing of effects or hosts. |
-| `crates/pixfx-core` | The engine on top of `pixfx-draw`: `Effect`/`Instance`, particles, `render_frames`, `Player`, the frame key and store; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`. |
+| `crates/pixfx-draw` | Drawing, the lowest layer: frame with colour and additive light, painter, shapes, blending, `composite`, `frame_hash`, palette presets, the JS-number maths (`math`). Knows nothing of effects or hosts. |
+| `crates/pixfx-core` | The engine on top of `pixfx-draw`: `Effect`/`Instance`, particles, `render_frames`, `Player`, the frame key and store; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`; sprite awareness: `Actor`, `Silhouette` (skill `.claude/skills/pixfx-sprite-aware/SKILL.md`). |
 | `crates/pixfx-scene` | What a stage shows and where, for every shell: `Scene` (effects playing, placement, layers, the view outside which nothing is drawn, the answer to their cues, events), `Frames` (the frames every scene of a game shares, and the `Painter` that paints them, on the spot or on another thread) and the `Shell` contract (`make`, `refill`, `show`, `free`). No browser or gpui types. |
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
-| `crates/pixfx-cli` | The `pixfx` binary: `parity`, `sheet`, `render`, `bake`, `bench`, `poses`, `pixel`, `diff`. |
-| `crates/pixfx-pixel` | Pixels for agents, not shipped in a game: a picture (an image model's, an artist's, a customer's sprite) cleaned to its pixel grid, read as text and drawn back, viewed, critiqued, split into parts; blank sheets for an image model (`pixfx pixel <verb>`, skill `skills/pixfx-pixel/SKILL.md`). |
-| `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF. |
+| `crates/pixfx-pixel` | Pixels for agents, not shipped in a game: a picture (an image model's, an artist's, a customer's sprite) cleaned to its pixel grid, read as text and drawn back, viewed, critiqued, split into parts; blank sheets for an image model (`pixfx_pixel::tool`, a script per step in `examples/`, skill `.claude/skills/pixfx-pixel/SKILL.md`). |
+| `crates/pixfx-ref` | Effect references from an image model, not shipped in a game: a spec of an effect's look and moments becomes a labelled template sheet and a prompt, the OpenRouter request is built and read, and the sheet the model drew is cut back into frames as colour and light layers with a review page (a script per step in `examples/`, the xianxia shields as worked specs, skill `.claude/skills/pixfx-ref/SKILL.md`). |
+| `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF, baked clips, and the parity check (`parity`); the scripts that write them in `examples/`. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
 | `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
 | `packages/pixfx-canvas2d` | Canvas 2D shell over `pixfx-web`: `createPixfx(ctx, { scale }).play(id, x, y, opts)`, then each frame `update(dt)` and `drawLayer("back")` / `drawLayer("front")` among your own drawing, `warp()` for a heavy blow's ring, `drawPicture()` for fighters and scene light Rust painted; workers paint. See its [README](packages/pixfx-canvas2d/README.md); demo in `packages/pixfx-canvas2d/demo/`. |
@@ -70,30 +101,35 @@ Effects say what an impact should do to the screen, and every host answers the s
   nearest upright `[sx, sy]` for hosts that cannot skew. `Blink` blinks a body while it cannot be hurt. In Phaser,
   use `scene.pixfx.squash(sprite)`. The fighter paints with the full shape.
 
-## Outlines
+## Effects that know their sprite
 
-Every effect takes an `outline` option. Left out, the effect looks as designed. A few effects draw an outline of
-their own: the explosions' rocks and clods, and the spinning coin. The option recolours that outline or turns it
-off. Any other effect gets a ring the engine draws round its shapes. Smoke, haze and lone motes, which the painter
-draws as a scatter of single pixels, get no ring.
+An effect can play on a sprite: a character, a sword, a hat. The game hands it the sprite's current frame every
+update (`effect.wrap(this.pixfx.actorOf(sprite))` in Phaser, `pixfx.actorOf(sprite)` in Pixi, `imageActor(...)` on a
+Canvas 2D context, `FxScene::set_actor` in gpui), and an effect that wraps its actor (`Effect::wraps_actor`) reads it
+and follows each frame. `feedback/power-up` grips the body with its aura; `feedback/outline` rings it.
 
-| `outline` | Result |
+To write one, read the sprite through `pixfx_core::Silhouette` (see `.claude/skills/pixfx-sprite-aware/SKILL.md`):
+
+| Call | Gives |
 |---|---|
-| left out | As designed. |
-| `false`, `"off"` | No outline, not even the effect's own. |
-| `true`, `"dark"` | The engine's dark 1 px outline (`#1a1422`). |
-| `"black"`, `"white"` | A 1 px outline in that colour; white reads over dark scenes. |
-| `"thick"` | Dark, 2 px, square corners. |
-| `"#ffcc00"` | A 1 px outline in any hex colour. |
-| `{color, width, corners}` | `color` is a preset name or a hex colour, `width` is 1 to 3, `corners` fills them (square) or leaves them cut (rounded). Each defaults to the dark 1 px ring. |
+| `Silhouette::of(&actor, area)` | The cells of an `Area` (a box of effect pixels) the sprite's opaque pixels cover. `Silhouette::from_fn` makes a stand-in body from shapes. |
+| `cells()`, `covers(x, y)`, `bounds()`, `centroid()` | The body, a test, its box, its middle. |
+| `edge()` | Cells on the body's edge: for rim light or sparks off it. |
+| `ring(width, corners)` | Cells of an outline round it, square or rounded. |
+| `around(max)`, `distance(x, y)` | Cells off the body with their distance in pixels: for an aura, a glow, a halo. |
+| `pick(&mut rng, tries)` | A random cell of the body, the same from the same seed. |
+| `Actor::opaque()` | The sprite's pixels with their colour: to tint the body or take its colours. |
 
-The engine's ring goes in the colour layer, so the effect's glow still shows over it. Elsewhere, an effect's
-darkest palette step does the work of an edge (the candle's wax, the icicle, the hit stars), and the effect's
-`palette` and colour options recolour it. pixelfx has no outline option, so effects left without one match it.
+### `feedback/outline`
 
-```sh
-cargo run -p pixfx-cli -- render fire/candle --gif --outline white
-```
+A ring round the sprite it wraps, drawn behind it, so it reads over busy ground or marks what is picked:
+`play("feedback/outline", x, y, { width: 2, palette: ["#ffffff"] }).wrap(actorOf(hero))`. `width` is 1 to 3,
+`corners: 1` fills the corners (square ring), 0 leaves them cut (rounded, the default); the colour is the
+palette's first, by default the engine's dark outline (`#1a1422`). `w` and `h` (default 128) size the box round where
+it plays that the sprite and its ring must fit in. It draws nothing until it has a sprite.
+
+Some effects draw an outline as part of their art (the explosions' rocks and clods, the spinning coin); their
+`palette` and colour options recolour it.
 
 ## Palettes
 
@@ -118,7 +154,7 @@ stage.play("explosions/small-explosion", x, y, { palette: "poison" });
 ```
 
 ```sh
-cargo run -p pixfx-cli -- render fire/campfire --gif --palette ice
+cargo run -p pixfx-export --example gif -- fire/campfire --palette ice
 ```
 
 In Phaser, `(await loadPixfx()).palettePresets()` lists the names.
@@ -137,21 +173,22 @@ In Phaser, `(await loadPixfx()).palettePresets()` lists the names.
 ## Render a sheet
 
 ```sh
-cargo run -p pixfx-cli -- sheet fire/campfire --out out
-cargo run -p pixfx-cli -- render fire/campfire --gif --scale 4 --out out
+cargo run -p pixfx-export --example sprite_sheet -- fire/campfire --out out
+cargo run -p pixfx-export --example gif -- fire/campfire --scale 4 --out out
 ```
 
-`sheet` writes the composite, colour and light PNGs and the beanfx-layout JSON into `out/`. `render --gif`
-writes a looping GIF.
+`sprite_sheet` writes the composite, colour and light PNGs and the beanfx-layout JSON into `out/`; `gif` writes a
+looping GIF. For a seed or an effect's own option, change the `Options` in the script.
 
 ## What a frame costs
 
 ```sh
-cargo run --release -p pixfx-cli -- bench --ids fire/candle,fire/campfire --n 50 --secs 10 --hz 60
+cargo run --release -p pixfx-effects --example bench -- --ids fire/candle,fire/campfire --n 50 --secs 10 --hz 60
 ```
 
-`bench` plays `--n` instances of each effect (default: the three fires, 50 each) on a `--hz` display for `--secs`
-seconds, drawing an instance only when its clock reaches a new frame, as hosts do. It prints the milliseconds per
+The bench plays `--n` instances of each effect (default: every effect the build has, 50 each) on a `--hz` display for `--secs`
+seconds, drawing an instance only when its clock reaches a new frame, as hosts do. Built with one effect's feature
+(`--no-default-features --features fire-candle`), it measures that effect alone. It prints the milliseconds per
 display frame spent updating every clock, then per effect its frame size (canvas plus glow margin), how many times it
 drew, and the milliseconds spent drawing and turning the lit box into RGBA. Run it on an idle machine; the numbers are
 native, and wasm in a browser is slower. `bun run perf` in `packages/pixfx-phaser` measures the browser.
@@ -163,7 +200,7 @@ Parity compares every pixel of every frame with pixelfx's own render. It needs N
 ```sh
 git clone https://github.com/patch-gg/pixelfx /tmp/pixelfx
 git -C /tmp/pixelfx checkout 044e12a
-cargo run -p pixfx-cli -- parity fire/candle --pixelfx /tmp/pixelfx --out target/parity
+cargo run -p pixfx-export --example parity -- fire/candle --pixelfx /tmp/pixelfx --out target/parity
 ```
 
 The ports match pixelfx commit `044e12a` (0.3.1); a later pixelfx may have changed an effect. Only `water/water-jet`
@@ -175,25 +212,35 @@ side-by-side `target/parity/<id>.side.gif`. Without `--pixelfx` it uses `$PIXELF
 code 0 is PASS, 1 is FAIL, 2 means the comparison could not run. Effects that ship below the gate are listed in
 `parity/LEDGER.md`; it is empty.
 
+An effect ported from Sprite Fusion has its source vendored verbatim at `tools/spritefusion/<id>.ts`, and the parity
+script checks it against that file instead (through `tools/spritefusion-ref.mjs`, which needs Node 22.6 or later to run
+TypeScript; no pixelfx checkout). The source runs on the port's canvas, fps and seed, sub-stepped at 120 Hz as
+pixelfx steps its effects. `arcane/hex-shield` and `feedback/power-up` match their sources pixel for pixel.
+
+An effect that wraps its character (`feedback/power-up`) is checked on one as well: `--actor idle.png,cast.png`
+stands each PNG with its feet on the effect's origin and shows them in turn, `--actor-every N` render frames each
+(default 6). Both the port and the source see the same sprite on the same frame.
+
 ## Determinism test
 
-Frame hashes of each effect are checked against goldens, natively and in wasm. The test is heavy, so it is
-ignored by default; run it before merging an effect.
+Frame hashes of each effect are checked against goldens, natively and in wasm, each effect against its own entry
+in `crates/pixfx-effects/tests/goldens/frame_hashes.json`. Every effect at once is heavy, so the test is ignored by
+default; build one effect alone and it checks that one in a fraction of a second.
 
 ```sh
-cargo test -p pixfx-effects --test determinism -- --ignored
+cargo test -p pixfx-effects --no-default-features --features fire-candle --test determinism -- --ignored
+cargo test -p pixfx-effects --test determinism -- --ignored        # every effect
 wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignored
 ```
 
-## Whole-repo check
+## Tests
+
+Each crate and package tests itself, and there is no repo-wide gate: run the tests of what you changed, as its
+`AGENTS.md` lists under "Before you finish" (`cargo test -p <crate>`, `bun run check` in a package). Working on one
+effect, build it alone, so nothing else compiles or runs:
 
 ```sh
-cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
-(cd packages/pixfx-phaser && bun run check)
-(cd packages/pixfx-web && bun run build:wasm && bun run check)
-(cd packages/pixfx-canvas2d && bun run check && bun run check:browser)
-(cd packages/pixfx-pixi && bun run check && bun run check:browser)
-bun test site/tests
+cargo test -p pixfx-effects --no-default-features --features fire-candle --all-targets
 ```
 
 ## Ship only the effects you play

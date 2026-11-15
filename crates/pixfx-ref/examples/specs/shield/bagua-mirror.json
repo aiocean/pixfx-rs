@@ -1,0 +1,28 @@
+{
+  "id": "shield/bagua-mirror",
+  "name": "Bagua mirror",
+  "look": "Bagua mirror, a protective treasure from cultivation fantasy. A large octagonal bronze mirror ringed with the eight trigram bars floats in front of the character, its polished face glowing pale jade, turning slowly.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "the mirror spins up out of a point of light in front of the character and grows to full size"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the mirror floats and turns slowly, the trigram bars lighting one after another; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow strikes the mirror's face from the right; the face flashes white and the blow is thrown back to the right as a straight beam of light"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the mirror spins faster, shrinks to a point and winks out"
+    }
+  ]
+}

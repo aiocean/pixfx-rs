@@ -61,9 +61,9 @@ export function loadedGame(): Game | null {
 }
 
 /**
- * Hold the frames of a clip baked by `pixfx bake` (`<name>.bake.json` and the PNG pages it names, fetched from
- * `url`'s folder): effects playing that effect with the same options then show the baked frames instead of painting
- * them. Baked frames are held like painted ones: past the frame budget they go, and are painted again if shown.
+ * Hold the frames of a clip the bake script (`crates/pixfx-export/examples/bake.rs`) wrote: `<name>.bake.json` and
+ * the PNG pages it names, fetched from `url`'s folder. Effects playing that effect with the same options then show
+ * the baked frames instead of painting them. Baked frames are held like painted ones: past the frame budget they go, and are painted again if shown.
  * Returns how many frames were loaded. Call after `loadPixfx()` resolves and a scene of the shell has started.
  */
 export async function loadBaked(url: string): Promise<number> {

@@ -6,8 +6,8 @@ anything here; this file only says what this crate holds.
 ## Job
 
 The engine for JavaScript. It translates and decides nothing: `effects()`, `meta(id)`, `new Fx(id, opts)`,
-`update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`, `new Feel(spec?)`, `new Squash(spec?)`,
-`new Blink(spec?)`, and `parse_options`. Every JS shell (Canvas 2D, Phaser, Pixi) loads the engine through it.
+`update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`, `lightColor(id, opts)`, `new Feel(spec?)`,
+`new Squash(spec?)`, `new Blink(spec?)`, and `parse_options`. Every JS shell (Canvas 2D, Phaser, Pixi) loads the engine through it.
 
 `src/scene.rs` is the `pixfx-scene` scene for JS shells: `new Frames(workers)` once per game, `frames.scene(scale)`
 per stage, `scene.play/moveTo/stop/update/events`, then `scene.draw(frames)` and `frames.endFrame()`, which return a
@@ -16,7 +16,7 @@ draw list (`Int32Array`, `OP_STRIDE` numbers per op: make, refill, show, free) w
 gives the frames to paint, a worker's `new Painting()` paints, cuts and turns each into RGBA (`painted.shape()`,
 `color()`, `light()`), the worker transfers the bytes, and `scene.deliver(frames, job, shape)` takes back only the
 shape: the make or refill it returns uploads the worker's bytes, which never pass through wasm on the main thread.
-Presets come from `palettePresets()` and `outlinePresets()`; `scene.setView(x, y, w, h, scrollX, scrollY)` and `scene.setScrollFactor(handle, f)` say what a camera sees and how
+Presets come from `palettePresets()`; `scene.setView(x, y, w, h, scrollX, scrollY)` and `scene.setScrollFactor(handle, f)` say what a camera sees and how
 far each effect moves with it, so the scene draws only those it sees. `scene.bend(src, w, h, unit)` bends a picture of the
 host's screen by the feel's live ripples (`pixfx_core::screen::ripple_rgba`), for a shell that bends pixels on the
 CPU. Behind the `fighter`, `light` and `mind` features (all default): `src/fighter.rs` (`Body`, `FightFeel`, `Sprites`,
@@ -56,10 +56,9 @@ effect on), `js-sys`, `wasm-bindgen`, `serde`, `serde-wasm-bindgen`, `serde_json
 ## Before you finish
 
 ```
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
+cargo test -p pixfx-wasm
+cargo clippy -p pixfx-wasm --all-targets -- -D warnings
 (cd packages/pixfx-web && bun run build:wasm && bun run check)
-(cd packages/pixfx-phaser && bun run check)
 ```
 
 A changed JS-facing name or shape breaks every JS shell; update them in the same change.

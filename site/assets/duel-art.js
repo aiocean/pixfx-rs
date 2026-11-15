@@ -67,14 +67,26 @@ function marks(f, time) {
 }
 
 /**
- * The two fighters and the dust of the fight (`feel`), feet on row `ground`; `jolts` from `feel.jolts()`. Returns
- * the picture to draw (`pixfx.drawPicture`).
+ * Each fighter on a picture of its own, feet on row `ground`, and then the dust of the fight (`feel`); `jolts` from
+ * `feel.jolts()`. Returns the pictures to draw (`pixfx.drawPicture`), the fighters' by their index: an effect that
+ * wraps a fighter reads its picture.
  */
 export function paintFighters(sprites, duel, feel, ground, jolts) {
+  const fighters = duel.fighters.map((f) => {
+    sprites.begin();
+    sprites.fighter(f.school, appearance(f, jolts[f.index]), ground, marks(f, duel.time));
+    return sprites.picture();
+  });
   sprites.begin();
-  for (const f of duel.fighters) sprites.fighter(f.school, appearance(f, jolts[f.index]), ground, marks(f, duel.time));
   sprites.dust(feel, ground);
-  return sprites.picture();
+  return { fighters, dust: sprites.picture() };
+}
+
+/** A fighter's picture as the sprite an effect wraps (`effect.wrap`): where it shows and its colour bytes. */
+export function actorOf(picture) {
+  const c = picture?.color;
+  if (!c) return null;
+  return { at: { x: picture.x, y: picture.y, w: picture.w, h: picture.h }, rgba: new Uint8Array(c.buffer, c.byteOffset, c.byteLength) };
 }
 
 /**

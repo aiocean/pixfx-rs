@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Reference render of a pixelfx effect, for `pixfx parity`: the raw colour and light buffers of every frame.
+// Reference render of a pixelfx effect, for the parity script (crates/pixfx-export/examples/parity.rs): the raw colour and light buffers of every frame.
 //
 //   node tools/pixelfx-ref.mjs <id> --out <dir> [--pixelfx DIR] [--opts JSON]
 //

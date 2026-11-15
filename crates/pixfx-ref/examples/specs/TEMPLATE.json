@@ -1,0 +1,52 @@
+{
+  "id": "category/my-effect",
+  "name": "My effect",
+  "look": "My effect, a <what it is> from <genre>. <One or two sentences: shape, material, colour, glow, where it sits round the character.>",
+  "subject": "shield",
+  "rules": [
+    "The effect grows from almost nothing: never jump from an empty cell to a half-formed shape.",
+    "Keep the colours of the second image's palette: no outline in black, no gradients wider than a few pixels."
+  ],
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "forms",
+      "text": "<how it appears>",
+      "frames": 5,
+      "notes": [
+        "only 3 to 6 faint specks of light, under 20 pixels in all: the shape is not visible yet",
+        "a thin faint outline of the lowest part, under 60 pixels",
+        "",
+        "",
+        "fully formed, the same as the IDLE frames"
+      ]
+    },
+    {
+      "name": "IDLE",
+      "caption": "holds",
+      "text": "<what moves while it holds>. It loops"
+    },
+    {
+      "name": "HIT RIGHT",
+      "caption": "blow from the right",
+      "text": "<a blow strikes its right side: what flashes, cracks or flies off to the right>"
+    },
+    {
+      "name": "HIT LEFT",
+      "caption": "blow from the left",
+      "text": "<the same blow from the left>"
+    },
+    {
+      "name": "BREAK",
+      "caption": "ends",
+      "text": "<how it ends>",
+      "frames": 4,
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left, about a third of the pixels of the first frame",
+        "a few last faint specks, under 20 pixels"
+      ]
+    }
+  ]
+}

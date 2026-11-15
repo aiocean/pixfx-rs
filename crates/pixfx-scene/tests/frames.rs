@@ -7,10 +7,10 @@ use std::num::NonZeroU32;
 #[path = "common/recorder.rs"]
 mod recorder;
 
-use pixfx_core::{Clip, Layer, Options};
+use pixfx_core::{Actor, Clip, Layer, Options};
 use pixfx_draw::Frame;
 use pixfx_effects::effect;
-use pixfx_scene::{EffectKey, Frames, InlinePainter, Job, Painter, Scene, Target};
+use pixfx_scene::{ActorFrame, EffectKey, Frames, InlinePainter, Job, Painter, Scene, Target};
 use recorder::Recorder;
 
 type Res = Result<(), Box<dyn Error>>;
@@ -42,6 +42,7 @@ struct Asked {
     place: pixfx_core::Placement,
     layer: Layer,
     target: Target,
+    actor: Option<ActorFrame>,
 }
 
 impl Painter for Later {
@@ -54,6 +55,7 @@ impl Painter for Later {
             place: job.place,
             layer: job.layer,
             target: job.target.clone(),
+            actor: job.actor.cloned(),
         });
         None
     }
@@ -80,6 +82,7 @@ fn deliver(
             place: a.place,
             layer: a.layer,
             target: a.target.clone(),
+            actor: a.actor.as_ref(),
         };
         let frame = frames
             .painter_mut()
@@ -91,9 +94,9 @@ fn deliver(
             Target::Shared(id) => frames
                 .deliver(&id, a.layer, &frame, shell)
                 .map_err(|()| "deliver")?,
-            Target::Own { clock, place } => {
+            Target::Own(at) => {
                 scene
-                    .deliver_own(a.effect.handle, a.layer, clock, place, &frame, shell)
+                    .deliver_own(a.effect.handle, a.layer, at, &frame, shell)
                     .map_err(|()| "deliver own")?;
             }
         }
@@ -208,7 +211,7 @@ fn a_fading_effect_painted_elsewhere_shows_its_own_frames() -> Res {
             .painter()
             .asked
             .iter()
-            .all(|a| matches!(a.target, Target::Own { .. })),
+            .all(|a| matches!(a.target, Target::Own(_))),
         "a fading effect asks for its own frames"
     );
     deliver(&mut frames, &mut scene, &mut shell)?;
@@ -335,5 +338,156 @@ fn a_shared_frame_counts_against_the_budget_as_the_lit_box_a_shell_holds() -> Re
         .sum();
     assert!(lit < whole, "a candle lights a small part of its frame");
     assert_eq!(frames.bytes(), lit);
+    Ok(())
+}
+
+fn power_up() -> Result<Clip, Box<dyn Error>> {
+    let fx = effect("feedback/power-up").ok_or("feedback/power-up not registered")?;
+    Ok(Clip::live(fx, Options::default()))
+}
+
+/// A 6 x 20 sprite standing on game pixel (`x`, `y`), its colour `c`, or a 2-wide one when `thin`.
+fn sprite(x: i32, y: i32, thin: bool) -> Result<Actor, Box<dyn Error>> {
+    let w = if thin { 2 } else { 6 };
+    Ok(Actor::new(
+        x - w / 2,
+        y - 20,
+        w as u32,
+        20,
+        vec![0xff80_c0e0; (w * 20) as usize],
+    )?)
+}
+
+#[test]
+fn an_effect_wrapping_its_actor_paints_its_own_frames_round_the_sprite() -> Res {
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    let (a, b) = (
+        scene.play(power_up()?, 40.0, 60.0)?,
+        scene.play(power_up()?, 40.0, 60.0)?,
+    );
+    assert!(scene.set_actor(a, Some(sprite(40, 60, false)?))?);
+    let mut shell = Recorder::default();
+    // past the burst, with the aura up (draws in order: a's back, b's back, a's front, b's front)
+    for _ in 0..36 {
+        scene.update(1.0 / 60.0)?;
+    }
+    let shown = host_frame(&mut frames, &mut scene, &mut shell)?;
+    assert_eq!(shown.len(), 4);
+    // a and b play the same effect at the same time; only b's frames are shared
+    assert_ne!(
+        shown[0], shown[1],
+        "a's aura grips its sprite, b's the stand-in body"
+    );
+    let made = shell.made;
+    // a new sprite frame draws a again at the same clock frame; b's shared frames stay
+    assert!(scene.set_actor(a, Some(sprite(40, 60, true)?))?);
+    let again = host_frame(&mut frames, &mut scene, &mut shell)?;
+    assert_eq!(
+        shell.made, made,
+        "a refills its own surfaces, b shows its held frames"
+    );
+    assert_ne!(again[0], shown[0], "a's back layer follows the new sprite");
+    assert_eq!(again[1], shown[1]);
+    assert!(!scene.set_actor(99, None)?, "no instance 99");
+    let _ = b;
+    Ok(())
+}
+
+#[test]
+fn the_same_sprite_moving_with_its_effect_draws_nothing_new() -> Res {
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    let h = scene.play(power_up()?, 40.0, 60.0)?;
+    let mut shell = Recorder::default();
+    scene.set_actor(h, Some(sprite(40, 60, false)?))?;
+    host_frame(&mut frames, &mut scene, &mut shell)?;
+    let drawn = shell.made + shell.refilled;
+    // the effect follows its sprite: both move, the host hands the same frame again where it now stands
+    for x in 41..45 {
+        scene.move_to(h, f64::from(x), 60.0)?;
+        scene.set_actor(h, Some(sprite(x, 60, false)?))?;
+        host_frame(&mut frames, &mut scene, &mut shell)?;
+    }
+    assert_eq!(
+        shell.made + shell.refilled,
+        drawn,
+        "nothing changed relative to the effect"
+    );
+    // the sprite steps away from the effect: drawn again
+    scene.set_actor(h, Some(sprite(46, 60, false)?))?;
+    host_frame(&mut frames, &mut scene, &mut shell)?;
+    assert!(shell.made + shell.refilled > drawn);
+    Ok(())
+}
+
+#[test]
+fn an_actor_painted_elsewhere_gives_the_frames_an_inline_painter_gives() -> Res {
+    let run = |frames: &mut Frames<Frame, Later>| -> Result<Vec<Frame>, Box<dyn Error>> {
+        let mut scene: Scene<Frame> = frames.scene(one()?);
+        let mut shell = Recorder::default();
+        let h = scene.play(power_up()?, 40.0, 60.0)?;
+        let mut out = Vec::new();
+        for k in 0..40 {
+            scene.set_actor(h, Some(sprite(40, 60, k % 10 < 5)?))?;
+            scene.update(1.0 / 60.0)?;
+            host_frame(frames, &mut scene, &mut shell)?;
+            deliver(frames, &mut scene, &mut shell)?;
+            out.extend(host_frame(frames, &mut scene, &mut shell)?);
+        }
+        Ok(out)
+    };
+    let elsewhere = run(&mut Frames::new(Later::default()))?;
+    let mut inline = Frames::default();
+    let mut scene: Scene<Frame> = inline.scene(one()?);
+    let mut shell = Recorder::default();
+    let h = scene.play(power_up()?, 40.0, 60.0)?;
+    let mut here = Vec::new();
+    for k in 0..40 {
+        scene.set_actor(h, Some(sprite(40, 60, k % 10 < 5)?))?;
+        scene.update(1.0 / 60.0)?;
+        host_frame(&mut inline, &mut scene, &mut shell)?;
+        here.extend(host_frame(&mut inline, &mut scene, &mut shell)?);
+    }
+    assert_eq!(elsewhere, here);
+    Ok(())
+}
+
+#[test]
+fn a_flipped_effect_sees_its_actor_mirrored() -> Res {
+    let mut frames = Frames::default();
+    let mut scene: Scene<Frame> = frames.scene(one()?);
+    let mut shell = Recorder::default();
+    let h = scene.play(power_up()?, 40.0, 60.0)?;
+    // a sprite standing right of the feet, seen by an effect drawn flipped, lands right of the feet on screen
+    let right = Actor::new(42, 40, 3, 20, vec![0xffff_ffff; 60])?;
+    scene.set_actor(h, Some(right))?;
+    let p = scene.placement(h).ok_or("placed")?;
+    scene.set(h, pixfx_core::Placement { flip: true, ..p })?;
+    // at the burst the character flashes
+    for _ in 0..20 {
+        scene.update(1.0 / 60.0)?;
+    }
+    let shown = host_frame(&mut frames, &mut scene, &mut shell)?;
+    let front = shown.get(1).ok_or("front")?;
+    let rect = scene.rect(h).ok_or("rect")?;
+    let lit = |gx: i64| {
+        (40..58)
+            .filter(|&gy| {
+                let (fx, fy) = (gx - rect.x, gy - rect.y);
+                front
+                    .color
+                    .get((fy * i64::from(front.w) + fx) as usize)
+                    .is_some_and(|&c| c != 0)
+            })
+            .count()
+    };
+    // the flash tints every pixel of the sprite's columns, 42 to 44, and the mirror image left of the feet only
+    // where motes and the floor shock land
+    assert!(
+        (42..45).all(|x| lit(x) == 18),
+        "the sprite's own columns flash"
+    );
+    assert!((35..38).all(|x| lit(x) < 18), "not their mirror image");
     Ok(())
 }

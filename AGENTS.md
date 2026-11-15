@@ -20,6 +20,10 @@ is to Zed: the games are the product, and the engine grows only what a real game
   before and after.
 - **Everywhere, identical.** Written once in Rust; the same frames natively, in WebAssembly and on every shell.
   `frame_hash` and the parity gate prove it.
+- **Source, not a package.** A user clones this repo and works in it with an agent. The agent imports the crates and
+  the JS packages, builds the wasm itself (`bun run build:wasm`), and runs or edits the scripts in each crate's
+  `examples/` to make files. There is no command-line tool: an output a game needs is a script over the library,
+  and its logic lives in the library so every script and game can call it.
 
 ## The boundary: Rust decides, the shell draws
 
@@ -50,7 +54,7 @@ Every shell is equal. None is the main one:
 | Canvas 2D | `packages/pixfx-canvas2d` | shipped |
 | Phaser 4 | `packages/pixfx-phaser` | shipped |
 | gpui | `crates/pixfx-gpui` | shipped (own workspace, needs the gpui fork) |
-| Files (PNG sheets, beanfx JSON, GIF) | `crates/pixfx-export`, `crates/pixfx-cli` | shipped |
+| Files (PNG sheets, beanfx JSON, GIF, baked clips) | `crates/pixfx-export` and its `examples/` scripts | shipped |
 | Pixi 8 | `packages/pixfx-pixi` | shipped |
 | CSS and DOM | `packages/pixfx-dom` | possible |
 | WebGL | a shell of its own | possible |
@@ -104,12 +108,12 @@ Dependencies point one way, top to bottom. A lower layer never depends on a high
 
 | Layer | Crate (target) | Holds | Rules |
 |---|---|---|---|
-| Shells | `pixfx-canvas2d`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-gpui`, `pixfx-export`, `pixfx-cli` | Host objects, the host loop, workers, surface caches | No decisions. Thin enough that a second shell for the same host would be the same code. |
+| Shells | `pixfx-canvas2d`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-gpui`, `pixfx-export` | Host objects, the host loop, workers, surface caches | No decisions. Thin enough that a second shell for the same host would be the same code. |
 | JS runtime | `packages/pixfx-web` (TypeScript) | Loading the wasm, painting workers, the game-wide frames and their surfaces, a stage per host scene following the draw list, effect handles, the feel's JS face | Host-neutral: no Phaser, no Pixi. A JS shell adds only its host objects and its loop. |
 | JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it, by way of `pixfx-web`. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
 | Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies | Pure and deterministic: no clock, no I/O, no host types. |
-| Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `blend`, `color`, `palette`, `outline`, `math`) | Frames with colour and light, painting, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
+| Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `blend`, `color`, `palette`, `math`) | Frames with colour and light, painting, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
 
 Where a new piece of code goes:
 
@@ -120,11 +124,17 @@ Where a new piece of code goes:
 - A new way to paint pixels (sprite, text, nine-slice, UI box): the drawing layer, driven by the first game that
   needs it; that game decides its API.
 - A tool an agent uses to read a picture as pixels (an image model's drawing, a customer's sprite): `pixfx-pixel`,
-  reached through `pixfx pixel`. It feeds the agent, never the game: the agent writes painter code from what it
+  a pure function per step in `pixfx_pixel::tool`, run by a script per step in its `examples/`. It feeds the agent, never the game: the agent writes painter code from what it
   reads, and nothing in the engine paints from its output.
+- Getting reference art for a new effect from an image model (template sheet, prompt, the call, the effect's pixels
+  cut back out as colour and light): `pixfx-ref`, a script per step in its `examples/`. Like `pixfx-pixel` it feeds the
+  agent: the effect is written by hand in `pixfx-effects` from what it shows.
 - Placement, layering, lifetimes, follow, fading after stop, which frame to show: `Scene`.
 - A JS-facing type or option: `pixfx-wasm`, as a translation of a Rust type.
 - A new host or output: a new shell.
+- A new file to make (a sheet, a video, a report): its logic in the library crate that owns it, and a short script
+  in that crate's `examples/` that reads arguments and writes files. Scripts share nothing but an
+  `examples/common/mod.rs` of their own crate.
 - The same rule written in two shells: move it down to the lowest layer that every user of it can reach.
 - Data that the engine owns (presets, effect metadata, option specs) is read from Rust at run time, never copied into
   a shell.
@@ -141,9 +151,13 @@ until its refactor lands.
 
 ## Rules
 
-- Parity: every effect in `pixfx_effects::EFFECTS` passes the parity gate against pixelfx (`pixfx parity`).
+- Parity: every port in `pixfx_effects::EFFECTS` passes the parity gate against its source (`cargo run -p pixfx-export --example parity -- <id>`): pixelfx,
+  or the Sprite Fusion file vendored at `tools/spritefusion/<id>.ts` for an effect pixelfx does not have. An effect
+  made here (`feedback/outline`) has no source; its golden hashes pin it.
 - Determinism: the same scene, options and time give the same `frame_hash` on every target.
 - Lints: clippy `unwrap_used`, `expect_used` and `panic` are denied; `unsafe_code` is forbidden.
-- Tests run in two tiers. While working: the tests of the crate or package you changed, and `bun run perf` (or an
-  fps measurement) for anything that claims speed. Once, before each commit: the whole gate (README "Whole-repo
-  check"). Keep every test; a slow loop is fixed by running less of it, not by deleting it.
+- Tests live in the crate or package they test, and there is no repo-wide gate: a change runs the tests of what it
+  changed (each crate's and package's "Before you finish"), and a speed claim shows that crate's own measurement
+  before and after (`bench` for effects, `bun run perf` for Phaser, the gpui measurements). One effect builds,
+  tests and benches alone behind its feature (`crates/pixfx-effects/AGENTS.md`). Keep every test; a slow loop is
+  fixed by running less of it, not by deleting it.

@@ -148,10 +148,24 @@ input[type="range"] { accent-color: var(--flame); width: 100%; }
 .crumbs { margin: 0 0 0.5rem; font-size: 0.95rem; }
 .effect-page .page > .lead { max-width: 70ch; }
 .effect-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr); gap: 2rem; align-items: start; margin-top: 1.5rem; }
+.effect-stage { margin: 0; }
+.effect-mode { display: flex; gap: 0.25rem; margin-bottom: 0.6rem; font-size: 0.9rem; }
+.effect-mode label {
+  position: relative; color: var(--ash); background: var(--night); border: 1px solid var(--soot);
+  padding: 0.3rem 0.75rem; cursor: pointer;
+}
+.effect-mode input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.effect-mode label:hover { color: var(--wax); border-color: var(--wax); }
+.effect-mode label:has(:checked) { color: var(--wax); border-color: var(--flame); }
+.effect-mode label:has(:focus-visible) { outline: 2px solid var(--flame); outline-offset: 2px; }
+.effect-caption { margin: 0.6rem 0 0; color: var(--ash); font-size: 0.95rem; }
 .effect-stage canvas { width: 100%; height: auto; image-rendering: pixelated; display: block; background: var(--ground); border: 1px solid var(--soot); }
 .effect-side { display: flex; flex-direction: column; gap: 1.25rem; }
 .effect-side pre { margin: 0; font-size: 0.85rem; border-left-color: var(--soot); }
 .effect-side table { margin: 0; }
+.effect-code [role="tablist"] { margin-bottom: 0.5rem; }
+.effect-code [role="tab"] { font-size: 0.85rem; }
+.effect-code-docs { margin: 0.4rem 0 0; font-size: 0.85rem; }
 .page .pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--soot); }
 .page .pager a { text-decoration: none; }
 

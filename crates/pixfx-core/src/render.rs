@@ -1,6 +1,9 @@
 //! Rendering an effect's frames: port of pixelfx `tools/lib/fxlib.mjs` `renderFrames` (the bare render: no
 //! backdrop, no stand-in actor) and `edgeFade`.
 
+use std::sync::Arc;
+
+use crate::actor::Actor;
 use crate::effect::{Effect, Instance, Layer, Options};
 use pixfx_draw::frame::Frame;
 use pixfx_draw::math::js_round;
@@ -28,6 +31,17 @@ const EDGE: u32 = 8;
 /// `opts.y` say. Without a margin, light is eased out at the canvas edge (full-screen effects excepted) so a
 /// glow cut off by the edge does not show as a box.
 pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -> Rendered {
+    render_frames_with_actor(effect, opts, margin, |_| None)
+}
+
+/// [`render_frames`] of an effect playing on a character: frame k is drawn after the state has stepped to it with
+/// `actor(k)`, the character's sprite as it shows on frame k, handed over before frame k's steps.
+pub fn render_frames_with_actor(
+    effect: &'static dyn Effect,
+    opts: &Options,
+    margin: u32,
+    actor: impl Fn(u64) -> Option<Arc<Actor>>,
+) -> Rendered {
     let meta = effect.meta();
     let canvas = effect.canvas(opts);
     let (w, h) = (canvas.size.0 + margin * 2, canvas.size.1 + margin * 2);
@@ -43,6 +57,7 @@ pub fn render_frames(effect: &'static dyn Effect, opts: &Options, margin: u32) -
     let mut frames = Vec::with_capacity(n as usize);
     for k in 0..n {
         // unclamped by MAX_DT: renders step exactly as pixelfx, whatever the fps
+        inst.set_actor(actor(k));
         inst.seek(k);
         let mut frame = Frame::new(w, h, corner, corner);
         inst.draw(&mut frame, Layer::Both, inst.placement());

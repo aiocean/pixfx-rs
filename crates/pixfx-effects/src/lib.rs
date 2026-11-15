@@ -1,4 +1,5 @@
-//! pixfx effects: ports of pixelfx's effects (https://github.com/patch-gg/pixelfx), listed in [`EFFECTS`].
+//! pixfx effects: ports of pixelfx's effects (https://github.com/patch-gg/pixelfx), and of Sprite Fusion's pixel art
+//! VFX (https://www.spritefusion.com/pixel-art-vfx) where pixelfx has no such effect, listed in [`EFFECTS`].
 #![forbid(unsafe_code)]
 
 use pixfx_core::effect::{Effect, find};
@@ -6,6 +7,7 @@ use pixfx_core::effect::{Effect, find};
 pub mod arcane;
 pub mod critters;
 pub mod explosions;
+pub mod feedback;
 pub mod fire;
 pub mod holy;
 pub mod ice;
@@ -41,10 +43,18 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &explosions::IMPLOSION,
     #[cfg(feature = "explosions-plasma-explosion")]
     &explosions::PLASMA_EXPLOSION,
+    #[cfg(feature = "explosions-body-burst")]
+    &explosions::BODY_BURST,
     #[cfg(feature = "arcane-rune-circle")]
     &arcane::RUNE_CIRCLE,
+    #[cfg(feature = "arcane-hex-shield")]
+    &arcane::HEX_SHIELD,
     #[cfg(feature = "critters-wisp")]
     &critters::WISP,
+    #[cfg(feature = "feedback-outline")]
+    &feedback::OUTLINE,
+    #[cfg(feature = "feedback-power-up")]
+    &feedback::POWER_UP,
     #[cfg(feature = "spawn-poof")]
     &spawn::POOF,
     #[cfg(feature = "holy-feather-burst")]

@@ -1,0 +1,10 @@
+The first image is a sheet of labelled cells, each holding a magenta stick figure. The figure is only a guide to size and place: it shows where a character stands and how tall it is. Fill every cell with one frame of the same pixel art effect, sized and placed around where the figure stands. Do not draw the figure or any character: leave the place where it stands empty, showing only the effect on a transparent background. The label above each cell says which moment it shows; read the rows top to bottom and the frames left to right.
+
+The effect: Golden Bell, a protective barrier from cultivation fantasy. A translucent golden-bronze temple bell made of qi covers the character from head to ground, with engraved rune bands round its waist and rim and a warm glow.
+
+- INIT row: the bell descends from above and settles over the character, landing with a small ring of dust at its rim.
+- IDLE row: the bell holds steady; light shimmers down its surface and the rune bands pulse softly. It loops.
+- HIT row: a blow strikes the bell's right side. The bell rings: a bright flash at the impact point, a ripple running round the bell, and a ring of light bursting outward, then settling.
+- BREAK row: the bell fades from the rim upward and dissolves into rising golden motes.
+
+Keep the cell layout and the labels unchanged and remove the magenta figure; draw only inside the cells, with the bell the same size and in the same place in every frame. Draw it in the style of the second image: hard square pixels, ordered dithering for soft edges, bright glow. The background is fully transparent everywhere, inside and outside the cells: no dark fill, no backdrop; the glow fades into transparency. Keep only the labels opaque.

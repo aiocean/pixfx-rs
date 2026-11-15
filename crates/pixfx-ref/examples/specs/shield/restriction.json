@@ -1,0 +1,28 @@
+{
+  "id": "shield/restriction",
+  "name": "Restriction",
+  "look": "Restriction barrier, a seal of layered runes from cultivation fantasy. Three stacked horizontal rings of glowing violet-white rune characters circle the character at knee, waist and head height, turning in alternating directions, joined by faint vertical light.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "the rings draw themselves one by one from the ground up, each rune lighting as it is written"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the three rings turn against each other and their runes pulse in sequence; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow strikes from the right; the runes of the struck ring flare bright white along its length and the ring jolts, a burst of rune sparks at the impact point"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the rings unravel layer by layer from the top, their runes peeling away and fading"
+    }
+  ]
+}

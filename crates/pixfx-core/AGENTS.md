@@ -9,7 +9,11 @@ The effect model and game feel, painted with `pixfx-draw`:
 
 - Effect model: `effect` (`Effect`, `Instance`, `Options`, `Meta`, `Placement`), `particles`, `sim`, `render`
   (`render_frames`, `edge_fade`), `player` (`Player`: one effect on its own canvas), `key` (`ClipKey`, `FrameId`),
-  `frames` (`FrameStore`, `FRAME_BUDGET`), `state` (`Creature`).
+  `frames` (`FrameStore`, `FRAME_BUDGET`), `state` (`Creature`), `light_color` (the colour an effect lights its
+  surroundings in).
+- Sprite awareness: `actor` (`Actor`: the sprite an effect wraps, `opaque()` its pixels) and `silhouette`
+  (`Silhouette`, `Area`: the body in the effect's cells, its edge, an outline ring, the cells round it by distance,
+  a random cell of it). Every effect that reads its sprite goes through these, so a new query lands here once.
 - Game feel: `cue` (`Cue`, `TimedCue`, `impact`), `feel` (`Feel`: shake, hit-stop, slow motion, flash, ripples),
   `squash` (`Squash`, `Blink`), `hit_flash`, `screen` (shake, ripple and flash passes).
 
@@ -24,7 +28,7 @@ The effect model and game feel, painted with `pixfx-draw`:
 
 | If the code... | It goes to |
 |---|---|
-| paints pixels in a way an effect does not need to know about (a primitive, blend, palette, outline) | `pixfx-draw` |
+| paints pixels in a way an effect does not need to know about (a primitive, blend, palette) | `pixfx-draw` |
 | is one effect | `pixfx-effects`, behind its own feature |
 | is a fighter's body, pose or look | `pixfx-fighter` |
 | is scene light (glows thrown on the world) | `pixfx-light` |
@@ -50,6 +54,5 @@ The effect model and game feel, painted with `pixfx-draw`:
 
 ```
 cargo test -p pixfx-core
-cargo test --workspace                                        # golden hashes of every effect
-cargo test -p pixfx-effects --test determinism -- --ignored
+cargo test -p pixfx-effects --test determinism -- --ignored   # when a change can move pixels: every effect's hashes
 ```

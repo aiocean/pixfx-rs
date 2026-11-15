@@ -23,7 +23,9 @@ bun run build:wasm --no-default-features --features pixfx-effects/fire-candle,pi
 ```
 
 Name an effect by its id with the `/` as `-` (`fire/candle` is `pixfx-effects/fire-candle`), or a whole category
-(`pixfx-effects/explosions`). `EffectId` then lists only those effects, so TypeScript flags a `play` of one left out.
+(`pixfx-effects/explosions`). `EffectId` then lists only those effects; `play` takes a string, so an id left out
+throws when it plays. `--no-default-features` also leaves out `fighter` and `light`; add them back
+(`,fighter,light`) when the game uses fighters or scene light.
 
 The package exports its TypeScript source (`src/index.ts`); Vite compiles it with the game. It runs on pixfx-web
 (the runtime every pixfx JS shell shares), which loads its wasm and its worker through
@@ -90,7 +92,7 @@ plugin.
 ### How frames are shown
 
 An effect plays its rendered frames: what it shows depends only on the effect, its options and the frame its
-clock is on. Effects with the same id and options (seed, flip, angle, light, palette, outline, their own
+clock is on. Effects with the same id and options (seed, flip, angle, light, palette, their own
 options) show the same frames, so the game paints each frame once and every such effect, in every scene, shows it.
 The engine (`pixfx-scene`, through `pixfx-wasm`) decides all of this; the plugin follows its draw list:
 
@@ -111,7 +113,8 @@ longest waiting first. 0 (the default) draws every one that changed.
 
 ### Baked frames
 
-`pixfx bake <id> [--palette WORD] [--outline WORD] --out public/fx` writes `<name>.bake.json` and its PNG pages:
+`cargo run -p pixfx-export --example bake -- <id> [--palette WORD] --out public/fx` (in the
+pixfx repo) writes `<name>.bake.json` and its PNG pages:
 every frame of the effect as the game would paint it, cropped. Load it once a scene with the plugin has started:
 
 ```ts
@@ -143,7 +146,6 @@ Options (all optional):
 | `light` | Glow strength, a number: `0` is no glow, default `1`. |
 | `depth: {back, front}` | Depths of the back and front images. Default `{back: 0, front: 1}`. |
 | `scrollFactor` | Camera scroll factor of the images: `1` world space (default), `0` screen space (HUD effects), between for parallax. |
-| `outline` | Outline round the effect: `true`, `false`, `"white"`, `"#ffcc00"`, `{color, width, corners}` (see the repo README's [Outlines](../../README.md#outlines)). Left out, the effect looks as designed. |
 
 Other numeric or array options are passed through to the effect.
 
@@ -156,6 +158,7 @@ Other numeric or array options are passed through to the effect.
 | `follow(obj, dx?, dy?)` | Track a game object each frame. If `obj` is destroyed, the effect stops (fades) where `obj` last was. |
 | `setDepths(back, front)` | Move the image pairs in the display list; put your sprite at a depth between them. |
 | `setPosition(x, y)` | Move; stops following. |
+| `wrap(this.pixfx.actorOf(sprite))` | Play on a sprite (a character, a sword, a hat): an effect that wraps its actor (`feedback/power-up`, `feedback/outline`) grips the sprite's outline and follows every frame it shows, at its scale and `flipX`. `wrap(null)` lets go. Rotation and parent containers are not read. |
 
 Events: `"complete"` when the effect finishes on its own (after `stop()`, or at the end of a one-shot), and
 `"destroy"` after `destroy()` (never both). When either fires, the effect's textures, images and engine

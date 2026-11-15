@@ -1,8 +1,8 @@
 // The landing page: a live duel in the hero, drawn by pixfx-canvas2d (workers paint the effects). The page owns the
 // animation-frame loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
-import { Body, FightFeel, Lighting, Mind, Sprites, createPixfx, loadPixfx, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
-import { DECOR, createDuel, step } from "./duel.js";
-import { BARS_TALL, drawBars, drawNumbers, drawSkills, drawStreaks, hudAt, paintFighters } from "./duel-art.js";
+import { Body, FightFeel, Lighting, Mind, Sprites, createPixfx, loadPixfx, lookColors, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
+import { DECOR, RAGE, createDuel, step } from "./duel.js";
+import { BARS_TALL, actorOf, drawBars, drawNumbers, drawSkills, drawStreaks, hudAt, paintFighters } from "./duel-art.js";
 import { buffInfo, skillInfo } from "./duel-info.js";
 import { createScene, drawScene } from "./duel-scene.js";
 import { kindle, lampGlows } from "./duel-light.js";
@@ -11,6 +11,11 @@ import { kindle, lampGlows } from "./duel-light.js";
 const BACKDROP = "#0b0a1c";
 /** How tall the film bars an ultimate brings in are, in game pixels, at the sky's darkest. */
 const LETTERBOX = 12;
+/** The effects that wrap a fighter's own sprite, while its ultimate is ready: a surge up its body when its rage fills,
+ *  then a ring in its school's glow round every pose until it casts. */
+const WRAP = { ring: "feedback/outline", surge: "feedback/power-up" };
+/** Where a fighter's ring plays, above its feet: about the middle of its body, so the ring's box holds it in any pose. */
+const RING_MID = 24;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Mount the landing page: the tabs and the hero. Returns how to unmount it. */
@@ -59,7 +64,7 @@ export async function mount() {
 // ---------- hero ----------
 
 function createHero(canvas, signal, icons, engine) {
-  const view = { canvas, icons, stage: null, duel: null, feel: null, sprites: null, lighting: null, lights: [], layout: null, handles: new Map() };
+  const view = { canvas, icons, stage: null, duel: null, feel: null, sprites: null, lighting: null, lights: [], layout: null, handles: new Map(), wrapped: [] };
   const have = new Set(engine.effects());
   // a picture Rust painted (fighters, faces, light), drawn and let go at once
   const show = (picture) => {
@@ -71,6 +76,7 @@ function createHero(canvas, signal, icons, engine) {
   function build() {
     view.free();
     view.handles.clear();
+    view.wrapped = [];
     view.lights = [];
     const narrow = innerWidth < 760;
     // the fighters stay big enough to read their poses: bigger pixels on a wider screen
@@ -104,6 +110,10 @@ function createHero(canvas, signal, icons, engine) {
     // fighters fly no higher than keeps their heads (about 44 pixels tall) under the bars
     const sky = ground - (barTop + BARS_TALL + 13) - 46;
     view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky, Body, Mind });
+    // each fighter's sprite as it was last painted, which the effects wrapped on it read
+    view.wrapped = view.duel.fighters.map((f) => {
+      return { body: null, rage: f.rage, surge: null, ring: null };
+    });
     // each fighter's skills, on the floor under its own side: bigger icons where the floor has the room
     const icon = h - ground >= 20 ? 16 : 12;
     view.layout = { scale, w, h, ground, barTop, icon, lamps: [arena.left, arena.right], scene: createScene(w, h, ground, barTop + BARS_TALL) };
@@ -126,6 +136,37 @@ function createHero(canvas, signal, icons, engine) {
     }
   }
 
+  /** Hand each fighter's new pose to the effects wrapped on it and keep them on it. When its rage fills: a surge, and a
+   *  ring that stays until the rage is spent or the fighter is down. */
+  function wrapFighters(pictures) {
+    const { ground } = view.layout;
+    for (const f of view.duel.fighters) {
+      const one = view.wrapped[f.index];
+      if (!one) continue;
+      one.body = actorOf(pictures[f.index]);
+      const feet = ground - f.air;
+      const ready = f.rage >= RAGE && f.hp > 0;
+      if (ready && one.rage < RAGE && have.has(WRAP.surge)) {
+        one.surge?.stop();
+        const surge = view.stage.play(WRAP.surge, f.x, feet);
+        surge.wrap(() => one.body).once("complete", () => {
+          if (one.surge === surge) one.surge = null;
+        });
+        one.surge = surge;
+      }
+      if (ready && !one.ring && have.has(WRAP.ring)) {
+        one.ring = view.stage.play(WRAP.ring, f.x, feet - RING_MID, { palette: [lookColors(f.school).glow] });
+        one.ring.wrap(() => one.body);
+      } else if (!ready && one.ring) {
+        one.ring.stop();
+        one.ring = null;
+      }
+      one.ring?.setPosition(f.x, feet - RING_MID);
+      one.surge?.setPosition(f.x, feet);
+      one.rage = f.rage;
+    }
+  }
+
   view.step = (dt) => {
     const { scale, w, h, ground, scene } = view.layout;
     // a blow stops the fight and its effects together for a few frames; a knockout plays out slowed
@@ -134,6 +175,9 @@ function createHero(canvas, signal, icons, engine) {
     play(commands);
     view.feel.react(commands);
     view.lights = stepLights(kindle(view.lights, commands, ground, (fx) => engine.meta(fx).loop, putOutLight), run);
+    // the fighters are painted before the effects play, so an effect wrapped on one grips this frame's pose
+    const painted = paintFighters(view.sprites, view.duel, view.feel, ground, view.feel.jolts());
+    wrapFighters(painted.fighters);
     view.stage.update(reduceMotion ? 0 : run);
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = BACKDROP;
@@ -150,7 +194,8 @@ function createHero(canvas, signal, icons, engine) {
       ctx.fillRect(-scale * 4, -scale * 4, (w + 8) * scale, (h + 8) * scale);
     }
     // the one a blow struck shudders through the hit-stop
-    show(paintFighters(view.sprites, view.duel, view.feel, ground, view.feel.jolts()));
+    for (const picture of painted.fighters) show(picture);
+    show(painted.dust);
     // the magic lights the dais, the peaks and the fighters in its own colour
     show(view.lighting.paint(view.lights, lampGlows(view.layout.lamps, ground, view.duel.time)));
     view.stage.drawLayer("front");

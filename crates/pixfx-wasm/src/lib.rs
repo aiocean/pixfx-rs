@@ -28,7 +28,7 @@ pub use pixfx_core::Player;
 pub use squash::{Blink, Squash};
 
 use js_sys::{Array, Uint8ClampedArray, Uint32Array};
-use pixfx_core::{Effect, Layer, Meta, OptKind, PixelBox, valid_dt};
+use pixfx_core::{Effect, Layer, OptKind, PixelBox, valid_dt};
 use pixfx_draw::Rgba;
 use pixfx_effects::{EFFECTS, effect};
 use serde::Serialize;
@@ -50,15 +50,6 @@ pub fn effects() -> Array {
 #[wasm_bindgen(js_name = palettePresets)]
 pub fn palette_presets() -> Vec<String> {
     pixfx_draw::palette::PRESETS
-        .iter()
-        .map(|(name, _)| (*name).to_string())
-        .collect()
-}
-
-/// The outline presets every effect takes by name (`outline: "..."`), in the engine's order.
-#[wasm_bindgen(js_name = outlinePresets)]
-pub fn outline_presets() -> Vec<String> {
-    pixfx_draw::outline::PRESETS
         .iter()
         .map(|(name, _)| (*name).to_string())
         .collect()
@@ -87,6 +78,9 @@ struct MetaJs {
     fps: u32,
     /// Seeds are small; a JS number holds them exactly up to 2^53.
     seed: u64,
+    /// Whether it wraps the character it plays on (`effect.wrap`), reading the sprite's shape, as
+    /// `feedback/outline` and `feedback/power-up` do; others ignore a wrapped sprite.
+    wraps_actor: bool,
     /// The effect's own options, beyond the ones every effect takes.
     options: Vec<OptionJs>,
 }
@@ -112,20 +106,34 @@ enum OptionJs {
     },
 }
 
-/// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed, options}` for one
+/// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed, wrapsActor, options}` for one
 /// effect; `options` lists its own options as `{name, kind: "num" | "color" | "ramp", default, range?}`.
 #[wasm_bindgen(unchecked_return_type = "EffectMeta")]
 pub fn meta(
     #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
 ) -> Result<JsValue, JsError> {
-    meta_object(find(id)?.meta())
+    meta_object(find(id)?)
+}
+
+/// The colour effect `id` with `opts` (as [`Fx::new`] takes them; `margin` is ignored) lights its surroundings
+/// in, `"#rrggbb"` at full brightness, or `undefined` when it casts no light ([`pixfx_core::light_color`]). It
+/// paints the effect several times, so a host asks once per effect and options and keeps the answer.
+#[wasm_bindgen(js_name = lightColor)]
+pub fn light_color(
+    #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
+    #[wasm_bindgen(unchecked_optional_param_type = "FxOptions")] opts: JsValue,
+) -> Result<Option<String>, JsError> {
+    let fx = find(id)?;
+    let (opts, _) = parse_options(fx.meta(), &opts)?;
+    Ok(pixfx_core::light_color(fx, opts).map(pixfx_draw::color::to_hex))
 }
 
 fn find(id: &str) -> Result<&'static dyn Effect, JsError> {
     effect(id).ok_or_else(|| JsError::new(&format!("unknown effect {id:?}")))
 }
 
-fn meta_object(m: &Meta) -> Result<JsValue, JsError> {
+fn meta_object(fx: &dyn Effect) -> Result<JsValue, JsError> {
+    let m = fx.meta();
     js::to_js(&MetaJs {
         id: m.id,
         name: m.name,
@@ -138,6 +146,7 @@ fn meta_object(m: &Meta) -> Result<JsValue, JsError> {
         looping: m.looping,
         fps: m.fps,
         seed: m.seed,
+        wraps_actor: fx.wraps_actor(),
         options: m
             .options
             .iter()
@@ -311,7 +320,7 @@ impl Fx {
         self.player.color_rgba().as_ptr() as usize
     }
 
-    /// As [`Fx::color_rgba_ptr`] for the light layer: lit pixels `r, g, b, 255`, unlit `0, 0, 0, 0`.
+    /// As [`Fx::color_rgba_ptr`] for the light layer: lit pixels the light over transparency (alpha its brightest channel), unlit `0, 0, 0, 0`, to draw added.
     #[wasm_bindgen(js_name = lightRgbaPtr)]
     pub fn light_rgba_ptr(&mut self) -> usize {
         self.player.light_rgba().as_ptr() as usize

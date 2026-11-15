@@ -15,14 +15,13 @@ use pixfx_draw::math::{js_max, js_min, js_round, rand};
 
 pub const OUTLINE: Rgba = Rgba::hex24(0x1a1422);
 
-/// Stone colours: a lit face, the body, a shaded face, and its outline (none when the caller turned outlines off:
-/// [`pixfx_core::Options::outline_color`] over [`OUTLINE`]).
+/// Stone colours: a lit face, the body, a shaded face, and its outline.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stone {
     pub light: Rgba,
     pub body: Rgba,
     pub shade: Rgba,
-    pub edge: Option<Rgba>,
+    pub edge: Rgba,
 }
 
 /// Drop particles that leave the box (local px), so nothing is drawn past the canvas.
@@ -91,7 +90,7 @@ pub fn rock(p: &mut Painter, b: &Bit, st: &Stone, fr: &[Rgba], heat: f64) {
             }
             out.a = fade;
             if d > r {
-                return st.edge;
+                return Some(st.edge);
             }
             let lit = dx * lx + dy * ly;
             if heat > 0.08 {

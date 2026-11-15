@@ -36,6 +36,7 @@ fn part(name: &str, parent: Option<&str>, rule: Rule) -> PartSpec {
         name: name.to_string(),
         parent: parent.map(str::to_string),
         rule,
+        joint: None,
     }
 }
 
@@ -237,4 +238,55 @@ fn parse_spec_names_the_bad_line() {
         .map(|e| e.to_string())
         .unwrap_or_default();
     assert!(msg.starts_with("line 2:") && msg.contains('!'), "{msg}");
+}
+
+#[test]
+fn a_poly_takes_the_cells_inside_its_outline_and_at_names_the_joint() -> Result<(), SplitError> {
+    // An arm lying diagonally over a body: the triangle (4,0) (8,0) (8,4) takes cells above the diagonal only.
+    let mut m = Map::empty(8, 8);
+    for c in m.cells.iter_mut() {
+        *c = Some(0);
+    }
+    let spec = parse_spec("arm body poly 4,0 8,0 8,4 at 6,1\nbody - rest\n")?;
+    let parts = split(&m, &spec)?;
+    let arm = parts.first().ok_or(SplitError("no arm".into()))?;
+    let taken: Vec<(u32, u32)> = (0..8u32)
+        .flat_map(|y| (0..8u32).map(move |x| (x, y)))
+        .filter(|&(x, y)| {
+            arm.map
+                .cells
+                .get((y * 8 + x) as usize)
+                .copied()
+                .flatten()
+                .is_some()
+        })
+        .collect();
+    // Cell centres above or on the line from (4,0) to (8,4): y <= x - 4.
+    let expect = vec![
+        (4, 0),
+        (5, 0),
+        (6, 0),
+        (7, 0),
+        (5, 1),
+        (6, 1),
+        (7, 1),
+        (6, 2),
+        (7, 2),
+        (7, 3),
+    ];
+    assert_eq!(taken, expect);
+    // The same triangle with its diagonal on the other side of the shape takes the diagonal's cells too.
+    let mirrored = parse_spec("arm body poly 0,0 4,0 0,4\nbody - rest\n")?;
+    let left = split(&m, &mirrored)?;
+    let on_diagonal = |x: u32, y: u32| {
+        left.first()
+            .and_then(|p| p.map.cells.get((y * 8 + x) as usize).copied().flatten())
+    };
+    assert!(
+        on_diagonal(3, 0).is_some() && on_diagonal(0, 3).is_some() && on_diagonal(3, 1).is_none()
+    );
+    assert_eq!(arm.pivot, Some((6.0, 1.0)));
+    assert_eq!(parse_spec(&spec_text(&spec))?, spec);
+    assert!(parse_spec("arm body poly 1,1 2,2\n").is_err());
+    Ok(())
 }

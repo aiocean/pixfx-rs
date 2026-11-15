@@ -8,13 +8,14 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
+use crate::actor::Actor;
 use crate::cue::{TimedCue, cues_between, cues_of};
 use crate::state::StateMeta;
 use pixfx_draw::color::{Rgba, fit};
 use pixfx_draw::frame::Frame;
 use pixfx_draw::math::{clamp, js_max, js_min, js_round};
-use pixfx_draw::outline::{Outline, ring_round};
 use pixfx_draw::painter::Painter;
 
 /// The longest step [`Instance::update`] takes: a live host that stalls (a background tab, a debugger)
@@ -119,9 +120,9 @@ pub trait Effect: Send + Sync {
     fn cues(&self, _opts: &Options) -> Vec<TimedCue> {
         Vec::new()
     }
-    /// It draws an outline of its own, in the colour [`Options::outline_color`] gives (none when outlines are
-    /// off), so the engine does not ring it again. False by default: the engine rings it when the caller asks.
-    fn draws_outline(&self) -> bool {
+    /// It grips the character it plays on ([`EffectState::set_actor`]), so its frames depend on that character's
+    /// sprite and are its instance's own, never shared. False by default.
+    fn wraps_actor(&self) -> bool {
         false
     }
 }
@@ -134,6 +135,9 @@ pub trait EffectState: Send {
     /// (pixelfx `drawBack`) and [`Layer::Front`] (pixelfx `draw`), never [`Layer::Both`]; an effect with
     /// nothing behind the character draws nothing for `Back`.
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer);
+    /// The character it plays on, as its sprite shows now, or none; [`Sim`] hands it over before every step and
+    /// again after a respawn. Only an effect that [`Effect::wraps_actor`] reads it.
+    fn set_actor(&mut self, _actor: Option<Arc<Actor>>) {}
 }
 
 /// An option value beyond the common ones: a number, a colour ramp or a single colour.
@@ -158,8 +162,6 @@ pub struct Options {
     /// Glow strength.
     pub light: f64,
     pub palette: Option<Vec<Rgba>>,
-    /// Its outline: unset looks as designed, `Off` has none, `On` rings it ([`pixfx_draw::outline`]).
-    pub outline: Option<Outline>,
     /// The effect's own options by name (pixelfx `height`, `wood`, ...).
     pub extra: BTreeMap<String, OptValue>,
 }
@@ -174,7 +176,6 @@ impl Default for Options {
             seed: None,
             light: 1.0,
             palette: None,
-            outline: None,
             extra: BTreeMap::new(),
         }
     }
@@ -374,16 +375,6 @@ fn resolve_ramp(given: Option<&[Rgba]>, default: &[Rgba]) -> Vec<Rgba> {
 }
 
 impl Options {
-    /// For an effect that draws its own outline: the colour to draw it in, `default` unless the caller set one,
-    /// or none when the caller turned outlines off.
-    pub fn outline_color(&self, default: Rgba) -> Option<Rgba> {
-        match self.outline {
-            None => Some(default),
-            Some(Outline::Off) => None,
-            Some(Outline::On(r)) => Some(r.color()),
-        }
-    }
-
     /// The palette, resolved against the effect's default as pixelfx `resolveOptions` does.
     pub fn palette_or(&self, default: &[Rgba]) -> Vec<Rgba> {
         resolve_ramp(self.palette.as_deref(), default)
@@ -563,6 +554,8 @@ pub struct Sim {
     tick: u64,
     /// The state's own time: `1 / fps` added once per tick, as the render adds it.
     tick_t: f64,
+    /// The character it plays on, handed to the state again whenever it is respawned.
+    actor: Option<Arc<Actor>>,
 }
 
 impl Sim {
@@ -575,6 +568,21 @@ impl Sim {
             seed,
             tick: 0,
             tick_t: 0.0,
+            actor: None,
+        }
+    }
+
+    /// The character it plays on from the next step, or none ([`EffectState::set_actor`]). Handing over the same
+    /// actor again changes nothing.
+    pub fn set_actor(&mut self, actor: Option<Arc<Actor>>) {
+        let same = match (&self.actor, &actor) {
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+            (None, None) => true,
+            _ => false,
+        };
+        if !same {
+            self.actor = actor;
+            self.state.set_actor(self.actor.clone());
         }
     }
 
@@ -589,6 +597,7 @@ impl Sim {
     pub fn seek(&mut self, k: u64) {
         if k < self.tick {
             self.state = self.effect.spawn(&self.opts, self.seed);
+            self.state.set_actor(self.actor.clone());
             self.tick = 0;
             self.tick_t = 0.0;
         }
@@ -605,21 +614,8 @@ impl Sim {
     }
 
     /// Draw the current frame ([`Sim::frame`]) into `frame`, placed as `place` says and at opacity `fade`
-    /// ([`Clock::fade`]), ringed by its outline when the caller set one (round what this call drew, not what
-    /// `frame` held before).
+    /// ([`Clock::fade`]).
     pub fn draw(&self, frame: &mut Frame, layer: Layer, place: Placement, fade: f64) {
-        let ring = match self.opts.outline {
-            Some(Outline::On(r)) if !self.effect.draws_outline() => Some(r),
-            _ => None,
-        };
-        let before = ring.map(|_| frame.color.clone());
-        self.paint(frame, layer, place, fade);
-        if let (Some(r), Some(before)) = (ring, before) {
-            ring_round(frame, &before, r);
-        }
-    }
-
-    fn paint(&self, frame: &mut Frame, layer: Layer, place: Placement, fade: f64) {
         let meta = self.effect.meta();
         let mut p = Painter::new(frame);
         p.place(place.x, place.y, place.flip, place.angle);
@@ -688,6 +684,11 @@ impl Instance {
     /// The frame the state shows.
     pub fn frame(&self) -> u64 {
         self.sim.frame()
+    }
+
+    /// The character it plays on, or none ([`Sim::set_actor`]).
+    pub fn set_actor(&mut self, actor: Option<Arc<Actor>>) {
+        self.sim.set_actor(actor);
     }
 
     /// Bring the state to frame `k` ([`Sim::seek`]).

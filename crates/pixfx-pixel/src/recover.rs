@@ -269,7 +269,9 @@ fn vote(voters: &mut Vec<(u32, usize)>, px: &Pixels) -> ([u8; 4], f64) {
         .map(|d| d.1)
         .sum();
     voters.clear();
-    (winner.0.to_be_bytes(), agree as f64 / total as f64)
+    // A painted cell is solid: the picture's alpha is 1-bit, so a faint edge (alpha 253) reads as the same colour.
+    let [r, g, b, _] = winner.0.to_be_bytes();
+    ([r, g, b, 255], agree as f64 / total as f64)
 }
 
 /// One pixel per cell of `grid`: each cell's middle half votes, the exact colour with more than half the painted

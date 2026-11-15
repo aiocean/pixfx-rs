@@ -10,10 +10,9 @@ use std::fmt;
 
 use crate::effect::{OptValue, Options, Placement};
 use pixfx_draw::color::Rgba;
-use pixfx_draw::outline::Outline;
 
 /// Bumped whenever the encoding changes, so keys written by an older build (baked sheets) never match.
-const VERSION: u8 = 1;
+const VERSION: u8 = 2;
 
 /// One effect with one set of options and margin, placed one way: its frames are the same wherever it plays.
 /// Shown as lowercase hex, the form hosts pass to JS and write into baked sheets.
@@ -116,7 +115,6 @@ impl Writer {
             seed,
             light,
             palette,
-            outline,
             extra,
         } = o;
         self.f64(*x);
@@ -136,16 +134,6 @@ impl Writer {
             Some(r) => {
                 self.u8(1);
                 self.ramp(r);
-            }
-        }
-        match outline {
-            None => self.u8(0),
-            Some(Outline::Off) => self.u8(1),
-            Some(Outline::On(ring)) => {
-                self.u8(2);
-                self.rgba(ring.color());
-                self.u32(ring.width());
-                self.bool(ring.corners());
             }
         }
         self.len(extra.len());

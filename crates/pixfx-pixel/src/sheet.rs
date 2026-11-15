@@ -297,25 +297,60 @@ pub fn cut(drawn: &RgbaImage, layout: &Layout) -> Vec<RgbaImage> {
     out
 }
 
-/// Bones from their text form: one `X,Y X,Y` per line, in sprite pixels; blank lines and `#` lines skipped.
-pub fn parse_bones(text: &str) -> Result<Vec<[(u32, u32); 2]>, String> {
+/// A bone: a straight line between two joints, in sprite pixels inside a cell.
+pub type Bone = [(u32, u32); 2];
+
+/// A bone and the cell (`C`, `R`) it belongs to; `None`: every cell.
+pub type CellBone = (Option<(u32, u32)>, Bone);
+
+/// Skeletons from their text form, a pose per cell. Blank lines and `#` lines are skipped. A line is a bone
+/// `X,Y X,Y`, or `circle X,Y R` (a head: a ring of 12 bones of radius `R`). `cell C,R` starts the bones of cell
+/// (`C`, `R`); bones before any `cell` line belong to every cell (`None`).
+pub fn parse_bones(text: &str) -> Result<Vec<CellBone>, String> {
     let point = |p: &str| -> Option<(u32, u32)> {
         let (x, y) = p.split_once(',')?;
         Some((x.trim().parse().ok()?, y.trim().parse().ok()?))
     };
-    text.lines()
-        .map(str::trim)
-        .enumerate()
-        .filter(|(_, l)| !l.is_empty() && !l.starts_with('#'))
-        .map(
-            |(n, l)| match l.split_whitespace().collect::<Vec<_>>().as_slice() {
-                [a, b] => match (point(a), point(b)) {
-                    (Some(a), Some(b)) => Ok([a, b]),
-                    _ => Err(format!("bones line {}: expected X,Y X,Y: {l}", n + 1)),
-                },
-                _ => Err(format!("bones line {}: expected X,Y X,Y: {l}", n + 1)),
-            },
-        )
+    let mut out = Vec::new();
+    let mut cell = None;
+    for (n, l) in text.lines().map(str::trim).enumerate() {
+        if l.is_empty() || l.starts_with('#') {
+            continue;
+        }
+        let bad = || {
+            format!(
+                "bones line {}: expected X,Y X,Y, circle X,Y R or cell C,R: {l}",
+                n + 1
+            )
+        };
+        match l.split_whitespace().collect::<Vec<_>>().as_slice() {
+            ["cell", c] => cell = Some(point(c).ok_or_else(bad)?),
+            ["circle", c, r] => {
+                let (cx, cy) = point(c).ok_or_else(bad)?;
+                let r: f64 = r.parse().map_err(|_| bad())?;
+                let at = |k: u32| {
+                    let a = f64::from(k) * core::f64::consts::TAU / 12.0;
+                    let x = libm::round(f64::from(cx) + r * libm::cos(a)).max(0.0) as u32;
+                    let y = libm::round(f64::from(cy) + r * libm::sin(a)).max(0.0) as u32;
+                    (x, y)
+                };
+                for k in 0..12 {
+                    out.push((cell, [at(k), at(k + 1)]));
+                }
+            }
+            [a, b] => out.push((cell, [point(a).ok_or_else(bad)?, point(b).ok_or_else(bad)?])),
+            _ => return Err(bad()),
+        }
+    }
+    Ok(out)
+}
+
+/// The bones of cell (`col`, `row`): those given for every cell, then its own.
+pub fn bones_of(bones: &[CellBone], col: u32, row: u32) -> Vec<Bone> {
+    bones
+        .iter()
+        .filter(|(c, _)| c.is_none_or(|c| c == (col, row)))
+        .map(|(_, b)| *b)
         .collect()
 }
 

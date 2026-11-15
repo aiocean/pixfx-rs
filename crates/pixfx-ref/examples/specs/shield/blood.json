@@ -1,0 +1,28 @@
+{
+  "id": "shield/blood",
+  "name": "Blood",
+  "look": "Blood shield from dark cultivation fantasy. A thin dark crimson film shaped like a tall dome surrounds the character, veins of bright red flowing through it.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "blood rises from the ground in streams and spreads into the dome"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the film holds, red veins flowing slowly across it and droplets sliding down; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow strikes from the right; the film bulges inward at the impact point and droplets splatter out to the right"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the film loses its shape and drains down into the ground as dripping streams"
+    }
+  ]
+}

@@ -20,6 +20,8 @@ serde = ["dep:serde", "pixfx-core/serde"]
 ts = ["serde", "pixfx-core/ts", "dep:tsify", "dep:wasm-bindgen"]
 
 [dev-dependencies]
+# PNG for the example scripts
+pixfx-export = { path = "../pixfx-export" }
 serde_json.workspace = true
 
 [lints]

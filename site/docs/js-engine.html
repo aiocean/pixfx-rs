@@ -96,7 +96,7 @@ requestAnimationFrame(frame);</code></pre>
     <tr><td><code>color()</code></td><td>A <code>Uint32Array</code> copy of the colour layer, one ABGR word per pixel, row-major.</td></tr>
     <tr><td><code>light()</code></td><td>A <code>Uint32Array</code> copy of the light layer, one xBGR word per pixel (top byte unused).</td></tr>
     <tr><td><code>colorRgbaPtr()</code></td><td>Address in wasm memory of the colour layer as straight-alpha RGBA8 bytes. No copy.</td></tr>
-    <tr><td><code>lightRgbaPtr()</code></td><td>Address of the light layer as RGBA8: lit pixels <code>r, g, b, 255</code>, unlit <code>0, 0, 0, 0</code>, to draw additively. No copy.</td></tr>
+    <tr><td><code>lightRgbaPtr()</code></td><td>Address of the light layer as RGBA8: lit pixels are the light over transparency (alpha its brightest channel), unlit <code>0, 0, 0, 0</code>, to draw additively on an opaque or a transparent canvas. No copy.</td></tr>
   </tbody>
 </table>
 </div>

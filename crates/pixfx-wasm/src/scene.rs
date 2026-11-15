@@ -31,9 +31,12 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::num::NonZeroU32;
+use std::sync::Arc;
 
 use js_sys::{Int32Array, JSON, Uint8Array, Uint8ClampedArray};
-use pixfx_core::{Clip, Feel, Layer, PixelBox, Placement, Sim, color_rgba_in, light_rgba_in};
+use pixfx_core::{
+    Actor, Clip, Feel, Layer, PixelBox, Placement, Sim, color_rgba_in, light_rgba_in,
+};
 use pixfx_draw::Frame;
 use pixfx_scene::{
     EffectKey, InlinePainter, Job, Painter, Pass, PlacementChange, Receive, Shell, StageError,
@@ -84,8 +87,8 @@ impl Shape {
     }
 }
 
-/// A frame cut to the box that holds anything, as RGBA bytes: colour with straight alpha, light as `r, g, b, 255`
-/// where lit and `0, 0, 0, 0` elsewhere. What a shell uploads.
+/// A frame cut to the box that holds anything, as RGBA bytes: colour with straight alpha, light as
+/// [`light_rgba_in`] makes it, to draw added. What a shell uploads.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cut {
     pub shape: Shape,
@@ -278,6 +281,41 @@ pub struct PaintJob {
     pub light: f64,
     /// 0 back, 1 front, 2 both.
     pub layer: u8,
+    /// The version of the character the effect wraps (0: none), set before the frame is painted.
+    pub actor_version: f64,
+    /// That character's sprite, sent with the first job of each version (a worker keeps it); `null` after.
+    pub actor: Option<ActorPixels>,
+}
+
+/// Where a character's sprite frame shows (`scene.setActor`): its top-left at game pixel (`x`, `y`), its bytes
+/// `w` x `h` pixels, drawn `shownW` x `shownH` game pixels (its own size unless given), mirrored with `flipX`.
+#[derive(Clone, Debug, Deserialize, tsify::Tsify)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ActorAt {
+    pub x: i32,
+    pub y: i32,
+    pub w: u32,
+    pub h: u32,
+    #[serde(default)]
+    #[tsify(optional)]
+    pub shown_w: Option<u32>,
+    #[serde(default)]
+    #[tsify(optional)]
+    pub shown_h: Option<u32>,
+    #[serde(default)]
+    #[tsify(optional)]
+    pub flip_x: bool,
+}
+
+/// A sprite frame on its way to a worker: its top-left in the effect's space, its size and its colour words
+/// (ABGR), row by row.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, tsify::Tsify)]
+pub struct ActorPixels {
+    pub x: i32,
+    pub y: i32,
+    pub w: u32,
+    pub h: u32,
+    pub pixels: Vec<u32>,
 }
 
 /// What a job was for, and the size of the frame it paints, to check the shape a worker sends back.
@@ -303,6 +341,8 @@ pub struct Workers {
     jobs: Vec<PaintJob>,
     asked: HashMap<u32, Asked>,
     ended: Vec<EffectKey>,
+    /// The actor version last sent with each effect's jobs: a version's pixels go once.
+    sent_actor: HashMap<EffectKey, u64>,
 }
 
 impl Workers {
@@ -333,6 +373,18 @@ impl Painter for Paint {
                 let n = w.next_job;
                 w.next_job = w.next_job.wrapping_add(1);
                 let (fw, fh) = job.clip.size();
+                let version = job.actor.map_or(0, |a| a.version);
+                let sent = w.sent_actor.insert(job.effect, version);
+                let actor = job
+                    .actor
+                    .filter(|_| sent != Some(version))
+                    .map(|a| ActorPixels {
+                        x: a.actor.x(),
+                        y: a.actor.y(),
+                        w: a.actor.w(),
+                        h: a.actor.h(),
+                        pixels: a.actor.pixels().to_vec(),
+                    });
                 w.jobs.push(PaintJob {
                     job: n,
                     scene: job.effect.scene,
@@ -347,6 +399,8 @@ impl Painter for Paint {
                     angle: job.place.angle,
                     light: job.place.light,
                     layer: layer_code(job.layer),
+                    actor_version: version as f64,
+                    actor,
                 });
                 w.asked.insert(
                     n,
@@ -368,6 +422,7 @@ impl Painter for Paint {
             Self::Inline(p) => p.end(effect),
             Self::Workers(w) => {
                 w.specs.remove(&effect);
+                w.sent_actor.remove(&effect);
                 w.ended.push(effect);
             }
         }
@@ -405,8 +460,8 @@ impl Frames {
         Ok(self.rec.take())
     }
 
-    /// Hold the frames of a clip baked by `pixfx bake` (its index JSON and PNG pages) as shared frames, so effects
-    /// reaching them paint nothing; returns how many were loaded and the ops (makes, their pixels read like those
+    /// Hold the frames of a clip the bake script (`crates/pixfx-export/examples/bake.rs`) wrote, its index JSON and
+    /// PNG pages, as shared frames, so effects reaching them paint nothing; returns how many were loaded and the ops (makes, their pixels read like those
     /// painted on the spot).
     pub fn load_baked_ops(
         &mut self,
@@ -503,17 +558,11 @@ impl Scene {
             Target::Shared(id) => frames
                 .inner
                 .deliver(&id, a.layer, &frame, &mut frames.rec)?,
-            Target::Own { clock, place } if a.effect.scene == self.inner.id() => {
-                self.inner.deliver_own(
-                    a.effect.handle,
-                    a.layer,
-                    clock,
-                    place,
-                    &frame,
-                    &mut frames.rec,
-                )?;
+            Target::Own(at) if a.effect.scene == self.inner.id() => {
+                self.inner
+                    .deliver_own(a.effect.handle, a.layer, at, &frame, &mut frames.rec)?;
             }
-            Target::Own { .. } => {}
+            Target::Own(_) => {}
         }
         Ok(frames.rec.take())
     }
@@ -529,6 +578,8 @@ impl Scene {
 #[derive(Default)]
 pub struct Painting {
     effects: HashMap<EffectKey, (Clip, Sim, Frame)>,
+    /// The actor each effect wraps, with its version, as the jobs sent it.
+    actors: HashMap<EffectKey, (u64, Arc<Actor>)>,
 }
 
 impl Painting {
@@ -563,6 +614,18 @@ impl Painting {
             angle: job.angle,
             light: job.light,
         };
+        let version = job.actor_version as u64;
+        if let Some(a) = &job.actor
+            && let Ok(actor) = Actor::new(a.x, a.y, a.w, a.h, a.pixels.clone())
+        {
+            self.actors.insert(key, (version, Arc::new(actor)));
+        }
+        let actor = self
+            .actors
+            .get(&key)
+            .filter(|(v, _)| version != 0 && *v == version)
+            .map(|(_, a)| Arc::clone(a));
+        sim.set_actor(actor);
         sim.seek(job.frame as u64);
         clip.draw(sim, frame, layer, place, job.fade);
         Some(frame)
@@ -571,6 +634,7 @@ impl Painting {
     /// The effect is gone: let go of its state.
     pub fn end(&mut self, key: EffectKey) {
         self.effects.remove(&key);
+        self.actors.remove(&key);
     }
 
     /// Effects whose state it keeps.
@@ -655,14 +719,14 @@ impl JsFrames {
         self.inner.rec.color(id).map_or(0, |b| b.as_ptr() as usize)
     }
 
-    /// As `colorPtr` for the light: lit pixels `r, g, b, 255`, unlit `0, 0, 0, 0`, to draw added.
+    /// As `colorPtr` for the light: lit pixels the light over transparency (alpha its brightest channel), unlit `0, 0, 0, 0`, to draw added.
     #[wasm_bindgen(js_name = lightPtr)]
     pub fn light_ptr(&self, id: u32) -> usize {
         self.inner.rec.light(id).map_or(0, |b| b.as_ptr() as usize)
     }
 
-    /// Hold the frames of a clip baked by `pixfx bake` (its index JSON and PNG pages): effects playing that effect
-    /// with the same options show them instead of painting them. Returns a draw list (makes; read their pixels
+    /// Hold the frames of a clip the bake script (`crates/pixfx-export/examples/bake.rs`) wrote, its index JSON and
+    /// PNG pages: effects playing that effect with the same options show them instead of painting them. Returns a draw list (makes; read their pixels
     /// with `colorPtr` / `lightPtr`). How many frames loaded is the number of makes.
     #[wasm_bindgen(js_name = loadBaked)]
     pub fn load_baked(
@@ -757,6 +821,37 @@ impl JsScene {
             return Ok(false);
         };
         scene.set(handle, change.over(base)).map_err(js_err)
+    }
+
+    /// Play the effect on a character: its sprite's current frame as straight-alpha RGBA bytes row by row (what
+    /// `getImageData` gives), drawn where `at` says. An effect that wraps its actor (as `feedback/power-up` does)
+    /// grips that outline; others ignore it. Hand it every frame: the same sprite at the same place relative to the
+    /// effect changes nothing, and the sprite keeps that place when the effect moves. False for an unknown handle.
+    #[wasm_bindgen(js_name = setActor)]
+    pub fn set_actor(
+        &mut self,
+        handle: u32,
+        #[wasm_bindgen(unchecked_param_type = "ActorAt")] at: JsValue,
+        rgba: &[u8],
+    ) -> Result<bool, JsError> {
+        let at: ActorAt = parse("actor", &at)?;
+        let actor = Actor::from_rgba(at.x, at.y, at.w, at.h, rgba)
+            .map_err(|e| JsError::new(&e.to_string()))?
+            .shown(
+                at.shown_w.unwrap_or(at.w),
+                at.shown_h.unwrap_or(at.h),
+                at.flip_x,
+            );
+        self.inner
+            .scene()
+            .set_actor(handle, Some(actor))
+            .map_err(js_err)
+    }
+
+    /// Play the effect on no character again. False for an unknown handle.
+    #[wasm_bindgen(js_name = clearActor)]
+    pub fn clear_actor(&mut self, handle: u32) -> Result<bool, JsError> {
+        self.inner.scene().set_actor(handle, None).map_err(js_err)
     }
 
     /// Let the effect end: loops fade out, one-shots are cut short. False for an unknown handle.
@@ -980,7 +1075,7 @@ impl Painted {
         Uint8Array::from(self.cut.color.as_slice())
     }
 
-    /// Lit pixels `r, g, b, 255`, unlit `0, 0, 0, 0`, to draw added.
+    /// Lit pixels the light over transparency (alpha its brightest channel), unlit `0, 0, 0, 0`, to draw added.
     pub fn light(&self) -> Uint8Array {
         Uint8Array::from(self.cut.light.as_slice())
     }

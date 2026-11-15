@@ -8,7 +8,8 @@ anything here; this file only says what this crate holds.
 What a stage shows and where, decided once in Rust for every shell. `Scene` holds the effects playing (each a
 `Clip` and its `Clock`), their placement and margins, the scale, the order their layers are drawn in, when finished
 ones go, which frame each shows, which effects the host can see (a `View` with the camera's scroll, and each
-effect's scroll factor: the rest play on undrawn), the game's answer to their cues (a `Feel`), and events
+effect's scroll factor: the rest play on undrawn), the character each effect plays on (`set_actor`, kept in the
+effect's own space and mirrored with its flip), the game's answer to their cues (a `Feel`), and events
 (`StageEvent`).
 
 `Frames` is game-wide and shared by every `Scene` of the game (a canvas, a Phaser scene, a gpui window each, made
@@ -18,7 +19,8 @@ scene drew.
 
 A `Painter` paints a `Job` (an effect's state brought to a frame, drawn placed and faded): `InlinePainter` on the
 spot (Canvas 2D, gpui, files, tests), or another painter elsewhere (a worker), whose frames come back through
-`Frames::deliver` (shared) and `Scene::deliver_own` (a fading effect's own). Both take a `Frame`, or whatever the
+`Frames::deliver` (shared) and `Scene::deliver_own` (the frames an effect has alone: fading after stop, or wrapping
+its actor). Both take a `Frame`, or whatever the
 shell takes from its painter through `Receive<D>` (a JS shell takes the shape of the RGBA a worker sent it, so pixels
 skip the scene). Until then the effect shows its last frame. The painter keeps each effect's state (`Sim`) between paints; `Scene` keeps only clocks, so deciding stays
 cheap on the thread that runs it.
@@ -60,6 +62,9 @@ only when every shell needs it, and say so in the commit.
 ## Traps
 
 - An effect stopped while following a moving sprite keeps fading at the sprite's last position.
+- An effect that wraps its actor paints its own frames (no sharing): each `set_actor` that changes the sprite
+  relative to the effect bumps a version (`OwnAt::actor`) and draws it again; the same sprite set again changes
+  nothing, so a host may set it every frame. A painter elsewhere gets the sprite in the `Job` (`Job::actor`).
 - A hit-stop (`dt = 0`) holds every frame; nothing advances.
 - Past `FRAME_BUDGET`, least recently shown frames are dropped and their surfaces freed; a shell's surface count
   returns to 0 after every effect ends.
@@ -83,6 +88,4 @@ that paint elsewhere, including one that falls behind
 
 ```
 cargo test -p pixfx-scene
-cargo test --workspace
-cargo clippy --manifest-path crates/pixfx-gpui/Cargo.toml -- -D warnings
 ```

@@ -4,13 +4,16 @@
 //! - [`cut`]: the picture out of its background, stray specks and guide lines gone;
 //! - [`nearest`] and [`colors`]: every pixel as an index into a palette (a given one, or the picture's own);
 //! - [`shrink`]: a picture drawn big (an image model's "pixels" are many real pixels wide) down to its pixel grid;
+//! - [`frames::recover_frames`]: the pixel grid shared by a sheet's frames, one size for all of them;
+//! - [`register::register`]: the frames of one drawing lined up on one origin, a whole-pixel shift each;
 //! - [`rects`]: equal cells merged into rects, the shape painter code fills;
 //! - [`text`] and [`zoom`]: the grid shown back, as letters with a colour legend and as a big picture with grid
 //!   lines, and [`Map::paint`]: at its true size;
 //! - [`diff`]: how far two pictures are apart, to check what the engine paints against what was meant.
 //!
 //! It is a tool for the agent at work, not part of what a game ships: nothing in the engine paints from its output.
-//! Pure: pictures come in as values and leave as values; reading and writing files is the CLI's job.
+//! Pure: pictures come in as values and leave as values; reading and writing files is the job of the scripts in
+//! `examples/`, one per step of [`tool`].
 #![forbid(unsafe_code)]
 
 mod cut;
@@ -19,11 +22,14 @@ mod grid;
 mod show;
 
 pub mod critique;
+pub mod frames;
 pub mod oklab;
 pub mod parts;
 pub mod recover;
 pub mod reduce;
+pub mod register;
 pub mod sheet;
+pub mod tool;
 pub mod view;
 
 pub use cut::cut;

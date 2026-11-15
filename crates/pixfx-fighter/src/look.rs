@@ -51,6 +51,39 @@ impl Look {
         }
     }
 
+    /// The look's colours, each once, in the order the look lists them, with the name of the part it paints
+    /// (`robe0`, `boot`): the palette its poses are drawn in.
+    pub fn colors(&self) -> Vec<(String, Rgba)> {
+        let parts: [(&str, &[Rgba]); 11] = [
+            ("robe", &self.robe),
+            ("inner", &self.inner),
+            ("trim", &self.trim),
+            ("hair", &self.hair),
+            ("skin", &self.skin),
+            ("boot", &[self.boot]),
+            ("blade", &self.blade),
+            ("jade", &[self.jade]),
+            ("ribbon", &self.ribbon),
+            ("glow", &[self.glow]),
+            ("outline", &[self.outline]),
+        ];
+        let mut distinct: Vec<(String, Rgba)> = Vec::new();
+        for (name, shades) in parts {
+            for (i, &c) in shades.iter().enumerate() {
+                if distinct.iter().any(|(_, d)| *d == c) {
+                    continue;
+                }
+                let named = if shades.len() > 1 {
+                    format!("{name}{i}")
+                } else {
+                    name.to_string()
+                };
+                distinct.push((named, c));
+            }
+        }
+        distinct
+    }
+
     /// The Thunder school: a white robe over red, gold trim, black hair in a topknot.
     pub const fn thunder() -> Look {
         Look {
@@ -89,7 +122,7 @@ impl Look {
 
     /// An alchemist: a white dress shaded lavender over a blue under-robe, silver-blue
     /// trim and sash ribbons, long black hair held by a teal jade pin. Colours read from a reference drawing with
-    /// `pixfx pixel` (`clean`, then `read`).
+    /// the `pixfx-pixel` scripts (`clean`, then `read`).
     pub const fn alchemist() -> Look {
         Look {
             robe: [c(0xf4f0fc), c(0xcec3ec), c(0x9d92ba)],

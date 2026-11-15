@@ -1,6 +1,6 @@
 // A campfire and braziers on dark ground, a candle following a walker drawn between the effects' back and front
-// layers, and an explosion where you click. `window.pixfxCanvasDemo` exposes the loop and pixfx for the browser check.
-import { createPixfx, loadPixfx } from "../src";
+// layers, a hero powering up (the aura grips each pose of its sprite), and an explosion where you click. `window.pixfxCanvasDemo` exposes the loop and pixfx for the browser check.
+import { createPixfx, imageActor, loadPixfx } from "../src";
 import type { Pixfx, WorldCue } from "../src";
 
 const SCALE = 4;
@@ -40,6 +40,43 @@ canvas.addEventListener("click", (e) => {
   pixfx.play("explosions/small-explosion", x, y).on("complete", () => events.push("explosion complete"));
 });
 
+// the hero: two poses of a 12 x 22 sprite, arms down then raised, drawn into one sheet
+const HERO = { x: 236, w: 12, h: 22 };
+const sheet = document.createElement("canvas");
+sheet.width = HERO.w * 2;
+sheet.height = HERO.h;
+const sctx = sheet.getContext("2d");
+if (!sctx) throw new Error("demo: no 2d context for the hero");
+for (const [pose, raised] of [[0, false], [1, true]] as const) {
+  const o = pose * HERO.w;
+  const px = (x: number, y: number, w: number, h: number, c: string): void => {
+    sctx.fillStyle = c;
+    sctx.fillRect(o + x, y, w, h);
+  };
+  px(4, 0, 4, 4, "#f2c79b"); // head
+  px(3, 4, 6, 8, "#d94f5c"); // body
+  px(3, 12, 2, 10, "#3b4a8c"); // legs
+  px(7, 12, 2, 10, "#3b4a8c");
+  if (raised) {
+    px(1, 0, 2, 6, "#f2c79b");
+    px(9, 0, 2, 6, "#f2c79b");
+  } else {
+    px(1, 5, 2, 7, "#f2c79b");
+    px(9, 5, 2, 7, "#f2c79b");
+  }
+}
+let heroPose = 0;
+const hero = (): { image: HTMLCanvasElement; cut: { x: number; y: number; w: number; h: number }; x: number; y: number } => ({
+  image: sheet,
+  cut: { x: heroPose * HERO.w, y: 0, w: HERO.w, h: HERO.h },
+  x: HERO.x - HERO.w / 2,
+  y: GROUND - HERO.h,
+});
+const powerUp = (): void => {
+  pixfx.play("feedback/power-up", HERO.x, GROUND, { seed: 5 }).wrap(imageActor(hero)).on("complete", powerUp);
+};
+powerUp();
+
 const demo = { pixfx, events, running: true, frames: 0 };
 window.pixfxCanvasDemo = demo;
 
@@ -50,6 +87,7 @@ const frame = (now: number): void => {
   last = now;
   t += dt;
   walker.x = 114 + Math.sin(t / 0.9) * 22;
+  heroPose = Math.floor(t / 0.4) % 2;
   pixfx.update(dt);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = "#17131c";
@@ -61,6 +99,9 @@ const frame = (now: number): void => {
   pixfx.drawLayer("back");
   ctx.fillStyle = "#4fd1c5";
   ctx.fillRect((Math.round(walker.x) - 4) * SCALE, walker.y * SCALE, 8 * SCALE, 18 * SCALE);
+  const h = hero();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(h.image, h.cut.x, h.cut.y, h.cut.w, h.cut.h, h.x * SCALE, h.y * SCALE, h.cut.w * SCALE, h.cut.h * SCALE);
   pixfx.drawLayer("front");
   demo.frames += 1;
   requestAnimationFrame(frame);

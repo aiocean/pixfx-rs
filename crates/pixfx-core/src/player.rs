@@ -4,7 +4,7 @@ use crate::cue::TimedCue;
 use crate::effect::{Canvas, Clock, Effect, Instance, Layer, Meta, Options, Placement, Sim};
 use crate::key::{ClipKey, FrameId};
 use crate::render::edge_fade;
-use pixfx_draw::frame::{Frame, composite};
+use pixfx_draw::frame::{Frame, composite, composite_px};
 
 /// What one effect draws and how big: the effect, its options with its origin where its canvas puts it, and the
 /// margin of empty pixels round the canvas. Every instance of a clip with the same placement and frame draws a
@@ -44,6 +44,11 @@ impl Clip {
 
     pub fn meta(&self) -> &'static Meta {
         self.effect.meta()
+    }
+
+    /// Whether its effect grips the character it plays on ([`Effect::wraps_actor`]).
+    pub fn wraps_actor(&self) -> bool {
+        self.effect.wraps_actor()
     }
 
     /// The canvas the effect draws on, margin not included.
@@ -250,8 +255,8 @@ impl Player {
         self.color_rgba_in(all)
     }
 
-    /// The last drawn light layer alone as RGBA8 bytes (`w * h * 4`): a lit pixel is `r, g, b, 255`, an unlit
-    /// one `0, 0, 0, 0`, so drawn with additive blending it adds exactly the light and nothing elsewhere.
+    /// The last drawn light layer alone as RGBA8 bytes (`w * h * 4`), as [`light_rgba_in`] makes them: drawn added,
+    /// they add the light, on an opaque canvas or a transparent one, and nothing elsewhere.
     pub fn light_rgba(&mut self) -> &[u8] {
         let all = self.whole();
         self.light_rgba_in(all)
@@ -345,12 +350,15 @@ pub fn color_rgba_in<'a>(frame: &Frame, b: PixelBox, out: &'a mut [u8]) -> &'a [
     unpack(&frame.color, frame.w, b, out, u32::to_le_bytes)
 }
 
-/// As [`color_rgba_in`] for the light: a lit pixel is `r, g, b, 255`, an unlit one `0, 0, 0, 0`.
+/// As [`color_rgba_in`] for the light, to draw added (`"lighter"`, or a premultiplied additive blend): a lit pixel
+/// is light over transparency as [`composite_px`] makes it (alpha its brightest channel, rgb `light * 255 / alpha`),
+/// an unlit one `0, 0, 0, 0`. Premultiplied it is the light itself, so it adds that light to an opaque canvas and
+/// shows as the light's own colour, glow fading to clear, on a transparent one.
 pub fn light_rgba_in<'a>(frame: &Frame, b: PixelBox, out: &'a mut [u8]) -> &'a [u8] {
     let b = b.within(frame.w, frame.h);
     unpack(&frame.light, frame.w, b, out, |word| {
-        let rgb = word & 0x00ff_ffff;
-        if rgb == 0 { 0u32 } else { rgb | 0xff00_0000 }.to_le_bytes()
+        // most of a frame is unlit, and unlit is transparent: skip the blend for it
+        if word & 0x00ff_ffff == 0 { [0; 4] } else { composite_px(0, word, None) }
     })
 }
 

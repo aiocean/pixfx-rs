@@ -36,7 +36,7 @@ Every number below is the builder's call unless the line says otherwise; all are
 | School | Spell | Kind | Effect | Role |
 |---|---|---|---|---|
 | Thunder | spark | bolt | projectiles/laser-bolt | cheap, fast, light; 1 shock stack |
-| Thunder | burst | blast | explosions/body-burst | heavy at arm's length; pays off shock |
+| Thunder | burst | blast | explosions/plasma-explosion | heavy at arm's length; pays off shock |
 | Thunder | quake | zone | explosions/small-explosion | quick blast under the foe, grounded |
 | Thunder | hex | ward | arcane/hex-shield | hit charges; cleanses (phase 4) |
 | Frost | shard | bolt | projectiles/laser-bolt | cheap, fast, light; 1 chill stack |

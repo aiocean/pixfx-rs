@@ -2,6 +2,7 @@
 // what shows where; this follows its draw list with the shell's images.
 import { z } from "zod";
 import type * as Wasm from "../wasm/pixfx_wasm.js";
+import type { ActorSource } from "./actor";
 import type { Counts, EffectHost, FollowTarget } from "./effect";
 import { PixfxEffect } from "./effect";
 import type { Delivering, Game } from "./game";
@@ -51,6 +52,7 @@ export class Stage<P> implements EffectHost<P>, Delivering {
   readonly id: number;
   private readonly effects = new Map<number, PixfxEffect<P>>();
   private readonly follows = new Map<number, Follow>();
+  private readonly actors = new Map<number, ActorSource>();
   private readonly pairs: Pair<P>[] = [];
   private cleared = false;
 
@@ -86,6 +88,7 @@ export class Stage<P> implements EffectHost<P>, Delivering {
   remove(effect: PixfxEffect<P>): void {
     this.effects.delete(effect.handle);
     this.follows.delete(effect.handle);
+    this.actors.delete(effect.handle);
     this.scene.remove(effect.handle);
   }
 
@@ -98,9 +101,18 @@ export class Stage<P> implements EffectHost<P>, Delivering {
     this.scene.moveTo(handle, x, y);
   }
 
+  wrap(handle: number, source: ActorSource | null): void {
+    if (source) {
+      this.actors.set(handle, source);
+    } else {
+      this.actors.delete(handle);
+      this.scene.clearActor(handle);
+    }
+  }
+
   /**
    * Let `dt` seconds of scene time pass: followed effects move to their targets (an effect whose target went
-   * inactive stops), then the scene plays. Emits the events. Returns the seconds the effects played (0 in a
+   * inactive stops), wrapped effects get their character's frame as it shows now, then the scene plays. Emits the events. Returns the seconds the effects played (0 in a
    * hit-stop).
    */
   update(dt: number): number {
@@ -112,12 +124,18 @@ export class Stage<P> implements EffectHost<P>, Delivering {
         this.scene.stop(handle);
       }
     }
+    for (const [handle, source] of this.actors) {
+      const a = source();
+      if (a) this.scene.setActor(handle, a.at, a.rgba);
+      else this.scene.clearActor(handle);
+    }
     const played = this.scene.update(dt);
     for (const e of this.scene.events()) {
       const effect = this.effects.get(e.handle);
       if (e.type === "end") {
         this.effects.delete(e.handle);
         this.follows.delete(e.handle);
+        this.actors.delete(e.handle);
         effect?.complete();
       } else {
         const cue: WorldCue = { t: e.t, pan: e.pan, cue: e.cue };
@@ -178,6 +196,7 @@ export class Stage<P> implements EffectHost<P>, Delivering {
     for (const e of [...this.effects.values()]) e.end();
     this.effects.clear();
     this.follows.clear();
+    this.actors.clear();
     for (const p of this.pairs) {
       p.color.destroy();
       p.light.destroy();

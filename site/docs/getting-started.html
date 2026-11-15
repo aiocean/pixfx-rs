@@ -37,14 +37,14 @@
 <p>Commands on this site run from the repository root.</p>
 
 <h2>Build and test</h2>
-<p>The root workspace holds every crate except <code>crates/pixfx-gpui</code>, so a fresh clone builds and tests with nothing else installed.</p>
-<pre><code>cargo test --workspace</code></pre>
+<p>The root workspace holds every crate except <code>crates/pixfx-gpui</code>, so a fresh clone builds and tests with nothing else installed. Each crate tests itself:</p>
+<pre><code>cargo test -p pixfx-core</code></pre>
 <p>Optional: cargo's intermediate build files can go in one shared directory with <code>export CARGO_BUILD_BUILD_DIR=$PWD/target/build-dir</code>. Nothing needs it.</p>
 
 <h2>Render an effect to files</h2>
-<pre><code>cargo run -p pixfx-cli -- sheet fire/campfire --out out
-cargo run -p pixfx-cli -- render fire/campfire --gif --scale 4 --out out</code></pre>
-<p><code>sheet</code> writes <code>fire_campfire.png</code>, <code>fire_campfire_color.png</code>, <code>fire_campfire_light.png</code> and <code>fire_campfire.json</code> into <code>out/</code>. <code>render --gif</code> writes <code>fire_campfire.gif</code>, each pixel enlarged 4 times. See <a href="cli.html">Command line</a> and <a href="sheets.html">Sprite sheet format</a>.</p>
+<pre><code>cargo run -p pixfx-export --example sprite_sheet -- fire/campfire --out out
+cargo run -p pixfx-export --example gif -- fire/campfire --scale 4 --out out</code></pre>
+<p><code>sprite_sheet</code> writes <code>fire_campfire.png</code>, <code>fire_campfire_color.png</code>, <code>fire_campfire_light.png</code> and <code>fire_campfire.json</code> into <code>out/</code>. <code>gif</code> writes <code>fire_campfire.gif</code>, each pixel enlarged 4 times. See <a href="scripts.html">Scripts</a> and <a href="sheets.html">Sprite sheet format</a>.</p>
 
 <h2>Play it in a browser</h2>
 <p>The Canvas 2D demo shows a campfire, braziers and a candle following a walker, painted on worker threads; click for an explosion:</p>
@@ -78,14 +78,9 @@ cd crates/pixfx-wasm/demo &amp;&amp; python3 -m http.server 8765 --bind 127.0.0.
 &lt;/script&gt;</code></pre>
 <p>Games that draw sprites between an effect's layers call <code>drawLayer("back")</code> and <code>drawLayer("front")</code> around them; see <a href="canvas.html">Canvas 2D shell</a>. With a bundler, install <code>pixfx-canvas2d</code> as a package instead.</p>
 
-<h2>Whole-repo check</h2>
-<p>What to run before a commit:</p>
-<pre><code>cargo fmt --check &amp;&amp; cargo clippy --workspace --all-targets -- -D warnings &amp;&amp; cargo test --workspace
-(cd packages/pixfx-phaser &amp;&amp; bun run check)
-(cd packages/pixfx-web &amp;&amp; bun run build:wasm &amp;&amp; bun run check)
-(cd packages/pixfx-canvas2d &amp;&amp; bun run check &amp;&amp; bun run check:browser)
-(cd packages/pixfx-pixi &amp;&amp; bun run check &amp;&amp; bun run check:browser)
-bun test site/tests</code></pre>
+<h2>Tests</h2>
+<p>Each crate and package tests itself, and there is no repo-wide gate: run the tests of what you changed, as its <code>AGENTS.md</code> lists under "Before you finish" (<code>cargo test -p &lt;crate&gt;</code>, <code>bun run check</code> in a package). Working on one effect, build it alone, so nothing else compiles or runs:</p>
+<pre><code>cargo test -p pixfx-effects --no-default-features --features fire-candle --all-targets</code></pre>
     </main>
     <aside class="toc" aria-label="On this page"></aside>
   </div>

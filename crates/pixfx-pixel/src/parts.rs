@@ -10,12 +10,16 @@
 //! Spec text, one part per line, blank lines and lines starting with `#` skipped:
 //!
 //! ```text
-//! <name> <parent>|- box X,Y,W,H
-//! <name> <parent>|- colors a,b[,..] [in X,Y,W,H]
+//! <name> <parent>|- box X,Y,W,H [at X,Y]
+//! <name> <parent>|- colors a,b[,..] [in X,Y,W,H] [at X,Y]
+//! <name> <parent>|- poly X,Y X,Y X,Y[ X,Y..] [at X,Y]
 //! <name> <parent>|- rest
 //! ```
 //!
-//! `-` means no parent; colours are the legend letters of [`crate::text`] (`a` is palette index 0).
+//! `-` means no parent; colours are the legend letters of [`crate::text`] (`a` is palette index 0). A `poly` takes
+//! the painted cells whose centres lie inside or on the outline through its corners (cell borders are whole numbers), the
+//! shape of an arm lying over a dress. `at X,Y` names the joint the part turns about (a shoulder), in place of the
+//! middle of its border with its parent.
 use std::fmt;
 
 use crate::{LEGEND, Map};
@@ -89,6 +93,8 @@ pub enum Rule {
         colors: Vec<usize>,
         within: Option<[u32; 4]>,
     },
+    /// Every painted cell whose centre lies inside the outline through these corners (even-odd).
+    Poly(Vec<(u32, u32)>),
     /// Every painted cell no other rule takes, wherever it stands in the spec.
     Rest,
 }
@@ -100,6 +106,8 @@ pub struct PartSpec {
     /// The part it hangs from (a hand from an arm); `None` for the root.
     pub parent: Option<String>,
     pub rule: Rule,
+    /// The joint it turns about, `(x, y)` in cells; `None` takes the middle of the border with its parent.
+    pub joint: Option<(u32, u32)>,
 }
 
 /// One part of a split sprite.
@@ -186,8 +194,14 @@ pub fn split(map: &Map, spec: &[PartSpec]) -> Result<Vec<Part>, SplitError> {
             return Err(SplitError(format!("part {} has no cells", s.name)));
         };
         let pivot = match &s.parent {
-            None => None,
-            Some(parent) => Some(pivot(map, &owner, p, &s.name, spec, parent)?),
+            None => s.joint.map(|(x, y)| (f64::from(x), f64::from(y))),
+            Some(parent) => {
+                let border = pivot(map, &owner, p, &s.name, spec, parent)?;
+                Some(
+                    s.joint
+                        .map_or(border, |(x, y)| (f64::from(x), f64::from(y))),
+                )
+            }
         };
         parts.push(Part {
             name: s.name.clone(),
@@ -221,7 +235,15 @@ pub fn spec_text(spec: &[PartSpec]) -> String {
                     None => format!("colors {}", letters.join(",")),
                 }
             }
+            Rule::Poly(points) => {
+                let corners: Vec<String> = points.iter().map(|(x, y)| format!("{x},{y}")).collect();
+                format!("poly {}", corners.join(" "))
+            }
             Rule::Rest => "rest".to_string(),
+        };
+        let rule = match s.joint {
+            Some((x, y)) => format!("{rule} at {x},{y}"),
+            None => rule,
         };
         let parent = s.parent.as_deref().unwrap_or("-");
         out.push_str(&format!("{} {parent} {rule}\n", s.name));
@@ -246,7 +268,25 @@ pub fn parse_spec(text: &str) -> Result<Vec<PartSpec>, SplitError> {
         if name == "-" {
             return Err(err("`-` is not a part name"));
         }
+        let (rest, joint) = match rest {
+            [rule @ .., "at", j] => (
+                rule,
+                Some(parse_point(j).ok_or_else(|| err("at must be X,Y"))?),
+            ),
+            _ => (rest, None),
+        };
         let rule = match rest {
+            ["poly", points @ ..] => {
+                let points = points
+                    .iter()
+                    .map(|p| parse_point(p))
+                    .collect::<Option<Vec<_>>>()
+                    .ok_or_else(|| err("poly corners must be X,Y"))?;
+                if points.len() < 3 {
+                    return Err(err("poly needs at least 3 corners"));
+                }
+                Rule::Poly(points)
+            }
             ["box", b] => Rule::Box(parse_box(b).ok_or_else(|| err("box must be X,Y,W,H"))?),
             ["colors", c] => Rule::Colors {
                 colors: parse_colors(c).map_err(|m| err(&m))?,
@@ -259,7 +299,7 @@ pub fn parse_spec(text: &str) -> Result<Vec<PartSpec>, SplitError> {
             ["rest"] => Rule::Rest,
             _ => {
                 return Err(err(
-                    "rule must be `box X,Y,W,H`, `colors a,b [in X,Y,W,H]` or `rest`",
+                    "rule must be `box X,Y,W,H`, `colors a,b [in X,Y,W,H]`, `poly X,Y X,Y X,Y..` or `rest`",
                 ));
             }
         };
@@ -267,6 +307,7 @@ pub fn parse_spec(text: &str) -> Result<Vec<PartSpec>, SplitError> {
             name: name.to_string(),
             parent: (parent != "-").then(|| parent.to_string()),
             rule,
+            joint,
         });
     }
     Ok(spec)
@@ -354,6 +395,7 @@ fn takes(rule: &Rule, x: u32, y: u32, color: usize) -> bool {
         Rule::Colors { colors, within } => {
             colors.contains(&color) && within.is_none_or(|b| inside(b, x, y))
         }
+        Rule::Poly(points) => in_poly(points, x, y),
         Rule::Rest => false,
     }
 }
@@ -411,4 +453,48 @@ fn mark(seen: &mut [bool], i: usize) {
     if let Some(s) = seen.get_mut(i) {
         *s = true;
     }
+}
+
+/// `X,Y`, two whole numbers.
+fn parse_point(v: &str) -> Option<(u32, u32)> {
+    let (x, y) = v.split_once(',')?;
+    Some((x.trim().parse().ok()?, y.trim().parse().ok()?))
+}
+
+/// Whether cell `(x, y)`'s centre lies inside the outline through `points` (even-odd), a centre on the outline
+/// itself counting as inside whichever side of the shape it is on. Coordinates are doubled so the test is exact.
+fn in_poly(points: &[(u32, u32)], x: u32, y: u32) -> bool {
+    let (px, py) = (2 * i64::from(x) + 1, 2 * i64::from(y) + 1);
+    let n = points.len();
+    let mut inside = false;
+    for i in 0..n {
+        let (Some(&(ax, ay)), Some(&(bx, by))) = (points.get(i), points.get((i + n - 1) % n))
+        else {
+            continue;
+        };
+        let (ax, ay, bx, by) = (
+            2 * i64::from(ax),
+            2 * i64::from(ay),
+            2 * i64::from(bx),
+            2 * i64::from(by),
+        );
+        let cross = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+        if cross == 0
+            && px >= ax.min(bx)
+            && px <= ax.max(bx)
+            && py >= ay.min(by)
+            && py <= ay.max(by)
+        {
+            return true;
+        }
+        // The ray to the right crosses edge a-b: x at height py is (ax + (py - ay)(bx - ax)/(by - ay)) > px.
+        if (ay > py) != (by > py) {
+            let lhs = (px - ax) * (by - ay);
+            let rhs = (py - ay) * (bx - ax);
+            if (by > ay && lhs < rhs) || (by < ay && lhs > rhs) {
+                inside = !inside;
+            }
+        }
+    }
+    inside
 }

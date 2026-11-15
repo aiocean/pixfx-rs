@@ -1,0 +1,28 @@
+{
+  "id": "shield/turtle-shell",
+  "name": "Turtle shell",
+  "look": "Black tortoise shell barrier from cultivation fantasy. A dome of dark jade-green hexagonal shell plates with glowing seams covers the character like a tortoise shell.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "the plates slam down from above one after another and lock into the dome with a puff of dust"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the shell holds, a dim green light running along the seams between the plates; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow strikes the right side; the struck plate cracks, dust and stone chips burst out to the right"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the plates crack and crumble into falling stones and dust"
+    }
+  ]
+}

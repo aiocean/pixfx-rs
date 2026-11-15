@@ -1,0 +1,28 @@
+{
+  "id": "shield/thunder",
+  "name": "Thunder",
+  "look": "Thunder shield from cultivation fantasy. A sphere of crackling purple-white lightning surrounds the character, jagged arcs crawling over its surface.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "sparks gather round the character and snap together into the crackling sphere"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "arcs crawl and flicker over the sphere's surface in different places each frame; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow comes from the right; a thick bolt of lightning arcs out from the sphere to the right and strikes back at it, a white flash at the contact"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the sphere collapses inward into a last bright flash and a few fading sparks"
+    }
+  ]
+}

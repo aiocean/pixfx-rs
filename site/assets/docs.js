@@ -9,7 +9,7 @@ const SECTIONS = [
     ["effects.html", "Effect catalog"],
   ]],
   ["Use pixfx", [
-    ["cli.html", "Command line"],
+    ["scripts.html", "Scripts"],
     ["sheets.html", "Sprite sheet format"],
     ["canvas.html", "Canvas renderer"],
     ["js-engine.html", "JS engine"],
@@ -24,7 +24,7 @@ const SECTIONS = [
   ]],
 ];
 
-// hosts may serve pages without ".html" (Cloudflare Pages redirects /docs/cli.html to /docs/cli), so match on the name
+// hosts may serve pages without ".html" (Cloudflare Pages redirects /docs/scripts.html to /docs/scripts), so match on the name
 const page = (href) => href.replace(/\.html$/, "") || "index";
 
 /** Fill the docs chrome of the page now in the document. */

@@ -89,10 +89,6 @@ impl Effect for DirtExplosion {
     fn meta(&self) -> &Meta {
         &META
     }
-    /// Its clods draw their own outline, which the `outline` option recolours or drops.
-    fn draws_outline(&self) -> bool {
-        true
-    }
     /// Beyond pixelfx: the charge going off asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
     fn cues(&self, opts: &Options) -> Vec<TimedCue> {
         impact(0.0, 0.8, 0.0, -8.0, opts)
@@ -105,7 +101,7 @@ impl Effect for DirtExplosion {
             light: e[5],
             body: e[3],
             shade: e[2],
-            edge: opts.outline_color(OUTLINE),
+            edge: OUTLINE,
         };
         let dust = mix(e[4], rgb(150.0, 140.0, 150.0), 0.2);
         let soil = mix(e[3], rgb(90.0, 80.0, 90.0), 0.2);

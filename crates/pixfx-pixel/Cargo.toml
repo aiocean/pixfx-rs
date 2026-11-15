@@ -15,3 +15,5 @@ workspace = true
 [dev-dependencies]
 # PNG for tests and example scripts only; the library itself does no I/O
 pixfx-export = { path = "../pixfx-export" }
+# a fighter look's named colours as a palette, for tests and example scripts
+pixfx-fighter = { path = "../pixfx-fighter" }

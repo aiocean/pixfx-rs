@@ -1,0 +1,28 @@
+{
+  "id": "shield/frost-ward",
+  "name": "Frost ward",
+  "look": "Frost ward, an ice barrier from cultivation fantasy. A faceted shell of pale blue ice crystals encloses the character in a tall dome, sharp facets catching cold light, frost mist at its foot.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "ice crystals grow up from the ground and close over the character into the shell"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the shell holds; cold light glints across the facets and a little frost mist drifts at its foot; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow strikes the shell's right side; white cracks spread from the impact point across the facets, ice chips fly off to the right"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the cracked shell shatters into ice shards that fall and scatter on the ground"
+    }
+  ]
+}

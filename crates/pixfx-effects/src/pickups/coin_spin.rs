@@ -49,15 +49,10 @@ impl Effect for CoinSpin {
     fn meta(&self) -> &Meta {
         &META
     }
-    /// The coin draws its own outline (its ramp's second-darkest step), which the `outline` option recolours or
-    /// drops.
-    fn draws_outline(&self) -> bool {
-        true
-    }
     fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
         let c: [Rgba; 8] = ramp(&opts.palette_or(&PALETTE));
         Box::new(State {
-            edge: opts.outline_color(c[1]),
+            edge: c[1],
             c,
             seed: seed as f64,
         })
@@ -66,7 +61,7 @@ impl Effect for CoinSpin {
 
 struct State {
     c: [Rgba; 8],
-    edge: Option<Rgba>,
+    edge: Rgba,
     seed: f64,
 }
 

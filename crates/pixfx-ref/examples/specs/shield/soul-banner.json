@@ -1,0 +1,28 @@
+{
+  "id": "shield/soul-banner",
+  "name": "Soul banner",
+  "look": "Soul banner barrier from dark cultivation fantasy. A vortex of pale ghostly spirits with hollow faces and trailing wisps swirls round the character, dark grey-green smoke between them.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "spirits pour out of the ground and begin circling, the vortex thickening round the character"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the spirits swirl round and round the character, faces turning as they pass; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow comes from the right; the spirits on that side shriek and lunge outward to the right, mouths open, then are pulled back into the swirl"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the vortex breaks apart and the spirits scatter outward and fade into smoke"
+    }
+  ]
+}

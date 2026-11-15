@@ -1,6 +1,7 @@
 import Phaser from "phaser";
-import type { Counts, Game, PixfxEffect } from "pixfx-web";
+import type { ActorSource, Counts, Game, PixfxEffect } from "pixfx-web";
 import { drawBudget, loadedEngine, loadedGame, PixfxFeel, Stage } from "pixfx-web";
+import { spriteActor } from "./actor";
 import { parsePlayOptions } from "./options";
 import { phaserImages, phaserTextures } from "./phaser-gfx";
 import { type FeelSprite, PixfxSpriteFeel, SpriteFeelCore } from "./sprite-feel";
@@ -82,6 +83,15 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     const effect = stage.play(id, x, y, p.engine, p.scrollFactor, p.depth);
     if (p.scrollFactor !== 1) stage.scene.setScrollFactor(effect.handle, p.scrollFactor);
     return effect;
+  }
+
+  /**
+   * `sprite` as the character an effect plays on: `effect.wrap(this.pixfx.actorOf(sprite))`. An effect that wraps
+   * its actor (as `feedback/power-up` does) grips the sprite's outline and follows each frame it shows. Its rotation
+   * and a parent container are not read.
+   */
+  actorOf(sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Image): ActorSource {
+    return spriteActor(sprite);
   }
 
   /**

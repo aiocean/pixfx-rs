@@ -6,8 +6,9 @@
 //! [`Scene`]: crate::Scene
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
-use pixfx_core::{Clip, FrameId, FrameStore, Layer, PixelBox, Placement, Sim};
+use pixfx_core::{Actor, Clip, FrameId, FrameStore, Layer, PixelBox, Placement, Sim};
 use pixfx_draw::Frame;
 
 use crate::{Receive, Scene, Shell};
@@ -21,16 +22,33 @@ pub struct EffectKey {
 }
 
 /// Which frame a paint is for, so a frame painted elsewhere finds its way back: a frame shared by every effect
-/// showing it, or an effect's own frame while it fades out, drawn at clock frame `clock` and placed as `place`.
+/// showing it, or an effect's own frame (while it fades out, or while it wraps its actor).
 #[derive(Clone, Debug, PartialEq)]
 pub enum Target {
     Shared(FrameId),
-    Own { clock: u64, place: Placement },
+    Own(OwnAt),
 }
 
-/// One layer of one frame of one effect to paint: the effect's state brought to `frame` ([`Sim::seek`]), drawn
-/// placed as `place` at opacity `fade`. The clip says what the effect is; a painter that has not seen `effect`
-/// before makes its state from it.
+/// What an effect's own frame was drawn at: clock frame `clock`, placed as `place`, with version `actor` of its
+/// actor (0 for none). It is drawn again when any of them changes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OwnAt {
+    pub clock: u64,
+    pub place: Placement,
+    pub actor: u64,
+}
+
+/// The character an effect plays on, as the scene last set it ([`crate::Scene::set_actor`]): its sprite in the
+/// effect's own space, and a version that changes with every set.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ActorFrame {
+    pub version: u64,
+    pub actor: Arc<Actor>,
+}
+
+/// One layer of one frame of one effect to paint: the effect's state handed `actor` ([`Sim::set_actor`]),
+/// brought to `frame` ([`Sim::seek`]), drawn placed as `place` at opacity `fade`. The clip says what the effect
+/// is; a painter that has not seen `effect` before makes its state from it.
 pub struct Job<'a> {
     pub effect: EffectKey,
     pub clip: &'a Clip,
@@ -39,6 +57,8 @@ pub struct Job<'a> {
     pub place: Placement,
     pub layer: Layer,
     pub target: Target,
+    /// The character it plays on, for an effect that wraps one; `None` otherwise.
+    pub actor: Option<&'a ActorFrame>,
 }
 
 /// Paints the frames scenes ask for. It keeps each effect's state between paints, so stepping a playing effect
@@ -75,6 +95,7 @@ impl Painter for InlinePainter {
             .sims
             .entry(job.effect)
             .or_insert_with(|| (job.clip.sim(), job.clip.blank()));
+        sim.set_actor(job.actor.map(|a| Arc::clone(&a.actor)));
         sim.seek(job.frame);
         job.clip.draw(sim, frame, job.layer, job.place, job.fade);
         Some(frame)

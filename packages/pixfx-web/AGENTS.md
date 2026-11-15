@@ -16,6 +16,7 @@ What every JS shell (Phaser, Pixi, the next ones) shares, so a shell adds only i
 | `effect.ts`, `feel.ts` | `PixfxEffect` and `PixfxFeel`, the handles a game holds (eventemitter3). |
 | `worker.ts`, `paint.ts`, `protocol.ts` | The painting worker, what it does with a message, and the messages (zod). |
 | `options.ts` | Splitting play options into a shell's own fields and the engine's. |
+| `actor.ts` | A character an effect plays on: an image cut's pixels read once and kept (`cutPixels`), and `imageActor` for sprites a game draws itself. |
 | `gfx.ts` | The contract a shell implements: `GfxTextures` (room for a surface) and `GfxImages` (images showing one). |
 | `tools/cdp.ts` | A Chrome DevTools Protocol client for the shells' browser checks. |
 
@@ -40,5 +41,3 @@ TypeScript strict; zod at every boundary; no `any`, no non-null assertions, no t
 bun run build:wasm    # when Rust changed
 bun run check         # tsc, eslint, bun test
 ```
-
-Then `bun run check` in every shell package that depends on this one.

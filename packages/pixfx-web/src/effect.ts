@@ -1,4 +1,5 @@
 import EventEmitter from "eventemitter3";
+import type { ActorSource } from "./actor";
 
 /** Live counts of what a scene's effects hold, read by `stats()` and the leak checks. */
 export interface Counts {
@@ -20,6 +21,7 @@ export interface EffectHost<P> {
   remove(effect: PixfxEffect<P>): void;
   follow(handle: number, target: FollowTarget | null, dx: number, dy: number): void;
   moveTo(handle: number, x: number, y: number): void;
+  wrap(handle: number, source: ActorSource | null): void;
 }
 
 /**
@@ -63,6 +65,16 @@ export class PixfxEffect<P = null> extends EventEmitter {
   /** Track `target` (plus offset) every update; when the target goes inactive the effect stops there. */
   follow(target: FollowTarget, dx = 0, dy = 0): this {
     if (!this.gone) this.host.follow(this.handle, target, dx, dy);
+    return this;
+  }
+
+  /**
+   * Play on a character: `source` is read every update and gives its sprite's frame as it shows now. An effect that
+   * wraps its actor (as `feedback/power-up` does) grips that outline and follows each pose; others ignore it.
+   * Shells give a source for their sprites; `null` plays on no character again.
+   */
+  wrap(source: ActorSource | null): this {
+    if (!this.gone) this.host.wrap(this.handle, source);
     return this;
   }
 

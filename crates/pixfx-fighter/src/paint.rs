@@ -344,72 +344,141 @@ impl Pen<'_> {
         }
     }
 
-    /// A fighter on its back, `up` pixels off the floor: feet toward the foe, head away, legs raised `legs`
-    /// pixels, arms flung up `arms` (0: along its sides), its chest lifting `breath`.
-    fn lying(&mut self, up: f64, legs: f64, arms: f64, breath: f64, eye: Eye) {
-        let c = self.c;
-        let l = up + legs;
-        let m = up + js_min(legs, 2.0);
-        self.px(12.0, l, 3.0, 4.0, c.boot);
-        self.px(-1.0, m, 13.0, 4.0, c.robe[1]);
-        self.px(-1.0, m + 3.0, 13.0, 1.0, c.robe[0]);
-        self.px(-1.0, m, 13.0, 1.0, c.robe[2]);
-        self.px(10.0, m, 2.0, 4.0, c.trim[0]);
-        self.px(-11.0, up, 11.0, 5.0 + breath, c.robe[1]);
-        self.px(-11.0, up, 11.0, 1.0, c.robe[2]);
-        self.px(-9.0, up + 4.0 + breath, 5.0, 1.0, c.inner[0]);
-        self.px(-8.0, up + 3.0 + breath, 3.0, 1.0, c.inner[1]);
-        self.px(-2.0, up, 1.0, 5.0 + breath, c.trim[0]);
-        if arms > 0.0 {
-            // flung up and back past the head from the shoulders
-            for (x0, len, shade) in [(-10.0, arms, 1), (-8.0, arms - 2.0, 2)] {
-                let x1 = x0 - js_round(len * 0.6);
-                let mut i = 0.0;
-                while i <= len {
-                    self.px(
-                        js_round(x0 + ((x1 - x0) * i) / len),
-                        up + 5.0 + i,
-                        2.0,
-                        1.0,
-                        c.robe[shade],
-                    );
-                    i += 1.0;
+    /// A `w` x `h` block stamped at every step from (x0, y0) to (x1, y1): a limb, or an edge of a shape.
+    fn bar(&mut self, (x0, y0): (f64, f64), (x1, y1): (f64, f64), w: f64, h: f64, col: Rgba) {
+        let n = js_max(js_max((x1 - x0).abs(), (y1 - y0).abs()), 1.0);
+        let mut i = 0.0;
+        while i <= n {
+            self.px(
+                js_round(x0 + ((x1 - x0) * i) / n),
+                js_round(y0 + ((y1 - y0) * i) / n),
+                w,
+                h,
+                col,
+            );
+            i += 1.0;
+        }
+    }
+
+    /// The convex shape with corners `p` filled, a row at a time: a robe's skirt, a body on a slant.
+    fn quad(&mut self, p: [(f64, f64); 4], col: Rgba) {
+        let lo = p.iter().fold(f64::INFINITY, |m, q| js_min(m, q.1));
+        let hi = p.iter().fold(f64::NEG_INFINITY, |m, q| js_max(m, q.1));
+        let mut y = floor(lo);
+        while y <= hi {
+            // where the row's middle crosses each edge
+            let mid = y + 0.5;
+            let (mut left, mut right) = (f64::INFINITY, f64::NEG_INFINITY);
+            for i in 0..4 {
+                let (a, b) = (p[i], p[(i + 1) % 4]);
+                let (y0, y1) = (js_min(a.1, b.1), js_max(a.1, b.1));
+                if mid < y0 || mid > y1 || y0 == y1 {
+                    continue;
                 }
-                self.px(x1 - 1.0, up + 6.0 + len, 2.0, 2.0, c.skin[0]);
+                let x = a.0 + ((b.0 - a.0) * (mid - a.1)) / (b.1 - a.1);
+                left = js_min(left, x);
+                right = js_max(right, x);
             }
-        } else {
-            self.px(-9.0, up + 5.0 + breath, 7.0, 1.0, c.robe[2]);
-            self.px(-2.0, up + 5.0 + breath, 2.0, 1.0, c.skin[0]);
-        }
-        // the head, face up
-        self.px(-18.0, up, 7.0, 6.0, c.skin[0]);
-        self.px(-18.0, up, 7.0, 1.0, c.skin[1]);
-        if eye == Eye::Crossed {
-            for (x, y) in [
-                (-15.0, 3.0),
-                (-14.0, 4.0),
-                (-13.0, 3.0),
-                (-15.0, 5.0),
-                (-13.0, 5.0),
-            ] {
-                self.px(x, up + y, 1.0, 1.0, c.outline);
+            if left <= right {
+                let x0 = js_round(left);
+                self.px(x0, y, js_round(right) - x0 + 1.0, 1.0, col);
             }
-        } else {
-            self.px(-15.0, up + 4.0, 3.0, 1.0, c.outline);
+            y += 1.0;
         }
+    }
+
+    /// A round patch of radius `r` about (cx, cy).
+    fn disc(&mut self, cx: f64, cy: f64, r: f64, col: Rgba) {
+        let mut dy = -r;
+        while dy <= r {
+            let half = js_round(sqrt(js_max(0.0, r * r - dy * dy)));
+            self.px(cx - half, cy + dy, 2.0 * half + 1.0, 1.0, col);
+            dy += 1.0;
+        }
+    }
+
+    /// An arm in its sleeve from the shoulder at (x0, y0) to the hand at (x1, y1): the sleeve in robe shade
+    /// `shade`, gold at the cuff, the hand bare.
+    fn arm(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, shade: usize) {
+        let c = self.c;
+        let (cx, cy) = (x1 - (x1 - x0).signum(), y1 - (y1 - y0).signum());
+        self.bar((x0, y0), (cx, cy), 3.0, 3.0, c.robe[shade]);
+        self.bar((cx, cy), (cx, cy), 3.0, 3.0, c.trim[0]);
+        self.px(x1, y1, 2.0, 2.0, c.skin[0]);
+    }
+
+    /// A leg in its trouser from the hip at (x0, y0) to the boot at (x1, y1) to (x1 + 3, y1 + 3).
+    fn leg(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) {
+        let c = self.c;
+        self.bar((x0, y0), (x1, y1), 3.0, 3.0, c.robe[2]);
+        self.px(x1, y1, 4.0, 4.0, c.boot);
+    }
+
+    /// A head lying face up, its crown toward -dx, at (x, y) to (x + 6, y + 6). The hair streams back from the
+    /// crown, `hang` pixels up (down when negative) at its end: spread on the floor at 0.
+    fn face_up(&mut self, x: f64, y: f64, eye: Eye, hang: f64) {
+        let (c, t) = (self.c, self.t);
+        self.px(x, y, 7.0, 7.0, c.skin[0]);
+        self.px(x, y, 7.0, 2.0, c.skin[1]);
+        // the nose and chin up
+        self.px(x + 3.0, y + 7.0, 1.0, 1.0, c.skin[0]);
+        match eye {
+            Eye::Crossed => {
+                for (ex, ey) in [(1.0, 4.0), (2.0, 5.0), (3.0, 4.0), (1.0, 6.0), (3.0, 6.0)] {
+                    self.px(x + ex, y + ey, 1.0, 1.0, c.outline);
+                }
+            }
+            Eye::Open => self.px(x + 1.0, y + 5.0, 2.0, 1.0, c.outline),
+            Eye::Shut => self.px(x + 1.0, y + 5.0, 3.0, 1.0, c.outline),
+        }
+        // the hair over the brow and round the back of the head
+        self.px(x - 3.0, y, 4.0, 7.0, c.hair[1]);
+        self.px(x - 1.0, y + 5.0, 2.0, 2.0, c.hair[1]);
         match c.hairdo {
             Hairdo::Topknot => {
-                self.px(-21.0, up, 3.0, 6.0, c.hair[1]);
-                self.px(-23.0, up + 1.0, 2.0, 3.0, c.hair[1]);
-                self.px(-22.0, up + 4.0, 1.0, 1.0, c.trim[0]);
-                self.px(-25.0, up, 2.0, 1.0, c.ribbon[0]);
+                self.px(x - 2.0, y + 1.0, 1.0, 5.0, c.hair[0]);
+                // the knot under its gold crown, and the ribbon streaming from it
+                self.px(x - 6.0, y + 2.0, 3.0, 3.0, c.hair[1]);
+                self.px(x - 7.0, y + 1.0, 1.0, 5.0, c.trim[0]);
+                for i in 0..7 {
+                    let fi = f64::from(i);
+                    let sway = js_round(sin(t * 6.0 + fi) * fi / 4.0);
+                    let ry = y + 3.0 + js_round((hang * fi) / 6.0) + sway;
+                    self.px(x - 8.0 - fi, ry, 1.0, 2.0, c.ribbon[usize::from(i >= 4)]);
+                }
             }
             Hairdo::Flowing => {
-                self.px(-21.0, up, 3.0, 6.0, c.hair[0]);
-                self.px(-29.0, up, 9.0, 2.0, c.hair[0]);
-                self.px(-29.0, up, 9.0, 1.0, c.hair[1]);
-                self.px(-20.0, up + 5.0, 2.0, 1.0, c.jade);
+                self.px(x - 3.0, y, 4.0, 7.0, c.hair[0]);
+                self.px(x - 3.0, y, 4.0, 1.0, c.hair[1]);
+                self.px(x - 1.0, y + 6.0, 2.0, 1.0, c.jade);
+                // the long hair, thick at the head and thinning to its end
+                for i in 0..13 {
+                    let fi = f64::from(i);
+                    let sway = js_round(sin(t * 4.0 - fi * 0.5) * fi / 8.0);
+                    let ty = y + 1.0 + js_round((hang * fi) / 12.0) + sway;
+                    let thick = 5.0 - floor(fi / 4.0);
+                    self.px(x - 4.0 - fi, ty, 1.0, thick, c.hair[0]);
+                    self.px(x - 4.0 - fi, ty, 1.0, 1.0, c.hair[1]);
+                }
             }
+        }
+    }
+
+    /// A swish of motion round a spinning body: a stroke along the circle of radius `r` about (cx, cy), from angle `a0`
+    /// to `a1` (radians, counter-clockwise from forward).
+    fn swish(&mut self, cx: f64, cy: f64, r: f64, a0: f64, a1: f64, col: Rgba) {
+        let n = js_max(1.0, js_round((a1 - a0).abs() * r));
+        let mut i = 0.0;
+        while i <= n {
+            let a = a0 + ((a1 - a0) * i) / n;
+            self.px(
+                js_round(cx + cos(a) * r),
+                js_round(cy + sin(a) * r),
+                2.0,
+                2.0,
+                col,
+            );
+            i += 1.0;
         }
     }
 
@@ -518,7 +587,7 @@ impl Pen<'_> {
     }
 }
 
-/// Paint fighter `a`'s pose into a sprite, not yet outlined. A tumble is painted spread-eagled; [`draw`] turns it.
+/// Paint fighter `a`'s pose into a sprite, not yet outlined. A tumble is painted curled up; [`draw`] turns it.
 pub fn paint(look: &Look, a: &Appearance) -> Sprite {
     let t = a.pose_t;
     let still = a.frozen;
@@ -551,18 +620,46 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
     let c = look;
     match a.pose {
         Pose::Down => {
-            // flat on its back; a knocked-out fighter's eyes are crossed out and its sword lies dropped beside it
+            // flat on its back, head away from the foe: the near knee bent up, the far foot standing up at the
+            // end of its leg, the near hand on its chest, the hair spread on the floor. A knocked-out fighter's
+            // eyes are crossed out and its sword lies dropped beside it.
             let breath = if !a.out && !still && floor(t * 2.5) % 2.0 != 0.0 {
                 1.0
             } else {
                 0.0
             };
-            pen.lying(
+            // the far leg straight along the floor, its boot toe-up
+            pen.px(4.0, 0.0, 17.0, 4.0, c.robe[2]);
+            pen.px(4.0, 3.0, 17.0, 1.0, c.robe[1]);
+            pen.px(19.0, 0.0, 4.0, 6.0, c.boot);
+            // the near knee bent up under the robe, its foot flat
+            pen.px(13.0, 0.0, 5.0, 2.0, c.boot);
+            pen.quad(
+                [(2.0, 0.0), (9.0, 15.0), (10.0, 15.0), (16.0, 1.0)],
+                c.robe[1],
+            );
+            pen.bar((10.0, 14.0), (16.0, 1.0), 1.0, 1.0, c.robe[2]);
+            pen.bar((11.0, 12.0), (15.0, 2.0), 1.0, 1.0, c.robe[2]);
+            pen.bar((3.0, 1.0), (9.0, 14.0), 1.0, 1.0, c.robe[0]);
+            pen.bar((13.0, 1.0), (16.0, 1.0), 1.0, 2.0, c.trim[0]);
+            // the body, chest up: shadowed along its back, the inner robe crossing the chest, the sash
+            let h = 7.0 + breath;
+            pen.px(-9.0, 0.0, 14.0, h, c.robe[1]);
+            pen.px(-9.0, 0.0, 14.0, 1.0, c.robe[2]);
+            pen.px(-9.0, h - 1.0, 14.0, 1.0, c.robe[0]);
+            pen.line(-8.0, h - 2.0, 0.0, h - 4.0, c.inner[0]);
+            pen.px(-9.0, h - 2.0, 3.0, 2.0, c.inner[1]);
+            pen.px(2.0, 0.0, 2.0, h, c.inner[0]);
+            pen.px(2.0, h - 2.0, 2.0, 1.0, c.trim[0]);
+            pen.px(4.0, 1.0, 1.0, 3.0, c.inner[1]);
+            // the far arm along its side, the near forearm across its chest
+            pen.arm(-7.0, 0.0, 1.0, 0.0, 2);
+            pen.arm(-7.0, h - 3.0, -1.0, h - 1.0, 1);
+            pen.face_up(
+                -16.0,
                 0.0,
-                0.0,
-                0.0,
-                breath,
                 if a.out { Eye::Crossed } else { Eye::Shut },
+                0.0,
             );
             if a.out {
                 pen.line(-6.0, -1.0, 10.0, -1.0, c.blade[2]);
@@ -570,14 +667,104 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
             }
             return pen.sprite;
         }
-        // thrown up and back: feet higher than its head, arms flung up past it
         Pose::Launched => {
-            pen.lying(6.0, 3.0, 5.0 + flail, 0.0, Eye::Shut);
+            // just thrown up and back by a heavy blow, spread like an X: head back and chest up on a slant, the
+            // near arm flung up, the far one out behind, the near leg kicked up toward the foe, the far leg and
+            // the robe's skirt flung down, the sash tails flying
+            let f = flail;
+            pen.arm(-7.0, 26.0, -17.0, 19.0 + f, 2);
+            pen.leg(6.0, 17.0, 13.0, 4.0 + f);
+            // the skirt, flared from the hips, its hem gold
+            pen.quad(
+                [(0.0, 21.0), (11.0, 28.0), (20.0, 12.0), (6.0, 6.0)],
+                c.robe[1],
+            );
+            pen.bar((0.0, 21.0), (6.0, 7.0), 2.0, 1.0, c.robe[2]);
+            pen.bar((11.0, 27.0), (19.0, 13.0), 1.0, 1.0, c.robe[0]);
+            pen.bar((6.0, 6.0), (19.0, 11.0), 1.0, 2.0, c.trim[0]);
+            pen.line(5.0, 21.0, 12.0, 9.0, c.inner[0]);
+            // the sash tails, flung down from the waist
+            pen.bar((1.0, 21.0), (0.0, 12.0 - f), 1.0, 1.0, c.inner[0]);
+            pen.bar((3.0, 21.0), (3.0, 13.0 + f), 1.0, 1.0, c.inner[1]);
+            // the body, back to the floor and chest up to the sky
+            pen.quad(
+                [(-10.0, 30.0), (2.0, 20.0), (11.0, 28.0), (-5.0, 38.0)],
+                c.robe[1],
+            );
+            pen.bar((-10.0, 30.0), (2.0, 20.0), 2.0, 1.0, c.robe[2]);
+            pen.bar((-5.0, 37.0), (10.0, 28.0), 1.0, 1.0, c.robe[0]);
+            pen.line(-5.0, 35.0, 5.0, 26.0, c.inner[0]);
+            pen.line(-6.0, 35.0, 4.0, 26.0, c.trim[0]);
+            pen.bar((2.0, 21.0), (9.0, 28.0), 2.0, 1.0, c.inner[0]);
+            pen.face_up(-17.0, 30.0, Eye::Shut, 5.0);
+            pen.leg(9.0, 26.0, 19.0, 31.0 - f);
+            pen.arm(-3.0, 35.0, -1.0 + f, 46.0, 1);
             return pen.sprite;
         }
-        // falling flat on its back, arms and legs trailing up as it drops
         Pose::Fall => {
-            pen.lying(6.0, 1.0, 7.0 - flail, 0.0, Eye::Shut);
+            // dropping back-first, a little head-down: the body on a slant with the head low, the arms and legs
+            // trailing up, the robe's skirt flaring up off the legs, the hair hanging below the head
+            let f = flail;
+            pen.arm(-7.0, 12.0, -17.0, 20.0 + f, 2);
+            pen.leg(5.0, 17.0, 9.0, 32.0 + f);
+            // the skirt flaring up from the hips, its hem gold
+            pen.quad(
+                [(1.0, 15.0), (8.0, 11.0), (21.0, 24.0), (10.0, 32.0)],
+                c.robe[1],
+            );
+            pen.bar((8.0, 11.0), (21.0, 24.0), 1.0, 1.0, c.robe[2]);
+            pen.bar((1.0, 16.0), (9.0, 31.0), 1.0, 1.0, c.robe[0]);
+            pen.bar((10.0, 32.0), (21.0, 24.0), 1.0, 1.0, c.trim[0]);
+            pen.line(5.0, 16.0, 14.0, 26.0, c.inner[0]);
+            // the body, back to the floor
+            pen.quad(
+                [(-10.0, 6.0), (7.0, 10.0), (6.0, 19.0), (-9.0, 13.0)],
+                c.robe[1],
+            );
+            pen.bar((-10.0, 6.0), (7.0, 10.0), 1.0, 1.0, c.robe[2]);
+            pen.bar((-9.0, 13.0), (6.0, 19.0), 1.0, 1.0, c.robe[0]);
+            pen.line(-7.0, 12.0, 2.0, 15.0, c.inner[0]);
+            pen.line(-8.0, 12.0, 1.0, 16.0, c.trim[0]);
+            pen.bar((3.0, 9.0), (3.0, 17.0), 2.0, 1.0, c.inner[0]);
+            pen.face_up(-17.0, 5.0, Eye::Shut, -6.0);
+            pen.leg(8.0, 17.0, 22.0, 20.0 - f);
+            pen.arm(-3.0, 16.0, -5.0 - f, 28.0, 1);
+            return pen.sprite;
+        }
+        Pose::Tumble => {
+            // spinning helplessly, curled into a ball round its middle: the head tucked down, the knees hugged to
+            // the chest, the feet folded under, the far arm flung out, swishes of motion round it; draw turns it
+            // a quarter at a time
+            let f = flail;
+            pen.swish(1.0, 16.0, 14.0, 2.6, 3.7, c.blade[1]);
+            pen.swish(1.0, 16.0, 14.0, -0.4, 0.6, c.blade[1]);
+            pen.arm(-5.0, 22.0, -14.0, 25.0 + f, 2);
+            // the back curled round, shadowed underneath
+            pen.disc(0.0, 15.0, 10.0, c.robe[2]);
+            pen.disc(1.0, 16.0, 9.0, c.robe[1]);
+            pen.px(-3.0, 24.0, 7.0, 1.0, c.robe[0]);
+            // the feet folded under the seat
+            pen.px(-9.0, 3.0, 7.0, 4.0, c.boot);
+            pen.px(-7.0, 7.0, 4.0, 2.0, c.boot);
+            // the knees hugged up to the chest, the skirt's hem gold round them
+            pen.disc(6.0, 14.0, 5.0, c.robe[1]);
+            pen.px(3.0, 18.0, 7.0, 1.0, c.robe[0]);
+            pen.bar((1.0, 9.0), (10.0, 11.0), 1.0, 1.0, c.trim[0]);
+            pen.bar((-6.0, 9.0), (1.0, 9.0), 1.0, 1.0, c.trim[0]);
+            // the sash round the middle, its tail whipping out behind
+            pen.bar((-9.0, 15.0), (10.0, 12.0), 1.0, 2.0, c.inner[0]);
+            for i in 0..6 {
+                let fi = f64::from(i);
+                let sway = js_round(sin(t * 9.0 + fi) * fi / 3.0);
+                pen.dot(
+                    -10.0 - fi,
+                    14.0 - js_round(fi / 2.0) + sway,
+                    c.inner[usize::from(i >= 3)],
+                );
+            }
+            pen.head(20.0, 2.0, Eye::Shut);
+            // the near arm wrapped round the knees
+            pen.arm(-1.0, 20.0, 9.0, 17.0, 1);
             return pen.sprite;
         }
         Pose::Roll => {
@@ -678,11 +865,10 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
     } else {
         0.0
     };
-    let spread_eagled = pose == Pose::Tumble;
     let p = a.act.and_then(|k| k.windup).map(|w| w.progress);
     let how = a.act.map(|k| k.how);
     // a fresh blow snaps it back; then it reels, bent over the hurt, lower the harder it was struck
-    let recoil = (pose == Pose::Hurt && a.hit_t < 0.1) || spread_eagled;
+    let recoil = pose == Pose::Hurt && a.hit_t < 0.1;
     let reel = pose == Pose::Hurt && !recoil;
     // how far the body sinks: a crouch, a landing, a kneel, a reel, a stance braced to gather or to strike
     let braced = (pose == Pose::Channel && matches!(how, Some(Gather::Summon | Gather::Palm)))
@@ -746,9 +932,7 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
     } else {
         0.0
     };
-    let spread = if spread_eagled {
-        3.0
-    } else if drop > 0.0 && pose != Pose::Kneel {
+    let spread = if drop > 0.0 && pose != Pose::Kneel {
         2.0
     } else {
         0.0

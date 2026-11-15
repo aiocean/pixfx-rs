@@ -6,9 +6,9 @@ anything here; this file only says what this crate holds.
 ## Job
 
 Pixel fighters, from the site's duel: a drawn fighter with a pose for each thing it can be doing (`paint`, `pose`,
-`look`; every pose is painter code written by hand, `pixfx pixel` reading reference art for it), a body that takes
-hits the way fighting games do (`body`), the screen's answer to a blow (`feel`) and the marks that hang on a fighter
-(`status`).
+`look`; every pose is painter code written by hand, the `pixfx-pixel` scripts reading reference art for it;
+`poses` lays every pose out as sheet cells), a body that takes hits the way fighting games do (`body`), the
+screen's answer to a blow (`feel`) and the marks that hang on a fighter (`status`).
 
 ## Belongs here
 
@@ -41,6 +41,6 @@ Build on `pixfx-core`'s hit-stop, shake and `Feel`; do not write a second copy h
 
 ```
 cargo test -p pixfx-fighter
-cargo test -p pixfx-cli --test poses                          # the pose sheet paints every pose
-cargo test --workspace
+cargo test -p pixfx-fighter --test poses                       # the pose sheet paints every pose
+cargo run -p pixfx-fighter --example poses -- thunder          # look at the sheet it writes to out/
 ```

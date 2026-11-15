@@ -54,11 +54,15 @@ pixfx.feel.on("cue", (c) => { if (c.cue.type === "sound") playSound(c.cue.name);
 
 `pixfx.play(id, x, y, opts?)` places the effect's origin at `(x, y)` in `container` and returns a `PixfxEffect`.
 Options: `depth: {back, front}` sets the back and front sprites' `zIndex` (default `{back: 0, front: 1}`); every
-other option (`seed`, `flip`, `angle`, `light`, `palette`, `outline`, the effect's own) is the engine's, as in
+other option (`seed`, `flip`, `angle`, `light`, `palette`, the effect's own) is the engine's, as in
 `pixfx-phaser`. An unknown id or a bad option throws and creates nothing.
 
-`PixfxEffect`: `stop()`, `destroy()`, `follow(target, dx?, dy?)`, `setDepths(back, front)`, `setPosition(x, y)`;
-events `"complete"`, `"destroy"` and `"cue"`, as in `pixfx-phaser`.
+`PixfxEffect`: `stop()`, `destroy()`, `follow(target, dx?, dy?)`, `setDepths(back, front)`, `setPosition(x, y)`,
+`wrap(source)`; events `"complete"`, `"destroy"` and `"cue"`, as in `pixfx-phaser`.
+
+`effect.wrap(pixfx.actorOf(sprite))` plays the effect on a character: an effect that wraps its actor
+(`feedback/power-up`) grips the sprite's outline and follows every texture it shows, at its scale (a negative x
+scale mirrors it). Its rotation, and the scale of containers between it and `container`, are not read.
 
 Effects advance on `app.ticker` (after the game's own ticker callbacks, before the render); `ticker.speed` scales
 them and `ticker.stop()` freezes them. `pixfx.feel` is the same `PixfxFeel` as Phaser's: the shake moves `camera`,

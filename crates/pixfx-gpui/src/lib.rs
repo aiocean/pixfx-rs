@@ -17,7 +17,7 @@ use gpui::{
     Bounds, Corners, Pixels, Point, RenderImage, SpriteBlend, SpriteFilter, Window, point, px, size,
 };
 use image::{Frame as ImageFrame, RgbaImage};
-use pixfx_core::{Clip, Effect, Layer, Options};
+use pixfx_core::{Actor, Clip, Effect, Layer, Options};
 use pixfx_draw::Frame;
 use pixfx_scene::{Frames, InlinePainter, Job, Painter, Pass, Receive, Scene, Shell, Target};
 
@@ -247,12 +247,11 @@ impl FxScene {
                     Target::Shared(id) => {
                         frames.deliver(&id, done.layer, &done.painted, shell)?;
                     }
-                    Target::Own { clock, place } => {
+                    Target::Own(at) => {
                         scene.deliver_own(
                             done.effect.handle,
                             done.layer,
-                            clock,
-                            place,
+                            at,
                             &done.painted,
                             shell,
                         )?;
@@ -280,6 +279,14 @@ impl FxScene {
     pub fn tick(&mut self, dt: f64) -> Result<()> {
         self.scene.update(dt).map_err(|e| anyhow!(e))?;
         Ok(())
+    }
+
+    /// Play it on a character: `actor` is its sprite's frame as the view shows it now, placed in effect pixels with
+    /// the effect's origin at (0, 0), or `None` for none. An effect that wraps its actor (as `feedback/power-up`
+    /// does) grips that outline from its next step; others ignore it. Hand it every frame: the same sprite at the
+    /// same place changes nothing. False if it is gone.
+    pub fn set_actor(&mut self, fx: FxHandle, actor: Option<Actor>) -> Result<bool> {
+        self.scene.set_actor(fx.0, actor).map_err(|e| anyhow!(e))
     }
 
     /// Let it end: loops fade out, one-shots are cut short. False if it is gone.

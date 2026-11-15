@@ -289,7 +289,7 @@ fn colour_budget(pic: &Pic, palette: &[Colour]) -> Vec<Issue> {
             pic.painted
         ),
         fix: format!(
-            "merge the {} least used colours ({}) into the nearest kept shade, e.g. `pixfx pixel clean <sprite.png> --max-colors {limit}`",
+            "merge the {} least used colours ({}) into the nearest kept shade, e.g. `cargo run -p pixfx-pixel --example clean -- <sprite.png> --max-colors {limit}`",
             extra.len(),
             names.join(" ")
         ),

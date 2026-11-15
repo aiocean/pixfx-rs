@@ -10,7 +10,7 @@ use pixfx_draw::composite;
 use crate::ExportError;
 
 /// Backdrop colour the effect is composited over.
-const BACKDROP: [u8; 4] = [20, 18, 28, 255];
+pub(crate) const BACKDROP: [u8; 4] = [20, 18, 28, 255];
 
 /// Write `r` to `path` as a looping gif, each pixel blown up to `scale` x `scale` (at least 1).
 pub fn write_gif(path: &Path, r: &Rendered, scale: u32) -> Result<(), ExportError> {

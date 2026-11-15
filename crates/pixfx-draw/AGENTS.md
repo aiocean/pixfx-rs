@@ -6,13 +6,13 @@ before changing anything here; this file only says what this crate holds.
 ## Job
 
 Pixels and nothing else: `Frame` with a colour layer and an additive light layer, the `painter`, `shapes`, `blend`
-and `composite`, `frame_hash`, `color` (`Rgba`, `hex`), `palette` presets, `outline` rings, `RgbaImage`
+and `composite`, `frame_hash`, `color` (`Rgba`, `hex`), `palette` presets, `RgbaImage`
 (plain RGBA bytes: a sprite leaving the engine or a picture coming in), and the JS-number maths in `math`
 (`js_round`, `js_max`, `js_min`, `clamp`). Every other crate paints through it.
 
 ## Belongs here
 
-- A new way to put pixels in a frame: a primitive, a blend, a palette, an outline style.
+- A new way to put pixels in a frame: a primitive, a blend, a palette.
 - Sprites, text, nine-slice and UI layout when a real game needs them. That game decides the API; do not add one
   ahead of it.
 - Number helpers that must give identical bits natively and in wasm.
@@ -43,8 +43,7 @@ and `composite`, `frame_hash`, `color` (`Rgba`, `hex`), `palette` presets, `outl
 
 ```
 cargo test -p pixfx-draw
-cargo test --workspace                                        # golden hashes of every effect
-cargo test -p pixfx-effects --test determinism -- --ignored
+cargo test -p pixfx-effects --test determinism -- --ignored   # when a change can move pixels: every effect's hashes
 ```
 
 A changed `frame_hash` without a stated reason is a failure, even if the result looks right.

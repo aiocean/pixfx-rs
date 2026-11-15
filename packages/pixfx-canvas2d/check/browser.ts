@@ -33,11 +33,12 @@ async function waitFor(b: Browser, expression: string, timeoutMs: number): Promi
   throw new Error(timeoutMessage(expression, b.takeErrors()));
 }
 
-/** A hash of the canvas, and how many of its pixels are none of the demo's own colours (so an effect drew them). */
+/** A hash of the canvas, and how many of its pixels are none of the demo's own colours (its ground, walker and hero),
+ * so an effect drew them. */
 const PICTURE = `(() => {
   const c = document.getElementById("scene");
   const px = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-  const own = new Set(["23,19,28", "42,34,51", "79,209,197"]);
+  const own = new Set(["23,19,28", "42,34,51", "79,209,197", "242,199,155", "217,79,92", "59,74,140"]);
   let h = 2166136261 >>> 0, lit = 0;
   for (let i = 0; i < px.length; i += 4) {
     h = Math.imul(h ^ px[i] ^ (px[i + 1] << 8) ^ (px[i + 2] << 16), 16777619) >>> 0;

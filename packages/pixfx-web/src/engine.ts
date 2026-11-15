@@ -44,8 +44,6 @@ export interface Engine {
   meta(id: string): EffectMeta;
   /** The palette presets every effect takes by name. */
   palettePresets(): readonly string[];
-  /** The outline presets every effect takes by name. */
-  outlinePresets(): readonly string[];
   /** A body's squash and stretch and its blink, with the default spec. */
   squash(): SquashLike;
   blink(): BlinkLike;
@@ -71,7 +69,6 @@ export function wasmEngine(wasm: WasmModule): Engine {
     effects: () => ids,
     meta: (id) => effectMetaSchema.parse(wasm.meta(effectId(id))),
     palettePresets: () => names.parse(wasm.palettePresets()),
-    outlinePresets: () => names.parse(wasm.outlinePresets()),
     squash: () => {
       const s = new wasm.Squash(undefined);
       return {

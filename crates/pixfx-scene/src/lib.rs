@@ -6,14 +6,15 @@
 
 use std::fmt;
 use std::num::NonZeroU32;
+use std::sync::Arc;
 
 mod frames;
 
-pub use frames::{EffectKey, Frames, InlinePainter, Job, Painter, Target};
+pub use frames::{ActorFrame, EffectKey, Frames, InlinePainter, Job, OwnAt, Painter, Target};
 
 use frames::frame_bytes;
 use pixfx_core::cue::Cue;
-use pixfx_core::{Clip, Clock, Feel, FrameId, Layer, Placement, TimedCue, valid_dt};
+use pixfx_core::{Actor, Clip, Clock, Feel, FrameId, Layer, Placement, TimedCue, valid_dt};
 use pixfx_draw::math::clamp;
 use pixfx_draw::math::js_round;
 use pixfx_draw::{Frame, composite_px};
@@ -145,6 +146,8 @@ pub enum StageError {
     BadStep,
     /// A frame painted elsewhere came back at another size than the one asked for.
     BadFrame,
+    /// An actor's sprite sits too far from its effect to place in the effect's space.
+    ActorTooFar,
 }
 
 impl fmt::Display for StageError {
@@ -154,6 +157,7 @@ impl fmt::Display for StageError {
             Self::OutOfHandles => "every handle has been used",
             Self::BadStep => "dt must be a finite number of seconds, 0 or more",
             Self::BadFrame => "a painted frame came back at another size than the one asked for",
+            Self::ActorTooFar => "the actor's sprite is too far from its effect",
         })
     }
 }
@@ -203,11 +207,12 @@ impl<H: Shell> Receive<Frame> for H {
     }
 }
 
-/// A layer's own frame: the surface an effect fading after `stop()` draws into, and what it last drew there.
+/// A layer's own frame: the surface an effect fading after `stop()`, or wrapping its actor, draws into, and what
+/// it last drew there.
 struct Own<S> {
     surface: S,
-    /// The clock frame and placement it was drawn at: it is drawn again only when either changes.
-    drawn: (u64, Placement),
+    /// What it was drawn at: it is drawn again only when that changes.
+    drawn: OwnAt,
 }
 
 struct Entry<S> {
@@ -219,10 +224,17 @@ struct Entry<S> {
     /// What it plays, and its time.
     clip: Clip,
     clock: Clock,
-    /// Its own frames while it fades out (back, front, both); shared frames live in [`Frames`].
+    /// Its own frames while it fades out or wraps its actor (back, front, both); shared frames live in [`Frames`].
     own: [Option<Own<S>>; 3],
     /// The own frame each layer asked a painter for and has not been handed yet ([`Scene::deliver_own`]).
-    asked: [Option<(u64, Placement)>; 3],
+    asked: [Option<OwnAt>; 3],
+    /// The character it plays on, in its own space, as the host last set it ([`Scene::set_actor`]).
+    actor: Option<ActorFrame>,
+    /// The sprite as the host gave it, in game pixels relative to the effect's origin, unmirrored: mirrored again
+    /// into `actor` when the effect's flip changes.
+    actor_given: Option<Arc<Actor>>,
+    /// Versions given out to this entry's actors; the next set takes the next one.
+    actor_sets: u64,
     /// The shared frame each layer showed last: what it shows again while it waits for a draw.
     last: [Option<FrameId>; 3],
     /// The shared frame each layer waits on from a painter elsewhere. One at a time: until it comes back the layer
@@ -236,6 +248,38 @@ struct Entry<S> {
     /// How far it moves when the camera scrolls, as a share of the scroll (1: with the world, 0: fixed to the
     /// camera); the view culls it where the camera shows it ([`View`]).
     scroll_factor: f64,
+}
+
+impl<S> Entry<S> {
+    /// Put the sprite the host gave in the effect's own space, mirrored when the effect draws flipped, under a new
+    /// version.
+    fn place_actor(&mut self) {
+        self.actor_sets = self.actor_sets.wrapping_add(1);
+        let version = self.actor_sets;
+        let flip = self.place.flip;
+        self.actor = self.actor_given.as_ref().map(|a| ActorFrame {
+            version,
+            actor: if flip {
+                Arc::new(a.mirrored())
+            } else {
+                Arc::clone(a)
+            },
+        });
+    }
+
+    /// The actor its effect wraps, if it wraps one and the host set one.
+    fn wrapped(&self) -> Option<&ActorFrame> {
+        self.actor.as_ref().filter(|_| self.clip.wraps_actor())
+    }
+
+    /// What its own frame would be drawn at now.
+    fn own_at(&self) -> OwnAt {
+        OwnAt {
+            clock: self.clock.clock_frame(),
+            place: self.place,
+            actor: self.wrapped().map_or(0, |a| a.version),
+        }
+    }
 }
 
 /// Why a frame was not put in a surface: the shell failed, the draw budget leaves it for a later host frame, or it
@@ -361,6 +405,9 @@ impl<S> Scene<S> {
             last: [None, None, None],
             awaiting: [None, None, None],
             waiting: [None, None, None],
+            actor: None,
+            actor_given: None,
+            actor_sets: 0,
             through_hitstop: false,
             scroll_factor: 1.0,
         });
@@ -402,12 +449,45 @@ impl<S> Scene<S> {
             return Ok(false);
         };
         e.at = at;
+        let flipped = e.place.flip != p.flip;
         // the player's own x/y keep the origin on its frame; the stage places the frame
         e.place = Placement {
             x: e.place.x,
             y: e.place.y,
             ..p
         };
+        if flipped {
+            e.place_actor();
+        }
+        Ok(true)
+    }
+
+    /// The character the instance plays on, as its sprite shows now: `actor` with its top-left at game pixel
+    /// (`actor.x()`, `actor.y()`), or `None` to play on none. An effect that wraps its actor
+    /// ([`pixfx_core::Effect::wraps_actor`]) grips this sprite from its next step, and its frames become its own;
+    /// any other effect ignores it. Set it again each time the sprite's frame changes (or it turns); the same sprite
+    /// at the same place relative to the effect's origin changes nothing, so a host may set it every frame. The
+    /// sprite keeps its place relative to the effect's origin when the effect moves, as a sprite the effect follows
+    /// does.
+    /// `Ok(false)` if no instance has this handle.
+    pub fn set_actor(&mut self, handle: u32, actor: Option<Actor>) -> Result<bool, StageError> {
+        let Some(e) = self.entries.iter_mut().find(|e| e.handle == handle) else {
+            return Ok(false);
+        };
+        let given = match actor {
+            Some(a) => {
+                let (dx, dy) = (i64::from(a.x()) - e.at.0, i64::from(a.y()) - e.at.1);
+                let x = i32::try_from(dx).map_err(|_| StageError::ActorTooFar)?;
+                let y = i32::try_from(dy).map_err(|_| StageError::ActorTooFar)?;
+                Some(a.moved_to(x, y))
+            }
+            None => None,
+        };
+        if given.as_ref() == e.actor_given.as_deref() {
+            return Ok(true);
+        }
+        e.actor_given = given.map(Arc::new);
+        e.place_actor();
         Ok(true)
     }
 
@@ -633,7 +713,7 @@ impl<S> Scene<S> {
                             .is_err()
                 }
                 None => {
-                    let drawn = (e.clock.clock_frame(), e.place);
+                    let drawn = e.own_at();
                     e.asked[slot] != Some(drawn)
                         && e.own[slot].as_ref().is_none_or(|own| own.drawn != drawn)
                 }
@@ -690,15 +770,15 @@ impl<S> Scene<S> {
         }
     }
 
-    /// Put `frame`, painted elsewhere for layer `layer` of instance `handle` while it fades
-    /// ([`Target::Own`]), in its own surface and show it from the next draw. A frame for an instance gone since,
-    /// or older than the one it shows, is dropped. `Ok(false)` if it was dropped.
+    /// Put `frame`, painted elsewhere at `drawn` for layer `layer` of instance `handle` while it fades or wraps
+    /// its actor ([`Target::Own`]), in its own surface and show it from the next draw. A frame for an instance gone
+    /// since, or older than the one it shows (an earlier clock frame, or the same one with an earlier actor), is
+    /// dropped. `Ok(false)` if it was dropped.
     pub fn deliver_own<D, H: Receive<D, Surface = S>>(
         &mut self,
         handle: u32,
         layer: Layer,
-        clock: u64,
-        place: Placement,
+        drawn: OwnAt,
         frame: &D,
         shell: &mut H,
     ) -> Result<bool, H::Error> {
@@ -706,12 +786,13 @@ impl<S> Scene<S> {
             return Ok(false);
         };
         let slot = own_slot(layer);
-        if e.asked[slot].is_some_and(|(c, p)| c == clock && p == place) {
+        if e.asked[slot] == Some(drawn) {
             e.asked[slot] = None;
         }
-        let drawn = (clock, place);
         match &mut e.own[slot] {
-            Some(o) if o.drawn.0 > clock => return Ok(false),
+            Some(o) if (o.drawn.clock, o.drawn.actor) > (drawn.clock, drawn.actor) => {
+                return Ok(false);
+            }
             Some(o) => {
                 shell.refill_from(&mut o.surface, frame)?;
                 o.drawn = drawn;
@@ -801,6 +882,7 @@ impl<S> Scene<S> {
                         place: e.place,
                         layer,
                         target: Target::Shared(id.clone()),
+                        actor: None,
                     };
                     match painter.paint(&job) {
                         Some(frame) => {
@@ -833,7 +915,7 @@ impl<S> Scene<S> {
                 }
             }
             None => {
-                let drawn = (e.clock.clock_frame(), e.place);
+                let drawn = e.own_at();
                 let stale = e.own[slot].as_ref().is_none_or(|o| o.drawn != drawn);
                 // one own frame on its way at a time, as for shared frames
                 let asked = e.asked[slot].is_some();
@@ -846,10 +928,8 @@ impl<S> Scene<S> {
                         fade: e.clock.fade(),
                         place: e.place,
                         layer,
-                        target: Target::Own {
-                            clock: drawn.0,
-                            place: drawn.1,
-                        },
+                        target: Target::Own(drawn),
+                        actor: e.wrapped(),
                     };
                     match frames.painter.paint(&job) {
                         Some(frame) => {
@@ -907,10 +987,10 @@ impl<S> Scene<S> {
     }
 }
 
-/// The shared frame entry `e` shows now, or none while it fades out after a stop (a fade frame is its own).
-/// Effects showing the same id draw byte-equal frames.
+/// The shared frame entry `e` shows now, or none while it fades out after a stop or wraps its actor (those
+/// frames are its own). Effects showing the same id draw byte-equal frames.
 fn shown<S>(e: &Entry<S>) -> Option<FrameId> {
-    (!e.clock.stopped()).then(|| FrameId {
+    (!e.clock.stopped() && e.wrapped().is_none()).then(|| FrameId {
         key: e.clip.key(e.place),
         index: e.clock.frame(),
     })

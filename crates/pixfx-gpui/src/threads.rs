@@ -4,10 +4,11 @@
 //! effect shows the frame it had.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread::JoinHandle;
 
-use pixfx_core::{Clip, Layer, Placement, Sim};
+use pixfx_core::{Actor, Clip, Layer, Placement, Sim};
 use pixfx_draw::Frame;
 use pixfx_scene::{EffectKey, Job, Painter, Target};
 
@@ -23,6 +24,8 @@ struct Paint {
     place: Placement,
     layer: Layer,
     target: Target,
+    /// The character the effect plays on, handed to its state before it is brought to `frame`.
+    actor: Option<Arc<Actor>>,
 }
 
 enum ToThread {
@@ -95,6 +98,7 @@ impl Painter for ThreadPainter {
             place: job.place,
             layer: job.layer,
             target: job.target.clone(),
+            actor: job.actor.map(|a| Arc::clone(&a.actor)),
         };
         // a thread that is gone (it panicked) paints nothing: the effect keeps the frame it had
         if let Some((tx, _)) = self.threads.get(owner) {
@@ -139,6 +143,7 @@ fn run(rx: &Receiver<ToThread>, done: &Sender<Done>) {
                 let Some((clip, sim, frame)) = sims.get_mut(&p.effect) else {
                     continue;
                 };
+                sim.set_actor(p.actor);
                 sim.seek(p.frame);
                 clip.draw(sim, frame, p.layer, p.place, p.fade);
                 let painted = Painted::of(frame);
@@ -163,8 +168,8 @@ fn run(rx: &Receiver<ToThread>, done: &Sender<Done>) {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use pixfx_core::{Clip, Layer, Options};
-    use pixfx_scene::{EffectKey, InlinePainter, Job, Painter, Target};
+    use pixfx_core::{Actor, Clip, Layer, Options};
+    use pixfx_scene::{ActorFrame, EffectKey, InlinePainter, Job, OwnAt, Painter, Target};
 
     use super::{Done, ThreadPainter};
     use crate::Painted;
@@ -223,10 +228,12 @@ mod tests {
                     fade: 1.0,
                     place: clip.placement(),
                     layer: Layer::Both,
-                    target: Target::Own {
+                    target: Target::Own(OwnAt {
                         clock: frame,
                         place: clip.placement(),
-                    },
+                        actor: 0,
+                    }),
+                    actor: None,
                 };
                 assert!(threads.paint(&job).is_none(), "painted elsewhere");
                 let painted = inline.paint(&job).ok_or("inline paints")?;
@@ -237,7 +244,7 @@ mod tests {
         let mut got: Vec<_> = done
             .iter()
             .map(|d| match d.target {
-                Target::Own { clock, .. } => (d.effect, clock, pixels(&d.painted)),
+                Target::Own(at) => (d.effect, at.clock, pixels(&d.painted)),
                 Target::Shared(_) => (d.effect, u64::MAX, Vec::new()),
             })
             .collect();
@@ -249,6 +256,62 @@ mod tests {
             expected.iter().all(|e| !e.2.is_empty()),
             "every layer draws something"
         );
+        assert!(got == expected, "same images, byte for byte");
+        Ok(())
+    }
+
+    #[test]
+    fn an_actor_painted_on_threads_gives_the_images_painted_on_the_spot()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fx = pixfx_effects::effect("feedback/power-up").ok_or("no power-up")?;
+        let clip = Clip::live(fx, Options::default());
+        let effect = EffectKey {
+            scene: 0,
+            handle: 1,
+        };
+        // a 6-wide sprite standing on the origin, then a 2-wide one
+        let sprite = |w: u32, version| -> Result<ActorFrame, pixfx_core::ActorError> {
+            let actor = Actor::new(
+                -(w as i32) / 2,
+                -20,
+                w,
+                20,
+                vec![0xff80_c0e0; (w * 20) as usize],
+            )?;
+            Ok(ActorFrame {
+                version,
+                actor: std::sync::Arc::new(actor),
+            })
+        };
+        let actors = [sprite(6, 1)?, sprite(2, 2)?];
+        let mut threads = ThreadPainter::new(1)?;
+        let mut inline = InlinePainter::default();
+        let mut expected = Vec::new();
+        for (frame, actor) in [(30, &actors[0]), (40, &actors[1]), (50, &actors[0])] {
+            let job = Job {
+                effect,
+                clip: &clip,
+                frame,
+                fade: 1.0,
+                place: clip.placement(),
+                layer: Layer::Back,
+                target: Target::Own(OwnAt {
+                    clock: frame,
+                    place: clip.placement(),
+                    actor: actor.version,
+                }),
+                actor: Some(actor),
+            };
+            threads.paint(&job);
+            let painted = inline.paint(&job).ok_or("inline paints")?;
+            expected.push(pixels(&Painted::of(painted)));
+        }
+        let got: Vec<_> = wait(&mut threads, 3)
+            .iter()
+            .map(|d| pixels(&d.painted))
+            .collect();
+        assert_eq!(got.len(), 3);
+        assert_ne!(expected[0], expected[1], "the aura follows the sprite");
         assert!(got == expected, "same images, byte for byte");
         Ok(())
     }
@@ -270,10 +333,12 @@ mod tests {
             fade: 1.0,
             place: clip.placement(),
             layer: Layer::Both,
-            target: Target::Own {
+            target: Target::Own(OwnAt {
                 clock: frame,
                 place: clip.placement(),
-            },
+                actor: 0,
+            }),
+            actor: None,
         };
         threads.paint(&job(2));
         threads.end(effect);
@@ -321,10 +386,12 @@ mod tests {
                         fade: 1.0,
                         place: clip.placement(),
                         layer: Layer::Both,
-                        target: Target::Own {
+                        target: Target::Own(OwnAt {
                             clock: frame,
                             place: clip.placement(),
-                        },
+                            actor: 0,
+                        }),
+                        actor: None,
                     });
                 }
                 assert_eq!(wait(&mut threads, n).len(), n);

@@ -63,7 +63,7 @@ const WARM: Rgba = Rgba::hex24(0xffb060);
 
 /// Stone colours from one body colour and its outline: a lit face, the body, a shaded face, the outline, and the
 /// dust it makes.
-fn stone(c: Rgba, edge: Option<Rgba>) -> (Stone, Rgba) {
+fn stone(c: Rgba, edge: Rgba) -> (Stone, Rgba) {
     let st = Stone {
         light: mix(scale(c, 1.35), WHITE, 0.08),
         body: c,
@@ -128,7 +128,7 @@ fn rock(p: &mut Painter, b: &Bit, st: &Stone) {
             }
             let lit = dx * lx + dy * ly;
             out.c = if d > r {
-                st.edge.unwrap_or(Rgba::NONE)
+                st.edge
             } else if lit < -0.4 {
                 st.light
             } else if lit > 0.6 {
@@ -169,10 +169,6 @@ impl Effect for SmallExplosion {
     fn meta(&self) -> &Meta {
         &META
     }
-    /// Its rocks draw their own outline, which the `outline` option recolours or drops.
-    fn draws_outline(&self) -> bool {
-        true
-    }
     /// Beyond pixelfx: the blast asks the game for an impact's answer (shake, hit-stop, ring, flash by weight).
     fn cues(&self, opts: &Options) -> Vec<TimedCue> {
         impact(0.0, 1.0, 0.0, -16.0, opts)
@@ -183,7 +179,7 @@ impl Effect for SmallExplosion {
         let rad = 18.0 * s;
         let power = 0.9 * libm::pow(s, 0.8);
         let earth = 1.6;
-        let (st, dust) = stone(opts.color(&STONE), opts.outline_color(OUTLINE));
+        let (st, dust) = stone(opts.color(&STONE), OUTLINE);
         let mut r = Rng::new(to_uint32(seed as f64));
         let mut ps = Particles::new(ParticlesOpts {
             ground: 0.0,

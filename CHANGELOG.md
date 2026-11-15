@@ -11,6 +11,73 @@
   rage lighting the ultimate) and plays with more chance: each fight a random 8 skills per school, a rarity and traits
   on every draw, and lucky casts (double, free, again). Thunder and Frost now win about even, and pixfx-mind's `Sense`
   takes a `power` per skill so a stronger skill is valued higher.
+- `crates/pixfx-ref` (new): a new effect's reference from an image model, in Rust. A spec (look, moments as rows, a
+  frame count per row, a note per frame, rules) becomes a labelled template sheet and a prompt (`template`); the
+  OpenRouter request goes out through curl (`generate`, transparent background, spend logged to
+  `target/ref/spend.jsonl`); the drawn sheet is cut back into frames as colour and light layers with a review page
+  and a gallery (`extract`, `gallery`). The eleven xianxia shields are its worked specs; `TEMPLATE.json` shows every
+  field. Skill `.claude/skills/pixfx-ref`. `pixfx_pose::captions` writes captions over a sheet's cells.
+- `pixfx_pixel::frames::recover_frames`: the pixel grid shared by a sheet's frames. The pitch comes from the gaps
+  between edges of every frame at once, every frame gets the same pixel count, and each frame fits its own cuts, with
+  a strength that is 0 for noise. `pixfx-ref`'s `extract` uses it: its layers are the model's pixels, the same size in
+  every frame, and the review page shows each frame's cuts.
+- `pixfx_pixel::register`: the frames of one drawing lined up on one origin, a whole-pixel shift each from their
+  edges, a frame that changes rather than moves left in place. `extract` moves each frame's layers by it and the
+  review page says how far.
+- `pixfx_ref::tween`: frames between the drawn ones of a row, made by moving their pixels. Pixels pair with the
+  pixel they become in the next frame, every cell follows a dense field of their moves, pixels with no partner grow
+  or erode from the other frame's shape, and every cell of an in-between is gathered, so none is left empty; unlike
+  colours swap at a time of their own instead of mixing to grey. The review page's player plays 1, 3 or 7 of them
+  between drawn frames (`extract --between N`, default 7).
+- `pixfx_ref::matrix`: every frame as a pixel matrix, each pixel empty, colour or light with its exact value and an
+  entry of a palette the frames share (32 colour, 16 light). `extract` writes it as `matrix.json` (text maps per
+  frame, exact values, palettes) and the review page shows the palette and each frame through it; its
+  swatches are colour pickers with a hue slider, and the player's recoloured layer repaints every frame live.
+- Skills for an agent working in the repo, in `.claude/skills/`: `pixfx` (where to start), `pixfx-effect`,
+  `pixfx-play`, `pixfx-render`, `pixfx-perf`; `pixfx-pixel` moves there from `skills/`. The export scripts take
+  `--seed N`, and `pixfx_export::write_video` with its `mp4` script writes a video through ffmpeg.
+- Sprite awareness: `pixfx_core::Silhouette` reads the sprite an effect wraps into cells of the effect's space
+  (`Area`): the body (`cells`, `covers`, `bounds`, `centroid`), its `edge`, an outline `ring`, the cells `around` it
+  with their distance, and `pick` for a random cell of it; `Actor::opaque` gives the sprite's pixels with their colour.
+  `feedback/power-up` is built on it, its frames unchanged. `.claude/skills/pixfx-sprite-aware` teaches writing such an effect.
+- `feedback/outline` (new, feature `feedback-outline`): a ring round the sprite it wraps, following each frame; `width`
+  1 to 3, `corners`, `palette` for its colour, `w`/`h` for the box the sprite fits in. Made here: it has no source to
+  check parity against.
+- The `outline` option is gone from every effect, with `outlinePresets()`, the export examples' `--outline` and
+  `pixfx_draw::outline`: an outline is now the effect above, played on the sprite to ring. Effects whose art has an
+  outline (rocks, clods, the coin) draw it as designed. `ClipKey` is at version 2: clips baked before are refused.
+
+- Each crate and package tests itself; there is no repo-wide gate. One effect builds, tests and benches alone behind
+  its feature (`cargo test -p pixfx-effects --no-default-features --features fire-candle --all-targets`): the tests
+  about named effects run when those effects are built, the golden check compares each built effect with its own
+  entry (bless keeps the others), and `bench` measures every effect the build has by default.
+- pixfx ships as source, with no command-line tool: `pixfx-cli` and its `pixfx` binary are removed. You clone the
+  repo and your agent imports the crates and JS packages, builds the wasm (`bun run build:wasm`), and runs or edits
+  scripts. Each command became a cargo example in the crate whose library it calls: `pixfx-export` `sprite_sheet`
+  (was `pixfx sheet`), `gif` (`pixfx render --gif`), `bake`, `parity`; `pixfx-effects` `bench`; `pixfx-fighter`
+  `poses`; `pixfx-pixel` `clean`, `read`, `draw`, `view`, `critique`, `sheet`, `cut`, `parts`, `diff`. Flags and
+  outputs are unchanged. The logic moved into the libraries: `pixfx_export::parity` (`compare`, `read_reference`,
+  `write_side_gif`, `ParityOpts`, `Actors`), `pixfx_fighter::poses`, `pixfx_pixel::tool`, and `Look::colors`.
+- `arcane/hex-shield` (new, feature `arcane-hex-shield`): a hemisphere of hex cells forms over the character, four
+  bolts strike it, spark off and ripple over its surface, then it breaks up into shards. `radius` (16 to 40) sizes
+  the dome, `hold` (0.8 to 2.75 s) sets when it breaks, `palette` recolours it, and each blow fires a light shake
+  cue (`feel`). It is a port of Sprite Fusion's shield, matched pixel for pixel by `pixfx parity` against the
+  vendored source.
+- `pixfx parity` checks an effect ported from Sprite Fusion against its source vendored at
+  `tools/spritefusion/<id>.ts` (through `tools/spritefusion-ref.mjs`, Node 22.6+), stepped as pixelfx steps its
+  effects; pixelfx ports are checked as before.
+- `feedback/power-up` (new, feature `feedback-power-up`): a buff in its stat's colour. Streaks are drawn in, the
+  character flashes, a shock races along the floor, then an aura grips the body and licks upward with speed
+  streaks and motes. `size` (0.25 to 2) scales it, `palette` recolours it, and the burst fires a shake and a flash
+  cue (`feel`). It is a port of Sprite Fusion's power up, matched pixel for pixel by `pixfx parity` against the
+  vendored source.
+- An effect can play on a character: `effect.wrap(source)` hands it the sprite's current frame every update, and an
+  effect that wraps its actor (`Effect::wraps_actor`; `feedback/power-up` does) grips that outline and follows each
+  pose. Shells read the sprite for you: `this.pixfx.actorOf(sprite)` (Phaser), `pixfx.actorOf(sprite)` (Pixi),
+  `imageActor(() => ({image, cut, x, y}))` (Canvas 2D, for the sprites a game draws), `FxScene::set_actor`
+  (gpui). Rust places the sprite (`Scene::set_actor`), scales and flips it, and paints a wrapped effect's frames
+  for that instance alone; workers and gpui threads get each sprite frame once. `pixfx parity --actor A.png,B.png
+  [--actor-every N]` checks such an effect against its source on the same sprites.
 - Attack timing (`Act`, `Performance`, `pose_for`) and `Effect::act` are removed: nothing used them. An attack's hit
   timing returns with the first attack effect a game plays; the caster's poses are the game's own sprite.
 - `pixfx-web`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-canvas2d`: `setDrawBudget(n)` caps the effect layers drawn per

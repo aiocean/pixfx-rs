@@ -3,7 +3,9 @@
 
 use pixfx_core::{Instance, Layer, OptValue, Options};
 use pixfx_draw::Frame;
-use pixfx_effects::effect;
+mod built;
+
+use built::built;
 use std::time::{Duration, Instant};
 
 /// Effect id and the number option that sizes its loops.
@@ -17,7 +19,7 @@ const CLAMPED: [(&str, &str); 4] = [
 #[test]
 fn huge_number_options_still_draw_quickly() -> Result<(), String> {
     for (id, key) in CLAMPED {
-        let fx = effect(id).ok_or(format!("{id} is not registered"))?;
+        let Some(fx) = built(id)? else { continue };
         for huge in [1e9, f64::INFINITY] {
             let mut opts = Options::default();
             opts.extra.insert(key.to_string(), OptValue::Num(huge));

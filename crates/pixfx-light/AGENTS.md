@@ -37,5 +37,4 @@ a light swells, fades and rings is data (`Style`).
 
 ```
 cargo test -p pixfx-light
-cargo test --workspace
 ```

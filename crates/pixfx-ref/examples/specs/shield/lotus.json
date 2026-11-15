@@ -1,0 +1,28 @@
+{
+  "id": "shield/lotus",
+  "name": "Lotus",
+  "look": "Lotus throne barrier from cultivation fantasy. Large translucent pink-white lotus petals of light rise round the character and close into a tall bud, a soft glow inside.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "petals rise from a lotus pad under the character's feet and fold up into the closed bud"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the bud holds, its petals breathing slightly and specks of light rising inside; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow strikes from the right; the petals on that side shiver and flash, a puff of glowing pollen bursts out to the right"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the bud opens wide and its petals detach and drift away, fading"
+    }
+  ]
+}

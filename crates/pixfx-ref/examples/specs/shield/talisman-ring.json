@@ -1,0 +1,28 @@
+{
+  "id": "shield/talisman-ring",
+  "name": "Talismans",
+  "look": "Talisman barrier from cultivation fantasy. Six yellow paper talismans painted with red glyphs orbit the character, joined to each other by thin lines of golden light forming a hexagon.",
+  "subject": "shield",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "the talismans flick out one by one from the character's hand and take their places in the ring, the light lines joining them"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the talismans orbit slowly and flutter, the light lines between them glowing; it loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow strikes from the right; the talisman on that side flares and burns up in a puff of fire, the light lines flicker but hold"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the remaining talismans catch fire one after another and burn to drifting ash"
+    }
+  ]
+}

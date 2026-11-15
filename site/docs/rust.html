@@ -93,10 +93,11 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
   <tbody>
     <tr><td><code>trait Effect</code></td><td><code>meta() -&gt; &amp;Meta</code>, <code>canvas(&amp;Options) -&gt; Canvas</code> (the size and origin an instance with those options draws on: <code>meta.canvas()</code> unless the effect sizes it from its options, as weather does with <code>width</code> and <code>height</code>) and <code>spawn(&amp;Options, seed) -&gt; Box&lt;dyn EffectState&gt;</code>. See <a href="writing-effects.html">Write an effect</a>.</td></tr>
     <tr><td><code>trait EffectState</code></td><td><code>update(dt)</code> for one simulation sub-step (default: nothing) and <code>draw(&amp;mut Painter, t, Layer)</code>.</td></tr>
-    <tr><td><code>struct Meta</code></td><td><code>id, name, desc, tags, size, origin, duration, looping, fps, seed</code>; <code>is_screen()</code> and <code>glow_margin()</code>. See <a href="concepts.html#metadata">Concepts</a>.</td></tr>
+    <tr><td><code>struct Meta</code></td><td><code>id, name, desc, tags, size, origin, duration, looping, fps, seed, state, options</code>; <code>is_screen()</code> and <code>glow_margin()</code>. See <a href="concepts.html#metadata">Concepts</a>.</td></tr>
     <tr><td><code>struct Options</code></td><td><code>x, y, flip, angle, seed: Option&lt;u64&gt;, light, palette: Option&lt;Vec&lt;Rgba&gt;&gt;, extra: BTreeMap&lt;String, OptValue&gt;</code>. <code>Default</code> is origin (0, 0), no flip, angle 0, effect seed, light 1, effect palette.</td></tr>
-    <tr><td><code>enum OptValue</code></td><td><code>Num(f64)</code> or <code>Ramp(Vec&lt;Rgba&gt;)</code>: an effect's own option.</td></tr>
-    <tr><td><code>Options::palette_or</code>, <code>ramp_or</code>, <code>num_or</code></td><td>For effects: resolve an option against its default (ramps resampled to the default's length).</td></tr>
+    <tr><td><code>enum OptValue</code></td><td><code>Num(f64)</code>, <code>Ramp(Vec&lt;Rgba&gt;)</code> or <code>Color(Rgba)</code>: an effect's own option.</td></tr>
+    <tr><td><code>NumOpt</code>, <code>RampOpt</code>, <code>ColorOpt</code></td><td>An effect's own option: a name and default (<code>NumOpt::new("size", 3.0).within(1.0, 12.0)</code>), listed in <code>Meta::options</code> as <code>.spec()</code>.</td></tr>
+    <tr><td><code>Options::num</code>, <code>ramp</code>, <code>color</code>, <code>palette_or</code></td><td>For effects: read an option against its default (ramps resampled to the default's length).</td></tr>
     <tr><td><code>enum Layer</code></td><td><code>Back</code>, <code>Front</code>, <code>Both</code>.</td></tr>
     <tr><td><code>find(list, id)</code></td><td>Find an effect by id in any list.</td></tr>
   </tbody>

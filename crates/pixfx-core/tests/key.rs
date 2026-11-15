@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use pixfx_core::{ClipKey, OptValue, Options, Placement};
-use pixfx_draw::{Outline, Rgba, Ring};
+use pixfx_draw::Rgba;
 
 fn place() -> Placement {
     Placement {
@@ -35,7 +35,6 @@ fn equal_inputs_give_equal_keys() {
 #[test]
 fn every_input_changes_the_key() -> Result<(), String> {
     let base = Options::default();
-    let ring = Ring::new(Rgba(0, 0, 0, 255), 1, false).ok_or("ring")?;
     let mut extra = BTreeMap::new();
     extra.insert("height".to_string(), OptValue::Num(2.0));
     let variants: Vec<(&str, Options)> = vec![
@@ -89,20 +88,6 @@ fn every_input_changes_the_key() -> Result<(), String> {
             },
         ),
         (
-            "outline off",
-            Options {
-                outline: Some(Outline::Off),
-                ..base.clone()
-            },
-        ),
-        (
-            "outline on",
-            Options {
-                outline: Some(Outline::On(ring)),
-                ..base.clone()
-            },
-        ),
-        (
             "extra",
             Options {
                 extra,
@@ -149,6 +134,6 @@ fn a_key_reads_back_from_its_hex_form() {
     assert!("".parse::<ClipKey>().is_err());
     assert!("0".parse::<ClipKey>().is_err());
     assert!("zz".parse::<ClipKey>().is_err());
-    let other_version = format!("02{}", &k.to_string()[2..]);
+    let other_version = format!("01{}", &k.to_string()[2..]);
     assert!(other_version.parse::<ClipKey>().is_err());
 }

@@ -11,7 +11,7 @@
 //          pixelfx's defaults filled (n 6, dir null = random)
 //   state  mod.meta.state, null for an effect that is no creature state
 // --opts is the options JSON given to the effect (`{"from": -1, "hits": 2}`), the same words as
-// `pixfx parity --opt`. The pixelfx dir is --pixelfx, else $PIXELFX, else ./pixelfx.
+// the parity script's `--opt` (crates/pixfx-export/examples/parity.rs). The pixelfx dir is --pixelfx, else $PIXELFX, else ./pixelfx.
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";

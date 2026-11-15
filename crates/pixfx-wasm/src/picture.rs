@@ -43,7 +43,7 @@ impl Picture {
         self.color.as_deref().map(Uint8ClampedArray::from)
     }
 
-    /// Lit pixels `r, g, b, 255`, unlit `0, 0, 0, 0`, to draw added.
+    /// Lit pixels the light over transparency (alpha its brightest channel), unlit `0, 0, 0, 0`, to draw added.
     #[wasm_bindgen(getter)]
     pub fn light(&self) -> Uint8ClampedArray {
         Uint8ClampedArray::from(self.light.as_slice())

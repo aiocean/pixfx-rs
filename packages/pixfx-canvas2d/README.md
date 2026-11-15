@@ -47,10 +47,15 @@ function frame(dt: number) {
 in game pixels, drawn in the context's current transform.
 
 `pixfx.play(id, x, y, opts?)` places the effect's origin at `(x, y)` and returns a `PixfxEffect` (`stop()`,
-`destroy()`, `follow(target, dx?, dy?)`, `setPosition(x, y)`; events `"complete"`, `"destroy"`, `"cue"`). Every option
-is the engine's (`seed`, `flip`, `angle`, `light`, `palette`, `outline`, the effect's own); an unknown id or a bad
+`destroy()`, `follow(target, dx?, dy?)`, `setPosition(x, y)`, `wrap(source)`; events `"complete"`, `"destroy"`, `"cue"`). Every option
+is the engine's (`seed`, `flip`, `angle`, `light`, `palette`, the effect's own); an unknown id or a bad
 option throws and creates nothing. `drawLayer` draws the default depths (back 0, front 1); `draw()` draws every
 depth, lowest first.
+
+A character an effect plays on: `effect.wrap(imageActor(() => ({ image, cut: { x, y, w, h }, x, y, w?, h?, flipX? })))`
+says, each update, what the game draws for its hero (the cut of its sheet, its top-left in game pixels, its drawn
+size and flip). An effect that wraps its actor (`feedback/power-up`) grips that outline and follows each pose;
+return `null` for none. Each cut of an image is read once.
 
 `pixfx.warp()`, after drawing everything a heavy blow's ring should bend, bends the canvas by the live ripples.
 `pixfx.drawPicture(picture)` draws a picture Rust painted outside the effects: fighters (`new Sprites(w, h)`, then

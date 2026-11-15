@@ -1,0 +1,407 @@
+//! A pose turned into joint positions in 3D, then seen from a facing.
+//!
+//! The figure stands in a 3D frame: `f` her forward, `u` up her spine, `r` her right. [`skeleton`] places every
+//! joint from the [`Body`] lengths and the [`Pose`] angles, then looks at it from the side the viewer stands on:
+//! screen x to the right, screen y down, depth toward the viewer.
+
+use serde::{Deserialize, Serialize};
+
+use crate::body::Body;
+use crate::pose::{Limb, Pose, Side};
+
+/// Which way the figure faces the viewer, in degrees: 0 faces screen right (a side view, her right side toward
+/// the viewer), 90 faces the viewer, 180 faces screen left, 270 shows her back. Any angle in between turns her.
+pub mod facing {
+    pub const RIGHT: f64 = 0.0;
+    pub const FRONT_RIGHT: f64 = 45.0;
+    pub const FRONT: f64 = 90.0;
+    pub const FRONT_LEFT: f64 = 135.0;
+    pub const LEFT: f64 = 180.0;
+    pub const BACK_LEFT: f64 = 225.0;
+    pub const BACK: f64 = 270.0;
+    pub const BACK_RIGHT: f64 = 315.0;
+    /// The eight facings, a turnaround's cells in order.
+    pub const ALL: [f64; 8] = [
+        RIGHT,
+        FRONT_RIGHT,
+        FRONT,
+        FRONT_LEFT,
+        LEFT,
+        BACK_LEFT,
+        BACK,
+        BACK_RIGHT,
+    ];
+
+    /// A caption for a facing: the nearest of the eight names.
+    pub fn name(deg: f64) -> &'static str {
+        const NAMES: [&str; 8] = [
+            "facing right, side view",
+            "facing front-right, three-quarter view",
+            "facing the viewer, front view",
+            "facing front-left, three-quarter view",
+            "facing left, side view",
+            "facing back-left, three-quarter back view",
+            "back view",
+            "facing back-right, three-quarter back view",
+        ];
+        let step = libm::round(deg.rem_euclid(360.0) / 45.0) as usize % 8;
+        NAMES.get(step).copied().unwrap_or(NAMES[0])
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct V3(f64, f64, f64);
+
+impl V3 {
+    fn add(self, o: V3) -> V3 {
+        V3(self.0 + o.0, self.1 + o.1, self.2 + o.2)
+    }
+    fn mul(self, k: f64) -> V3 {
+        V3(self.0 * k, self.1 * k, self.2 * k)
+    }
+    fn dot(self, o: V3) -> f64 {
+        self.0 * o.0 + self.1 * o.1 + self.2 * o.2
+    }
+    fn cross(self, o: V3) -> V3 {
+        V3(
+            self.1 * o.2 - self.2 * o.1,
+            self.2 * o.0 - self.0 * o.2,
+            self.0 * o.1 - self.1 * o.0,
+        )
+    }
+    /// The unit vector along `self`, or `fallback` when `self` has no length.
+    fn unit_or(self, fallback: V3) -> V3 {
+        let n = libm::sqrt(self.dot(self));
+        if n > 1e-9 {
+            self.mul(1.0 / n)
+        } else {
+            fallback
+        }
+    }
+    /// `self` turned `deg` degrees about the unit axis `k` (right-handed).
+    fn turn(self, k: V3, deg: f64) -> V3 {
+        let (s, c) = libm::sincos(deg.to_radians());
+        self.mul(c)
+            .add(k.cross(self).mul(s))
+            .add(k.mul(k.dot(self) * (1.0 - c)))
+    }
+}
+
+/// A body part's own axes: forward, up, her right.
+#[derive(Clone, Copy, Debug)]
+struct Frame {
+    f: V3,
+    u: V3,
+    r: V3,
+}
+
+impl Frame {
+    fn turned(self, k: V3, deg: f64) -> Frame {
+        Frame {
+            f: self.f.turn(k, deg),
+            u: self.u.turn(k, deg),
+            r: self.r.turn(k, deg),
+        }
+    }
+    /// Bent forward by `deg` (up toward forward) about its own right.
+    fn pitched(self, deg: f64) -> Frame {
+        self.turned(self.r, -deg)
+    }
+    /// Tilted toward its right by `deg` (up toward right) about its own forward.
+    fn rolled(self, deg: f64) -> Frame {
+        self.turned(self.f, deg)
+    }
+    /// Turned toward its right by `deg` (forward toward right) about its own up.
+    fn yawed(self, deg: f64) -> Frame {
+        self.turned(self.u, -deg)
+    }
+    /// `v` given in this frame's components.
+    fn of(self, forward: f64, up: f64, right: f64) -> V3 {
+        self.f
+            .mul(forward)
+            .add(self.u.mul(up))
+            .add(self.r.mul(right))
+    }
+}
+
+/// A joint on screen: `x` right and `y` down from the pelvis, in sprite pixels; `depth` toward the viewer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Point {
+    pub x: f64,
+    pub y: f64,
+    pub depth: f64,
+}
+
+impl Point {
+    fn of(v: V3) -> Point {
+        Point {
+            x: v.0,
+            y: -v.1,
+            depth: v.2,
+        }
+    }
+    fn shifted(self, dx: f64, dy: f64) -> Point {
+        Point {
+            x: self.x + dx,
+            y: self.y + dy,
+            ..self
+        }
+    }
+}
+
+/// An arm or a leg on screen.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct LimbPoints {
+    /// Shoulder or hip.
+    pub root: Point,
+    /// Elbow or knee.
+    pub mid: Point,
+    /// Hand or foot.
+    pub end: Point,
+}
+
+impl LimbPoints {
+    fn shifted(self, dx: f64, dy: f64) -> LimbPoints {
+        LimbPoints {
+            root: self.root.shifted(dx, dy),
+            mid: self.mid.shifted(dx, dy),
+            end: self.end.shifted(dx, dy),
+        }
+    }
+}
+
+/// Every joint of a posed figure seen from a facing. After [`Skeleton::placed`] the coordinates are pixels in a
+/// cell; from [`skeleton`] they are relative to the pelvis.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Skeleton {
+    pub head: Point,
+    pub head_radius: f64,
+    /// A point on the face, a head radius ahead of its centre: which way she looks.
+    pub nose: Point,
+    /// Whether the nose is on the viewer's side of the head (false from behind).
+    pub nose_visible: bool,
+    /// Top of the spine, between the shoulders.
+    pub neck: Point,
+    pub pelvis: Point,
+    pub right_arm: LimbPoints,
+    pub left_arm: LimbPoints,
+    pub right_leg: LimbPoints,
+    pub left_leg: LimbPoints,
+    /// Hilt (the hand) and tip of a held sword.
+    pub sword: Option<[Point; 2]>,
+    pub facing: f64,
+}
+
+/// Each line of a skeleton, the unit a sheet colours.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Bone {
+    Neck,
+    Spine,
+    Shoulders,
+    Hips,
+    RightUpperArm,
+    RightForearm,
+    LeftUpperArm,
+    LeftForearm,
+    RightThigh,
+    RightShin,
+    LeftThigh,
+    LeftShin,
+    Sword,
+}
+
+impl Skeleton {
+    /// Every line, start and end.
+    pub fn bones(&self) -> Vec<(Bone, Point, Point)> {
+        let s = self;
+        let mid = |a: Point, b: Point| Point {
+            x: (a.x + b.x) / 2.0,
+            y: (a.y + b.y) / 2.0,
+            depth: (a.depth + b.depth) / 2.0,
+        };
+        let mut out = vec![
+            (Bone::Neck, s.neck, s.head),
+            (Bone::Spine, s.neck, s.pelvis),
+            (Bone::Shoulders, s.right_arm.root, s.left_arm.root),
+            (Bone::Hips, s.right_leg.root, s.left_leg.root),
+            (Bone::RightUpperArm, s.right_arm.root, s.right_arm.mid),
+            (Bone::RightForearm, s.right_arm.mid, s.right_arm.end),
+            (Bone::LeftUpperArm, s.left_arm.root, s.left_arm.mid),
+            (Bone::LeftForearm, s.left_arm.mid, s.left_arm.end),
+            (Bone::RightThigh, s.right_leg.root, s.right_leg.mid),
+            (Bone::RightShin, s.right_leg.mid, s.right_leg.end),
+            (Bone::LeftThigh, s.left_leg.root, s.left_leg.mid),
+            (Bone::LeftShin, s.left_leg.mid, s.left_leg.end),
+        ];
+        // The neck line stops at the bottom of the head circle.
+        if let Some(first) = out.first_mut() {
+            first.2 = mid(s.neck, s.head);
+        }
+        if let Some([hilt, tip]) = s.sword {
+            out.push((Bone::Sword, hilt, tip));
+        }
+        out
+    }
+
+    /// Every point that can touch the ground or the cell's edge.
+    fn extremes(&self) -> Vec<Point> {
+        let mut p: Vec<Point> = self.bones().iter().flat_map(|b| [b.1, b.2]).collect();
+        let r = self.head_radius;
+        p.push(self.head.shifted(0.0, -r));
+        p.push(self.head.shifted(0.0, r));
+        p.push(self.head.shifted(-r, 0.0));
+        p.push(self.head.shifted(r, 0.0));
+        p
+    }
+
+    /// The bounding box of the body (not the sword): left, top, right, bottom.
+    pub fn body_bounds(&self) -> [f64; 4] {
+        let pts: Vec<Point> = self
+            .extremes()
+            .into_iter()
+            .filter(|p| self.sword.is_none_or(|[_, tip]| *p != tip))
+            .collect();
+        bounds(&pts)
+    }
+
+    /// The skeleton moved into a cell `w` x `h` pixels: the pelvis centred across, the lowest point of the body
+    /// `lift` pixels above `ground` (a y in the cell).
+    pub fn placed(&self, w: f64, ground: f64, lift: f64) -> Skeleton {
+        let [_, _, _, bottom] = self.body_bounds();
+        let (dx, dy) = (w / 2.0 - self.pelvis.x, ground - lift - bottom);
+        let limb = |l: LimbPoints| l.shifted(dx, dy);
+        Skeleton {
+            head: self.head.shifted(dx, dy),
+            nose: self.nose.shifted(dx, dy),
+            neck: self.neck.shifted(dx, dy),
+            pelvis: self.pelvis.shifted(dx, dy),
+            right_arm: limb(self.right_arm),
+            left_arm: limb(self.left_arm),
+            right_leg: limb(self.right_leg),
+            left_leg: limb(self.left_leg),
+            sword: self
+                .sword
+                .map(|[a, b]| [a.shifted(dx, dy), b.shifted(dx, dy)]),
+            ..*self
+        }
+    }
+}
+
+fn bounds(pts: &[Point]) -> [f64; 4] {
+    pts.iter().fold(
+        [f64::MAX, f64::MAX, f64::MIN, f64::MIN],
+        |[l, t, r, b], p| [l.min(p.x), t.min(p.y), r.max(p.x), b.max(p.y)],
+    )
+}
+
+/// A non-finite angle (NaN, infinity from a bad file) counts as 0, so a pose always gives a drawable skeleton.
+fn fin(deg: f64) -> f64 {
+    if deg.is_finite() { deg } else { 0.0 }
+}
+
+/// The direction of a limb's first bone and of its second, in `frame`. `fold` is +1 for an elbow (folds forward
+/// and up), -1 for a knee (folds back).
+fn limb_dirs(frame: Frame, side: f64, l: Limb, fold: f64) -> (V3, V3) {
+    let (sr, cr) = libm::sincos(fin(l.raise).to_radians());
+    let (ss, cs) = libm::sincos(fin(l.spread).to_radians());
+    let swing = frame.of(sr, -cr, 0.0);
+    let d = swing.mul(cs).add(frame.r.mul(side * ss)).unit_or(swing);
+    let e = bend(frame, d, fin(l.bend) * fold);
+    (d, e)
+}
+
+/// `d` folded by `deg` within the frame's forward-up plane: positive turns down toward forward, forward toward up.
+fn bend(frame: Frame, d: V3, deg: f64) -> V3 {
+    let (a, b) = (d.dot(frame.f), d.dot(frame.u));
+    let p = frame.of(-b, a, 0.0).unit_or(frame.f);
+    let (s, c) = libm::sincos(deg.to_radians());
+    d.mul(c).add(p.mul(s)).unit_or(d)
+}
+
+/// The joints of `pose` on a figure built as `body`, seen at `facing` degrees (see [`facing`]), relative to the
+/// pelvis. Place it in a cell with [`Skeleton::placed`].
+pub fn skeleton(body: &Body, pose: &Pose, facing_deg: f64) -> Skeleton {
+    let yaw = fin(facing_deg).to_radians();
+    let (sy, cy) = libm::sincos(yaw);
+    // The viewer looks along -z: x right, y up, z toward the viewer.
+    let world = Frame {
+        f: V3(cy, 0.0, sy),
+        u: V3(0.0, 1.0, 0.0),
+        r: V3(-sy, 0.0, cy),
+    };
+    let pelvis_frame = world.pitched(-fin(pose.lie));
+    let torso = pelvis_frame
+        .pitched(fin(pose.lean))
+        .rolled(fin(pose.tilt))
+        .yawed(fin(pose.twist));
+    let head_frame = torso.pitched(fin(pose.head.nod)).yawed(fin(pose.head.turn));
+
+    let pelvis = V3(0.0, 0.0, 0.0);
+    let neck = pelvis.add(torso.u.mul(body.torso));
+    let head = neck.add(head_frame.u.mul(body.neck + body.head));
+    let nose_dir = head_frame.f;
+    let nose = head.add(nose_dir.mul(body.head));
+
+    let arm = |side: Side| {
+        let k = side_sign(side);
+        let root = neck.add(torso.r.mul(k * body.shoulder));
+        let l = match side {
+            Side::Right => pose.right_arm,
+            Side::Left => pose.left_arm,
+        };
+        let (d, e) = limb_dirs(torso, k, l, 1.0);
+        let mid = root.add(d.mul(body.upper_arm));
+        (root, mid, mid.add(e.mul(body.forearm)), e)
+    };
+    let leg = |side: Side| {
+        let k = side_sign(side);
+        let root = pelvis.add(pelvis_frame.r.mul(k * body.hip));
+        let l = match side {
+            Side::Right => pose.right_leg,
+            Side::Left => pose.left_leg,
+        };
+        let (d, e) = limb_dirs(pelvis_frame, k, l, -1.0);
+        let mid = root.add(d.mul(body.thigh));
+        LimbPoints {
+            root: Point::of(root),
+            mid: Point::of(mid),
+            end: Point::of(mid.add(e.mul(body.shin))),
+        }
+    };
+    let (ra, la) = (arm(Side::Right), arm(Side::Left));
+    let pts = |a: (V3, V3, V3, V3)| LimbPoints {
+        root: Point::of(a.0),
+        mid: Point::of(a.1),
+        end: Point::of(a.2),
+    };
+    let sword = pose.sword.map(|s| {
+        let (hand, fore) = match s.hand {
+            Side::Right => (ra.2, ra.3),
+            Side::Left => (la.2, la.3),
+        };
+        let blade = bend(torso, fore, fin(s.angle));
+        [Point::of(hand), Point::of(hand.add(blade.mul(body.sword)))]
+    });
+    Skeleton {
+        head: Point::of(head),
+        head_radius: body.head,
+        nose: Point::of(nose),
+        nose_visible: nose_dir.2 > -0.25,
+        neck: Point::of(neck),
+        pelvis: Point::of(pelvis),
+        right_arm: pts(ra),
+        left_arm: pts(la),
+        right_leg: leg(Side::Right),
+        left_leg: leg(Side::Left),
+        sword,
+        facing: fin(facing_deg),
+    }
+}
+
+fn side_sign(side: Side) -> f64 {
+    match side {
+        Side::Right => 1.0,
+        Side::Left => -1.0,
+    }
+}

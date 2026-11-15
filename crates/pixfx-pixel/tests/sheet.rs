@@ -272,7 +272,29 @@ fn a_layout_comes_back_from_its_json_and_bones_from_their_text() {
     );
     assert!(pixfx_pixel::sheet::parse_layout("{\"cell_w\": 3}").is_err());
     let bones = pixfx_pixel::sheet::parse_bones("# spine\n16,10 16,30\n\n16,30 10,46\n");
-    assert_eq!(bones, Ok(vec![[(16, 10), (16, 30)], [(16, 30), (10, 46)]]));
+    assert_eq!(
+        bones,
+        Ok(vec![
+            (None, [(16, 10), (16, 30)]),
+            (None, [(16, 30), (10, 46)])
+        ])
+    );
+    let posed = pixfx_pixel::sheet::parse_bones("1,1 1,5\ncell 1,0\n2,2 3,3\ncircle 10,10 4\n");
+    let posed = posed.unwrap_or_default();
+    assert_eq!(
+        pixfx_pixel::sheet::bones_of(&posed, 0, 0),
+        vec![[(1, 1), (1, 5)]]
+    );
+    let own = pixfx_pixel::sheet::bones_of(&posed, 1, 0);
+    assert_eq!(
+        own.len(),
+        1 + 1 + 12,
+        "shared bone, own bone and a 12-bone ring"
+    );
+    assert!(
+        own.contains(&[(14, 10), (13, 12)]),
+        "the ring starts at the right of the circle"
+    );
     assert!(pixfx_pixel::sheet::parse_bones("16,10 16").is_err());
 }
 
