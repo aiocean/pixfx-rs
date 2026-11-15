@@ -1,6 +1,6 @@
 // The landing page: a live duel in the hero, drawn by pixfx-canvas2d (workers paint the effects). The page owns the
 // animation-frame loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
-import { Body, FightFeel, Lighting, Sprites, createPixfx, loadPixfx, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
+import { Body, FightFeel, Lighting, Mind, Sprites, createPixfx, loadPixfx, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
 import { DECOR, createDuel, step } from "./duel.js";
 import { BARS_TALL, drawBars, drawNumbers, drawSkills, drawStreaks, paintFighters } from "./duel-art.js";
 import { createScene, drawScene } from "./duel-scene.js";
@@ -102,7 +102,7 @@ function createHero(canvas, signal, icons, engine) {
     const barTop = Math.max(6, Math.ceil((topbar - rect.top) / scale) + 6);
     // fighters fly no higher than keeps their heads (about 44 pixels tall) under the bars
     const sky = ground - (barTop + BARS_TALL + 13) - 46;
-    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky, Body });
+    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky, Body, Mind });
     view.layout = { scale, w, h, ground, barTop, lamps: [arena.left, arena.right], scene: createScene(w, h, ground, barTop + BARS_TALL) };
     // a still frame shows the fight under way
     if (reduceMotion) {
