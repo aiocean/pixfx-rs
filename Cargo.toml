@@ -1,8 +1,9 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-# pixfx-gpui needs the local gpui fork at ../zed-gpui; it is its own workspace so the rest builds without it
-exclude = ["crates/pixfx-gpui"]
+# pixfx-gpui needs the local gpui fork at ../zed-gpui, and pixfx-duel-py needs pyo3 for the trainer; each is its own
+# workspace so the rest builds without them
+exclude = ["crates/pixfx-gpui", "crates/pixfx-duel-py"]
 
 [workspace.package]
 version = "0.1.0"

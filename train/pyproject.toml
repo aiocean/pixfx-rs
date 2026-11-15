@@ -1,0 +1,15 @@
+[project]
+name = "pixfx-duel-train"
+version = "0.1.0"
+description = "Trains the landing duel's policy with PPO on the Rust rules (crates/pixfx-duel-py)"
+requires-python = ">=3.12"
+dependencies = ["numpy>=2.3", "torch==2.8.*"]
+
+[dependency-groups]
+dev = ["maturin>=1.9", "pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
