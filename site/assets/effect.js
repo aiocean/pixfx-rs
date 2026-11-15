@@ -463,8 +463,9 @@ function createDuelView(canvas, id, m, role, room, told) {
       if (reduceMotion) advance(0);
       else {
         advance(dt);
-        // a take ends once its effect has landed and both fighters stand still: rest a moment, then take again
-        if (bout.done) {
+        // a take ends once its effect has landed and both fighters stand still: rest a moment, then take again;
+        // a fighter struck down is gone for good, so a death is not fought again until the options change
+        if (bout.done && !bout.fighters.some((f) => f.dead)) {
           resting += dt;
           if (resting >= REST) again(opts);
         }
