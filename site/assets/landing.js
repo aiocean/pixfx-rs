@@ -2,7 +2,8 @@
 // animation-frame loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
 import { Body, FightFeel, Lighting, Mind, Sprites, createPixfx, loadPixfx, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
 import { DECOR, createDuel, step } from "./duel.js";
-import { BARS_TALL, drawBars, drawNumbers, drawSkills, drawStreaks, paintFighters } from "./duel-art.js";
+import { BARS_TALL, drawBars, drawNumbers, drawSkills, drawStreaks, hudAt, paintFighters } from "./duel-art.js";
+import { buffInfo, skillInfo } from "./duel-info.js";
 import { createScene, drawScene } from "./duel-scene.js";
 import { kindle, lampGlows } from "./duel-light.js";
 
@@ -103,7 +104,9 @@ function createHero(canvas, signal, icons, engine) {
     // fighters fly no higher than keeps their heads (about 44 pixels tall) under the bars
     const sky = ground - (barTop + BARS_TALL + 13) - 46;
     view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky, Body, Mind });
-    view.layout = { scale, w, h, ground, barTop, lamps: [arena.left, arena.right], scene: createScene(w, h, ground, barTop + BARS_TALL) };
+    // each fighter's skills, on the floor under its own side: bigger icons where the floor has the room
+    const icon = h - ground >= 20 ? 16 : 12;
+    view.layout = { scale, w, h, ground, barTop, icon, lamps: [arena.left, arena.right], scene: createScene(w, h, ground, barTop + BARS_TALL) };
     // a still frame shows the fight under way
     if (reduceMotion) {
       for (let i = 0; i < 6 * 30; i++) play(step(view.duel, 1 / 30));
@@ -162,10 +165,11 @@ function createHero(canvas, signal, icons, engine) {
       ctx.fillRect(0, (h - band) * scale, w * scale, band * scale);
     }
     drawBars(ctx, view.sprites, show, view.duel, scale, view.layout.barTop);
-    // each fighter's skills, on the floor under its own side: bigger icons where the floor has the room, from the
-    // atlas whose pixels land on whole screen pixels
-    const icon = h - ground >= 20 ? 16 : 12;
+    // each fighter's skills, from the atlas whose pixels land on whole screen pixels
+    const { icon } = view.layout;
     drawSkills(ctx, view.duel, scale, h, icon, (icon * scale) % 32 === 0 ? view.icons[32] : view.icons[24]);
+    // what the pointer holds changes with the fight: its tooltip follows
+    view.tip.update();
   };
 
   let pending = null;
@@ -183,7 +187,91 @@ function createHero(canvas, signal, icons, engine) {
   view.playing = () => view.stage?.stats().engines ?? 0;
 
   build();
+  view.tip = createTip(view, signal);
   return view;
+}
+
+// ---------- the hero's tooltips ----------
+
+/** A tooltip title's colour by its skill's tier, as the bar frames it. */
+const TIP_TIER = { common: "#f0cf7a", rare: "#4fa3ff", epic: "#c36bff", legendary: "#ff9a1a" };
+
+/**
+ * Hover a skill slot or a buff tile (or tap it) to see what it is: a panel by the pointer, kept up to date while the
+ * pointer stays. A tap pins it; a tap anywhere else, or a scroll, lets it go.
+ */
+function createTip(view, signal) {
+  const { canvas } = view;
+  const el = document.createElement("div");
+  el.className = "duel-tip";
+  el.hidden = true;
+  el.setAttribute("role", "tooltip");
+  document.body.append(el);
+  signal.addEventListener("abort", () => el.remove());
+  // where the pointer is, in the page, and whether a tap pinned it there
+  let at = null;
+  let shown = "";
+  const target = () => {
+    if (!at || !view.duel || !view.layout) return null;
+    const r = canvas.getBoundingClientRect();
+    const { scale, barTop, h, icon } = view.layout;
+    const gx = (((at.cx - r.left) / r.width) * canvas.width) / scale;
+    const gy = (((at.cy - r.top) / r.height) * canvas.height) / scale;
+    return hudAt(view.duel, gx, gy, barTop, h, icon);
+  };
+  const update = () => {
+    const hit = target();
+    canvas.style.cursor = hit ? "pointer" : "";
+    const f = hit && view.duel.fighters[hit.fighter];
+    const info = !hit ? null : hit.kind === "skill" ? skillInfo(f, hit.slot) : buffInfo(hit.buff);
+    if (!info) {
+      el.hidden = true;
+      shown = "";
+      return;
+    }
+    const key = JSON.stringify(info);
+    if (key !== shown) {
+      shown = key;
+      const title = document.createElement("h3");
+      title.textContent = info.title;
+      if (info.tier) title.style.color = TIP_TIER[info.tier];
+      el.replaceChildren(title, ...info.lines.map((line) => Object.assign(document.createElement("p"), { textContent: line })));
+      el.dataset.good = info.good === undefined ? "" : String(info.good);
+    }
+    el.hidden = false;
+    // beside the pointer, kept on the screen
+    const pad = 14;
+    const x = Math.max(4, Math.min(at.cx + pad, innerWidth - el.offsetWidth - 4));
+    const y = at.cy + pad + el.offsetHeight > innerHeight - 4 ? at.cy - el.offsetHeight - pad : at.cy + pad;
+    el.style.left = `${x}px`;
+    el.style.top = `${Math.max(4, y)}px`;
+  };
+  canvas.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse" || at?.pinned) return;
+    at = { cx: e.clientX, cy: e.clientY, pinned: false };
+    update();
+  }, { signal });
+  canvas.addEventListener("pointerleave", () => {
+    if (at?.pinned) return;
+    at = null;
+    update();
+  }, { signal });
+  canvas.addEventListener("click", (e) => {
+    at = { cx: e.clientX, cy: e.clientY, pinned: true };
+    if (!target()) at = null;
+    update();
+  }, { signal });
+  document.addEventListener("click", (e) => {
+    if (e.target === canvas || !at?.pinned) return;
+    at = null;
+    update();
+  }, { signal });
+  addEventListener("scroll", () => {
+    if (!at) return;
+    at = null;
+    update();
+  }, { signal, passive: true });
+  return { update };
 }
 
 /** Each skill icon atlas, by the size of its icons: `{ [size]: { image, size } }`. */

@@ -255,3 +255,16 @@ html[aria-busy="true"], html[aria-busy="true"] * { cursor: progress; }
 @media (prefers-reduced-motion: no-preference) {
   @view-transition { navigation: auto; }
 }
+
+/* the duel's tooltips: what a skill or a buff under the pointer is */
+.duel-tip {
+  position: fixed; z-index: 30; max-width: 280px; padding: 8px 11px;
+  background: rgba(19, 16, 27, 0.96); border: 2px solid #b8893c; box-shadow: 0 0 0 1px #2a1c0e, 0 8px 22px rgba(0, 0, 0, 0.55);
+  font: 400 0.8rem/1.45 var(--body); color: var(--wax); pointer-events: none;
+}
+.duel-tip[data-good="true"] { border-color: #3fae5a; }
+.duel-tip[data-good="false"] { border-color: #c8322a; }
+.duel-tip h3 { margin: 0 0 4px; font: 400 1rem/1.2 var(--display); color: var(--flame); }
+.duel-tip p { margin: 0; }
+.duel-tip p + p { margin-top: 2px; color: var(--ash); }
+.duel-tip p:first-of-type { color: var(--wax); }

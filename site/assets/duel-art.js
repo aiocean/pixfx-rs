@@ -4,6 +4,33 @@
 // fighter is doing, in the duel's own terms. Everything is in game pixels times `s`, the canvas scale.
 import { lookColors } from "../pkg/pixfx-canvas2d.js";
 import { RAGE, SPELLS, buffsOf, skillBar } from "./duel.js";
+
+// ---------- where the HUD's parts stand (drawing and the pointer both read these) ----------
+
+/** Where slot `i` of fighter f's skill bar stands, in game pixels: icons `n` square, standing on row `bottom`. */
+export function slotRect(duel, f, i, bottom, n) {
+  const size = n + 4;
+  return { x: f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2), y: bottom - size, w: size, h: size };
+}
+
+/** Where buff tile `i` of fighter f stands, under the bars that start at row `top`. */
+export function buffRect(duel, f, i, top) {
+  return { x: f.index === 1 ? duel.right - 9 - i * 11 : duel.left + i * 11, y: top + BARS_TALL + 2, w: 9, h: 9 };
+}
+
+/**
+ * What of the HUD lies under game pixel (px, py): `{ kind: "skill", fighter, slot }`, `{ kind: "buff", fighter, buff }`
+ * (the buff from `buffsOf`), or null. The bars start at row `top`; the skill icons are `n` square on row `bottom`.
+ */
+export function hudAt(duel, px, py, top, bottom, n) {
+  const inside = (r) => px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h;
+  for (const f of duel.fighters) {
+    for (let i = 0; i < skillBar(f).length; i++) if (inside(slotRect(duel, f, i, bottom, n))) return { kind: "skill", fighter: f.index, slot: i };
+    const list = buffsOf(f);
+    for (let i = 0; i < list.length; i++) if (inside(buffRect(duel, f, i, top))) return { kind: "buff", fighter: f.index, buff: list[i] };
+  }
+  return null;
+}
 import { ICON_CELLS, ICON_COLUMNS } from "./skill-icons.js";
 
 /** Each school's colours the HUD draws in, from the engine's looks (asked once the engine has loaded). */
@@ -152,9 +179,10 @@ export const BARS_TALL = 26;
 
 /**
  * The fight's bars, with no words: for each fighter a bronze medallion with its face, then its life (what a blow
- * just took drains away behind it), its qi under that, and its rage as beads that blaze once full (its ultimate
- * is ready). Between the two, a bronze plaque with a diamond for each round won. `top` is the bars' top edge in
- * game pixels; `show(picture)` draws the faces `sprites` painted (`pixfx.drawPicture`).
+ * just took drains away behind it), its qi in a blue bar of its own under that, its rage in a red bar of segments
+ * that blaze once full (its ultimate is ready), and its buffs in tiles under it all. Between the two, a bronze plaque
+ * with the rounds each has won. `top` is the bars' top edge in game pixels; `show(picture)` draws the faces
+ * `sprites` painted (`pixfx.drawPicture`).
  */
 export function drawBars(ctx, sprites, show, duel, s, top) {
   const faces = [];
@@ -224,7 +252,7 @@ export function drawBars(ctx, sprites, show, duel, s, top) {
       if (on) box(x, top + 18, seg - 1, 1, blaze ? "#ffffff" : BAR.rageLight);
     }
     // what it carries, in tiles under the medallion and the bars, from its own edge inward (after Path of Exile)
-    buffs(f, right ? duel.right : duel.left, top + medal + 2, right, box);
+    buffs(duel, f, top, box);
   }
   // the plaque in the middle: the rounds each fighter has won, as a number in its own colour on its own half
   const mid = Math.round((duel.left + duel.right) / 2);
@@ -252,13 +280,14 @@ export function drawBars(ctx, sprites, show, duel, s, top) {
   show(sprites.picture());
 }
 
-/** Fighter f's buffs (`buffsOf`) as 9 by 9 tiles in a row from `edge`, at row `top`: an icon on a dark field, a rim
- *  green for a good one and red for a bad one, and its stacks as a digit in its lower right corner. */
-function buffs(f, edge, top, right, box) {
+/** Fighter f's buffs (`buffsOf`) as 9 by 9 tiles in a row under its bars (`buffRect`; the bars start at row `top`):
+ *  an icon on a dark field, a rim green for a good one and red for a bad one, and its stacks as a digit in its lower
+ *  right corner. */
+function buffs(duel, f, barsTop, box) {
   buffsOf(f).forEach((b, i) => {
     const look = BUFF[b.id];
     if (!look) return;
-    const x = right ? edge - 9 - i * 11 : edge + i * 11;
+    const { x, y: top } = buffRect(duel, f, i, barsTop);
     box(x, top, 9, 9, b.good ? BUFF_RIM.good : BUFF_RIM.bad);
     box(x + 1, top + 1, 7, 7, "#120d18");
     look.rows.forEach((row, r) => {
@@ -382,7 +411,7 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
     glints.set(f, seen);
     /** A word floating up over slot i, `since` seconds into its `time`, kept inside the arena. */
     const float = (word, color, i, since, time) => {
-      const x = f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2);
+      const { x } = slotRect(duel, f, i, bottom, n);
       ctx.font = `700 ${8 * s}px "Pixelify Sans", monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
@@ -397,7 +426,7 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
       ctx.globalAlpha = 1;
     };
     skillBar(f).forEach((slot, i) => {
-      const x = f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2);
+      const { x } = slotRect(duel, f, i, bottom, n);
       if (seen.left[i] > 0 && slot.left === 0) seen.at[i] = duel.time;
       seen.left[i] = slot.left;
       // the same skill a tier higher than last frame: a duplicate draw lifted it
@@ -473,7 +502,7 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
     const since = luck ? duel.time - luck.at : Infinity;
     if (since < LUCKY_TIME) {
       const i = luck.slot ?? 0;
-      const x = f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2);
+      const { x } = slotRect(duel, f, i, bottom, n);
       if (since < 0.3) frame(box, x, top, size, "#ffd84a", 1 - since / 0.3);
       float(LUCKY_WORD[luck.kind], "#ffd84a", i, since, LUCKY_TIME);
     }
