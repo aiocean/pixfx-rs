@@ -6,4 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub mod data;
+pub mod fighter;
+pub mod out;
 pub mod rng;
+pub mod status;

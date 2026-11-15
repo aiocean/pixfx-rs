@@ -12,6 +12,22 @@ const rng = Object.fromEntries(SEEDS.map((seed) => {
   return [String(seed), Array.from({ length: 50 }, () => r())];
 }));
 
+// damageOf over both schools, both blow types, crit, fury, defence-down and the spread's ends
+const DAMAGE = [
+  ["thunder", 0, "frost", 0, 20, "magic", false, 0.5],
+  ["thunder", 0, "frost", 0, 20, "physical", false, 0.5],
+  ["frost", 0, "thunder", 0, 25, "magic", false, 0],
+  ["frost", 0, "thunder", 0, 25, "magic", false, 0.999],
+  ["thunder", 3, "frost", 0, 13, "magic", false, 0.25],
+  ["thunder", 5, "frost", 2, 15, "physical", true, 0.75],
+  ["frost", 0, "thunder", 4, 28, "magic", true, 0.1],
+  ["frost", 0, "thunder", 0, 5, "physical", false, 0.6],
+  ["thunder", 1, "frost", 0, 0.1, "magic", false, 0.3],
+  ["thunder", 0, "thunder", 0, 14, "magic", false, 0.9],
+  ["frost", 0, "frost", 1, 31, "magic", true, 0.45],
+  ["thunder", 2, "frost", 3, 24 * 1.36, "physical", false, 0.05],
+].map(([bs, fury, fs, defDown, power, type, crit, roll]) => [bs, fury, fs, defDown, power, type, crit, roll, duel.damageOf({ stats: STATS[bs], fury }, { stats: STATS[fs], defDown }, power, type, crit, roll)]);
+
 const ts = Array.from({ length: 22 }, (_, i) => i * 0.37);
 const out = {
   rng,
@@ -19,6 +35,7 @@ const out = {
   blockChance: [0, 1, 5, 20, 33.3, 80].map((p) => [p, duel.blockChance(p)]),
   shockInterval: [1, 2, 3, 4, 5].map((n) => [n, duel.shockInterval(n)]),
   slotPower: TIERS.flatMap((rarity) => [[], ["heavy"]].flatMap((traits) => [false, true].map((evolved) => [rarity, traits, evolved, duel.slotPower(rarity, traits, evolved)]))),
+  damage: DAMAGE,
   fits: Object.keys(TRAITS).flatMap((t) => Object.keys(SPELLS).map((name) => [t, name, duel.fits(t, name)])),
   spells: SPELLS,
   schools: SCHOOLS,

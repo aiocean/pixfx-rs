@@ -8,6 +8,8 @@ license.workspace = true
 [dependencies]
 libm.workspace = true
 pixfx-draw = { path = "../pixfx-draw" }
+pixfx-fighter = { path = "../pixfx-fighter" }
+pixfx-mind = { path = "../pixfx-mind" }
 serde = { workspace = true, optional = true }
 tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
@@ -18,9 +20,9 @@ serde_json = { version = "=1.0.154", features = ["float_roundtrip", "preserve_or
 
 [features]
 # serde for the commands, events and views, in the shapes JS reads them (camelCase, tagged with "type")
-serde = ["dep:serde"]
+serde = ["dep:serde", "pixfx-mind/serde", "pixfx-fighter/serde"]
 # TypeScript declarations for the wasm bindings
-ts = ["serde", "dep:tsify", "dep:wasm-bindgen"]
+ts = ["serde", "pixfx-mind/ts", "pixfx-fighter/ts", "dep:tsify", "dep:wasm-bindgen"]
 
 [lints]
 workspace = true

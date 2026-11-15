@@ -100,6 +100,8 @@ pub const WARD: Ward = Ward { charges: 3.0, time: 6.0 };
 
 /// A skill's tier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Rarity {
     Common = 0,
     Rare = 1,
@@ -182,6 +184,8 @@ pub const TRAITS: Traits = Traits { swift_cooldown: 0.6, heavy_power: 1.3, linge
 
 /// What luck does to a cast.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Luck {
     /// Hits twice as hard.
     Double,
@@ -275,6 +279,7 @@ impl School {
 }
 
 /// Each school's fighter: full life, attack, the two defences, crit chance and damage, dodge, and its passives.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stats {
     pub hp: f64,
     pub atk: f64,
