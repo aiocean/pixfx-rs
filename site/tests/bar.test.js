@@ -185,3 +185,70 @@ describe("the icons", () => {
     expect(Math.max(...cells)).toBeLessThan(ICON_COLUMNS * ICON_COLUMNS);
   });
 });
+
+describe("evolution", () => {
+  /** A still duel; fighter `f`'s bar set to `spells`, each with `casts` casts. */
+  function barOf(seed, index, spells, casts = 1) {
+    const duel = arena(seed);
+    for (const g of duel.fighters) g.mind.hold(1e9);
+    const f = duel.fighters[index];
+    f.bar = spells.map((spell) => ({ spell, casts, left: casts, power: castsPower(casts), evolved: false }));
+    return { duel, f };
+  }
+
+  test("a spent skill whose partner is on the bar refills at once, evolved and half again as strong", () => {
+    for (let seed = 1; seed <= 8; seed++) {
+      const { duel, f } = barOf(seed, 0, ["palm", "step", "orb"]);
+      spend(duel, f, 0);
+      const slot = f.bar[0];
+      expect(slot.spell).toBe("palm");
+      expect(slot.evolved).toBe(true);
+      expect(slot.left).toBe(slot.casts);
+      expect(slot.power).toBeCloseTo(1.5 * castsPower(slot.casts), 9);
+    }
+  });
+
+  test("each school has its own pairs: Frost's bolt evolves with the icicle, not the seal", () => {
+    const frost = barOf(1, 1, ["bolt", "icicle", "lotus"]);
+    spend(frost.duel, frost.f, 0);
+    expect(frost.f.bar[0].evolved).toBe(true);
+    const thunder = barOf(1, 0, ["bolt", "seal", "orb"]);
+    spend(thunder.duel, thunder.f, 0);
+    expect(thunder.f.bar[0].evolved).toBe(true);
+  });
+
+  test("without its partner on the bar a spent skill counts down as usual", () => {
+    const { duel, f } = barOf(2, 0, ["palm", "orb", "bell"]);
+    spend(duel, f, 0);
+    expect(f.bar[0].empty).toBeGreaterThanOrEqual(3);
+  });
+
+  test("an evolved skill, once spent, empties its slot: it does not evolve again", () => {
+    const { duel, f } = barOf(3, 0, ["palm", "step", "orb"]);
+    spend(duel, f, 0);
+    const casts = f.bar[0].casts;
+    for (let k = 0; k < casts; k++) spend(duel, f, 0);
+    expect(f.bar[0].empty).toBeGreaterThanOrEqual(3);
+  });
+
+  test("an evolved skill inflicts one more stack of what it inflicts", () => {
+    const chillOf = (evolved) => {
+      let cast = false;
+      const caster = () => ({
+        think: () => (cast ? null : ((cast = true), { type: "cast", skill: "jet" })),
+        tell() {}, reset() {}, hold() {},
+      });
+      const idle = () => ({ think: () => null, tell() {}, reset() {}, hold() {} });
+      const duel = createDuel({ seed: 4, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind, minds: [idle, caster] });
+      const [thunder, frost] = duel.fighters;
+      for (const g of duel.fighters) g.stats = { ...g.stats, dodge: 0, crit: 0 };
+      frost.bar = [{ spell: "jet", casts: 2, left: 2, power: 1, evolved }, { spell: "shard", casts: 1, left: 1, power: 1, evolved: false }, { spell: "mirror", casts: 1, left: 1, power: 1, evolved: false }];
+      frost.x = thunder.x + 30;
+      frost.face = -1;
+      for (let i = 0; i < 60; i++) step(duel, 1 / 60);
+      return thunder.chill;
+    };
+    expect(chillOf(false)).toBe(1);
+    expect(chillOf(true)).toBe(2);
+  });
+});

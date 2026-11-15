@@ -104,7 +104,10 @@ describe("duel", () => {
           const j = before[f.index].findIndex((slot) => slot.spell === spell);
           if (j < 0) continue;
           const after = f.bar[j];
-          expect(after.empty !== undefined ? 0 : after.left).toBe(before[f.index][j].left - 1);
+          const prior = before[f.index][j];
+          // the last cast of a skill whose partner is on the bar refills it at once, evolved
+          if (after.evolved && !prior.evolved) expect(prior.left).toBe(1);
+          else expect(after.empty !== undefined ? 0 : after.left).toBe(prior.left - 1);
           checked++;
         }
       }

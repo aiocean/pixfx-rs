@@ -105,6 +105,15 @@ const WARD = { charges: 3, time: 6 };
  */
 const BAR = { slots: 3, casts: 4, wait: 3, spread: 2 };
 const CAST_POWER = [1.4, 1.2, 1.1, 1.0];
+/**
+ * The pairs that evolve, per school: a spent skill whose partner is on the bar refills at once as its evolved form,
+ * `EVOLVED` times as strong and inflicting one more stack. An evolved skill, once spent, empties its slot.
+ */
+const EVOLVES = {
+  thunder: [["bolt", "seal"], ["palm", "step"], ["quake", "burst"]],
+  frost: [["bolt", "icicle"], ["shatter", "flurry"], ["lotus", "jet"]],
+};
+const EVOLVED = 1.5;
 
 /** How hard a skill drawn with `casts` casts hits, as a multiple of its power. */
 export function castsPower(casts) {
@@ -479,8 +488,10 @@ function begin(duel, me, name, target) {
   // a bar skill spends a cast, and strikes with the power it was drawn with even if that empties its slot
   const i = me.bar.findIndex((slot) => slot.spell === name);
   const power = i < 0 ? 1 : me.bar[i].power;
+  // an evolved skill inflicts one more stack of what it inflicts
+  const stacks = i >= 0 && me.bar[i].evolved ? 2 : 1;
   if (i >= 0) spend(duel, me, i);
-  me.act = { spell: name, phase: "windup", t: 0, target, power };
+  me.act = { spell: name, phase: "windup", t: 0, target, power, stacks };
   setMeditating(duel, me, false);
   // longer casts stand in a rune circle while they gather
   if (spell.kind !== "melee" && spell.kind !== "blink" && spell.kind !== "dash" && spell.kind !== "barrier" && duel.has(CAST_CIRCLE)) {
@@ -514,16 +525,16 @@ function release(duel, me, foe, spell) {
         // both blades swing at once: they meet
         clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
         foe.act = null;
-      } else hurt(duel, foe, hit, me.face, me.act.spell);
+      } else hurt(duel, foe, hit, me.face, me.act.spell, me.act.stacks);
     }
   } else if (spell.kind === "bolt") {
     const y = me.air + me.spec.chest;
     const key = play(duel, spell.fx, me.x + me.face * 8, g - y, { palette: SCHOOLS[me.school].bolt, flip: me.face < 0, seed: me.index + 7 });
-    duel.shots.push({ kind: "bolt", owner: me.index, x: me.x + me.face * 8, y, vx: me.face * spell.speed, t: 0, key, spell, name: me.act.spell, power: hit });
+    duel.shots.push({ kind: "bolt", owner: me.index, x: me.x + me.face * 8, y, vx: me.face * spell.speed, t: 0, key, spell, name: me.act.spell, power: hit, stacks: me.act.stacks ?? 1 });
   } else if (spell.kind === "orb") {
     const x = me.x + me.face * 10;
     const key = play(duel, spell.fx, x, g, { seed: me.index + 3 });
-    duel.shots.push({ kind: "orb", owner: me.index, x, t: 0, key, spell, name: me.act.spell, power: hit });
+    duel.shots.push({ kind: "orb", owner: me.index, x, t: 0, key, spell, name: me.act.spell, power: hit, stacks: me.act.stacks ?? 1 });
   } else if (spell.kind === "zone") {
     const x = clamp(me.act.target, duel.left + 6, duel.right - 6);
     // what hangs in the air (a collapse) gathers at the foe's height; what falls (an icicle) hits the floor
@@ -533,7 +544,7 @@ function release(duel, me, foe, spell) {
     const sigil = spell.sigil ?? 0;
     const mark = sigil > 0 && duel.has(CAST_CIRCLE) ? play(duel, CAST_CIRCLE, x, g - air, { palette: SCHOOLS[me.school].circle, seed: me.index + 11 }) : null;
     for (let k = 0; k < (spell.strikes ?? 1); k++) {
-      duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, air, t: -k * (spell.every ?? 0) - sigil, lead: sigil, key: k === 0 ? mark : null, spell, follow: k > 0, power: hit });
+      duel.shots.push({ kind: "zone", name: me.act.spell, owner: me.index, x, air, t: -k * (spell.every ?? 0) - sigil, lead: sigil, key: k === 0 ? mark : null, spell, follow: k > 0, power: hit, stacks: me.act.stacks ?? 1 });
     }
     streak(duel, me, x, air + zoneHeight(spell, foe));
   } else if (spell.kind === "blast") {
@@ -541,12 +552,12 @@ function release(duel, me, foe, spell) {
     cast(duel, me, spell.fx, x, g - me.spec.chest - me.air);
     if (Math.abs(foe.x - me.x) <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
       if (blocks(duel, foe, me.x, hit)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
-      else if (hurt(duel, foe, hit, me.face, me.act.spell) && spell.shock) addShock(duel, foe, me, 1);
+      else if (hurt(duel, foe, hit, me.face, me.act.spell, me.act.stacks) && spell.shock) addShock(duel, foe, me, me.act.stacks ?? 1);
     }
   } else if (spell.kind === "void") {
     const x = clamp(foe.x, duel.left + 10, duel.right - 10);
     const key = cast(duel, me, spell.fx, x, g, { seed: me.index + 5 });
-    duel.shots.push({ kind: "void", name: me.act.spell, owner: me.index, x, t: 0, tick: 0, key, spell, power: hit });
+    duel.shots.push({ kind: "void", name: me.act.spell, owner: me.index, x, t: 0, tick: 0, key, spell, power: hit, stacks: me.act.stacks ?? 1 });
     streak(duel, me, x, spell.height ? spell.height : 4);
   } else if (spell.kind === "dash") {
     // gone in a flash and back a stride past the foe, cutting through it on the way
@@ -560,14 +571,16 @@ function release(duel, me, foe, spell) {
     const hi = Math.max(from, to) + foe.spec.halfWidth;
     if (foe.x > lo && foe.x < hi && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
       if (blocks(duel, foe, from, hit)) clash(duel, foe.x, g - foe.spec.chest - foe.air, [foe]);
-      else hurt(duel, foe, hit, me.face, me.act.spell);
+      else hurt(duel, foe, hit, me.face, me.act.spell, me.act.stacks);
     }
   } else if (spell.kind === "heal") {
+    cleanse(me);
     const gained = Math.min(100 - me.hp, spell.amount);
     me.hp += gained;
     emit(duel, { type: "heal", by: me.index, amount: Math.round((gained / 100) * me.stats.hp), x: me.x, y: me.air + me.spec.chest });
     cast(duel, me, spell.fx, me.x, g - me.spec.body - me.air);
   } else if (spell.kind === "ward") {
+    cleanse(me);
     me.charges = 1 + Math.floor(duel.rng() * WARD.charges);
     me.shieldT = WARD.time;
     emit(duel, { type: "ward", by: me.index, amount: me.charges, x: me.x, y: me.air + me.spec.chest });
@@ -639,7 +652,7 @@ function dropBarrier(duel, f) {
  * f takes a blow of `power` from `spell`, pushed toward `dir`; the step reports it as a `hit` command (or a
  * `dodge`). Returns whether it landed.
  */
-function hurt(duel, f, power, dir, spell) {
+function hurt(duel, f, power, dir, spell, stacks = 1) {
   if (f.hp <= 0 || f.body.untouchable()) return false;
   if (turnsAside(duel, f, dir, spell)) return false;
   const by = duel.fighters[1 - f.index];
@@ -693,7 +706,7 @@ function hurt(duel, f, power, dir, spell) {
   if (s?.burn) f.burn = { t: BURN.time, tick: BURN.every, per: Math.round(by.stats.atk * (1 + FURY.per * by.fury) * BURN.share), by: by.index };
   if (s?.defDown) f.defDown = s.defDown;
   if (s?.silence) f.silence = s.silence;
-  if (s?.chill) addChill(duel, f, 1);
+  if (s?.chill) addChill(duel, f, stacks);
   if (s?.stealRage && f.rage > 0) {
     f.rage -= s.stealRage;
     gainRage(by, s.stealRage);
@@ -836,7 +849,7 @@ function shot(duel, s, dt) {
     }
     if (overlaps(foe, s.x, s.y, 3)) {
       if (blocks(duel, foe, s.x - s.vx, s.power)) clash(duel, s.x, g - s.y, []);
-      else if (hurt(duel, foe, s.power, Math.sign(s.vx), s.name) && spell.shock) addShock(duel, foe, duel.fighters[s.owner], 1);
+      else if (hurt(duel, foe, s.power, Math.sign(s.vx), s.name, s.stacks) && spell.shock) addShock(duel, foe, duel.fighters[s.owner], s.stacks);
       return endShot(duel, s);
     }
     if (s.x < duel.left - 40 || s.x > duel.right + 40) endShot(duel, s);
@@ -847,7 +860,7 @@ function shot(duel, s, dt) {
     const [bx, by] = orbAt(s);
     if (overlaps(foe, bx, -by, spell.radius)) {
       if (blocks(duel, foe, bx, s.power)) clash(duel, bx, g + by, []);
-      else hurt(duel, foe, s.power, Math.sign(foe.x - bx) || 1, s.name);
+      else hurt(duel, foe, s.power, Math.sign(foe.x - bx) || 1, s.name, s.stacks);
       burst(duel, spell.hitFx, bx, g + by);
       return endShot(duel, s);
     }
@@ -876,9 +889,9 @@ function shot(duel, s, dt) {
     if (!s.fell && s.t >= spell.impact) {
       s.fell = true;
       const reaches = Math.abs(foe.x - s.x) < spell.radius + foe.spec.halfWidth && (spell.grounded ? foe.air < 10 : Math.abs(foe.air - s.air) < 22);
-      if (reaches && hurt(duel, foe, s.power, Math.sign(foe.x - s.x) || 1, s.name)) {
+      if (reaches && hurt(duel, foe, s.power, Math.sign(foe.x - s.x) || 1, s.name, s.stacks)) {
         if (spell.freeze) control(duel, foe, "freeze", spell.freeze);
-        if (spell.shock) addShock(duel, foe, duel.fighters[s.owner], 1);
+        if (spell.shock) addShock(duel, foe, duel.fighters[s.owner], s.stacks);
       }
     }
     if (s.t >= spell.impact + 0.2) duel.shots.splice(duel.shots.indexOf(s), 1);
@@ -896,12 +909,12 @@ function shot(duel, s, dt) {
         const share = take(duel, foe, amount);
         emit(duel, { type: "tick", by: by.index, damage: amount, share, x: foe.x, y: foe.air + foe.spec.chest });
         // a cold fire chills whoever stands in it, a stack a tick
-        if (spell.chill) addChill(duel, foe, 1);
+        if (spell.chill) addChill(duel, foe, s.stacks);
       }
     }
     if (s.t >= spell.life) {
       burst(duel, spell.endFx, s.x, g - spell.height);
-      if (Math.abs(dx) < spell.under) hurt(duel, foe, s.power, -Math.sign(dx) || 1, s.name);
+      if (Math.abs(dx) < spell.under) hurt(duel, foe, s.power, -Math.sign(dx) || 1, s.name, s.stacks);
       endShot(duel, s);
     }
   }
@@ -998,15 +1011,29 @@ export function draw(duel, f, i, first = false) {
   f.bar[i] = { spell, casts, left: casts, power: castsPower(casts), evolved: false };
 }
 
-/** One cast of slot `i`'s skill; the last empties the slot, which counts down before it draws again. */
+/** A heal or a ward washes off what clings to the caster: burn, silence, defence-down, chill and shock. */
+function cleanse(f) {
+  Object.assign(f, { burn: null, silence: 0, defDown: 0, chill: 0, chillT: 0, shock: null });
+}
+
+/**
+ * One cast of slot `i`'s skill; the last empties the slot, which counts down before it draws again, unless the skill's
+ * partner is on the bar: then it refills at once, evolved.
+ */
 export function spend(duel, f, i) {
   const slot = f.bar[i];
   if (!slot || slot.empty !== undefined) return;
   slot.left--;
-  if (slot.left <= 0) {
-    const wait = BAR.wait + BAR.spread * duel.rng();
-    f.bar[i] = { empty: wait, full: wait };
+  if (slot.left > 0) return;
+  const pair = EVOLVES[f.school]?.find((names) => names.includes(slot.spell));
+  const partner = pair?.find((name) => name !== slot.spell);
+  if (!slot.evolved && partner && f.bar.some((other, j) => j !== i && other.spell === partner)) {
+    const casts = 1 + Math.floor(duel.rng() * BAR.casts);
+    f.bar[i] = { spell: slot.spell, casts, left: casts, power: EVOLVED * castsPower(casts), evolved: true };
+    return;
   }
+  const wait = BAR.wait + BAR.spread * duel.rng();
+  f.bar[i] = { empty: wait, full: wait };
 }
 
 // ---------- the brain: what a fighter sees, and doing what it chose ----------

@@ -140,3 +140,33 @@ describe("grit", () => {
     expect(control(duel, f, "stun", 0.6)).toBeCloseTo(0.3, 9);
   });
 });
+
+describe("cleanse", () => {
+  for (const [spell, index] of [["heal", 0], ["hex", 0], ["ward", 1]]) {
+    test(`${spell} clears burn, silence, defence-down, chill and shock`, () => {
+      const duel = still(5);
+      const f = duel.fighters[index];
+      const foe = duel.fighters[1 - index];
+      f.burn = { t: 3, tick: 0.5, per: 2, by: foe.index };
+      f.defDown = 3;
+      addChill(duel, f, 1);
+      addChill(duel, f, 1);
+      addShock(duel, f, foe, 3);
+      f.act = { spell, phase: "windup", t: SPELLS[spell].windup, target: f.x, power: 1 };
+      step(duel, 1 / 60);
+      expect(f.burn).toBeNull();
+      expect(f.defDown).toBe(0);
+      expect(f.chill).toBe(0);
+      expect(f.shock).toBeNull();
+    });
+  }
+
+  test("a cleanse lifts a silence that fell during the cast", () => {
+    const duel = still(5);
+    const f = duel.fighters[0];
+    f.act = { spell: "heal", phase: "windup", t: SPELLS.heal.windup, target: f.x, power: 1 };
+    f.silence = 2;
+    step(duel, 1 / 60);
+    expect(f.silence).toBe(0);
+  });
+});
