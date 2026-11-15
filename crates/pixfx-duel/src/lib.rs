@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bar;
 pub mod data;
 pub mod fighter;
 pub mod out;

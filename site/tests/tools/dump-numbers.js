@@ -3,6 +3,7 @@
 //   bun site/tests/tools/dump-numbers.js > crates/pixfx-duel/tests/fixtures/js_numbers.json
 // Deleted with the JS rules (plan 2026-11-15-duel-rules-in-rust, Task 8).
 import * as duel from "../../assets/duel.js";
+import { Body, Mind, effects } from "../engine.js";
 
 const { RARITY, TRAITS, SPELLS, SCHOOLS, STATS, LUCKY, PAYOFF, RAGE, STALE, POOL_SIZE, DECOR, TIERS } = duel;
 
@@ -28,6 +29,13 @@ const DAMAGE = [
   ["thunder", 2, "frost", 3, 24 * 1.36, "physical", false, 0.05],
 ].map(([bs, fury, fs, defDown, power, type, crit, roll]) => [bs, fury, fs, defDown, power, type, crit, roll, duel.damageOf({ stats: STATS[bs], fury }, { stats: STATS[fs], defDown }, power, type, crit, roll)]);
 
+// each fighter's pool and opening bar, as createDuel draws them with every effect in the registry
+const registry = new Set(effects());
+const arenas = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map((seed) => {
+  const d = duel.createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => registry.has(id), Body, Mind });
+  return [String(seed), d.fighters.map((f) => ({ pool: f.pool, bar: f.bar.map((s) => ({ spell: s.spell, rarity: s.rarity, traits: s.traits, power: s.power })) }))];
+}));
+
 const ts = Array.from({ length: 22 }, (_, i) => i * 0.37);
 const out = {
   rng,
@@ -36,6 +44,7 @@ const out = {
   shockInterval: [1, 2, 3, 4, 5].map((n) => [n, duel.shockInterval(n)]),
   slotPower: TIERS.flatMap((rarity) => [[], ["heavy"]].flatMap((traits) => [false, true].map((evolved) => [rarity, traits, evolved, duel.slotPower(rarity, traits, evolved)]))),
   damage: DAMAGE,
+  arenas,
   fits: Object.keys(TRAITS).flatMap((t) => Object.keys(SPELLS).map((name) => [t, name, duel.fits(t, name)])),
   spells: SPELLS,
   schools: SCHOOLS,

@@ -149,7 +149,9 @@ pub const RARITY: [RarityData; 4] = [
 ];
 
 /// A trait a bar skill can be drawn with.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Trait {
     Swift,
     Heavy,
