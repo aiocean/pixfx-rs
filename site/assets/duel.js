@@ -118,6 +118,9 @@ export const TRAITS = {
   cheap: { cost: 0.5 },
 };
 
+/** A cast of a bar skill is lucky this often: it hits twice as hard, costs nothing, or is ready again at once. */
+export const LUCKY = { chance: 0.08, kinds: ["double", "free", "again"] };
+
 /** Whether `trait` does anything to spell `name`: heavy and piercing need a blow, lingering a chill or a shock. */
 export function fits(trait, name) {
   const s = SPELLS[name];
@@ -535,7 +538,8 @@ function pose(f) {
 function begin(duel, me, name, target) {
   const spell = SPELLS[name];
   const slot = slotOf(me, name);
-  me.qi -= costOf(me, name);
+  const cost = costOf(me, name);
+  me.qi -= cost;
   if (spell.ultimate) {
     me.rage = 0;
     emit(duel, { type: "ultimate", by: me.index, x: me.x, y: me.air + me.spec.chest });
@@ -548,6 +552,14 @@ function begin(duel, me, name, target) {
   const pierce = has(slot, "piercing");
   if (slot) spend(duel, me, me.bar.indexOf(slot));
   me.act = { spell: name, phase: "windup", t: 0, target, power, stacks, pierce };
+  // luck smiles on a bar skill now and then
+  if (slot && duel.rng() < LUCKY.chance) {
+    const kind = LUCKY.kinds[Math.floor(duel.rng() * LUCKY.kinds.length)];
+    if (kind === "double") me.act.power *= 2;
+    else if (kind === "free") me.qi += cost;
+    else me.cool[name] = 0;
+    emit(duel, { type: "lucky", by: me.index, kind, x: me.x, y: me.air + me.spec.chest + 10 });
+  }
   setMeditating(duel, me, false);
   // longer casts stand in a rune circle while they gather
   if (spell.kind !== "melee" && spell.kind !== "blink" && spell.kind !== "dash" && spell.kind !== "barrier" && duel.has(CAST_CIRCLE)) {

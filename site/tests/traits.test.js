@@ -1,6 +1,6 @@
 // Chance on the bar: each draw rolls a rarity (a little more power) and traits that change how its skill plays.
 import { describe, expect, test } from "bun:test";
-import { RARITY, SPELLS, TRAITS, castsPower, createDuel, draw, fits, ready, slotPower, step } from "../assets/duel.js";
+import { LUCKY, RARITY, SPELLS, TRAITS, castsPower, createDuel, draw, fits, ready, slotPower, step } from "../assets/duel.js";
 import { Body, Mind, effects } from "./engine.js";
 
 const all = new Set(effects());
@@ -136,5 +136,48 @@ describe("traits", () => {
     const { duel, foe } = castOnce(4, 0, "spark", { traits: ["lingering"], evolved: true });
     for (let i = 0; i < 60 && !foe.shock; i++) step(duel, 1 / 60);
     expect(foe.shock?.stacks).toBe(3);
+  });
+});
+
+describe("lucky casts", () => {
+  /** Fighter 0 casts `spell` every step it can, `n` times, with qi and the slot topped up; what each cast did. */
+  function casts(spell, n) {
+    const always = () => ({ think: () => ({ type: "cast", skill: spell }), tell() {}, reset() {}, hold() {} });
+    const duel = createDuel({ seed: 12, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind, minds: [always, idle] });
+    const me = duel.fighters[0];
+    if (!me.spells.includes(spell)) me.spells.push(spell);
+    const onBar = me.pool.includes(spell) || SPELLS[spell].kind !== "melee";
+    if (onBar && !me.pool.includes(spell)) me.pool.push(spell);
+    const out = [];
+    while (out.length < n) {
+      me.act = null;
+      me.cool = {};
+      me.qi = 50;
+      me.hp = 100;
+      if (onBar) me.bar = [{ spell, casts: 4, left: 4, power: 1, evolved: false, rarity: "common", traits: [] }, { empty: 9, full: 9 }, { empty: 9, full: 9 }];
+      const lucky = step(duel, 1 / 600).find((c) => c.type === "lucky");
+      if (me.act?.spell === spell) out.push({ kind: lucky?.kind ?? null, power: me.act.power, qi: me.qi, cool: me.cool[spell] ?? 0 });
+    }
+    return out;
+  }
+
+  test("about one bar cast in twelve is lucky, and each kind does what it says", () => {
+    const seen = casts("spark", 3000);
+    const lucky = seen.filter((c) => c.kind);
+    expect(Math.abs(lucky.length / seen.length - LUCKY.chance)).toBeLessThan(0.02);
+    const kinds = new Set(lucky.map((c) => c.kind));
+    expect([...kinds].sort()).toEqual(["again", "double", "free"]);
+    for (const c of seen) {
+      if (c.kind === "double") expect(c.power).toBeCloseTo(2, 9);
+      else expect(c.power).toBeCloseTo(1, 9);
+      if (c.kind === "free") expect(c.qi).toBeGreaterThan(49.9);
+      else expect(c.qi).toBeLessThan(45);
+      if (c.kind === "again") expect(c.cool).toBe(0);
+      else expect(c.cool).toBeGreaterThan(0);
+    }
+  });
+
+  test("the blade and the ultimate are never lucky", () => {
+    expect(casts("slash", 400).filter((c) => c.kind).length).toBe(0);
   });
 });
