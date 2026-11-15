@@ -4,6 +4,7 @@
 // fighter is doing, in the duel's own terms. Everything is in game pixels times `s`, the canvas scale.
 import { lookColors } from "../pkg/pixfx-canvas2d.js";
 import { RAGE, SPELLS, skillBar } from "./duel.js";
+import { ICON_CELLS, ICON_COLUMNS } from "./skill-icons.js";
 
 /** Each school's colours the HUD draws in, from the engine's looks (asked once the engine has loaded). */
 const LOOKS = {};
@@ -245,8 +246,6 @@ function medallion(f, x, top, size, box, c, faces) {
 
 // ---------- the skill bars ----------
 
-/** Each school's row in the skill icon atlases (site/art/skill-icons.sh); its slots are the columns, in order. */
-const ICON_ROW = { thunder: 0, frost: 1 };
 /** The numbers on slots 1, 2 and 3, 3 by 5. */
 const DIGIT = [
   [".#.", "##.", ".#.", ".#.", "###"],
@@ -260,10 +259,26 @@ const GLINT = 0.25;
 const glints = new WeakMap();
 
 /**
+ * Shade a share of an `n`-square from twelve o'clock, one pixel at a time: `share` > 0 is the first part of the turn
+ * clockwise, `share` < 0 the last part (what a cooldown still has to run).
+ */
+function sweep(box, x, y, n, share, col, alpha) {
+  const mid = (n - 1) / 2;
+  for (let py = 0; py < n; py++) {
+    for (let px = 0; px < n; px++) {
+      const turn = (Math.atan2(px - mid, mid - py) / (2 * Math.PI) + 1) % 1;
+      if (share >= 0 ? turn < share : turn >= 1 + share) box(x + px, y + py, 1, 1, col, alpha);
+    }
+  }
+}
+
+/**
  * Each fighter's skill bar on the floor of the dais, under its own side: slots 1, 2 and 3 and the ultimate, the
- * ultimate nearest the middle. A slot's icon is lit while a spell in it can be cast; a cooldown darkens it and
- * sweeps back clockwise as it runs out; a cast flashes it and the end of a cooldown glints its frame. The
- * ultimate's slot fills with rage and blazes once full. The slots stand on row `bottom`, the foot of the scene.
+ * ultimate nearest the middle. A slot shows the icon of the skill in it, with a pip for each cast it has left, and
+ * a bright frame once it has evolved; an empty slot fills clockwise in the school's glow as it waits for its next
+ * skill. An icon is lit while it can be cast; a cooldown darkens it and sweeps back clockwise as it runs out; a
+ * cast flashes it and the end of a cooldown glints its frame. The ultimate's slot fills with rage and blazes once
+ * full. The slots stand on row `bottom`, the foot of the scene.
  * Each icon is `n` game pixels square, drawn from `icons`, a skill icon atlas: its `image` and the `size` of each
  * icon in it, in the atlas's own pixels (finer than the game's, so an icon keeps its detail).
  */
@@ -289,28 +304,38 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
       const full = slot.ultimate && slot.ready;
       const blaze = full && Math.sin(duel.time * 12) > 0;
       box(x, top, size, size, BRONZE.deep);
-      box(x + 1, top + 1, size - 2, size - 2, full ? c.glow : BRONZE.mid);
-      box(x + 1, top + 1, size - 2, 1, full && blaze ? "#ffffff" : BRONZE.light);
+      box(x + 1, top + 1, size - 2, size - 2, full || slot.evolved ? c.glow : BRONZE.mid);
+      box(x + 1, top + 1, size - 2, 1, (full && blaze) || slot.evolved ? "#ffffff" : BRONZE.light);
       box(x + 2, top + 2, n, n, SLOT.field);
-      if (slot.empty) return;
+      // the slot's number, on a bronze tab at its foot, where there is room for it
+      const number = () => {
+        if (slot.ultimate || size < 13) return;
+        const tx = f.index === 0 ? x + size - 5 : x;
+        box(tx, top + size - 7, 5, 7, BRONZE.deep);
+        DIGIT[i].forEach((row, r) => {
+          for (let k = 0; k < 3; k++) if (row[k] === "#") box(tx + 1 + k, top + size - 6 + r, 1, 1, BRONZE.light);
+        });
+      };
+      const cell = ICON_CELLS[f.school]?.[slot.spell];
+      if (slot.empty || cell === undefined) {
+        // the wait for the next skill: the share already waited glows, sweeping clockwise from twelve o'clock
+        if (slot.full > 0) sweep(box, x + 2, top + 2, n, 1 - slot.left / slot.full, c.glow, 0.35);
+        number();
+        return;
+      }
       // a slot that cannot be cast (its cooldown, too little qi, a silence) keeps its icon, faint
       ctx.globalAlpha = slot.ready ? 1 : 0.3;
       const k = icons.size;
-      ctx.drawImage(icons.image, i * k, ICON_ROW[f.school] * k, k, k, (x + 2) * s, (top + 2) * s, n * s, n * s);
+      ctx.drawImage(icons.image, (cell % ICON_COLUMNS) * k, Math.floor(cell / ICON_COLUMNS) * k, k, k, (x + 2) * s, (top + 2) * s, n * s, n * s);
       ctx.globalAlpha = 1;
+      // a pip for each cast the skill has left, along the top of its icon
+      for (let p = 0; p < slot.casts; p++) box(x + 3 + p * 3, top + 2, 2, 1, slot.evolved ? "#ffffff" : c.glow);
       // the ultimate's rage, rising from the foot of the slot
       const rage = Math.round(n * slot.charge);
       if (slot.ultimate) box(x + 2, top + 2 + n - rage, n, rage, c.glow, full ? (blaze ? 0.3 : 0.1) : 0.3);
       // the cooldown: the share still to run stays dark, sweeping clockwise from twelve o'clock
       if (slot.left > 0 && slot.full > 0) {
-        const dark = slot.left / slot.full;
-        const mid = (n - 1) / 2;
-        for (let py = 0; py < n; py++) {
-          for (let px = 0; px < n; px++) {
-            const turn = (Math.atan2(px - mid, mid - py) / (2 * Math.PI) + 1) % 1;
-            if (turn >= 1 - dark) box(x + 2 + px, top + 2 + py, 1, 1, SLOT.shade, 0.6);
-          }
-        }
+        sweep(box, x + 2, top + 2, n, -slot.left / slot.full, SLOT.shade, 0.6);
         const since = slot.full - slot.left;
         if (since < GLINT) box(x + 2, top + 2, n, n, "#ffffff", 0.6 * (1 - since / GLINT));
       }
@@ -322,14 +347,7 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
         box(x, top + 1, 1, size - 2, "#ffffff", a);
         box(x + size - 1, top + 1, 1, size - 2, "#ffffff", a);
       }
-      // the slot's number, on a bronze tab at its foot, where there is room for it
-      if (!slot.ultimate && size >= 13) {
-        const tx = f.index === 0 ? x + size - 5 : x;
-        box(tx, top + size - 7, 5, 7, BRONZE.deep);
-        DIGIT[i].forEach((row, r) => {
-          for (let k = 0; k < 3; k++) if (row[k] === "#") box(tx + 1 + k, top + size - 6 + r, 1, 1, BRONZE.light);
-        });
-      }
+      number();
     });
   }
 }

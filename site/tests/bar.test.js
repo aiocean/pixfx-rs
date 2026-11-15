@@ -2,6 +2,7 @@
 // spent skill empties its slot, which counts down and draws a new one.
 import { describe, expect, test } from "bun:test";
 import { SCHOOLS, SPELLS, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
+import { ICON_CELLS, ICON_COLUMNS } from "../assets/skill-icons.js";
 import { Body, Mind, effects } from "./engine.js";
 
 const all = new Set(effects());
@@ -167,5 +168,20 @@ describe("draw rules", () => {
       draw(duel, f, i);
       expect(new Set(onBar(f)).size).toBe(3);
     }
+  });
+});
+
+describe("the icons", () => {
+  test("every bar skill and ultimate of a school has its own cell in the icon atlas", () => {
+    const cells = [];
+    for (const [school, { pool, ultimate }] of Object.entries(SCHOOLS)) {
+      for (const name of [...pool, ultimate]) {
+        const cell = ICON_CELLS[school]?.[name];
+        expect([school, name, Number.isInteger(cell)]).toEqual([school, name, true]);
+        cells.push(cell);
+      }
+    }
+    expect(new Set(cells).size).toBe(cells.length);
+    expect(Math.max(...cells)).toBeLessThan(ICON_COLUMNS * ICON_COLUMNS);
   });
 });

@@ -1,17 +1,34 @@
-Skill icons for the pixel-art fighting game in the reference images. Reference 1 is a frame of the game: a night duel between a gold Thunder cultivator and an ice-blue Frost cultivator. Reference 2 is its HUD: bronze frames, chunky square pixels, a dark night-purple field. Match the game's pixel size, palette and bronze-and-glow look exactly.
+Skill icons for a pixel-art fighting game: a night duel between a gold Thunder cultivator and an ice-blue Frost cultivator. Its HUD has bronze frames, chunky square pixels and a dark night-purple field.
 
-Make one sheet of 8 icons in a strict grid of 4 columns and 2 rows on a plain black (#000000) background, with a wide black gap between icons. Each icon is a square drawn on a 32 by 32 grid of hard-edged, perfectly square pixels (every pixel the same size, no anti-aliasing, no blur, no soft glow), so it reads clearly at 32 x 32 pixels.
+Make one sheet of 25 icons in a strict grid of 5 columns and 5 rows on a plain black (#000000) background, with a wide black gap between icons. Each icon is a square drawn on a 32 by 32 grid of hard-edged, perfectly square pixels (every pixel the same size, no anti-aliasing, no blur, no soft glow), so it reads clearly at 32 x 32 pixels.
 
-Each icon: a dark night-purple (#1a1424) square field, and on it ONE bold, simple, centred silhouette that fills most of the field, a 1-pixel dark outline round it, and only 3 shades of one colour plus white for the highlight. No small details, no particles, no scenery, no text, numbers or letters, no frame or border.
+Each icon: a dark night-purple (#1a1424) square field, and on it ONE bold, simple, centred silhouette that fills most of the field, a 1-pixel dark outline round it, and only 3 shades of one colour plus white for the highlight. No small details, no scenery, no text, numbers or letters, no frame or border.
 
-Top row, Thunder, gold (#6a4410, #e8b030, #ffd84a, white):
-1. A single thick zigzag lightning bolt.
-2. A round gold seal disc seen from the front, a short bolt striking up from its centre.
-3. A temple bell.
-4. Ultimate: a dark cloud with three short bolts falling from it, the boldest of the row.
+Gold icons use #6a4410, #e8b030, #ffd84a and white. Blue icons use #2c58aa, #62c8f4, #a6ecff and white.
 
-Bottom row, Frost, ice blue (#2c58aa, #62c8f4, #a6ecff, white):
-5. A single long ice shard pointing up-right.
-6. A six-pointed burst of ice shards.
-7. A tall hexagonal ice shield.
-8. Ultimate: an ice crystal cage, the boldest of the row.
+The 25 icons, left to right, top row first:
+1. Gold: a single thick zigzag lightning bolt.
+2. Gold: an open palm crackling with short sparks.
+3. Gold: a boot dashing forward with a zigzag lightning streak behind it.
+4. Gold: a round seal disc seen from the front, a short bolt striking up from its centre.
+5. Gold: a round ball of lightning.
+6. Gold: a temple bell.
+7. Gold: a single glowing feather.
+8. Gold: a small four-pointed spark star.
+9. Gold: a round explosion burst with jagged rays.
+10. Gold: cracked ground with a blast bursting up out of the crack.
+11. Gold: a dome made of hexagon cells.
+12. Gold: a dark cloud with three short bolts falling from it, the boldest of the gold icons.
+13. Blue: a single straight frost arrow of light flying right.
+14. Blue: an ice lotus flower, open.
+15. Blue: a six-pointed burst of ice shards.
+16. Blue: one big icicle pointing down.
+17. Blue: a ring of ice shards all pointing inward to the centre.
+18. Blue: a single blue flame.
+19. Blue: a dark swirling vortex orb with a blue rim.
+20. Blue: an oval ice mirror with a bright glint.
+21. Blue: a tall hexagonal ice shield.
+22. Blue: a single long ice shard pointing up-right.
+23. Blue: a jet of water spraying to the right.
+24. Blue: a big snowflake with a few snowflakes falling.
+25. Blue: an ice crystal cage, the boldest of the blue icons.

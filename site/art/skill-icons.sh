@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The duel's skill icons: from a generated 4 x 2 sheet (skill-icons.prompt.txt: Thunder's slots 1, 2, 3 and ultimate
-# on the top row, Frost's under it, a plain colour between the cells) to the atlases the hero draws, one per icon size:
-# site/assets/skills-32.png and skills-24.png, a row per school and a column per slot.
+# The duel's skill icons: from a generated 5 x 5 sheet (skill-icons.prompt.txt: an icon per spell, left to right and
+# top row first, a plain colour between the cells) to the atlases the hero draws, one per icon size:
+# site/assets/skills-32.png and skills-24.png, the same 5 x 5 grid. site/assets/skill-icons.js names each cell.
 # Each cell is trimmed of the gap round it and any frame inside that, squared on the slot's field colour, snapped to its own pixel grid by the pixel
 # snapper, then reduced to the icon size with a small palette and no dithering.
 # Usage: site/art/skill-icons.sh <sheet.png> [out dir, default site/assets]
@@ -16,8 +16,10 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 magick "$sheet" -alpha off -fuzz 5% -trim +repage -fuzz 5% -trim +repage "$tmp/sheet.png"
-magick "$tmp/sheet.png" -crop 4x2@ +repage "$tmp/cell-%d.png"
-for i in 0 1 2 3 4 5 6 7; do
+grid=5
+cells=$((grid * grid))
+magick "$tmp/sheet.png" -crop ${grid}x${grid}@ +repage "$tmp/cell-%d.png"
+for ((i = 0; i < cells; i++)); do
   cell="$tmp/cell-$i.png"
   # the gap left at the cell's edges, then a frame the model drew round the icon
   magick "$cell" -fuzz 8% -trim +repage -fuzz 8% -trim +repage "$cell"
@@ -26,10 +28,15 @@ for i in 0 1 2 3 4 5 6 7; do
   "$snapper" "$cell" "$tmp/snap-$i.png" 32 > /dev/null
 done
 for size in 32 24; do
-  for i in 0 1 2 3 4 5 6 7; do
+  for ((i = 0; i < cells; i++)); do
     magick "$tmp/snap-$i.png" -filter Box -resize "${size}x${size}!" -dither None -colors 32 "$tmp/icon-$size-$i.png"
   done
-  magick \( "$tmp"/icon-"$size"-{0,1,2,3}.png +append \) \( "$tmp"/icon-"$size"-{4,5,6,7}.png +append \) -append \
-    -strip "PNG32:$out/skills-$size.png"
+  rows=()
+  for ((r = 0; r < grid; r++)); do
+    row=()
+    for ((c = 0; c < grid; c++)); do row+=("$tmp/icon-$size-$((r * grid + c)).png"); done
+    rows+=("(" "${row[@]}" +append ")")
+  done
+  magick "${rows[@]}" -append -strip "PNG32:$out/skills-$size.png"
   echo "$out/skills-$size.png"
 done
