@@ -30,6 +30,31 @@ const SHOCK = { max: 5, every: 0.6, fast: 0.854, share: 0.03, hold: 0.12 };
 /** Skills that spend the foe's stacks of a status to hit harder: this much more power per stack. */
 const PAYOFF = { palm: { status: "shock", per: 0.12 }, burst: { status: "shock", per: 0.12 }, shatter: { status: "chill", per: 0.15 }, lotus: { status: "chill", per: 0.15 } };
 
+/**
+ * Grit (after Vampire Survivors' freeze resistance and Valhalla's stagger cap): each hard control a fighter takes
+ * (a freeze, the shock's hold, the bell's stun) adds `per`; grit falls `fall` a second. A control lasts
+ * `seconds / (1 + grit)`, and from grit `thaw` a freeze is only a chill stack.
+ */
+const GRIT = { per: 1, fall: 0.4, thaw: 2 };
+
+/** f takes a hard control of `kind` for `seconds`, cut by its grit; returns how long it holds. */
+export function control(duel, f, kind, seconds) {
+  if (f.hp <= 0) return 0;
+  if (kind === "freeze" && f.grit >= GRIT.thaw) {
+    addChill(duel, f, 1);
+    return 0;
+  }
+  const time = seconds / (1 + f.grit);
+  f.grit += GRIT.per;
+  if (kind === "freeze") f.frozen = Math.max(f.frozen, time);
+  else if (kind === "hold") f.shocked = Math.max(f.shocked, time);
+  else {
+    f.stun = Math.max(f.stun, time);
+    f.shocked = Math.max(f.shocked, time);
+  }
+  return time;
+}
+
 /** Seconds between shock ticks with `stacks` stacks. */
 export function shockInterval(stacks) {
   return SHOCK.every * SHOCK.fast ** (stacks - 1);
@@ -43,7 +68,7 @@ export function addChill(duel, f, n) {
   if (f.chill >= CHILL.max) {
     f.chill = 0;
     f.chillT = 0;
-    f.frozen = Math.max(f.frozen, FREEZE);
+    control(duel, f, "freeze", FREEZE);
   }
 }
 
@@ -288,7 +313,7 @@ function fighter(index, school, usable, body) {
   const { basics, pool, ultimate } = SCHOOLS[school];
   // every spell it may cast this fight: the brain is told them all once; one off the bar is never ready
   const spells = [...basics, ...pool, ultimate].filter(usable);
-  const f = { index, school, spells, pool: pool.filter(usable), bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
+  const f = { index, school, spells, pool: pool.filter(usable), bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
   for (const k of BODY_FIELDS) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
@@ -304,7 +329,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, cool: {}, coolFull: {}, intent: { move: 0 } });
+    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 } });
     f.mind.reset();
     f.bar = [];
     for (let i = 0; i < BAR.slots; i++) draw(duel, f, i);
@@ -355,6 +380,7 @@ function body(duel, me, foe, dt) {
   me.defDown = Math.max(0, me.defDown - dt);
   me.silence = Math.max(0, me.silence - dt);
   me.dodged = Math.max(0, me.dodged - dt);
+  me.grit = Math.max(0, me.grit - GRIT.fall * dt);
   me.chillT = Math.max(0, me.chillT - dt);
   if (me.chillT === 0) me.chill = 0;
   shocking(duel, me, dt);
@@ -551,8 +577,7 @@ function turnsAside(duel, f, dir, spell) {
   if (counter && close && (s?.kind === "melee" || s?.kind === "blast" || s?.kind === "dash")) {
     emit(duel, { type: "streak", by: f.index, x0: f.x, y0: f.air + f.spec.chest, x1: by.x, y1: by.air + by.spec.chest });
     if (hurt(duel, by, counter.damage, Math.sign(by.x - f.x) || 1, f.barrierSpell)) {
-      by.stun = Math.max(by.stun, counter.stun);
-      by.shocked = Math.max(by.shocked, counter.stun);
+      control(duel, by, "stun", counter.stun);
     }
   }
   return true;
@@ -683,7 +708,7 @@ function shocking(duel, f, dt) {
   const amount = Math.round(by.stats.atk * SHOCK.share);
   const share = take(duel, f, amount);
   emit(duel, { type: "tick", by: by.index, damage: amount, share, x: f.x, y: f.air + f.spec.chest });
-  f.shocked = Math.max(f.shocked, SHOCK.hold);
+  control(duel, f, "hold", SHOCK.hold);
   f.shock.stacks--;
   if (f.shock.stacks <= 0) f.shock = null;
   else f.shock.tick = shockInterval(f.shock.stacks);
@@ -809,7 +834,7 @@ function shot(duel, s, dt) {
       s.fell = true;
       const reaches = Math.abs(foe.x - s.x) < spell.radius + foe.spec.halfWidth && (spell.grounded ? foe.air < 10 : Math.abs(foe.air - s.air) < 22);
       if (reaches && hurt(duel, foe, s.power, Math.sign(foe.x - s.x) || 1, s.name)) {
-        if (spell.freeze) foe.frozen = spell.freeze;
+        if (spell.freeze) control(duel, foe, "freeze", spell.freeze);
         if (spell.shock) addShock(duel, foe, duel.fighters[s.owner], 1);
       }
     }

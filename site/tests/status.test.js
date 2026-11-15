@@ -1,7 +1,7 @@
 // Statuses that stack (after Halls of Torment): chill builds to a freeze, shock ticks its stacks away, and some
 // skills spend the stacks on the foe to hit harder.
 import { describe, expect, test } from "bun:test";
-import { SPELLS, STATS, addChill, addShock, createDuel, shockInterval, step } from "../assets/duel.js";
+import { SPELLS, STATS, addChill, addShock, control, createDuel, shockInterval, step } from "../assets/duel.js";
 import { Body, Mind, effects } from "./engine.js";
 
 const all = new Set(effects());
@@ -100,5 +100,43 @@ describe("payoffs", () => {
     });
     expect(chilled.hit.power / plain.hit.power).toBeCloseTo(1.3, 5);
     expect(chilled.f.chill).toBe(0);
+  });
+});
+
+describe("grit", () => {
+  test("a second freeze at once is half as long", () => {
+    const duel = still();
+    const f = duel.fighters[0];
+    expect(control(duel, f, "freeze", 0.9)).toBeCloseTo(0.9, 9);
+    f.frozen = 0;
+    expect(control(duel, f, "freeze", 0.9)).toBeCloseTo(0.45, 9);
+  });
+
+  test("with grit 2 a freeze is only a chill stack", () => {
+    const duel = still();
+    const f = duel.fighters[0];
+    f.grit = 2;
+    expect(control(duel, f, "freeze", 0.9)).toBe(0);
+    expect(f.frozen).toBe(0);
+    expect(f.chill).toBe(1);
+  });
+
+  test("grit falls 0.4 a second and is gone next round", () => {
+    const duel = still();
+    const f = duel.fighters[0];
+    f.grit = 1;
+    run(duel, 1);
+    expect(f.grit).toBeCloseTo(0.6, 1);
+    f.grit = 3;
+    duel.fighters[1].hp = 0;
+    run(duel, 6);
+    expect(f.grit).toBe(0);
+  });
+
+  test("a stun goes through grit too", () => {
+    const duel = still();
+    const f = duel.fighters[0];
+    control(duel, f, "stun", 0.6);
+    expect(control(duel, f, "stun", 0.6)).toBeCloseTo(0.3, 9);
   });
 });
