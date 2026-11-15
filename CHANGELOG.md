@@ -7,6 +7,10 @@
   down and draws again, and a skill whose partner is on the bar evolves. Chill and shock stack, payoff skills spend
   them, repeated control wears off (grit), a guard turns heavy blows aside less often, wards hold charges, heals and
   wards cleanse, and every spell has its own icon.
+- The landing duel's bar reads at a glance (casts left, the seconds to the next skill, rarity in the frame, trait marks,
+  rage lighting the ultimate) and plays with more chance: each fight a random 8 skills per school, a rarity and traits
+  on every draw, and lucky casts (double, free, again). Thunder and Frost now win about even, and pixfx-mind's `Sense`
+  takes a `power` per skill so a stronger skill is valued higher.
 - Attack timing (`Act`, `Performance`, `pose_for`) and `Effect::act` are removed: nothing used them. An attack's hit
   timing returns with the first attack effect a game plays; the caster's poses are the game's own sprite.
 - `pixfx-web`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-canvas2d`: `setDrawBudget(n)` caps the effect layers drawn per
