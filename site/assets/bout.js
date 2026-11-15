@@ -25,7 +25,7 @@ const JET_REACH = 0.75;
 /** How far apart the two stand for each role, before the arena's width caps it. */
 const DISTANCE = {
   strike: 72, projectile: 112, stream: 88, ward: 100, buff: 60, "ground-self": 40, "ground-foe": 70,
-  clash: 26, flight: 64, ambient: 30, blink: 70,
+  clash: 26, flight: 64, ambient: 30, blink: 70, death: 60,
 };
 /** Knockback two blades that meet give each other (duel.js KNOCKBACK). */
 const KNOCKBACK = 130;
@@ -125,12 +125,13 @@ const CAPTIONS = {
   flight: "{c} flies on it and dives at {t}",
   ambient: "{c} and {t} spar beside it",
   blink: "{c} vanishes in it and strikes {t} from behind",
+  death: "{c} strikes {t} down, and {t}'s body bursts apart",
 };
 
 function caption(tune, caster, target) {
   const name = (f) => f.school[0].toUpperCase() + f.school.slice(1);
   const text = tune.role === "ambient" && tune.at === "wipe" ? "{c} and {t} spar, and it ends the scene" : CAPTIONS[tune.role] ?? CAPTIONS.strike;
-  return text.replace("{c}", name(caster)).replace("{t}", name(target));
+  return text.replaceAll("{c}", name(caster)).replaceAll("{t}", name(target));
 }
 
 /**
@@ -337,6 +338,20 @@ const palm = (f) => f.air + f.spec.chest;
 // ---------- the roles ----------
 
 const SCRIPTS = {
+  /** The caster strikes the foe down: the effect plays on the foe's own body, in the pose the blow caught it in. */
+  death(bout, T, dt, out) {
+    const { caster: me, target: foe, tune } = T;
+    if (T.phase === "begin") {
+      gather(me, tune.spell ?? "seal");
+      return go(T, "gather");
+    }
+    if (T.phase === "gather" && released(me)) {
+      playFx(bout, T, foe.x, 0, foe, out, false);
+      hit(bout, T, me, foe, tune.power ?? 30, toward(me, foe), out);
+      go(T, "rest");
+    }
+  },
+
   /** The caster summons it on the foe; the foe sees it late, backs off, and is thrown when it lands. */
   strike(bout, T, dt, out) {
     const { caster: me, target: foe, tune } = T;

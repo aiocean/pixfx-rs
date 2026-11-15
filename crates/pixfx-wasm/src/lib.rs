@@ -81,6 +81,9 @@ struct MetaJs {
     /// Whether it wraps the character it plays on (`effect.wrap`), reading the sprite's shape, as
     /// `feedback/outline` and `feedback/power-up` do; others ignore a wrapped sprite.
     wraps_actor: bool,
+    /// Whether it draws the character it wraps itself, as `explosions/body-burst` does: the host hides that
+    /// character's own sprite while it plays.
+    replaces_actor: bool,
     /// The effect's own options, beyond the ones every effect takes.
     options: Vec<OptionJs>,
 }
@@ -106,7 +109,7 @@ enum OptionJs {
     },
 }
 
-/// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed, wrapsActor, options}` for one
+/// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed, wrapsActor, replacesActor, options}` for one
 /// effect; `options` lists its own options as `{name, kind: "num" | "color" | "ramp", default, range?}`.
 #[wasm_bindgen(unchecked_return_type = "EffectMeta")]
 pub fn meta(
@@ -147,6 +150,7 @@ fn meta_object(fx: &dyn Effect) -> Result<JsValue, JsError> {
         fps: m.fps,
         seed: m.seed,
         wraps_actor: fx.wraps_actor(),
+        replaces_actor: fx.replaces_actor(),
         options: m
             .options
             .iter()

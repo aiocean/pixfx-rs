@@ -28,6 +28,8 @@ export const ROLES = [
   "ambient",
   // the caster vanishes in it and comes out behind the foe
   "blink",
+  // the caster strikes the foe down and it plays on the foe's own body, which it takes the place of
+  "death",
 ];
 
 /**
@@ -36,6 +38,8 @@ export const ROLES = [
  * spell damage); `life`: how long a lasting effect stays.
  */
 const TABLE = {
+  // the body it wraps is the foe's: a killing blow blows the foe apart (explosions/body_burst.rs replaces_actor)
+  "explosions/body-burst": { role: "death", power: 30, spell: "seal" },
   // plasma-explosion's cue is at 0 (explosions/plasma_explosion.rs cues): the thunderclap lands as it appears
   "explosions/plasma-explosion": { role: "strike", at: "chest", impact: 0, power: 22, spell: "seal" },
   "explosions/small-explosion": { role: "strike", at: "ground", impact: 0, power: 20, spell: "seal" },

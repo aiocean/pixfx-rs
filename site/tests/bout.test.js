@@ -25,7 +25,7 @@ function sourceIds() {
 const BUILT = new Set(effects());
 const ALL = [...new Set([...sourceIds(), ...BUILT])].sort();
 /** Roles in which the effect (or the blow it gives the caster) strikes the other fighter. */
-const HITTING = new Set(["strike", "projectile", "stream", "buff", "ground-self", "ground-foe", "flight", "blink", "ambient"]);
+const HITTING = new Set(["strike", "projectile", "stream", "buff", "ground-self", "ground-foe", "flight", "blink", "ambient", "death"]);
 
 const arena = (seed) => createBout({ left: 20, right: 300, ground: 150, Body, seed });
 
@@ -195,6 +195,25 @@ describe("bout", () => {
     }
     expect(hits.map((c) => c.by)).toEqual([0, 0]);
     expect(() => take(bout, "projectiles/laser-bolt", laser, {}, { caster: 2 })).toThrow("caster must be 0 or 1");
+  });
+
+  test("a body burst plays on the fighter the caster strikes down, not on the caster", () => {
+    const { commands } = run("explosions/body-burst");
+    const play = commands.find((c) => c.type === "play" && c.fx === "explosions/body-burst");
+    const hit = commands.find((c) => c.type === "hit");
+    // Thunder (0) casts; the burst takes Frost's (1) body, where Frost stands as the blow lands
+    expect(play?.by).toBe(1);
+    expect(hit?.by).toBe(0);
+    expect(commands.indexOf(play)).toBeLessThan(commands.indexOf(hit));
+    const bout = arena(3);
+    take(bout, "explosions/body-burst", roleFor("explosions/body-burst", meta("explosions/body-burst")));
+    expect(bout.caption).toBe("Thunder strikes Frost down, and Frost's body bursts apart");
+  });
+
+  test("only an effect that draws the body itself takes the fighter's place", () => {
+    expect(meta("explosions/body-burst").replacesActor).toBe(true);
+    expect(meta("feedback/outline").replacesActor).toBe(false);
+    expect(meta("explosions/plasma-explosion").replacesActor).toBe(false);
   });
 
   test("a take says what it shows, the caster first", () => {

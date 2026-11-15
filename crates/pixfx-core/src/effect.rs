@@ -125,6 +125,12 @@ pub trait Effect: Send + Sync {
     fn wraps_actor(&self) -> bool {
         false
     }
+    /// It draws the character it wraps itself (a body blown apart), so the host hides that character's own sprite
+    /// while it plays and shows it again when it ends. False by default: an outline or a glow draws round a sprite
+    /// that stays on show.
+    fn replaces_actor(&self) -> bool {
+        false
+    }
 }
 
 /// One instance's state.
