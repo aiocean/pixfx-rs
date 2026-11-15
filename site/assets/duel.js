@@ -296,11 +296,13 @@ export const SPELLS = {
     sigil: 0.3, impact: 0.05, radius: 14, damage: 18, notice: 0, grounded: true,
   },
   // Thunder: a dome of hex cells that takes blows for the caster
-  hex: { kind: "ward", fx: "arcane/hex-shield", cost: 40, windup: 0.45, recover: 0.25, cooldown: 8 },
+  // its dome stands on the caster's feet
+  hex: { kind: "ward", fx: "arcane/hex-shield", feet: true, cost: 40, windup: 0.45, recover: 0.25, cooldown: 8 },
   // Frost: a sliver of ice, light and quick, that chills where it strikes
   shard: { kind: "bolt", type: "magic", fx: "projectiles/laser-bolt", cost: 10, windup: 0.18, recover: 0.18, cooldown: 0.9, speed: 300, damage: 7, chill: true },
   // Frost: a jet of freezing water from the palm, at middle reach
-  jet: { kind: "blast", type: "magic", fx: "water/water-jet", cost: 22, windup: 0.3, recover: 0.3, cooldown: 2.4, range: 56, damage: 14, chill: true },
+  // the jet's stream loops: it sprays for `spray` seconds, then stops
+  jet: { kind: "blast", type: "magic", fx: "water/water-jet", spray: 0.6, cost: 22, windup: 0.3, recover: 0.3, cooldown: 2.4, range: 56, damage: 14, chill: true },
   // Frost: a short flurry of snow under the foe: two ticks that chill whoever stands in it, then its blow
   flurry: {
     kind: "void", type: "magic", fx: "weather/snow", cost: 30, windup: 0.4, recover: 0.3, cooldown: 5,
@@ -636,7 +638,8 @@ function release(duel, me, foe, spell) {
     streak(duel, me, x, air + zoneHeight(spell, foe));
   } else if (spell.kind === "blast") {
     const x = me.x + me.face * spell.range * 0.7;
-    cast(duel, me, spell.fx, x, g - me.spec.chest - me.air);
+    const key = cast(duel, me, spell.fx, x, g - me.spec.chest - me.air);
+    if (spell.spray) duel.shots.push({ kind: "spray", name: me.act.spell, owner: me.index, t: 0, key, spell });
     if (Math.abs(foe.x - me.x) <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
       if (!me.act.pierce && blocks(duel, foe, me.x, hit, spell.type)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
       else if (hurt(duel, foe, hit, me.face, me.act.spell, me.act.stacks) && spell.shock) addShock(duel, foe, me, me.act.stacks ?? 1);
@@ -672,7 +675,7 @@ function release(duel, me, foe, spell) {
     me.charges = 1 + Math.floor(duel.rng() * WARD.charges);
     me.shieldT = WARD.time;
     emit(duel, { type: "ward", by: me.index, amount: me.charges, x: me.x, y: me.air + me.spec.chest });
-    cast(duel, me, spell.fx, me.x, g - me.spec.body - me.air);
+    cast(duel, me, spell.fx, me.x, g - (spell.feet ? 0 : me.spec.body) - me.air);
   } else if (spell.kind === "barrier") {
     dropBarrier(duel, me);
     me.barrier = spell.time;
@@ -984,6 +987,11 @@ function shot(duel, s, dt) {
       }
     }
     if (s.t >= spell.impact + 0.2) duel.shots.splice(duel.shots.indexOf(s), 1);
+  } else if (s.kind === "spray") {
+    if (s.t >= spell.spray) {
+      stopShot(duel, s);
+      duel.shots.splice(duel.shots.indexOf(s), 1);
+    }
   } else if (s.kind === "void") {
     // the vortex drags the foe in, and burns while it stands under it
     const dx = s.x - foe.x;
