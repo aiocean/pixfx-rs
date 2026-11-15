@@ -87,15 +87,15 @@ export function addShock(duel, f, by, n) {
  * fighter's full life, 0 to 100; hits report the real amounts.
  */
 const DEFENCE = 500;
-const SPREAD = 0.1;
+const SPREAD = 0.03;
 /** Fury: each blow a fury fighter lands raises its attack, up to a cap of stacks, for the rest of the round. */
 const FURY = { per: 0.04, max: 5 };
 /** Defence broken by a spell: this much defence lost, for the spell's `defDown` seconds. */
 const DEF_DOWN = 0.3;
 /** Burn: a share of the caster's attack every tick, ignoring defence. */
 const BURN = { time: 3, every: 0.5, share: 0.05 };
-/** A frost ward absorbs this share of full life, for this long. */
-const WARD = { share: 0.18, time: 6 };
+/** A ward (after Valhalla's hit shields) holds 1 to `charges` charges for `time` seconds; each erases one whole blow. */
+const WARD = { charges: 3, time: 6 };
 /**
  * The rotating skill bar: `slots` skills at a time, each drawn from the school's pool with its own casts (1 to 4,
  * equal odds). A skill drawn with fewer casts hits harder (CAST_POWER, by casts). A spent skill empties its slot,
@@ -134,8 +134,20 @@ const MEDITATE_REGEN = 16;
 const TEMPERAMENT = { spread: 0.8, risk: 0.6, floor: 0.3, lead: 0.8, prior: 6, reaction: 0.16, think: 0.12 };
 /** Qi a block costs. */
 const GUARD_COST = 8;
-/** The share of a blocked blow's damage that still lands. */
-const CHIP = 0.15;
+/** The share of a blocked blow's damage that still lands: damage taken is never cut by more than 80%. */
+const CHIP = 0.2;
+/**
+ * Guard by the size of the blow (after Halls of Torment): a guarded blow of `power` is turned aside with chance
+ * `min(0.5r, 0.5√r)`, at most 1, where `r = GUARD / power`: a blade's cut always, a heavy blast about 2 in 5.
+ */
+const GUARD = 20;
+
+/** The chance a guard turns aside a blow of `power`. */
+export function blockChance(power) {
+  if (!(power > 0)) return 1;
+  const r = GUARD / power;
+  return Math.min(1, 0.5 * r, 0.5 * Math.sqrt(r));
+}
 const KNOCKBACK = 130;
 const ROUND_PAUSE = 3.2;
 
@@ -313,7 +325,7 @@ function fighter(index, school, usable, body) {
   const { basics, pool, ultimate } = SCHOOLS[school];
   // every spell it may cast this fight: the brain is told them all once; one off the bar is never ready
   const spells = [...basics, ...pool, ultimate].filter(usable);
-  const f = { index, school, spells, pool: pool.filter(usable), bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
+  const f = { index, school, spells, pool: pool.filter(usable), bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
   for (const k of BODY_FIELDS) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
@@ -329,7 +341,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 } });
+    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 } });
     f.mind.reset();
     f.bar = [];
     for (let i = 0; i < BAR.slots; i++) draw(duel, f, i);
@@ -385,7 +397,7 @@ function body(duel, me, foe, dt) {
   if (me.chillT === 0) me.chill = 0;
   shocking(duel, me, dt);
   me.shieldT = Math.max(0, me.shieldT - dt);
-  if (me.shieldT === 0) me.shield = 0;
+  if (me.shieldT === 0) me.charges = 0;
   me.rang = Math.max(0, me.rang - dt);
   if (me.barrier > 0) {
     me.barrier = Math.max(0, me.barrier - dt);
@@ -472,7 +484,7 @@ function release(duel, me, foe, spell) {
     }
     const dx = Math.abs(foe.x - me.x);
     if (dx <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < me.spec.chest + 4 && foe.hp > 0) {
-      if (blocks(foe, me.x, hit)) clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
+      if (blocks(duel, foe, me.x, hit)) clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
       else if (foe.act?.spell === "slash" && foe.act.phase === "windup" && foe.act.t > SPELLS.slash.windup * 0.6) {
         // both blades swing at once: they meet
         clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
@@ -503,7 +515,7 @@ function release(duel, me, foe, spell) {
     const x = me.x + me.face * spell.range * 0.7;
     cast(duel, me, spell.fx, x, g - me.spec.chest - me.air);
     if (Math.abs(foe.x - me.x) <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
-      if (blocks(foe, me.x, hit)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
+      if (blocks(duel, foe, me.x, hit)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
       else if (hurt(duel, foe, hit, me.face, me.act.spell) && spell.shock) addShock(duel, foe, me, 1);
     }
   } else if (spell.kind === "void") {
@@ -522,7 +534,7 @@ function release(duel, me, foe, spell) {
     const lo = Math.min(from, to) - foe.spec.halfWidth;
     const hi = Math.max(from, to) + foe.spec.halfWidth;
     if (foe.x > lo && foe.x < hi && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
-      if (blocks(foe, from, hit)) clash(duel, foe.x, g - foe.spec.chest - foe.air, [foe]);
+      if (blocks(duel, foe, from, hit)) clash(duel, foe.x, g - foe.spec.chest - foe.air, [foe]);
       else hurt(duel, foe, hit, me.face, me.act.spell);
     }
   } else if (spell.kind === "heal") {
@@ -531,9 +543,9 @@ function release(duel, me, foe, spell) {
     emit(duel, { type: "heal", by: me.index, amount: Math.round((gained / 100) * me.stats.hp), x: me.x, y: me.air + me.spec.chest });
     cast(duel, me, spell.fx, me.x, g - me.spec.body - me.air);
   } else if (spell.kind === "ward") {
-    me.shield = Math.round(WARD.share * me.stats.hp);
+    me.charges = 1 + Math.floor(duel.rng() * WARD.charges);
     me.shieldT = WARD.time;
-    emit(duel, { type: "ward", by: me.index, amount: me.shield, x: me.x, y: me.air + me.spec.chest });
+    emit(duel, { type: "ward", by: me.index, amount: me.charges, x: me.x, y: me.air + me.spec.chest });
     cast(duel, me, spell.fx, me.x, g - me.spec.body - me.air);
   } else if (spell.kind === "barrier") {
     dropBarrier(duel, me);
@@ -552,13 +564,15 @@ function release(duel, me, foe, spell) {
  * Does f block a blow of `damage` from fromX? A block costs qi and still lets a little damage through (chip), so
  * no fight stalls behind a guard; with too little qi left the guard breaks and the blow lands.
  */
-function blocks(f, fromX, damage = 0) {
+function blocks(duel, f, fromX, damage = 0) {
   if (f.guard === 0 || f.body.reeling() || Math.sign(fromX - f.x) !== f.face) return false;
   if (f.qi < GUARD_COST) {
     f.guard = 0;
     return false;
   }
   f.qi -= GUARD_COST;
+  // a blow too heavy for the guard breaks through whole
+  if (duel.rng() >= blockChance(damage)) return false;
   f.hp = Math.max(0, f.hp - damage * CHIP);
   return true;
 }
@@ -604,6 +618,12 @@ function hurt(duel, f, power, dir, spell) {
   if (f.hp <= 0 || f.body.untouchable()) return false;
   if (turnsAside(duel, f, dir, spell)) return false;
   const by = duel.fighters[1 - f.index];
+  // a ward's charge erases the whole blow
+  if (f.charges > 0) {
+    f.charges--;
+    clash(duel, f.x, duel.ground - f.spec.chest - f.air, [f]);
+    return false;
+  }
   const s = SPELLS[spell];
   // an ultimate cannot be dodged
   if (!s?.ultimate && duel.rng() < f.stats.dodge) {
@@ -665,13 +685,11 @@ export function damageOf(by, f, power, type, crit, roll) {
 }
 
 /**
- * f loses `amount` life: its ward takes what it can first, and an unyielding fighter stands up once a round from
+ * f loses `amount` life (a ward's charges stop blows in `hurt`, never this), and an unyielding fighter stands up once a round from
  * a killing blow with 1 life left. Returns the share of full life lost.
  */
 function take(duel, f, amount) {
-  const absorbed = Math.min(f.shield, amount);
-  f.shield -= absorbed;
-  let share = ((amount - absorbed) / f.stats.hp) * 100;
+  let share = (amount / f.stats.hp) * 100;
   if (share >= f.hp && f.stats.unyielding && !f.rose) {
     f.rose = true;
     share = f.hp - 100 / f.stats.hp;
@@ -792,7 +810,7 @@ function shot(duel, s, dt) {
       return;
     }
     if (overlaps(foe, s.x, s.y, 3)) {
-      if (blocks(foe, s.x - s.vx, s.power)) clash(duel, s.x, g - s.y, []);
+      if (blocks(duel, foe, s.x - s.vx, s.power)) clash(duel, s.x, g - s.y, []);
       else if (hurt(duel, foe, s.power, Math.sign(s.vx), "bolt")) addShock(duel, foe, duel.fighters[s.owner], 1);
       return endShot(duel, s);
     }
@@ -803,7 +821,7 @@ function shot(duel, s, dt) {
     emit(duel, { type: "move", key: s.key, x: s.x, y: g });
     const [bx, by] = orbAt(s);
     if (overlaps(foe, bx, -by, spell.radius)) {
-      if (blocks(foe, bx, s.power)) clash(duel, bx, g + by, []);
+      if (blocks(duel, foe, bx, s.power)) clash(duel, bx, g + by, []);
       else hurt(duel, foe, s.power, Math.sign(foe.x - bx) || 1, "orb");
       burst(duel, spell.hitFx, bx, g + by);
       return endShot(duel, s);
@@ -1006,7 +1024,7 @@ function senseOf(duel, me, foe) {
     time: duel.time,
     me: {
       x: me.x, air: me.air, face: me.face, hp: me.hp, qi: me.qi, rage: me.rage, rageFull: RAGE, flying: me.fly, hover: me.hover, vx: me.vx,
-      canAct: free, silenced: me.silence > 0, sealed: me.sealed > 0, barrier: me.barrier > 0, shield: me.shield > 0,
+      canAct: free, silenced: me.silence > 0, sealed: me.sealed > 0, barrier: me.barrier > 0, shield: me.charges > 0,
       seekerOut: duel.shots.some((s) => s.kind === "orb" && s.owner === me.index),
     },
     foe: {

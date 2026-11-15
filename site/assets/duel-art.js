@@ -31,7 +31,7 @@ function appearance(f, jolt) {
 function marks(f, time) {
   if (f.hp <= 0) return null;
   return {
-    shield: f.shield > 0, barrier: f.barrier > 0, rang: f.rang > 0, burning: !!f.burn, defDown: f.defDown > 0,
+    shield: f.shield > 0 || f.charges > 0, barrier: f.barrier > 0, rang: f.rang > 0, burning: !!f.burn, defDown: f.defDown > 0,
     silence: f.silence > 0, chilled: f.chilled > 0 || f.chill > 0, fury: f.fury, poseT: f.poseT, dome: f.school === "thunder" ? "banded" : "faceted",
     burn: !!f.burn, shock: f.shocked > 0, ice: f.frozen > 0, t: time, seed: f.index + 1,
   };
@@ -175,6 +175,8 @@ export function drawBars(ctx, sprites, show, duel, s, top) {
       const w = Math.min(width, Math.round((width * f.shield) / f.stats.hp));
       box(from(w), top + 7, w, 2, "#bff2ff");
     }
+    // a ward's charges: a pip each
+    for (let i = 0; i < (f.charges ?? 0); i++) box(right ? left + width - 4 - i * 5 : left + 1 + i * 5, top + 7, 3, 2, "#bff2ff");
     // a notch each tenth
     for (let i = 1; i < 10; i++) box(left + Math.round((width * i) / 10), top + 8, 1, 1, BAR.back, 0.6);
     const cap = (x) => {
