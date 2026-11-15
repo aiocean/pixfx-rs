@@ -19,4 +19,5 @@ pub mod sense;
 pub mod shot;
 pub mod status;
 pub mod style;
+pub mod train;
 pub mod view;

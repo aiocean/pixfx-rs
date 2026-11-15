@@ -97,19 +97,25 @@ pub fn shipped() -> Result<Rc<Net>, NetError> {
     Net::load(include_bytes!("../weights/policy.bin")).map(Rc::new)
 }
 
+/// Fighter `me`'s policy mind in `style`: its spells, its tag, the brain's reaction and think times, dice of its own.
+pub fn policy_mind(state: &State, me: usize, style: Style) -> PolicyMind {
+    let f = &state.fighters[me];
+    let skills = f.spells.iter().map(|n| skill_of(n)).collect();
+    let t = TEMPERAMENT;
+    let seed = state.seed.wrapping_mul(2).wrapping_add(me as u32) ^ 0x9e37_79b9;
+    PolicyMind::new(skills, tag(f.school, style), t.reaction, t.think, seed)
+}
+
 /// The trained policy, in the fighter's style, seeing as late and thinking as often as the brain.
 pub struct PolicySeat {
+    net: Rc<Net>,
     pub mind: PolicyMind,
 }
 
 impl PolicySeat {
     /// Fighter `me`'s policy seat, playing `style`.
     pub fn new(net: Rc<Net>, state: &State, me: usize, style: Style) -> PolicySeat {
-        let f = &state.fighters[me];
-        let skills = f.spells.iter().map(|n| skill_of(n)).collect();
-        let t = TEMPERAMENT;
-        let seed = state.seed.wrapping_mul(2).wrapping_add(me as u32) ^ 0x9e37_79b9;
-        PolicySeat { mind: PolicyMind::new(net, skills, tag(f.school, style), t.reaction, t.think, seed) }
+        PolicySeat { net, mind: policy_mind(state, me, style) }
     }
 
     /// A maker for `Duel::new`: the policy in the style the fight drew for the fighter.
@@ -128,7 +134,7 @@ impl PolicySeat {
 
 impl Seat for PolicySeat {
     fn think(&mut self, state: &State, me: usize, dt: f64) -> Option<Choice> {
-        self.mind.think(&sense_of(state, me), dt)
+        self.mind.think(&self.net, &sense_of(state, me), dt)
     }
 
     fn tell(&mut self, _outcome: &Outcome) {}

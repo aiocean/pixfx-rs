@@ -5,19 +5,19 @@ mod common;
 use common::*;
 use pixfx_mind::policy::{Net, OBS, PolicyMind};
 use pixfx_mind::*;
-use std::rc::Rc;
 
 const DT: f64 = 1.0 / 60.0;
 
+thread_local! {
+    static NET: Net = Net::seeded(5);
+}
+
 fn mind(seed: u32) -> PolicyMind {
-    PolicyMind::new(
-        Rc::new(Net::seeded(5)),
-        kit(),
-        [1.0, 0.0, 0.0, 1.0, 0.0],
-        0.16,
-        0.12,
-        seed,
-    )
+    PolicyMind::new(kit(), [1.0, 0.0, 0.0, 1.0, 0.0], 0.16, 0.12, seed)
+}
+
+fn think(m: &mut PolicyMind, s: &Sense, dt: f64) -> Option<Choice> {
+    NET.with(|n| m.think(n, s, dt))
 }
 
 fn at(t: f64) -> Sense {
@@ -30,7 +30,7 @@ fn at(t: f64) -> Sense {
 fn run(m: &mut PolicyMind, seconds: f64) -> Vec<(usize, Choice)> {
     let mut out = vec![];
     for i in 0..(seconds / DT) as usize {
-        if let Some(c) = m.think(&at(i as f64 * DT), DT) {
+        if let Some(c) = think(m, &at(i as f64 * DT), DT) {
             out.push((i, c));
         }
     }
@@ -56,12 +56,12 @@ fn hit_stop_holds_its_clock_and_dice_still() {
     let mut stopped = vec![];
     for i in 0..(3.0 / DT) as usize {
         let t = i as f64 * DT;
-        if let Some(c) = m.think(&at(t), DT) {
+        if let Some(c) = think(&mut m, &at(t), DT) {
             stopped.push((i, c));
         }
         // a few frames of hit-stop after each tick: the same time, no time passing
         for _ in 0..3 {
-            assert_eq!(m.think(&at(t), 0.0), None, "no thought in hit-stop");
+            assert_eq!(think(&mut m, &at(t), 0.0), None, "no thought in hit-stop");
         }
     }
     assert_eq!(plain, stopped);
@@ -73,7 +73,8 @@ fn hold_keeps_it_quiet_for_that_long() {
     m.hold(1.0);
     let choices = run(&mut m, 2.0);
     let first = choices.first().map_or(usize::MAX, |(i, _)| *i);
-    assert!((59..=62).contains(&first), "first choice at tick {first}");
+    // decided once the hold ends (tick 60), acted on the tick after
+    assert!((60..=62).contains(&first), "first choice at tick {first}");
 }
 
 #[test]
@@ -88,16 +89,11 @@ fn it_sees_a_windup_late_by_its_reaction() {
         if t >= 1.0 {
             s.foe.doing = blade_windup(t - 1.0);
         }
-        let mut a = None;
-        let mut b = None;
-        late.decide_with(&s, DT, |o, _| {
-            a = Some(*o);
-            0
-        });
-        calm.decide_with(&at(t), DT, |o, _| {
-            b = Some(*o);
-            0
-        });
+        // nothing is queued (no act is answered), so only the decisions show
+        let _ = late.begin(&s, DT);
+        let a = late.due(&s).map(|d| d.obs);
+        let _ = calm.begin(&at(t), DT);
+        let b = calm.due(&at(t)).map(|d| d.obs);
         if let (Some(a), Some(b)) = (a, b) {
             seen.push((t, a, b));
         }
@@ -122,8 +118,7 @@ fn a_reset_forgets_what_it_saw_and_its_clock() {
     run(&mut m, 1.0);
     m.hold(5.0);
     m.reset();
-    assert!(
-        m.think(&at(10.0), DT).is_some(),
-        "thinks at once after a reset"
-    );
+    // nothing it meant to do survives, and it decides at once: its act comes the tick after
+    assert_eq!(think(&mut m, &at(10.0), DT), None);
+    assert!(think(&mut m, &at(10.0 + DT), DT).is_some());
 }
