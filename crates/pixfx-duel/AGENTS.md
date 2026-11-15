@@ -35,10 +35,12 @@ wrapper over the wasm `Duel`) plays the effect commands and feels the events the
 
 ## Traps
 
-- `tests/goldens/event_hashes.json` pins every command and event of 120 s of seeds 1-20: a change that alters
-  fights fails it. When the change is meant, delete the file and run the test once to rewrite it.
-- `tests/fixtures/js_numbers.json` holds the tables, dice and first-mind choices the rules were ported against.
-  A deliberate change to a number updates the fixture's value with it.
+- `tests/goldens/` pins what the rules produce: `event_hashes.json` (every command and event of 120 s of seeds
+  1-20), `first_mind.json` (the first mind's first 600 choices of seeds 1-5) and `arenas.json` (each seed's pools and
+  opening bars). A change that alters fights fails them; when the change is meant, delete the files it fails and run
+  the tests once to rewrite them.
+- `tests/fixtures/js_numbers.json` pins the tables, dice and formulas (`tests/data.rs`), one key per number: a
+  deliberate change to a number edits its key there too.
 - One extra or missing roll of the dice changes every fight after it.
 - JS maths: `Math.sign(0)` is 0 (never `f64::signum`), `Math.round` rounds half up (`js_round`), `**` is `powi`.
 

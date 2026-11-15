@@ -153,12 +153,11 @@ impl Duel {
             let arena = pixfx_fighter::body::Arena { left: self.state.left, right: self.state.right, top: self.state.top };
             pixfx_fighter::body::separate(&mut a.body, &mut b.body, &arena);
         }
-        // every shot in flight at the start of the tick runs, even one another shot ended this tick
+        // the shots in flight at the start of the tick run, but not one another shot ended this tick
         let ids: Vec<u32> = self.state.shots.iter().map(|s| s.id).collect();
         for id in ids {
             shot(&mut self.state, id, dt);
         }
-        self.state.gone.clear();
         for f in 0..2 {
             if self.state.fighters[f].hp <= 0.0 && self.state.winner.is_none() {
                 knock_out(&mut self.state, f);

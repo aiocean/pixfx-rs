@@ -9,7 +9,7 @@ use pixfx_duel::act::{advance, begin, clash, knock_out};
 use pixfx_duel::data::{KNOCKBACK, spell};
 use pixfx_duel::fighter::{Act, Phase, State};
 use pixfx_duel::out::Out;
-use pixfx_duel::shot::shot;
+use pixfx_duel::shot::{ShotKind, shot};
 use pixfx_duel::status::{add_shock, shocking};
 use pixfx_draw::math::{js_sign, or_one};
 
@@ -172,7 +172,6 @@ fn a_bolt_flies_strikes_and_ends_its_effect() {
         for id in ids {
             shot(&mut s, id, 1.0 / 60.0);
         }
-        s.gone.clear();
         landed |= hits(&s.out, "bolt");
         if s.shots.is_empty() {
             break;
@@ -203,7 +202,6 @@ fn two_bolts_meeting_head_on_are_both_spent() {
         for id in ids {
             shot(&mut s, id, 1.0 / 60.0);
         }
-        s.gone.clear();
         if s.shots.is_empty() {
             break;
         }
@@ -212,4 +210,39 @@ fn two_bolts_meeting_head_on_are_both_spent() {
     assert!(s.out.iter().any(|o| matches!(o, Out::Clash { .. })));
     assert!(!s.out.iter().any(|o| matches!(o, Out::Hit { .. })));
     assert_eq!(s.out.iter().filter(|o| matches!(o, Out::Stop { .. })).count(), 2);
+}
+
+#[test]
+fn a_bolt_spent_in_a_clash_neither_lands_nor_takes_another_shot_with_it() {
+    let mut s = still(5);
+    s.fighters[0].body.x = 60.0;
+    s.fighters[1].body.x = 160.0;
+    s.fighters[0].body.face = 1.0;
+    s.fighters[1].body.face = -1.0;
+    for (me, name) in [(0, "bolt"), (1, "shard")] {
+        let windup = spell(name).map_or(0.0, |sp| sp.windup);
+        s.fighters[me].act = Some(Act { spell: name, phase: Phase::Windup, t: windup, target: None, power: 1.0, stacks: 1.0, pierce: false, circle: None });
+        advance(&mut s, me, 1.0 / 60.0);
+    }
+    assert_eq!(s.shots.len(), 2);
+    // the two bolts meet right at Thunder's body, and a third shot flies last in the list, far above it all
+    let y = s.fighters[0].body.spec.chest;
+    s.shots[0].kind = ShotKind::Bolt { x: 100.0, y, vx: 60.0 };
+    s.shots[1].kind = ShotKind::Bolt { x: 104.0, y, vx: -60.0 };
+    s.fighters[0].body.x = 103.0;
+    s.fighters[1].body.x = 200.0;
+    let mut third = s.shots[0];
+    third.id = 99;
+    third.key = Some(999);
+    third.kind = ShotKind::Bolt { x: 10.0, y: 500.0, vx: 0.0 };
+    s.shots.push(third);
+    s.out.clear();
+    let ids: Vec<u32> = s.shots.iter().map(|x| x.id).collect();
+    for id in ids {
+        shot(&mut s, id, 1.0 / 60.0);
+    }
+    assert!(s.out.iter().any(|o| matches!(o, Out::Clash { .. })));
+    // the spent bolt does not strike, and the third shot flies on
+    assert!(!s.out.iter().any(|o| matches!(o, Out::Hit { .. } | Out::Dodge { .. } | Out::Block { .. })), "{:?}", s.out);
+    assert!(s.shots.iter().any(|x| x.id == 99), "the third shot left the list with its effect playing");
 }

@@ -319,25 +319,27 @@ fn an_evolved_skill_once_spent_empties_its_slot() {
 }
 
 #[test]
-fn pools_and_opening_bars_match_js_for_each_seed() {
-    let f: serde_json::Value = serde_json::from_str(include_str!("fixtures/js_numbers.json")).unwrap_or_default();
-    let arenas = f["arenas"].as_object().cloned().unwrap_or_default();
-    assert_eq!(arenas.len(), 8);
-    for (seed, js) in arenas {
-        let s = arena(seed.parse().unwrap_or(0));
-        for (i, want) in js.as_array().into_iter().flatten().enumerate() {
-            let me = &s.fighters[i];
-            assert_eq!(serde_json::json!(me.pool), want["pool"], "seed {seed} fighter {i} pool");
-            let bar: Vec<serde_json::Value> = me
-                .bar
-                .iter()
-                .map(|slot| {
-                    let (spell, power, _, rarity, traits) = held(slot);
-                    let traits: Vec<&str> = traits.iter().map(|t| t.name()).collect();
-                    serde_json::json!({ "spell": spell, "rarity": rarity.name(), "traits": traits, "power": power })
-                })
-                .collect();
-            assert_eq!(common::norm(&serde_json::Value::Array(bar)), common::norm(&want["bar"]), "seed {seed} fighter {i} bar");
-        }
+fn pools_and_opening_bars_are_pinned_for_each_seed() {
+    let mut arenas = serde_json::Map::new();
+    for seed in 1..=8_u32 {
+        let s = arena(seed);
+        let fighters: Vec<serde_json::Value> = s
+            .fighters
+            .iter()
+            .map(|me| {
+                let bar: Vec<serde_json::Value> = me
+                    .bar
+                    .iter()
+                    .map(|slot| {
+                        let (spell, power, _, rarity, traits) = held(slot);
+                        let traits: Vec<&str> = traits.iter().map(|t| t.name()).collect();
+                        serde_json::json!({ "spell": spell, "rarity": rarity.name(), "traits": traits, "power": power })
+                    })
+                    .collect();
+                serde_json::json!({ "pool": me.pool, "bar": bar })
+            })
+            .collect();
+        arenas.insert(seed.to_string(), serde_json::Value::Array(fighters));
     }
+    common::pinned("arenas", &serde_json::Value::Object(arenas));
 }

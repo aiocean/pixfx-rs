@@ -247,8 +247,6 @@ pub struct State {
     pub key: u32,
     /// Spells in flight, in the order they were cast.
     pub shots: Vec<Shot>,
-    /// Shots taken out of `shots` during this tick: the tick still runs them, as it runs a copy of its list.
-    pub gone: Vec<Shot>,
     /// The last shot id handed out.
     pub shot_id: u32,
     pub fighters: [Fighter; 2],
@@ -278,7 +276,6 @@ impl State {
             pause: 0.0,
             key: 0,
             shots: Vec::new(),
-            gone: Vec::new(),
             shot_id: 0,
             fighters,
             out: Vec::new(),

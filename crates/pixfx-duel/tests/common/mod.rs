@@ -1,6 +1,6 @@
-//! A duel's state built as `createDuel` builds it, without its minds or its first round's bodies: each fighter's
-//! pool drawn by the duel's dice (Thunder's, then Frost's), then three draws each. Every effect is in the registry.
-//! Replaced by `Duel::new` once the duel loop lands.
+//! What the tests share: a duel's state built as `Duel::new` builds it, without its minds or its first round's
+//! bodies (each fighter's pool drawn by the duel's dice, Thunder's then Frost's, then three draws each), duels to run,
+//! and `pinned`, which checks an output against its golden file.
 #![allow(dead_code)]
 
 use pixfx_duel::bar::{draw, fight_pool};
@@ -105,4 +105,21 @@ pub fn run(duel: &mut pixfx_duel::duel::Duel, seconds: f64) -> Vec<pixfx_duel::o
         out.extend(duel.step(1.0 / 60.0));
     }
     out
+}
+
+/// `got` against `tests/goldens/<name>.json`. A change that alters it fails; when the change is meant, delete the file
+/// and run the test once: a missing file is written from `got`, and the test says so.
+pub fn pinned(name: &str, got: &serde_json::Value) {
+    let file = format!("{}/tests/goldens/{name}.json", env!("CARGO_MANIFEST_DIR"));
+    match std::fs::read_to_string(&file) {
+        Ok(text) => {
+            let want: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+            assert_eq!(norm(got), norm(&want), "{name} changed: if that was meant, delete {file} and run again");
+        }
+        Err(_) => {
+            let text = serde_json::to_string_pretty(got).unwrap_or_default() + "\n";
+            assert!(std::fs::write(&file, text).is_ok(), "could not write {file}");
+            eprintln!("wrote {file}: the first run pins it");
+        }
+    }
 }

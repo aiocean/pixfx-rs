@@ -1,9 +1,7 @@
 //! Spells in flight: bolts, orbs, zones (seals, icicles, collapses, barrages), sprays and voids.
 //!
-//! Each tick runs over a copy of the shot list, so a shot ended earlier in the tick (two bolts meeting) still runs,
-//! from where it was, as a ghost; a ghost that ends again removes the list's last shot. So every shot has an id, a
-//! removed shot moves to `State::gone`, and the duel loop runs a snapshot of ids, looking each up in `shots`, then in
-//! `gone`.
+//! Every shot has an id. A tick runs the shots in flight at its start, by id, so a shot cast during the tick waits for
+//! the next, and a shot ended earlier in the tick (two bolts meeting) does not run again.
 
 use crate::act::{blocks, burst, cast, clash, hurt, play, turn_aside, zone_height};
 use crate::data::{Blow, Spell, orb_offset, school, spell};
@@ -43,29 +41,13 @@ pub struct Shot {
     pub kind: ShotKind,
 }
 
-/// Where a shot is: in flight, or taken out this tick.
-enum Place {
-    Live,
-    Gone,
-}
-
-/// Move shot `id` on by `dt`. A shot not found in flight runs from `gone`, as from a copy of the list.
+/// Move shot `id` on by `dt`; a shot no longer in flight (ended earlier this tick) does nothing.
 pub fn shot(state: &mut State, id: u32, dt: f64) {
-    let (mut s, place) = match state.shots.iter().find(|s| s.id == id) {
-        Some(s) => (*s, Place::Live),
-        None => match state.gone.iter().find(|s| s.id == id) {
-            Some(s) => (*s, Place::Gone),
-            None => return,
-        },
-    };
-    if run(state, &mut s, dt) {
-        let list = match place {
-            Place::Live => &mut state.shots,
-            Place::Gone => &mut state.gone,
-        };
-        if let Some(slot) = list.iter_mut().find(|x| x.id == id) {
-            *slot = s;
-        }
+    let Some(mut s) = state.shots.iter().find(|s| s.id == id).copied() else { return };
+    if run(state, &mut s, dt)
+        && let Some(slot) = state.shots.iter_mut().find(|x| x.id == id)
+    {
+        *slot = s;
     }
 }
 
@@ -305,13 +287,7 @@ pub fn stop_shot(state: &mut State, s: &Shot) {
     }
 }
 
-/// Shot `s` leaves the list; a ghost (already out) takes the last shot with it, as `splice(-1, 1)` does.
+/// Shot `s` leaves the list.
 fn remove_shot(state: &mut State, s: &Shot) {
-    let taken = match state.shots.iter().position(|x| x.id == s.id) {
-        Some(p) => Some(state.shots.remove(p)),
-        None => state.shots.pop(),
-    };
-    if let Some(t) = taken {
-        state.gone.push(t);
-    }
+    state.shots.retain(|x| x.id != s.id);
 }

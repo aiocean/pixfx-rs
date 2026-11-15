@@ -1,8 +1,8 @@
-//! The first mind makes the choices it was ported with (`firstMind` in the fixture): the same choices on the same ticks.
+//! The first mind's first 600 choices of seeds 1-5, each with its tick and its fighter, pinned (`goldens/first_mind.json`).
 
 mod common;
 
-use common::{all_effects, config, norm};
+use common::{all_effects, config, pinned};
 use pixfx_duel::duel::Duel;
 use pixfx_duel::fighter::State;
 use pixfx_duel::first_mind::FirstMind;
@@ -60,11 +60,9 @@ fn recorder(log: &Log, tick: &Rc<Cell<usize>>) -> MakeSeat {
 }
 
 #[test]
-fn first_mind_matches_js_choices() {
-    let f: Value = serde_json::from_str(include_str!("fixtures/js_numbers.json")).unwrap_or_default();
+fn first_mind_choices_are_pinned() {
+    let mut all = serde_json::Map::new();
     for seed in 1..=5_u32 {
-        let want = f["firstMind"][seed.to_string()].as_array().cloned().unwrap_or_default();
-        assert_eq!(want.len(), 600, "seed {seed}");
         let log: Log = Rc::default();
         let tick = Rc::new(Cell::new(0));
         let mut duel = Duel::new(config(seed, all_effects()), [recorder(&log, &tick), recorder(&log, &tick)]);
@@ -72,10 +70,9 @@ fn first_mind_matches_js_choices() {
             duel.step(1.0 / 60.0);
             tick.set(tick.get() + 1);
         }
-        let got = log.borrow();
-        for (i, (g, w)) in got.iter().zip(&want).enumerate() {
-            assert_eq!(norm(g), norm(w), "seed {seed}, choice {i}");
-        }
-        assert!(got.len() >= 600, "seed {seed}: {} choices", got.len());
+        let got: Vec<Value> = log.borrow().iter().take(600).cloned().collect();
+        assert_eq!(got.len(), 600, "seed {seed}");
+        all.insert(seed.to_string(), Value::Array(got));
     }
+    pinned("first_mind", &Value::Object(all));
 }
