@@ -223,8 +223,9 @@ describe("evolution", () => {
     }
   });
 
-  test("each school has its own pairs: Frost's bolt evolves with the icicle, not the seal", () => {
-    const frost = barOf(1, 1, ["bolt", "icicle", "lotus"]);
+  test("each school has its own pairs: Frost's shard evolves with the icicle, Thunder's bolt with the seal", () => {
+    expect(SCHOOLS.frost.pool).not.toContain("bolt");
+    const frost = barOf(1, 1, ["shard", "icicle", "lotus"]);
     spend(frost.duel, frost.f, 0);
     expect(frost.f.bar[0].evolved).toBe(true);
     const thunder = barOf(1, 0, ["bolt", "seal", "orb"]);

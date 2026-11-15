@@ -170,3 +170,18 @@ describe("cleanse", () => {
     expect(f.silence).toBe(0);
   });
 });
+
+describe("the orb", () => {
+  test("an orb that lands leaves a shock stack", () => {
+    const duel = still(7);
+    const [by, f] = duel.fighters;
+    for (const g of duel.fighters) g.stats = { ...g.stats, dodge: 0, crit: 0 };
+    by.act = { spell: "orb", phase: "windup", t: SPELLS.orb.windup, target: f.x, power: 1, stacks: 1 };
+    by.x = f.x - 30;
+    by.face = 1;
+    let landed = false;
+    for (let i = 0; i < 60 * 7 && !landed; i++) landed = step(duel, 1 / 60).some((c) => c.type === "hit" && c.spell === "orb");
+    expect(landed).toBe(true);
+    expect(f.shock?.stacks ?? 0).toBeGreaterThan(0);
+  });
+});

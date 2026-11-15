@@ -50,6 +50,23 @@ describe("guard", () => {
   });
 });
 
+test("a guarded blow's chip is cut by the target's defence, like any blow", () => {
+  const chip = (pdef) => {
+    const duel = still(6);
+    const [by, f] = duel.fighters;
+    f.stats = { ...f.stats, pdef };
+    f.face = Math.sign(by.x - f.x);
+    f.guard = 5;
+    const hp = f.hp;
+    strike(duel, by, f, "slash");
+    return hp - f.hp;
+  };
+  const soft = chip(20);
+  const hard = chip(400);
+  expect(soft).toBeGreaterThan(0);
+  expect(hard).toBeLessThan(soft * 0.7);
+});
+
 describe("ward", () => {
   test("each charge erases one whole blow", () => {
     const duel = still(2);

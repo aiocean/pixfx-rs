@@ -111,7 +111,7 @@ const CAST_POWER = [1.4, 1.2, 1.1, 1.0];
  */
 const EVOLVES = {
   thunder: [["bolt", "seal"], ["palm", "step"], ["quake", "burst"]],
-  frost: [["bolt", "icicle"], ["shatter", "flurry"], ["lotus", "jet"]],
+  frost: [["shard", "icicle"], ["shatter", "flurry"], ["lotus", "jet"]],
 };
 const EVOLVED = 1.5;
 
@@ -199,7 +199,7 @@ export const SPELLS = {
   dive: { kind: "melee", type: "physical", dive: true, cost: 12, windup: 0.22, recover: 0.4, cooldown: 1.6, range: 26, damage: 11, speed: 260, slamFx: "explosions/dirt-explosion" },
   bolt: { kind: "bolt", type: "magic", fx: "projectiles/laser-bolt", cost: 18, windup: 0.28, recover: 0.22, cooldown: 1.3, speed: 230, damage: 13, shock: true },
   orb: {
-    kind: "orb", type: "magic", fx: "lightning/ball-lightning", hitFx: "explosions/plasma-explosion", burn: true,
+    kind: "orb", type: "magic", fx: "lightning/ball-lightning", hitFx: "explosions/plasma-explosion", burn: true, shock: true,
     cost: 45, windup: 0.6, recover: 0.3, cooldown: 4.5, speed: 26, life: 5.5, damage: 14, radius: 10,
   },
   // icicle-fall drops its icicle at FREE + fall time: 0.64 + sqrt(2 * (80 - 36) / 950) s, and only starts to tremble,
@@ -284,7 +284,7 @@ export const SCHOOLS = {
     },
   },
   frost: {
-    name: "Frost", basics: ["slash", "dive", "blink"], pool: ["bolt", "lotus", "shatter", "icicle", "collapse", "frostfire", "void", "mirror", "ward", "shard", "jet", "flurry"], ultimate: "prison", signature: "zone", postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
+    name: "Frost", basics: ["slash", "dive", "blink"], pool: ["lotus", "shatter", "icicle", "collapse", "frostfire", "void", "mirror", "ward", "shard", "jet", "flurry"], ultimate: "prison", signature: "zone", postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
     // every effect a Frost spell plays is drawn in ice blue and white
@@ -521,7 +521,7 @@ function release(duel, me, foe, spell) {
     }
     const dx = Math.abs(foe.x - me.x);
     if (dx <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < me.spec.chest + 4 && foe.hp > 0) {
-      if (blocks(duel, foe, me.x, hit)) clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
+      if (blocks(duel, foe, me.x, hit, spell.type)) clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
       else if (foe.act?.spell === "slash" && foe.act.phase === "windup" && foe.act.t > SPELLS.slash.windup * 0.6) {
         // both blades swing at once: they meet
         clash(duel, (me.x + foe.x) / 2, g - me.spec.chest - me.air, [me, foe]);
@@ -552,7 +552,7 @@ function release(duel, me, foe, spell) {
     const x = me.x + me.face * spell.range * 0.7;
     cast(duel, me, spell.fx, x, g - me.spec.chest - me.air);
     if (Math.abs(foe.x - me.x) <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
-      if (blocks(duel, foe, me.x, hit)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
+      if (blocks(duel, foe, me.x, hit, spell.type)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
       else if (hurt(duel, foe, hit, me.face, me.act.spell, me.act.stacks) && spell.shock) addShock(duel, foe, me, me.act.stacks ?? 1);
     }
   } else if (spell.kind === "void") {
@@ -571,7 +571,7 @@ function release(duel, me, foe, spell) {
     const lo = Math.min(from, to) - foe.spec.halfWidth;
     const hi = Math.max(from, to) + foe.spec.halfWidth;
     if (foe.x > lo && foe.x < hi && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
-      if (blocks(duel, foe, from, hit)) clash(duel, foe.x, g - foe.spec.chest - foe.air, [foe]);
+      if (blocks(duel, foe, from, hit, spell.type)) clash(duel, foe.x, g - foe.spec.chest - foe.air, [foe]);
       else hurt(duel, foe, hit, me.face, me.act.spell, me.act.stacks);
     }
   } else if (spell.kind === "heal") {
@@ -603,7 +603,7 @@ function release(duel, me, foe, spell) {
  * Does f block a blow of `damage` from fromX? A block costs qi and still lets a little damage through (chip), so
  * no fight stalls behind a guard; with too little qi left the guard breaks and the blow lands.
  */
-function blocks(duel, f, fromX, damage = 0) {
+function blocks(duel, f, fromX, damage = 0, type = "physical") {
   if (f.guard === 0 || f.body.reeling() || Math.sign(fromX - f.x) !== f.face) return false;
   if (f.qi < GUARD_COST) {
     f.guard = 0;
@@ -612,7 +612,8 @@ function blocks(duel, f, fromX, damage = 0) {
   f.qi -= GUARD_COST;
   // a blow too heavy for the guard breaks through whole
   if (duel.rng() >= blockChance(damage)) return false;
-  f.hp = Math.max(0, f.hp - damage * CHIP);
+  // what gets through a guard is a share of the blow, cut by defence like any blow
+  take(duel, f, damageOf(duel.fighters[1 - f.index], f, damage, type, false, 0.5) * CHIP);
   return true;
 }
 
@@ -849,7 +850,7 @@ function shot(duel, s, dt) {
       return;
     }
     if (overlaps(foe, s.x, s.y, 3)) {
-      if (blocks(duel, foe, s.x - s.vx, s.power)) clash(duel, s.x, g - s.y, []);
+      if (blocks(duel, foe, s.x - s.vx, s.power, spell.type)) clash(duel, s.x, g - s.y, []);
       else if (hurt(duel, foe, s.power, Math.sign(s.vx), s.name, s.stacks) && spell.shock) addShock(duel, foe, duel.fighters[s.owner], s.stacks);
       return endShot(duel, s);
     }
@@ -860,8 +861,8 @@ function shot(duel, s, dt) {
     emit(duel, { type: "move", key: s.key, x: s.x, y: g });
     const [bx, by] = orbAt(s);
     if (overlaps(foe, bx, -by, spell.radius)) {
-      if (blocks(duel, foe, bx, s.power)) clash(duel, bx, g + by, []);
-      else hurt(duel, foe, s.power, Math.sign(foe.x - bx) || 1, s.name, s.stacks);
+      if (blocks(duel, foe, bx, s.power, spell.type)) clash(duel, bx, g + by, []);
+      else if (hurt(duel, foe, s.power, Math.sign(foe.x - bx) || 1, s.name, s.stacks) && spell.shock) addShock(duel, foe, duel.fighters[s.owner], s.stacks);
       burst(duel, spell.hitFx, bx, g + by);
       return endShot(duel, s);
     }
