@@ -4,6 +4,7 @@
 // Deleted with the JS rules (plan 2026-11-15-duel-rules-in-rust, Task 8).
 import * as duel from "../../assets/duel.js";
 import { Body, Mind, effects } from "../engine.js";
+import { baselineMind } from "../mind-baseline.js";
 
 const { RARITY, TRAITS, SPELLS, SCHOOLS, STATS, LUCKY, PAYOFF, RAGE, STALE, POOL_SIZE, DECOR, TIERS } = duel;
 
@@ -36,6 +37,25 @@ const arenas = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map((seed) => {
   return [String(seed), d.fighters.map((f) => ({ pool: f.pool, bar: f.bar.map((s) => ({ spell: s.spell, rarity: s.rarity, traits: s.traits, power: s.power })) }))];
 }));
 
+// the first 600 choices the first mind makes in a duel of two first minds, each as [tick, fighter, choice]
+const firstMind = Object.fromEntries([1, 2, 3, 4, 5].map((seed) => {
+  const choices = [];
+  let tick = 0;
+  const record = (d, f) => {
+    const m = baselineMind(d, f);
+    const think = m.think;
+    m.think = (duel, me, foe, dt) => {
+      const c = think(duel, me, foe, dt);
+      if (c && choices.length < 600) choices.push([tick, me.index, c]);
+      return c;
+    };
+    return m;
+  };
+  const d = duel.createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => registry.has(id), Body, Mind, minds: [record, record] });
+  for (; choices.length < 600 && tick < 600 * 60; tick++) duel.step(d, 1 / 60);
+  return [String(seed), choices];
+}));
+
 const ts = Array.from({ length: 22 }, (_, i) => i * 0.37);
 const out = {
   rng,
@@ -45,6 +65,7 @@ const out = {
   slotPower: TIERS.flatMap((rarity) => [[], ["heavy"]].flatMap((traits) => [false, true].map((evolved) => [rarity, traits, evolved, duel.slotPower(rarity, traits, evolved)]))),
   damage: DAMAGE,
   arenas,
+  firstMind,
   fits: Object.keys(TRAITS).flatMap((t) => Object.keys(SPELLS).map((name) => [t, name, duel.fits(t, name)])),
   spells: SPELLS,
   schools: SCHOOLS,

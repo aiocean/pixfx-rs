@@ -10,6 +10,7 @@ pub mod bar;
 pub mod data;
 pub mod duel;
 pub mod fighter;
+pub mod first_mind;
 pub mod out;
 pub mod rng;
 pub mod seat;
