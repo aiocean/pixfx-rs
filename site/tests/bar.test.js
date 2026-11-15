@@ -1,7 +1,7 @@
 // The rotating skill bar: three slots, each a skill drawn from the school's pool with its own casts and power; a
 // spent skill empties its slot, which counts down and draws a new one.
 import { describe, expect, test } from "bun:test";
-import { SCHOOLS, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
+import { SCHOOLS, SPELLS, addChill, addShock, castsPower, createDuel, draw, skillBar, spend, step } from "../assets/duel.js";
 import { Body, Mind, effects } from "./engine.js";
 
 const all = new Set(effects());
@@ -96,5 +96,76 @@ describe("the bar", () => {
     duel.fighters[0].hp = 0;
     step(duel, 1 / 60);
     for (const f of duel.fighters) clean(f);
+  });
+});
+
+describe("the pools", () => {
+  test("the new spells are in their schools' pools, and every pool spell's effect is in the engine", () => {
+    for (const name of ["spark", "burst", "quake", "hex"]) expect(SCHOOLS.thunder.pool).toContain(name);
+    for (const name of ["shard", "jet", "flurry"]) expect(SCHOOLS.frost.pool).toContain(name);
+    for (const school of Object.values(SCHOOLS)) {
+      for (const name of [...school.pool, school.ultimate]) {
+        const fx = SPELLS[name].fx;
+        if (fx) expect(all.has(fx)).toBe(true);
+        expect(SPELLS[name].cost).toBeGreaterThan(name === school.ultimate ? -1 : 0);
+      }
+    }
+  });
+
+  test("every pool spell is cast in some fight", () => {
+    const cast = new Set();
+    // heal and void are rare picks for the brain (a heal only below half life, a void only with a long opening)
+    for (let seed = 1; seed <= 24; seed++) {
+      const duel = arena(seed);
+      for (let i = 0; i < 120 * 60; i++) {
+        step(duel, 1 / 60);
+        for (const f of duel.fighters) if (f.act && f.act.t === 0) cast.add(f.act.spell);
+      }
+    }
+    for (const school of Object.values(SCHOOLS)) for (const name of school.pool) expect([name, cast.has(name)]).toEqual([name, true]);
+  }, 300_000);
+});
+
+describe("draw rules", () => {
+  test("a round's first slot is the school's signature kind", () => {
+    for (let seed = 1; seed <= 15; seed++) {
+      for (const f of arena(seed).fighters) expect(SPELLS[f.bar[0].spell].kind).toBe(SCHOOLS[f.school].signature);
+    }
+  });
+
+  test("with a status on the foe, the skills that spend it are drawn far more often", () => {
+    const rate = (set) => {
+      let pays = 0;
+      const n = 600;
+      const duel = arena(9);
+      const [thunder, frost] = duel.fighters;
+      for (let k = 0; k < n; k++) {
+        set(duel, thunder, frost);
+        thunder.bar[1] = { empty: 1, full: 1 };
+        draw(duel, thunder, 1);
+        if (["palm", "burst"].includes(thunder.bar[1].spell)) pays++;
+      }
+      return pays / n;
+    };
+    const plain = rate((duel, by, f) => {
+      f.shock = null;
+    });
+    const shocked = rate((duel, by, f) => {
+      f.shock = null;
+      addShock(duel, f, by, 2);
+    });
+    expect(shocked).toBeGreaterThan(plain + 0.15);
+  });
+
+  test("a draw never repeats a skill on the bar", () => {
+    const duel = arena(11);
+    const f = duel.fighters[1];
+    for (let k = 0; k < 300; k++) {
+      addChill(duel, duel.fighters[0], 1);
+      const i = k % 3;
+      f.bar[i] = { empty: 1, full: 1 };
+      draw(duel, f, i);
+      expect(new Set(onBar(f)).size).toBe(3);
+    }
   });
 });

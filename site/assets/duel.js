@@ -28,6 +28,8 @@ const FREEZE = 0.9;
 const CHILL = { max: 3, time: 2.5, slow: 0.85 };
 const SHOCK = { max: 5, every: 0.6, fast: 0.854, share: 0.03, hold: 0.12 };
 /** Skills that spend the foe's stacks of a status to hit harder: this much more power per stack. */
+/** While the foe carries a status, the share of draws that come from the skills that spend it. */
+const PAY_DRAW = 1 / 3;
 const PAYOFF = { palm: { status: "shock", per: 0.12 }, burst: { status: "shock", per: 0.12 }, shatter: { status: "chill", per: 0.15 }, lotus: { status: "chill", per: 0.15 } };
 
 /**
@@ -214,9 +216,9 @@ export const SPELLS = {
   // void-orb hangs 62 px over its origin (pixelfx shadow/void-orb.js Y) and loops every 3.2 s
   void: {
     kind: "void", type: "magic", fx: "shadow/void-orb", endFx: "explosions/implosion",
-    cost: 90, windup: 0.9, recover: 0.45, cooldown: 11, life: 3.2, height: 62, pull: 34, reach: 90, under: 22, tick: 4, damage: 14,
+    cost: 60, windup: 0.9, recover: 0.45, cooldown: 11, life: 3.2, height: 62, pull: 34, reach: 90, under: 22, tick: 4, damage: 14,
   },
-  heal: { kind: "heal", fx: "holy/feather-burst", cost: 60, windup: 0.85, recover: 0.3, cooldown: 9, amount: 20 },
+  heal: { kind: "heal", fx: "holy/feather-burst", cost: 35, windup: 0.85, recover: 0.3, cooldown: 9, amount: 20 },
   // a shell of frost qi that takes blows for the caster until it breaks
   ward: { kind: "ward", fx: "holy/feather-burst", cost: 45, windup: 0.5, recover: 0.25, cooldown: 8 },
   // the defences: a dome of qi for a moment that turns every blow aside. Thunder's golden bell rings back at a
@@ -224,6 +226,27 @@ export const SPELLS = {
   bell: { kind: "barrier", fx: "arcane/rune-circle", cost: 18, windup: 0.06, recover: 0.1, cooldown: 6.5, time: 2, counter: { damage: 9, stun: 0.6 } },
   mirror: { kind: "barrier", fx: "arcane/rune-circle", cost: 18, windup: 0.06, recover: 0.1, cooldown: 6.5, time: 2.2, reflect: true },
   blink: { kind: "blink", fx: "spawn/poof", cost: 20, windup: 0.06, recover: 0.12, cooldown: 1.8, distance: 56 },
+  // the bar's newer spells. Thunder: a quick spark off the fingertips, light but fast
+  spark: { kind: "bolt", type: "magic", fx: "projectiles/laser-bolt", cost: 10, windup: 0.18, recover: 0.18, cooldown: 0.9, speed: 300, damage: 8, shock: true },
+  // Thunder: a palm that bursts with everything the foe's shocks have gathered
+  burst: { kind: "blast", type: "physical", fx: "explosions/plasma-explosion", cost: 30, windup: 0.36, recover: 0.4, cooldown: 3, range: 30, damage: 24 },
+  // Thunder: the ground under the foe cracks and blows up; small-explosion flashes at once, so the seal's mark is
+  // what warns of it
+  quake: {
+    kind: "zone", type: "physical", fx: "explosions/small-explosion", cost: 26, windup: 0.3, recover: 0.3, cooldown: 2.6,
+    sigil: 0.3, impact: 0.05, radius: 14, damage: 18, notice: 0, grounded: true,
+  },
+  // Thunder: a dome of hex cells that takes blows for the caster
+  hex: { kind: "ward", fx: "arcane/hex-shield", cost: 40, windup: 0.45, recover: 0.25, cooldown: 8 },
+  // Frost: a sliver of ice, light and quick, that chills where it strikes
+  shard: { kind: "bolt", type: "magic", fx: "projectiles/laser-bolt", cost: 10, windup: 0.18, recover: 0.18, cooldown: 0.9, speed: 300, damage: 7, chill: true },
+  // Frost: a jet of freezing water from the palm, at middle reach
+  jet: { kind: "blast", type: "magic", fx: "water/water-jet", cost: 22, windup: 0.3, recover: 0.3, cooldown: 2.4, range: 56, damage: 14, chill: true },
+  // Frost: a short flurry of snow under the foe: two ticks that chill whoever stands in it, then its blow
+  flurry: {
+    kind: "void", type: "magic", fx: "weather/snow", cost: 30, windup: 0.4, recover: 0.3, cooldown: 5,
+    life: 1.2, height: 0, pull: 0, reach: 22, under: 22, tick: 3, damage: 10, chill: true,
+  },
 };
 
 /**
@@ -237,7 +260,7 @@ export const SPELLS = {
  */
 export const SCHOOLS = {
   thunder: {
-    name: "Thunder", basics: ["slash", "dive", "blink"], pool: ["bolt", "palm", "step", "seal", "orb", "bell", "heal"], ultimate: "tribulation", postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 64, dry: SPELLS.slash.range - 4, aggression: 1.15, tempo: 0.8, sky: 22,
+    name: "Thunder", basics: ["slash", "dive", "blink"], pool: ["bolt", "palm", "step", "seal", "orb", "bell", "heal", "spark", "burst", "quake", "hex"], ultimate: "tribulation", signature: "blast", postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 64, dry: SPELLS.slash.range - 4, aggression: 1.15, tempo: 0.8, sky: 22,
     bolt: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#ffe98a", "#fff6c4", "#ffffff"],
     circle: ["#2a1a08", "#6a4410", "#b07a1a", "#e8b030", "#ffd84a", "#fff6c4", "#ffffff"],
     // every effect a Thunder spell plays is drawn in gold and white, so it is plain whose it is
@@ -252,7 +275,7 @@ export const SCHOOLS = {
     },
   },
   frost: {
-    name: "Frost", basics: ["slash", "dive", "blink"], pool: ["bolt", "lotus", "shatter", "icicle", "collapse", "frostfire", "void", "mirror", "ward"], ultimate: "prison", postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
+    name: "Frost", basics: ["slash", "dive", "blink"], pool: ["bolt", "lotus", "shatter", "icicle", "collapse", "frostfire", "void", "mirror", "ward", "shard", "jet", "flurry"], ultimate: "prison", signature: "zone", postures: [1, 1, 1, 1, 1, 1, 1, 1], range: 100, dry: 80, aggression: 1.1, tempo: 2, sky: 48,
     bolt: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     circle: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#dcfbff", "#ffffff"],
     // every effect a Frost spell plays is drawn in ice blue and white
@@ -265,6 +288,8 @@ export const SCHOOLS = {
       "holy/feather-burst": { palette: ["#1e3f80", "#2c58aa", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"], glow: "#a6ecff" },
       "fire/spirit-flame": { palette: ["#0a1430", "#16306a", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"] },
       "spawn/poof": { palette: ["#16306a", "#2c58aa", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"], stars: ["#a6ecff", "#dcfbff", "#ffffff"] },
+      // a flurry falls on a patch round the foe, not the whole sky
+      "weather/snow": { width: 48, height: 72 },
     },
   },
 };
@@ -344,7 +369,7 @@ function startRound(duel) {
     Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 } });
     f.mind.reset();
     f.bar = [];
-    for (let i = 0; i < BAR.slots; i++) draw(duel, f, i);
+    for (let i = 0; i < BAR.slots; i++) draw(duel, f, i, i === 0);
     f.body.startRound(duel.left + span * (f.index === 0 ? 0.22 : 0.78));
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
@@ -494,11 +519,11 @@ function release(duel, me, foe, spell) {
   } else if (spell.kind === "bolt") {
     const y = me.air + me.spec.chest;
     const key = play(duel, spell.fx, me.x + me.face * 8, g - y, { palette: SCHOOLS[me.school].bolt, flip: me.face < 0, seed: me.index + 7 });
-    duel.shots.push({ kind: "bolt", owner: me.index, x: me.x + me.face * 8, y, vx: me.face * spell.speed, t: 0, key, spell, power: hit });
+    duel.shots.push({ kind: "bolt", owner: me.index, x: me.x + me.face * 8, y, vx: me.face * spell.speed, t: 0, key, spell, name: me.act.spell, power: hit });
   } else if (spell.kind === "orb") {
     const x = me.x + me.face * 10;
     const key = play(duel, spell.fx, x, g, { seed: me.index + 3 });
-    duel.shots.push({ kind: "orb", owner: me.index, x, t: 0, key, spell, power: hit });
+    duel.shots.push({ kind: "orb", owner: me.index, x, t: 0, key, spell, name: me.act.spell, power: hit });
   } else if (spell.kind === "zone") {
     const x = clamp(me.act.target, duel.left + 6, duel.right - 6);
     // what hangs in the air (a collapse) gathers at the foe's height; what falls (an icicle) hits the floor
@@ -811,7 +836,7 @@ function shot(duel, s, dt) {
     }
     if (overlaps(foe, s.x, s.y, 3)) {
       if (blocks(duel, foe, s.x - s.vx, s.power)) clash(duel, s.x, g - s.y, []);
-      else if (hurt(duel, foe, s.power, Math.sign(s.vx), "bolt")) addShock(duel, foe, duel.fighters[s.owner], 1);
+      else if (hurt(duel, foe, s.power, Math.sign(s.vx), s.name) && spell.shock) addShock(duel, foe, duel.fighters[s.owner], 1);
       return endShot(duel, s);
     }
     if (s.x < duel.left - 40 || s.x > duel.right + 40) endShot(duel, s);
@@ -822,7 +847,7 @@ function shot(duel, s, dt) {
     const [bx, by] = orbAt(s);
     if (overlaps(foe, bx, -by, spell.radius)) {
       if (blocks(duel, foe, bx, s.power)) clash(duel, bx, g + by, []);
-      else hurt(duel, foe, s.power, Math.sign(foe.x - bx) || 1, "orb");
+      else hurt(duel, foe, s.power, Math.sign(foe.x - bx) || 1, s.name);
       burst(duel, spell.hitFx, bx, g + by);
       return endShot(duel, s);
     }
@@ -949,10 +974,20 @@ export function skillBar(f) {
   return slots;
 }
 
-/** Fill slot `i` of f's bar with a skill from its pool that is not on the bar, with 1 to 4 casts. */
-export function draw(duel, f, i) {
+/**
+ * Fill slot `i` of f's bar with a skill from its pool that is not on the bar, with 1 to 4 casts. A round's first
+ * draw is of the school's signature kind; while the foe carries a status, one draw in `PAY_DRAW` is a skill that
+ * spends it.
+ */
+export function draw(duel, f, i, first = false) {
   const held = f.bar.filter((slot, j) => j !== i && slot.spell).map((slot) => slot.spell);
-  const free = f.pool.filter((name) => !held.includes(name));
+  let free = f.pool.filter((name) => !held.includes(name));
+  const foe = duel.fighters[1 - f.index];
+  const carried = (status) => (status === "shock" ? (foe.shock?.stacks ?? 0) : foe.chill) > 0;
+  const want = first
+    ? free.filter((name) => SPELLS[name].kind === SCHOOLS[f.school].signature)
+    : duel.rng() < PAY_DRAW ? free.filter((name) => PAYOFF[name] && carried(PAYOFF[name].status)) : [];
+  if (want.length > 0) free = want;
   if (free.length === 0) {
     // nothing left to draw: wait and look again
     f.bar[i] = { empty: BAR.wait, full: BAR.wait };
