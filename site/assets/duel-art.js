@@ -27,13 +27,14 @@ function appearance(f, jolt) {
   };
 }
 
-/** What hangs on fighter f: a ward's shell, a barrier, a mark for each effect on it, fury, and fire, lightning or
- *  frost over its body. None once it is knocked out. */
+/** What hangs on fighter f: a ward's shell, a barrier, and fire, lightning or frost over its body. None once it is
+ *  knocked out. */
 function marks(f, time) {
   if (f.hp <= 0) return null;
   return {
-    shield: f.shield > 0 || f.charges > 0, barrier: f.barrier > 0, rang: f.rang > 0, burning: !!f.burn, defDown: f.defDown > 0,
-    silence: f.silence > 0, chilled: f.chilled > 0 || f.chill > 0, fury: f.fury, poseT: f.poseT, dome: f.school === "thunder" ? "banded" : "faceted",
+    // the signs of what it carries (a burn, defence down, silence, chill, fury) are on the HUD under its bars
+    shield: f.shield > 0 || f.charges > 0, barrier: f.barrier > 0, rang: f.rang > 0, burning: false, defDown: false,
+    silence: false, chilled: false, fury: 0, poseT: f.poseT, dome: f.school === "thunder" ? "banded" : "faceted",
     burn: !!f.burn, shock: f.shocked > 0, ice: f.frozen > 0, t: time, seed: f.index + 1,
   };
 }
