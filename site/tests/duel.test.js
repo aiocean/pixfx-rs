@@ -87,6 +87,22 @@ describe("duel", () => {
     expect(poses.slice(poses.indexOf("down"))).toEqual(["down", "sit", "kneel", "crouch", "land"]);
     expect(lands.length).toBe(2);
   });
+  test("with the rotating bar, fights still end in knockouts and each school wins at least 15% of rounds", () => {
+    // the whole engine, as the landing page has it: with fewer effects a school loses the spells they play
+    const every = new Set(effects());
+    const wins = [0, 0];
+    for (let seed = 1; seed <= 20; seed++) {
+      const { rounds } = run(createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => every.has(id), Body, Mind }), 120);
+      expect([seed, rounds.length > 0]).toEqual([seed, true]);
+      const [last] = rounds.slice(-1);
+      wins[0] += last[0];
+      wins[1] += last[1];
+    }
+    const total = wins[0] + wins[1];
+    console.log(`rounds won over seeds 1-20: thunder ${wins[0]}, frost ${wins[1]}`);
+    for (const w of wins) expect(w / total).toBeGreaterThanOrEqual(0.15);
+  }, 300_000);
+
   test("a cast puts its spell on its own cooldown, and a bar skill spends a cast", () => {
     let checked = 0;
     for (const seed of [1, 2, 3, 4]) {

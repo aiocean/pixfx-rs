@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The landing duel plays a rotating skill bar: three slots, each a skill drawn at random from the school's pool
+  (now 11 for Thunder and 12 for Frost, seven of them new) with 1 to 4 casts (fewer hit harder); a spent slot counts
+  down and draws again, and a skill whose partner is on the bar evolves. Chill and shock stack, payoff skills spend
+  them, repeated control wears off (grit), a guard turns heavy blows aside less often, wards hold charges, heals and
+  wards cleanse, and every spell has its own icon.
 - Attack timing (`Act`, `Performance`, `pose_for`) and `Effect::act` are removed: nothing used them. An attack's hit
   timing returns with the first attack effect a game plays; the caster's poses are the game's own sprite.
 - `pixfx-web`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-canvas2d`: `setDrawBudget(n)` caps the effect layers drawn per
