@@ -146,6 +146,18 @@ describe("a fight's pool", () => {
     }
   });
 
+  test("a pool's payoff skill always has a skill in the pool that lays its status", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      for (const f of arena(seed).fighters) {
+        for (const name of f.pool.filter((n) => PAYOFF[n])) {
+          const status = PAYOFF[name].status;
+          const lays = f.pool.some((n) => n !== name && (status === "shock" ? SPELLS[n].shock : SPELLS[n].chill));
+          expect([seed, name, lays]).toEqual([seed, name, true]);
+        }
+      }
+    }
+  });
+
   test("the same seed plays the same pools, and seeds differ", () => {
     const pools = (seed) => arena(seed).fighters.map((f) => [...f.pool].sort().join(",")).join("|");
     expect(pools(5)).toBe(pools(5));

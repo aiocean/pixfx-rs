@@ -181,3 +181,46 @@ describe("lucky casts", () => {
     expect(casts("slash", 400).filter((c) => c.kind).length).toBe(0);
   });
 });
+
+describe("review fixes", () => {
+  test("piercing fits only skills whose blow a guard can stop", () => {
+    for (const name of ["icicle", "collapse", "quake", "frostfire", "void", "flurry", "seal"]) expect([name, fits("piercing", name)]).toEqual([name, false]);
+    for (const name of ["palm", "burst", "spark", "shard", "jet", "orb", "bolt"]) expect([name, fits("piercing", name)]).toEqual([name, true]);
+  });
+
+  test("a lucky last cast names its own slot, and is never Again (the slot is empty)", () => {
+    const always = () => ({ think: () => ({ type: "cast", skill: "spark" }), tell() {}, reset() {}, hold() {} });
+    const duel = createDuel({ seed: 21, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind, minds: [always, idle] });
+    const me = duel.fighters[0];
+    if (!me.pool.includes("spark")) me.pool.push("spark");
+    if (!me.spells.includes("spark")) me.spells.push("spark");
+    const kinds = new Set();
+    for (let k = 0; k < 4000 && kinds.size < 2; k++) {
+      me.act = null;
+      me.cool = {};
+      me.qi = 50;
+      me.lucky = null;
+      me.bar = [{ empty: 9, full: 9 }, { spell: "spark", casts: 1, left: 1, power: 1, evolved: false, rarity: "common", traits: [] }, { empty: 9, full: 9 }];
+      step(duel, 1 / 600);
+      if (me.lucky) {
+        expect(me.lucky.slot).toBe(1);
+        expect(me.lucky.kind).not.toBe("again");
+        kinds.add(me.lucky.kind);
+      }
+    }
+    expect([...kinds].sort()).toEqual(["double", "free"]);
+  });
+
+  test("a heal on the bar heals by its power, as the AI is told", () => {
+    const healed = (power) => {
+      const { duel, me } = castOnce(2, 0, "heal", { casts: 1 }, (d, f) => {
+        f.hp = 40;
+        f.qi = 100;
+      });
+      me.bar[0].power = power;
+      for (let i = 0; i < 90 && me.hp === 40; i++) step(duel, 1 / 60);
+      return me.hp - 40;
+    };
+    expect(healed(1.4)).toBeCloseTo(SPELLS.heal.amount * 1.4, 5);
+  });
+});

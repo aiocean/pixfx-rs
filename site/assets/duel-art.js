@@ -395,7 +395,7 @@ export function drawSkills(ctx, duel, s, bottom, n, icons) {
     const luck = f.lucky;
     const since = luck ? duel.time - luck.at : Infinity;
     if (since < LUCKY_TIME) {
-      const i = Math.max(0, f.bar.findIndex((slot) => slot.spell === luck.spell));
+      const i = luck.slot ?? 0;
       const x = f.index === 0 ? duel.left + i * (size + 2) : duel.right - size - i * (size + 2);
       const a = 1 - since / LUCKY_TIME;
       if (since < 0.3) frame(box, x, top, size, "#ffd84a", 1 - since / 0.3);

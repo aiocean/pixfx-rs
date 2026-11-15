@@ -121,10 +121,17 @@ export const TRAITS = {
 /** A cast of a bar skill is lucky this often: it hits twice as hard, costs nothing, or is ready again at once. */
 export const LUCKY = { chance: 0.08, kinds: ["double", "free", "again"] };
 
-/** Whether `trait` does anything to spell `name`: heavy and piercing need a blow, lingering a chill or a shock. */
+/** The kinds of blow a guard can turn aside (a zone or a field falls past it). */
+const GUARDED = ["melee", "blast", "dash", "bolt", "orb"];
+
+/**
+ * Whether `trait` does anything to spell `name`: heavy needs a blow, piercing a blow a guard can stop, lingering a
+ * chill or a shock.
+ */
 export function fits(trait, name) {
   const s = SPELLS[name];
-  if (trait === "heavy" || trait === "piercing") return (s.damage ?? 0) > 0;
+  if (trait === "heavy") return (s.damage ?? 0) > 0;
+  if (trait === "piercing") return (s.damage ?? 0) > 0 && GUARDED.includes(s.kind);
   if (trait === "lingering") return !!(s.chill || s.shock);
   return true;
 }
@@ -551,15 +558,17 @@ function begin(duel, me, name, target) {
   // an evolved or lingering skill inflicts one more stack of what it inflicts, each
   const stacks = 1 + (slot?.evolved ? 1 : 0) + (has(slot, "lingering") ? TRAITS.lingering.stacks : 0);
   const pierce = has(slot, "piercing");
-  if (slot) spend(duel, me, me.bar.indexOf(slot));
+  const at = me.bar.indexOf(slot);
+  if (slot) spend(duel, me, at);
   me.act = { spell: name, phase: "windup", t: 0, target, power, stacks, pierce };
-  // luck smiles on a bar skill now and then
+  // luck smiles on a bar skill now and then; Again only while the skill is still on the bar to cast again
   if (slot && duel.rng() < LUCKY.chance) {
-    const kind = LUCKY.kinds[Math.floor(duel.rng() * LUCKY.kinds.length)];
+    const kinds = me.bar[at]?.spell === name ? LUCKY.kinds : LUCKY.kinds.filter((k) => k !== "again");
+    const kind = kinds[Math.floor(duel.rng() * kinds.length)];
     if (kind === "double") me.act.power *= 2;
     else if (kind === "free") me.qi += cost;
     else me.cool[name] = 0;
-    me.lucky = { kind, spell: name, at: duel.time };
+    me.lucky = { kind, spell: name, slot: at, at: duel.time };
     emit(duel, { type: "lucky", by: me.index, kind, x: me.x, y: me.air + me.spec.chest + 10 });
   }
   setMeditating(duel, me, false);
@@ -645,7 +654,8 @@ function release(duel, me, foe, spell) {
     }
   } else if (spell.kind === "heal") {
     cleanse(me);
-    const gained = Math.min(100 - me.hp, spell.amount);
+    // a heal on the bar heals by its power, as its damage would
+    const gained = Math.min(100 - me.hp, spell.amount * (me.act.power ?? 1));
     me.hp += gained;
     emit(duel, { type: "heal", by: me.index, amount: Math.round((gained / 100) * me.stats.hp), x: me.x, y: me.air + me.spec.chest });
     cast(duel, me, spell.fx, me.x, g - me.spec.body - me.air);
