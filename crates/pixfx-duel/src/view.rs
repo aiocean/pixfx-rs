@@ -1,5 +1,6 @@
 //! The duel as the page reads it: each fighter's body, life, statuses, cast, skill bar and buffs, and the round.
 
+use crate::style::Style;
 use crate::bar::{Buff, SlotView, buffs_of, skill_bar};
 use crate::data::{Luck, School, Stats};
 use crate::fighter::{Fighter, Phase, State};
@@ -27,6 +28,8 @@ pub struct DuelView {
 pub struct FighterView {
     pub index: usize,
     pub school: School,
+    /// How it fights this fight, shown before the fight so a watcher can study it.
+    pub style: Style,
     pub hp: f64,
     pub qi: f64,
     pub rage: f64,
@@ -94,6 +97,7 @@ fn fighter_view(f: &Fighter) -> FighterView {
     FighterView {
         index: f.index,
         school: f.school,
+        style: f.style,
         hp: f.hp,
         qi: f.qi,
         rage: f.rage,

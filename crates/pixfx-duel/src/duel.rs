@@ -50,6 +50,9 @@ impl Duel {
             let spells = d.basics.iter().copied().chain(pool.iter().copied()).chain([d.ultimate]).filter(|n| usable(n)).collect();
             state.fighters[i] = Fighter::new(i, s, spells, pool);
         }
+        for (f, style) in state.fighters.iter_mut().zip(crate::style::draw(config.seed)) {
+            f.style = style;
+        }
         let [make0, make1] = seats;
         let seats = [make0(&state, 0), make1(&state, 1)];
         state.decor = DECOR.iter().any(|d| state.has(d));

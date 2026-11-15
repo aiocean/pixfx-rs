@@ -4,6 +4,7 @@ use crate::data::{Luck, Rarity, School, Stats, Trait, stats};
 use crate::out::Out;
 use crate::rng::Rng;
 use crate::shot::Shot;
+use crate::style::Style;
 use pixfx_fighter::body::{Arena, Body};
 use pixfx_mind::Outcome;
 
@@ -122,6 +123,8 @@ pub struct Fighter {
     pub aura: Option<u32>,
     pub attune: f64,
     pub body: Body,
+    /// How it fights, drawn once a fight (its seat reads it; the rules do not).
+    pub style: Style,
 }
 
 impl Fighter {
@@ -166,6 +169,7 @@ impl Fighter {
             aura: None,
             attune: 0.0,
             body: Body::new(0.0),
+            style: Style::Balanced,
         }
     }
 
@@ -181,6 +185,7 @@ impl Fighter {
             aura: self.aura,
             attune: self.attune,
             body: self.body.clone(),
+            style: self.style,
             ..fresh
         };
     }

@@ -4,7 +4,10 @@
 use crate::data::{TEMPERAMENT, school};
 use crate::fighter::State;
 use crate::sense::{sense_of, skill_of};
+use crate::style::{Style, tag};
+use pixfx_mind::policy::{Net, NetError, PolicyMind};
 use pixfx_mind::{BodySize, Choice, Mind, Outcome, Posture, Profile, Thought};
+use std::rc::Rc;
 
 /// A fighter's decider.
 pub trait Seat {
@@ -86,6 +89,56 @@ impl Seat for Brain {
 
     fn posture(&self) -> Option<Posture> {
         Some(self.mind.posture())
+    }
+}
+
+/// The trained policy the page ships (`weights/policy.bin`).
+pub fn shipped() -> Result<Rc<Net>, NetError> {
+    Net::load(include_bytes!("../weights/policy.bin")).map(Rc::new)
+}
+
+/// The trained policy, in the fighter's style, seeing as late and thinking as often as the brain.
+pub struct PolicySeat {
+    pub mind: PolicyMind,
+}
+
+impl PolicySeat {
+    /// Fighter `me`'s policy seat, playing `style`.
+    pub fn new(net: Rc<Net>, state: &State, me: usize, style: Style) -> PolicySeat {
+        let f = &state.fighters[me];
+        let skills = f.spells.iter().map(|n| skill_of(n)).collect();
+        let t = TEMPERAMENT;
+        let seed = state.seed.wrapping_mul(2).wrapping_add(me as u32) ^ 0x9e37_79b9;
+        PolicySeat { mind: PolicyMind::new(net, skills, tag(f.school, style), t.reaction, t.think, seed) }
+    }
+
+    /// A maker for `Duel::new`: the policy in the style the fight drew for the fighter.
+    pub fn make(net: Rc<Net>) -> MakeSeat {
+        Box::new(move |state, me| {
+            let style = state.fighters[me].style;
+            Box::new(PolicySeat::new(net, state, me, style))
+        })
+    }
+
+    /// A maker for `Duel::new`: the policy in `style`, whatever the fight drew.
+    pub fn with_style(net: Rc<Net>, style: Style) -> MakeSeat {
+        Box::new(move |state, me| Box::new(PolicySeat::new(net, state, me, style)))
+    }
+}
+
+impl Seat for PolicySeat {
+    fn think(&mut self, state: &State, me: usize, dt: f64) -> Option<Choice> {
+        self.mind.think(&sense_of(state, me), dt)
+    }
+
+    fn tell(&mut self, _outcome: &Outcome) {}
+
+    fn reset(&mut self) {
+        self.mind.reset();
+    }
+
+    fn hold(&mut self, seconds: f64) {
+        self.mind.hold(seconds);
     }
 }
 
