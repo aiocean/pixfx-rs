@@ -87,21 +87,28 @@ pub fn is_area(kind: SkillKind) -> bool {
 }
 
 /// A skill the foe winds up that strikes where it stands: no opening, only a trade.
-fn striking(kind: SkillKind) -> bool {
+pub(crate) fn striking(kind: SkillKind) -> bool {
     matches!(
         kind,
         SkillKind::Melee | SkillKind::Dive | SkillKind::Blast | SkillKind::Dash
     )
 }
 
-/// The hardest blow `foe` could land on `me` within `time` seconds (my recovery after a miss), from what it has
-/// ready and where it stands.
-pub fn punisher(foe: &Foe, me: &Me, body: &BodySize, time: f64, reaction: f64) -> f64 {
+/// The hardest blow `foe` could land on `me` within `time` seconds (my recovery after a miss), from the skills of its
+/// kit it has ready and where it stands.
+pub fn punisher(
+    foe: &Foe,
+    foe_skills: &[Skill],
+    me: &Me,
+    body: &BodySize,
+    time: f64,
+    reaction: f64,
+) -> f64 {
     let d = (foe.x - me.x).abs();
     let level = (foe.air - me.air).abs();
     let mut most: f64 = 0.0;
-    for s in &foe.ready {
-        if s.damage <= 0.0 || s.ultimate {
+    for (s, ready) in foe_skills.iter().zip(&foe.ready) {
+        if !ready || s.damage <= 0.0 || s.ultimate {
             continue;
         }
         let lands = match s.kind {

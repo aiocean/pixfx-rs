@@ -21,7 +21,7 @@ far each effect moves with it, so the scene draws only those it sees. `scene.ben
 host's screen by the feel's live ripples (`pixfx_core::screen::ripple_rgba`), for a shell that bends pixels on the
 CPU. Behind the `fighter`, `light` and `mind` features (all default): `src/fighter.rs` (`Body`, `FightFeel`, `Sprites`,
 `lookColors`), `src/light.rs` (`stepLights`, `putOutLight`, `Lighting`; the game owns its list of lights) and
-`src/mind.rs` (`Mind`, a fighter's brain: `think(sense, dt)`, `tell`, `reset`, `hold`, `explain`, `posture`).
+`src/mind.rs` (`Mind`, a fighter's brain: `meet(foeSkills)`, `think(sense, dt)`, `tell`, `reset`, `hold`, `explain`, `posture`).
 `Sprites.picture()` and `Lighting.paint()` return a `Picture` (`src/picture.rs`: the lit box's colour and light
 RGBA) that a shell draws. `Squash.step(dt, x, y, vx?, vy?)` works out velocity from movement.
 

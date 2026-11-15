@@ -34,7 +34,7 @@ mod serde_shapes {
                "shield": false, "seekerOut": false},
         "foe": {"x": 60, "air": 0, "flying": false, "hp": 70, "qi": 50,
                 "doing": {"type": "act", "kind": "melee", "phase": "windup", "t": 0.1, "windup": 0.2, "recover": 0.32, "reach": 24, "damage": 5},
-                "outFor": 0, "openIn": 0, "frozen": 0, "shocked": 0, "barrier": false, "ready": []},
+                "outFor": 0, "openIn": 0, "frozen": 0, "shocked": 0, "barrier": false, "ready": [true]},
         "arena": {"left": 0, "right": 220, "top": 96},
         "threats": [{"age": 0.3, "damage": 13, "shape": {"type": "projectile", "x": 10, "y": 14, "vx": 230}}],
         "ready": [true, false]

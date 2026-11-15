@@ -1,7 +1,7 @@
 //! What a fighter could perceive this tick, as the game hands it in: the true state. The mind applies its own
 //! reaction time to the foe and the threats.
 
-use crate::skill::{Skill, SkillKind};
+use crate::skill::SkillKind;
 
 /// The arena's walls and ceiling, in game pixels.
 #[derive(Clone, Debug, PartialEq)]
@@ -118,8 +118,8 @@ pub struct Foe {
     pub frozen: f64,
     pub shocked: f64,
     pub barrier: bool,
-    /// Its damaging skills ready now: what it could answer with.
-    pub ready: Vec<Skill>,
+    /// Whether each of its skills (as handed to `Mind::meet`) is ready now: what it could answer with.
+    pub ready: Vec<bool>,
 }
 
 /// The shape of a threat in flight, as the mind reasons about it. Heights from the ground, lengths in game pixels.

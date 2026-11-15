@@ -53,6 +53,16 @@ impl Mind {
         Ok(())
     }
 
+    /// The foe's skills, once: each sense then says only which of them are ready (`foe.ready`).
+    pub fn meet(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "Skill[]")] skills: &JsValue,
+    ) -> Result<(), JsError> {
+        let skills: Vec<Skill> = parse("skills", skills)?;
+        self.inner.meet(skills);
+        Ok(())
+    }
+
     /// A new round: it forgets what it learnt and held.
     pub fn reset(&mut self) {
         self.inner.reset();

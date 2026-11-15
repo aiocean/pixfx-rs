@@ -6,9 +6,9 @@ use crate::candidates::Candidate;
 use crate::rng::Rng;
 
 /// Candidates within this share of the best stay in the draw.
-const KEEP: f64 = 0.7;
+const KEEP: f64 = 0.9;
 /// The chance of taking the second best on purpose, if it is at least `SECOND` of the best.
-const OFF_PICK: f64 = 0.08;
+const OFF_PICK: f64 = 0.0;
 const SECOND: f64 = 0.5;
 /// Seconds over which a punished skill is trusted again.
 const SORE: f64 = 6.0;

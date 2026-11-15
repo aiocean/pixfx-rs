@@ -7,7 +7,9 @@ use pixfx_mind::*;
 const DT: f64 = 1.0 / 60.0;
 
 fn mind(seed: u32) -> Mind {
-    Mind::new(profile(), body(), kit(), seed)
+    let mut m = Mind::new(profile(), body(), kit(), seed);
+    m.meet(foe_kit());
+    m
 }
 
 /// Ticks the mind through `seconds` of the same moment (time moving), returning its thoughts.
@@ -127,7 +129,7 @@ fn scenario_punishes_a_whiff() {
         "{first:?}"
     );
     assert!(
-        first.iter().any(|th| matches!(&th.choice, Choice::Cast { skill, .. } if skill == "slash" || skill == "lotus")),
+        first.iter().any(|th| matches!(&th.choice, Choice::Cast { skill, .. } if ["slash", "lotus", "prison"].contains(&skill.as_str()))),
         "{first:?}"
     );
 }

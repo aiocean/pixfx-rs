@@ -1,7 +1,7 @@
 // The duel's rules and minds, driven the way the hero drives them: step after step, playing what comes back.
 import { describe, expect, test } from "bun:test";
 import { RAGE, SCHOOLS, SPELLS, createDuel, skillBar, step } from "../assets/duel.js";
-import { Body, Fx, effects } from "./engine.js";
+import { Body, Fx, Mind, effects } from "./engine.js";
 
 const PLAN2 = new Set([
   "fire/candle", "fire/campfire", "fire/brazier", "impacts/parry", "explosions/plasma-explosion", "explosions/implosion",
@@ -9,7 +9,7 @@ const PLAN2 = new Set([
   "ice/icicle-fall", "shadow/void-orb", "holy/feather-burst", "spawn/poof", "fire/spirit-flame", "weather/fireflies",
 ]);
 
-const arena = (seed) => createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => PLAN2.has(id), Body });
+const arena = (seed) => createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => PLAN2.has(id), Body, Mind });
 
 /** Run a duel for `seconds` at 60 fps; returns every command and what happened in each round. */
 function run(duel, seconds) {
@@ -41,14 +41,15 @@ describe("duel", () => {
       const [last] = rounds.slice(-1);
       expect(last[0] + last[1]).toBe(rounds.length);
     }
-  });
+    // ten minutes of fighting, two brains thinking: about 3 s on an idle machine
+  }, 30_000);
 
   /** Two fighters face to face and frozen in thought, so a test decides everything they do. */
   function standoff(seed = 2) {
     const duel = arena(seed);
     const [thunder, frost] = duel.fighters;
     for (const f of duel.fighters) {
-      f.think = 1e9;
+      f.mind.hold(1e9);
       f.stats = { ...f.stats, dodge: 0 };
     }
     thunder.x = 100;
@@ -132,7 +133,7 @@ describe("duel", () => {
     const all = new Set(effects());
     const played = new Set();
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
-      const duel = createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body });
+      const duel = createDuel({ seed, left: 0, right: 220, ground: 150, has: (id) => all.has(id), Body, Mind });
       for (const c of run(duel, 90).commands) {
         if (c.type !== "play") continue;
         played.add(c.fx);
@@ -140,5 +141,6 @@ describe("duel", () => {
       }
     }
     expect(played.has("explosions/dirt-explosion")).toBe(true);
-  });
+    // twelve minutes of fighting, two brains thinking: about 4 s on an idle machine
+  }, 30_000);
 });

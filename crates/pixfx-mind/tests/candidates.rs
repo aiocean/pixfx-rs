@@ -45,6 +45,7 @@ impl Case {
         let ctx = Ctx {
             me: &self.me,
             foe: &self.foe,
+            foe_skills: &foe_kit(),
             threats: &self.threats,
             arena: &arena(),
             skills: &self.skills,

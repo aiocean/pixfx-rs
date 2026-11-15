@@ -116,8 +116,13 @@ pub fn foe(x: f64) -> Foe {
         frozen: 0.0,
         shocked: 0.0,
         barrier: false,
-        ready: vec![skill("slash", SkillKind::Melee, 0.0, 0.2, 0.32, 5.0, 24.0)],
+        ready: vec![true],
     }
+}
+
+/** The foe's kit in these tests: a blade. */
+pub fn foe_kit() -> Vec<Skill> {
+    vec![skill("slash", SkillKind::Melee, 0.0, 0.2, 0.32, 5.0, 24.0)]
 }
 
 pub fn arena() -> Arena {

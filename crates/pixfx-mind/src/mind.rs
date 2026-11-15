@@ -22,6 +22,7 @@ pub struct Mind {
     profile: Profile,
     body: BodySize,
     skills: Vec<Skill>,
+    foe_skills: Vec<Skill>,
     rng: Rng,
     explain: bool,
     // the round
@@ -48,6 +49,7 @@ impl Mind {
             profile,
             body,
             skills,
+            foe_skills: Vec::new(),
             rng: Rng::new(seed),
             explain: false,
             clock: 0.0,
@@ -88,6 +90,11 @@ impl Mind {
         self.yomi.clear();
         self.read.clear();
         self.mine = None;
+    }
+
+    /// The foe's skills, once: each sense then says only which of them are ready (`foe.ready`).
+    pub fn meet(&mut self, foe_skills: Vec<Skill>) {
+        self.foe_skills = foe_skills;
     }
 
     /// No thought for `seconds`.
@@ -147,6 +154,7 @@ impl Mind {
         let cands = candidates(&Ctx {
             me: &sense.me,
             foe: &foe,
+            foe_skills: &self.foe_skills,
             threats: &threats,
             arena: &sense.arena,
             skills: &self.skills,

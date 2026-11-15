@@ -16,12 +16,13 @@ const me = {
   x: 40, air: 0, face: 1, hp: 100, qi: 100, rage: 0, rageFull: 4, flying: false, hover: 0, vx: 0, canAct: true,
   silenced: false, sealed: false, barrier: false, shield: false, seekerOut: false,
 };
-const foe = { x: 150, air: 0, flying: false, hp: 100, qi: 100, doing: { type: "idle" }, outFor: 0, openIn: 0, frozen: 0, shocked: 0, barrier: false, ready: [] };
+const foe = { x: 150, air: 0, flying: false, hp: 100, qi: 100, doing: { type: "idle" }, outFor: 0, openIn: 0, frozen: 0, shocked: 0, barrier: false, ready: [true] };
 const sense = (time) => ({ time, me, foe, arena: { left: 0, right: 220, top: 96 }, threats: [], ready: [true, true] });
 
 describe("Mind", () => {
   test("a mind thinks from a sense", () => {
     const mind = new Mind(profile, body, skills, 1);
+    mind.meet([skill("slash", "melee")]);
     let thought = null;
     for (let i = 0; i < 60 && !thought; i++) thought = mind.think(sense(i / 60), 1 / 60);
     expect(thought).not.toBeNull();

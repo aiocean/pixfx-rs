@@ -47,8 +47,24 @@ fn a_long_cast_is_an_opening() {
 
 #[test]
 fn punisher_reads_foe_blade_in_reach() {
-    assert_eq!(punisher(&foe(60.0), &me(40.0), &body(), 0.32, 0.16), 5.0);
-    assert_eq!(punisher(&foe(160.0), &me(40.0), &body(), 0.32, 0.16), 0.0);
+    assert_eq!(
+        punisher(&foe(60.0), &foe_kit(), &me(40.0), &body(), 0.32, 0.16),
+        5.0
+    );
+    assert_eq!(
+        punisher(&foe(160.0), &foe_kit(), &me(40.0), &body(), 0.32, 0.16),
+        0.0
+    );
+}
+
+#[test]
+fn an_unready_foe_blade_does_not_punish() {
+    let mut f = foe(60.0);
+    f.ready = vec![false];
+    assert_eq!(
+        punisher(&f, &foe_kit(), &me(40.0), &body(), 0.32, 0.16),
+        0.0
+    );
 }
 
 #[test]

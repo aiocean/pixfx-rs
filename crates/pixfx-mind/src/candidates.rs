@@ -26,6 +26,8 @@ pub struct Ctx<'a> {
     pub me: &'a Me,
     /// The foe as seen (late).
     pub foe: &'a Foe,
+    /// The foe's skills, as `foe.ready` lists them.
+    pub foe_skills: &'a [Skill],
     /// The threats as seen (old enough).
     pub threats: &'a [Threat],
     pub arena: &'a Arena,
@@ -164,6 +166,7 @@ impl Ctx<'_> {
             self.profile.risk
                 * punisher(
                     self.foe,
+                    self.foe_skills,
                     self.me,
                     self.body,
                     s.recover,

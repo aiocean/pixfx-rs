@@ -1,8 +1,10 @@
-//! Seeing late (Rabin, Game AI Pro 2 ch. 5): what the foe starts doing reaches the mind `reaction` seconds later,
-//! and a threat only once it has been there that long. Where the foe is, how it stands and its countdowns are
-//! seen as they are.
+//! Seeing late (Rabin, Game AI Pro 2 ch. 5): a blow the foe winds up reaches the mind `reaction` seconds after it
+//! starts, and a threat only once it has been there that long. That is the time to react to a danger. Everything
+//! else (where the foe is, a cast it gathers, a recovery, a walk) is seen as it is: an opening is taken the moment
+//! it shows.
 
-use crate::sense::{Doing, Foe, Sense, Threat};
+use crate::reading::striking;
+use crate::sense::{ActPhase, Doing, Foe, Sense, Threat};
 use std::collections::VecDeque;
 
 /// How far back the mind remembers what the foe did, in seconds.
@@ -37,8 +39,9 @@ impl Delayed {
         self.now = Some((sense.foe.clone(), sense.threats.clone()));
     }
 
-    /// The foe as the mind sees it at `now`: as it is, but doing what it did `reaction` seconds ago (aged to now),
-    /// and the threats at least `reaction` old. Before anything is that old, the oldest doing it has.
+    /// The foe as the mind sees it at `now`: as it is, but while it winds up a blow, doing what it did `reaction`
+    /// seconds ago (aged to now); and the threats at least `reaction` old. Before anything is that old, the oldest
+    /// doing it has.
     pub fn seen(&self, now: f64, reaction: f64) -> (Foe, Vec<Threat>) {
         let Some((foe, threats)) = &self.now else {
             return (empty_foe(), vec![]);
@@ -51,7 +54,9 @@ impl Delayed {
             .find(|(t, _)| *t <= edge + 1e-9)
             .or(self.past.front());
         let mut seen = foe.clone();
-        if let Some((t, doing)) = past {
+        let blow =
+            matches!(foe.doing, Doing::Act { kind, phase: ActPhase::Windup, .. } if striking(kind));
+        if blow && let Some((t, doing)) = past {
             seen.doing = aged(doing, now - t);
         }
         let threats = threats
@@ -76,27 +81,38 @@ impl Delayed {
     }
 }
 
-/// A doing seen `by` seconds ago, as it would stand now if it went on.
+/// A doing seen `by` seconds ago, as it would stand now if it went on: a wind-up past its length is a blow struck
+/// and recovering, a recovery past its length is over.
 fn aged(doing: &Doing, by: f64) -> Doing {
-    match doing {
-        Doing::Act {
-            kind,
-            phase,
-            t,
-            windup,
-            recover,
-            reach,
-            damage,
-        } => Doing::Act {
-            kind: *kind,
-            phase: *phase,
-            t: t + by,
-            windup: *windup,
-            recover: *recover,
-            reach: *reach,
-            damage: *damage,
-        },
-        other => other.clone(),
+    let Doing::Act {
+        kind,
+        phase,
+        t,
+        windup,
+        recover,
+        reach,
+        damage,
+    } = *doing
+    else {
+        return doing.clone();
+    };
+    let mut t = t + by;
+    let mut phase = phase;
+    if phase == ActPhase::Windup && t >= windup {
+        phase = ActPhase::Recover;
+        t -= windup;
+    }
+    if phase == ActPhase::Recover && t >= recover {
+        return Doing::Idle;
+    }
+    Doing::Act {
+        kind,
+        phase,
+        t,
+        windup,
+        recover,
+        reach,
+        damage,
     }
 }
 
