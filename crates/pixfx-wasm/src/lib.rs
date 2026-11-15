@@ -81,8 +81,8 @@ struct MetaJs {
     /// Whether it wraps the character it plays on (`effect.wrap`), reading the sprite's shape, as
     /// `feedback/outline` and `feedback/power-up` do; others ignore a wrapped sprite.
     wraps_actor: bool,
-    /// Whether it draws the character it wraps itself, as `explosions/body-burst` does: the host hides that
-    /// character's own sprite while it plays.
+    /// Whether it destroys the character it wraps, as `explosions/body-burst` does: the host removes that
+    /// character's own sprite when it starts, for good.
     replaces_actor: bool,
     /// The effect's own options, beyond the ones every effect takes.
     options: Vec<OptionJs>,

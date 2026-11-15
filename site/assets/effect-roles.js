@@ -28,7 +28,7 @@ export const ROLES = [
   "ambient",
   // the caster vanishes in it and comes out behind the foe
   "blink",
-  // the caster strikes the foe down and it plays on the foe's own body, which it takes the place of
+  // the caster strikes the foe down and it destroys the foe's own body: the foe is gone
   "death",
 ];
 
@@ -38,8 +38,6 @@ export const ROLES = [
  * spell damage); `life`: how long a lasting effect stays.
  */
 const TABLE = {
-  // the body it wraps is the foe's: a killing blow blows the foe apart (explosions/body_burst.rs replaces_actor)
-  "explosions/body-burst": { role: "death", power: 30, spell: "seal" },
   // plasma-explosion's cue is at 0 (explosions/plasma_explosion.rs cues): the thunderclap lands as it appears
   "explosions/plasma-explosion": { role: "strike", at: "chest", impact: 0, power: 22, spell: "seal" },
   "explosions/small-explosion": { role: "strike", at: "ground", impact: 0, power: 20, spell: "seal" },
@@ -105,6 +103,8 @@ const BY_TAG = [
 ];
 
 const DEFAULT = { role: "strike", at: "ground", impact: 0, power: 18, spell: "seal" };
+/** For an effect that destroys the character it wraps (`meta.replacesActor`, as explosions/body-burst): a death. */
+const DEATH = { role: "death", power: 30, spell: "seal" };
 
 /**
  * The role effect `id` plays in a take and its tuning: `{ role, ...tuning }`. Known effects come from the table,
@@ -114,7 +114,7 @@ const DEFAULT = { role: "strike", at: "ground", impact: 0, power: 18, spell: "se
  */
 export function roleFor(id, meta) {
   const tags = meta?.tags ?? [];
-  const known = TABLE[id] ?? BY_TAG.find(([tag]) => tags.includes(tag))?.[1] ?? DEFAULT;
+  const known = TABLE[id] ?? (meta?.replacesActor ? DEATH : undefined) ?? BY_TAG.find(([tag]) => tags.includes(tag))?.[1] ?? DEFAULT;
   const option = (name) => meta?.options?.find((o) => o.name === name)?.default;
   return {
     ...known,

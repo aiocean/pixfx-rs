@@ -357,8 +357,6 @@ function createDuelView(canvas, id, m, role, room, told) {
     picture?.free();
   };
   const handles = new Map();
-  // the fighter each playing effect that draws its body itself stands in for, by the effect's key: hidden meanwhile
-  const standIns = new Map();
   let lights = [];
   let opts = {};
   let resting = 0;
@@ -379,20 +377,14 @@ function createDuelView(canvas, id, m, role, room, told) {
             impact(bout, key);
           })
           // a one-shot that ends on its own is let go
-          .on("complete", () => {
-            handles.delete(key);
-            standIns.delete(key);
-          });
+          .on("complete", () => handles.delete(key));
         // an effect that reads the sprite it plays on wraps the fighter that plays it
         if (meta(c.fx).wrapsActor) handle.wrap(() => bodies[c.by] ?? null);
-        // one that draws that fighter's body itself (a body blown apart) takes its place until it ends
-        if (meta(c.fx).replacesActor) standIns.set(key, c.by);
         handles.set(key, handle);
       } else if (c.type === "move" && handles.has(c.key)) handles.get(c.key).setPosition(c.x, c.y);
       else if (c.type === "stop" && handles.has(c.key)) {
         handles.get(c.key).stop();
         handles.delete(c.key);
-        standIns.delete(c.key);
       }
     }
   }
@@ -435,8 +427,8 @@ function createDuelView(canvas, id, m, role, room, told) {
     drawScene(ctx, scene, bout.time, scale);
     stage.drawLayer("back");
     if (!painted) paint();
-    const replaced = new Set(standIns.values());
-    for (const [i, picture] of painted.fighters.entries()) if (!replaced.has(i)) show(picture);
+    // one struck down is gone: the effect that destroyed it draws what is left of it
+    for (const [i, picture] of painted.fighters.entries()) if (!bout.fighters[i].dead) show(picture);
     show(painted.dust);
     painted = null;
     // the effect lights the dais and the fighters

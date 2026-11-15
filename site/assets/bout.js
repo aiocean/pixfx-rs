@@ -49,7 +49,7 @@ const BODY_FIELDS = ["x", "air", "vx", "vy", "face", "stun", "wake", "land", "sq
 function fighter(index, school, body) {
   const f = {
     index, school, stats: STATS[school], hp: 100, qi: 100, rage: 0, act: null, guard: 0, fly: false, hover: 0, intent: { move: 0 },
-    shield: 0, barrier: 0, rang: 0, burn: null, defDown: 0, silence: 0, chilled: 0, fury: 0, dodged: 0, cool: {}, coolFull: {},
+    dead: false, shield: 0, barrier: 0, rang: 0, burn: null, defDown: 0, silence: 0, chilled: 0, fury: 0, dodged: 0, cool: {}, coolFull: {},
     body, spec: body.spec,
   };
   for (const k of BODY_FIELDS) {
@@ -91,6 +91,8 @@ export function take(bout, fx, role, opts = {}, { caster: pick } = {}) {
   const target = bout.fighters[1 - caster.index];
   bout.takes++;
   for (const f of bout.fighters) {
+    // each take is a new fight: one struck down in the last stands again
+    f.dead = false;
     f.act = null;
     f.guard = 0;
     f.fly = false;
@@ -125,7 +127,7 @@ const CAPTIONS = {
   flight: "{c} flies on it and dives at {t}",
   ambient: "{c} and {t} spar beside it",
   blink: "{c} vanishes in it and strikes {t} from behind",
-  death: "{c} strikes {t} down, and {t}'s body bursts apart",
+  death: "{c} strikes {t} down, and {t} bursts apart",
 };
 
 function caption(tune, caster, target) {
@@ -168,8 +170,9 @@ function tick(bout, dt) {
   bout.time += dt;
   const [a, b] = bout.fighters;
   if (bout.take) direct(bout, bout.take, dt, bout.out);
-  for (const [me, foe] of [[a, b], [b, a]]) move(bout, me, foe, dt, bout.out);
-  bout.Body.separate(a.body, b.body, bout.arena);
+  // one struck down is gone: its body neither moves nor stands in the way
+  for (const [me, foe] of [[a, b], [b, a]]) if (!me.dead) move(bout, me, foe, dt, bout.out);
+  if (!a.dead && !b.dead) bout.Body.separate(a.body, b.body, bout.arena);
 }
 
 /** One step of fighter me's body, driven as duel.js drives it, and its act's clock. */
@@ -315,13 +318,14 @@ function expect(bout, T, times, land) {
  * f takes a blow of `power` from `by`, pushed toward `dir`: it reels or is thrown, and the screen feels a `hit`.
  * Life is not lost: a bout shows a fight, it does not end one.
  */
-function hit(bout, T, by, f, power, dir, out, { freeze = 0, ranged = false, spell = T.tune.spell ?? "seal" } = {}) {
+function hit(bout, T, by, f, power, dir, out, { freeze = 0, ranged = false, spell = T.tune.spell ?? "seal", kills = false } = {}) {
   if (f.body.untouchable()) return false;
   const type = SPELLS[spell]?.type ?? "magic";
   const damage = damageOf(by, f, power, type, false, bout.rng());
   const launch = bout.Body.heavy(power, freeze > 0);
   out.push({ type: "hit", by: by.index, spell, power, launch, ranged, damage, crit: false, share: (damage / f.stats.hp) * 100, x: f.x, y: f.air + f.spec.chest });
-  f.body.hit(power, dir, freeze > 0, f.fly);
+  // a killing blow throws nothing: what it struck is gone where it stood
+  if (!kills) f.body.hit(power, dir, freeze > 0, f.fly);
   if (freeze > 0) f.frozen = freeze;
   f.fly = false;
   f.act = null;
@@ -338,7 +342,7 @@ const palm = (f) => f.air + f.spec.chest;
 // ---------- the roles ----------
 
 const SCRIPTS = {
-  /** The caster strikes the foe down: the effect plays on the foe's own body, in the pose the blow caught it in. */
+  /** The caster strikes the foe down: the effect destroys the foe's own body where it stands, and the foe is gone. */
   death(bout, T, dt, out) {
     const { caster: me, target: foe, tune } = T;
     if (T.phase === "begin") {
@@ -347,7 +351,8 @@ const SCRIPTS = {
     }
     if (T.phase === "gather" && released(me)) {
       playFx(bout, T, foe.x, 0, foe, out, false);
-      hit(bout, T, me, foe, tune.power ?? 30, toward(me, foe), out);
+      hit(bout, T, me, foe, tune.power ?? 30, toward(me, foe), out, { kills: true });
+      foe.dead = true;
       go(T, "rest");
     }
   },

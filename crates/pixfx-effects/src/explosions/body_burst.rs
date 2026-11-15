@@ -3,8 +3,8 @@
 //! crack again, down to single pixels that bounce and heap up as dust on the floor; then the heap crumbles away. Made here, not ported: no source to check parity against; its golden
 //! hashes pin it.
 //!
-//! It wraps its actor ([`Effect::wraps_actor`]) and draws the body itself from its first frame, so it replaces the
-//! actor ([`Effect::replaces_actor`]): the game hides the character's own sprite while it plays. It reads the sprite as it
+//! It wraps its actor ([`Effect::wraps_actor`]) and destroys it ([`Effect::replaces_actor`]): it draws the body
+//! itself from its first frame, so the game removes the character's own sprite when the burst starts, for good. It reads the sprite as it
 //! shows up to the burst and ignores later frames: what flies is the pose the character died in. With no actor it
 //! blows apart a stand-in body (head, trunk, legs).
 //!
@@ -27,7 +27,7 @@ pub static BODY_BURST: BodyBurst = BodyBurst;
 const META: Meta = Meta {
     id: "explosions/body-burst",
     name: "Body burst",
-    desc: "The character blows apart: it swells white, bursts into big chunks of its own sprite that crack smaller and smaller as they fly and hit the floor, down to pixels that heap up as dust, then crumble away. The game hides its sprite while this plays.",
+    desc: "The character blows apart: it swells white, bursts into big chunks of its own sprite that crack smaller and smaller as they fly and hit the floor, down to pixels that heap up as dust, then crumble away. The character is gone: the game removes its sprite when this starts.",
     tags: &[
         "explosion",
         "death",

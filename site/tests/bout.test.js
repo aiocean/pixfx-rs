@@ -197,20 +197,27 @@ describe("bout", () => {
     expect(() => take(bout, "projectiles/laser-bolt", laser, {}, { caster: 2 })).toThrow("caster must be 0 or 1");
   });
 
-  test("a body burst plays on the fighter the caster strikes down, not on the caster", () => {
-    const { commands } = run("explosions/body-burst");
+  test("a body burst destroys the fighter the caster strikes down: it is gone where it stood", () => {
+    const { bout, commands } = run("explosions/body-burst");
     const play = commands.find((c) => c.type === "play" && c.fx === "explosions/body-burst");
     const hit = commands.find((c) => c.type === "hit");
     // Thunder (0) casts; the burst takes Frost's (1) body, where Frost stands as the blow lands
     expect(play?.by).toBe(1);
     expect(hit?.by).toBe(0);
     expect(commands.indexOf(play)).toBeLessThan(commands.indexOf(hit));
-    const bout = arena(3);
+    // after the take Frost is still gone, on the spot the burst played: thrown nowhere, never back
+    const [, frost] = bout.fighters;
+    expect(frost.dead).toBe(true);
+    expect(Math.round(frost.x)).toBe(play.x);
+    // a new take is a new fight: it stands again
     take(bout, "explosions/body-burst", roleFor("explosions/body-burst", meta("explosions/body-burst")));
-    expect(bout.caption).toBe("Thunder strikes Frost down, and Frost's body bursts apart");
+    expect(frost.dead).toBe(false);
+    expect(bout.caption).toBe("Frost strikes Thunder down, and Thunder bursts apart");
   });
 
-  test("only an effect that draws the body itself takes the fighter's place", () => {
+  test("only an effect that destroys the body it wraps plays as a death", () => {
+    expect(roleFor("explosions/body-burst", meta("explosions/body-burst")).role).toBe("death");
+    expect(roleFor("feedback/outline", meta("feedback/outline")).role).not.toBe("death");
     expect(meta("explosions/body-burst").replacesActor).toBe(true);
     expect(meta("feedback/outline").replacesActor).toBe(false);
     expect(meta("explosions/plasma-explosion").replacesActor).toBe(false);
