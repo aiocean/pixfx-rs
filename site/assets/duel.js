@@ -1088,6 +1088,32 @@ export function skillBar(f) {
 }
 
 /**
+ * What the HUD shows under fighter f's bars, good first, then bad: its school's passives (Thunder can stand up once
+ * a round, Frost's every second spell charges rage), then each thing it carries, with its stacks (0: none to show).
+ * Nothing once it is knocked out.
+ */
+export function buffsOf(f) {
+  if (f.hp <= 0) return [];
+  const good = (id, on, stacks = 0) => (on ? [{ id, good: true, stacks }] : []);
+  const bad = (id, on, stacks = 0) => (on ? [{ id, good: false, stacks }] : []);
+  return [
+    ...good("fury", f.fury > 0, f.fury),
+    ...good("unyielding", f.stats.unyielding && !f.rose),
+    ...good("attune", f.stats.attuned, f.attune % 2),
+    ...good("ward", f.charges > 0, f.charges),
+    ...good("barrier", f.barrier > 0),
+    ...good("grit", f.grit >= 1, Math.floor(f.grit)),
+    ...bad("burn", !!f.burn),
+    ...bad("chill", f.chill > 0, f.chill),
+    ...bad("shock", (f.shock?.stacks ?? 0) > 0, f.shock?.stacks ?? 0),
+    ...bad("frozen", f.frozen > 0),
+    ...bad("defDown", f.defDown > 0),
+    ...bad("silence", f.silence > 0),
+    ...bad("sealed", f.sealed > 0),
+  ];
+}
+
+/**
  * Fill slot `i` of f's bar with a skill from its pool that is not on the bar, with 1 to 4 casts. A round's first
  * draw is of the school's signature kind; while the foe carries a status, one draw in `PAY_DRAW` is a skill that
  * spends it. A stale skill's replacement is never that skill (`gone`).

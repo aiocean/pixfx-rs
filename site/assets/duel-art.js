@@ -3,7 +3,7 @@
 // they raise) are drawn by the engine (pixfx-fighter, through the wasm `Sprites`); this module tells it what each
 // fighter is doing, in the duel's own terms. Everything is in game pixels times `s`, the canvas scale.
 import { lookColors } from "../pkg/pixfx-canvas2d.js";
-import { RAGE, SPELLS, skillBar } from "./duel.js";
+import { RAGE, SPELLS, buffsOf, skillBar } from "./duel.js";
 import { ICON_CELLS, ICON_COLUMNS } from "./skill-icons.js";
 
 /** Each school's colours the HUD draws in, from the engine's looks (asked once the engine has loaded). */
@@ -124,7 +124,25 @@ export function drawNumbers(ctx, list, duel, s) {
 // ---------- the bars ----------
 
 const BRONZE = { light: "#f0cf7a", mid: "#b8893c", dark: "#6a4a1c", deep: "#2a1c0e" };
-const BAR = { back: "#160f1c", lost: "#5a1a14", trail: "#fff0d0", qi: "#7fb4ff", qiDark: "#2c4a80", beadOff: "#3a2c1a" };
+const BAR = { back: "#160f1c", lost: "#5a1a14", trail: "#fff0d0", qi: "#7fb4ff", qiLight: "#c8e0ff", rage: "#ff5a32", rageLight: "#ffb070" };
+/** Each buff's 7 by 7 icon and colour, in the tile under the bars (see `buffsOf`). */
+const BUFF = {
+  fury: { color: "#ffc23d", rows: ["...#...", "..###..", "..###..", "..###..", ".#####.", "...#...", "..###.."] },
+  unyielding: { color: "#ff6a5a", rows: [".##.##.", "#######", "#######", ".#####.", "..###..", "...#...", "......."] },
+  attune: { color: "#c89bff", rows: ["...#...", "..#.#..", ".#.#.#.", "#.###.#", ".#.#.#.", "..#.#..", "...#..."] },
+  ward: { color: "#a6ecff", rows: ["#######", "#.....#", "#.###.#", "#.###.#", ".#.#.#.", "..#.#..", "...#..."] },
+  barrier: { color: "#f0cf7a", rows: ["..###..", ".#...#.", "#.....#", "#.....#", "#.....#", "#######", "......."] },
+  grit: { color: "#b8893c", rows: ["..###..", ".#####.", "##.####", "#######", "####.##", ".#####.", "......."] },
+  burn: { color: "#ff9a3a", rows: ["...#...", "..##...", "..###..", ".####.#", ".######", "#######", ".#####."] },
+  chill: { color: "#bff2ff", rows: ["...#...", ".#.#.#.", "..###..", "#######", "..###..", ".#.#.#.", "...#..."] },
+  shock: { color: "#ffe14a", rows: ["....##.", "...##..", "..##...", ".#####.", "...##..", "..##...", ".##...."] },
+  frozen: { color: "#a6ecff", rows: ["#######", "#.#...#", "#..#..#", "#...#.#", "#.#...#", "#..#..#", "#######"] },
+  defDown: { color: "#8f8aa8", rows: [".##.##.", "#..#..#", "#..#..#", "#.#...#", ".#.#.#.", "..#.#..", "...#..."] },
+  silence: { color: "#c9c3e6", rows: ["#.....#", ".#...#.", "..#.#..", "...#...", "..#.#..", ".#...#.", "#.....#"] },
+  sealed: { color: "#c9c3e6", rows: ["..###..", ".#...#.", ".#...#.", "#######", "###.###", "###.###", "#######"] },
+};
+/** A buff tile's rim: green for a good one, red for a bad one. */
+const BUFF_RIM = { good: "#3fae5a", bad: "#c8322a" };
 /** Life each bar last showed, so a blow's loss drains away behind the bar instead of vanishing. */
 const shown = new WeakMap();
 
@@ -176,8 +194,6 @@ export function drawBars(ctx, sprites, show, duel, s, top) {
       const w = Math.min(width, Math.round((width * f.shield) / f.stats.hp));
       box(from(w), top + 7, w, 2, "#bff2ff");
     }
-    // a ward's charges: a pip each
-    for (let i = 0; i < (f.charges ?? 0); i++) box(right ? left + width - 4 - i * 5 : left + 1 + i * 5, top + 7, 3, 2, "#bff2ff");
     // a notch each tenth
     for (let i = 1; i < 10; i++) box(left + Math.round((width * i) / 10), top + 8, 1, 1, BAR.back, 0.6);
     const cap = (x) => {
@@ -185,24 +201,29 @@ export function drawBars(ctx, sprites, show, duel, s, top) {
       box(x + (right ? -1 : 1), top + 5, 1, 3, BRONZE.mid);
     };
     cap(right ? left - 2 : left + width + 1);
-    // qi
-    box(left, top + 11, width, 2, BAR.qiDark);
+    // qi (mana): a blue bar in its own frame under the life bar
+    box(left - 1, top + 12, width + 2, 4, BRONZE.deep);
+    box(left, top + 13, width, 2, BAR.back);
     const qi = Math.round((width * f.qi) / 100);
-    box(from(qi), top + 11, qi, 2, BAR.qi);
-    box(from(qi), top + 11, qi, 1, "#c8e0ff");
-    // rage beads
+    box(from(qi), top + 13, qi, 2, BAR.qi);
+    box(from(qi), top + 13, qi, 1, BAR.qiLight);
+    // rage: a red bar of its own under the qi, a segment per point, blazing once full
     const full = f.rage >= RAGE;
     const blaze = full && Math.sin(duel.time * 12) > 0;
+    // a narrow arena's plaque hangs between the rage bars: they shrink to leave it room
+    const seg = Math.max(3, Math.min(9, Math.floor((width - (narrow ? 20 : 0) + 1) / RAGE)));
+    const rageW = RAGE * seg - 1;
+    const rx = right ? left + width - rageW : left;
+    if (full) box(rx - 2, top + 16, rageW + 4, 8, BAR.rage, blaze ? 0.35 : 0.15);
+    box(rx - 1, top + 17, rageW + 2, 6, BRONZE.deep);
     for (let i = 0; i < RAGE; i++) {
-      const x = right ? left + width - 6 - i * 8 : left + i * 8;
+      const x = right ? rx + rageW - seg + 1 - i * seg : rx + i * seg;
       const on = i < f.rage;
-      if (full) box(x - 1, top + 14, 8, 7, c.glow, blaze ? 0.35 : 0.15);
-      box(x + 1, top + 15, 4, 1, BRONZE.dark);
-      box(x, top + 16, 6, 3, BRONZE.dark);
-      box(x + 1, top + 19, 4, 1, BRONZE.dark);
-      box(x + 1, top + 16, 4, 3, on ? (blaze ? "#ffffff" : c.glow) : BAR.beadOff);
-      if (on) box(x + 1, top + 16, 2, 1, "#ffffff", 0.7);
+      box(x, top + 18, seg - 1, 4, on ? (blaze ? "#ffffff" : BAR.rage) : BAR.back);
+      if (on) box(x, top + 18, seg - 1, 1, blaze ? "#ffffff" : BAR.rageLight);
     }
+    // what it carries, in tiles under the medallion and the bars, from its own edge inward (after Path of Exile)
+    buffs(f, right ? duel.right : duel.left, top + medal + 2, right, box);
   }
   // the plaque in the middle: the rounds each fighter has won, as a number in its own colour on its own half
   const mid = Math.round((duel.left + duel.right) / 2);
@@ -228,6 +249,29 @@ export function drawBars(ctx, sprites, show, duel, s, top) {
     sprites.portrait(m.f.school, look, m.x, m.y, m.size, m.f.hp <= 0 ? 0.35 : 1);
   }
   show(sprites.picture());
+}
+
+/** Fighter f's buffs (`buffsOf`) as 9 by 9 tiles in a row from `edge`, at row `top`: an icon on a dark field, a rim
+ *  green for a good one and red for a bad one, and its stacks as a digit in its lower right corner. */
+function buffs(f, edge, top, right, box) {
+  buffsOf(f).forEach((b, i) => {
+    const look = BUFF[b.id];
+    if (!look) return;
+    const x = right ? edge - 9 - i * 11 : edge + i * 11;
+    box(x, top, 9, 9, b.good ? BUFF_RIM.good : BUFF_RIM.bad);
+    box(x + 1, top + 1, 7, 7, "#120d18");
+    look.rows.forEach((row, r) => {
+      for (let k = 0; k < 7; k++) if (row[k] === "#") box(x + 1 + k, top + 1 + r, 1, 1, look.color);
+    });
+    if (b.stacks > 0) {
+      // inside the tile's lower right corner, so a tile at the screen's edge keeps its digit
+      const d = DIGIT[Math.min(9, b.stacks)];
+      box(x + 4, top + 2, 5, 7, "#120d18");
+      d.forEach((row, r) => {
+        for (let k = 0; k < 3; k++) if (row[k] === "#") box(x + 5 + k, top + 3 + r, 1, 1, "#ffffff");
+      });
+    }
+  });
 }
 
 /** A bronze medallion at (x, top), `size` across, with f's face in it, lit in its colour once its rage is full. */
