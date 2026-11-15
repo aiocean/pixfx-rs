@@ -32,7 +32,7 @@ function marks(f, time) {
   if (f.hp <= 0) return null;
   return {
     shield: f.shield > 0, barrier: f.barrier > 0, rang: f.rang > 0, burning: !!f.burn, defDown: f.defDown > 0,
-    silence: f.silence > 0, chilled: f.chilled > 0, fury: f.fury, poseT: f.poseT, dome: f.school === "thunder" ? "banded" : "faceted",
+    silence: f.silence > 0, chilled: f.chilled > 0 || f.chill > 0, fury: f.fury, poseT: f.poseT, dome: f.school === "thunder" ? "banded" : "faceted",
     burn: !!f.burn, shock: f.shocked > 0, ice: f.frozen > 0, t: time, seed: f.index + 1,
   };
 }

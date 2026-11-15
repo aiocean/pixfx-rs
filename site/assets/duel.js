@@ -19,7 +19,42 @@ const FLY = { top: 96, cost: 3 };
 export const RAGE = 4;
 /** Status effects: frozen (no moving, no acting) and shocked (a short paralysis), in seconds. */
 const FREEZE = 0.9;
-const SHOCK = { time: 0.4, chance: 0.3 };
+/**
+ * Statuses that stack (after Halls of Torment). Chill: each chilling hit adds a stack (at most `max`), all of them
+ * fading `time` seconds after the last; each slows walking by `slow`, and the last freezes and clears them. Shock:
+ * each shocking hit adds a stack (at most `max`); a shocked fighter twitches every `every × fast^(stacks − 1)`
+ * seconds, spending a stack, losing `share` of the caster's attack (no defence) and held for `hold` seconds.
+ */
+const CHILL = { max: 3, time: 2.5, slow: 0.85 };
+const SHOCK = { max: 5, every: 0.6, fast: 0.854, share: 0.03, hold: 0.12 };
+/** Skills that spend the foe's stacks of a status to hit harder: this much more power per stack. */
+const PAYOFF = { palm: { status: "shock", per: 0.12 }, burst: { status: "shock", per: 0.12 }, shatter: { status: "chill", per: 0.15 }, lotus: { status: "chill", per: 0.15 } };
+
+/** Seconds between shock ticks with `stacks` stacks. */
+export function shockInterval(stacks) {
+  return SHOCK.every * SHOCK.fast ** (stacks - 1);
+}
+
+/** f takes `n` chill stacks; the last one it can hold freezes it. */
+export function addChill(duel, f, n) {
+  if (f.hp <= 0) return;
+  f.chill = Math.min(CHILL.max, f.chill + n);
+  f.chillT = CHILL.time;
+  if (f.chill >= CHILL.max) {
+    f.chill = 0;
+    f.chillT = 0;
+    f.frozen = Math.max(f.frozen, FREEZE);
+  }
+}
+
+/** f takes `n` shock stacks from `by`. */
+export function addShock(duel, f, by, n) {
+  if (f.hp <= 0) return;
+  if (!f.shock) f.shock = { stacks: 0, tick: 0, by: by.index };
+  f.shock.stacks = Math.min(SHOCK.max, f.shock.stacks + n);
+  if (f.shock.tick <= 0) f.shock.tick = shockInterval(f.shock.stacks);
+  f.shock.by = by.index;
+}
 /**
  * How a blow turns into damage, the way xianxia hero battlers count it: attack times the skill's percentage, cut by
  * the defence that matches its type (physical or magic), then a crit roll, a little spread, and a dodge roll before
@@ -253,7 +288,7 @@ function fighter(index, school, usable, body) {
   const { basics, pool, ultimate } = SCHOOLS[school];
   // every spell it may cast this fight: the brain is told them all once; one off the bar is never ready
   const spells = [...basics, ...pool, ultimate].filter(usable);
-  const f = { index, school, spells, pool: pool.filter(usable), bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
+  const f = { index, school, spells, pool: pool.filter(usable), bar: [], stats: STATS[school], hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, cool: {}, coolFull: {}, intent: { move: 0 }, aura: null, attune: 0, mind: null, body, spec: body.spec };
   for (const k of BODY_FIELDS) {
     Object.defineProperty(f, k, { enumerable: true, get: () => body[k], set: (v) => { body[k] = v; } });
   }
@@ -269,7 +304,7 @@ function startRound(duel) {
   for (const s of duel.shots) stopShot(duel, s);
   duel.shots = [];
   for (const f of duel.fighters) {
-    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chilled: 0, cool: {}, coolFull: {}, intent: { move: 0 } });
+    Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, shield: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, cool: {}, coolFull: {}, intent: { move: 0 } });
     f.mind.reset();
     f.bar = [];
     for (let i = 0; i < BAR.slots; i++) draw(duel, f, i);
@@ -320,7 +355,9 @@ function body(duel, me, foe, dt) {
   me.defDown = Math.max(0, me.defDown - dt);
   me.silence = Math.max(0, me.silence - dt);
   me.dodged = Math.max(0, me.dodged - dt);
-  me.chilled = Math.max(0, me.chilled - dt);
+  me.chillT = Math.max(0, me.chillT - dt);
+  if (me.chillT === 0) me.chill = 0;
+  shocking(duel, me, dt);
   me.shieldT = Math.max(0, me.shieldT - dt);
   if (me.shieldT === 0) me.shield = 0;
   me.rang = Math.max(0, me.rang - dt);
@@ -342,7 +379,7 @@ function body(duel, me, foe, dt) {
   // a dive drops straight at the foe's height
   const diving = me.act?.phase === "windup" && SPELLS[me.act.spell].dive;
   const motion = diving ? { dive: SPELLS.dive.speed, floor: foe.air } : me.fly ? { fly: me.hover } : "gravity";
-  const drive = { alive: me.hp > 0, acting: me.act !== null, meditating: me.medit, guarding: me.guard > 0, chilled: me.chilled > 0, intent: me.intent.move, motion, foeX: foe.x };
+  const drive = { alive: me.hp > 0, acting: me.act !== null, meditating: me.medit, guarding: me.guard > 0, chilled: false, intent: me.intent.move * CHILL.slow ** me.chill, motion, foeX: foe.x };
   for (const e of me.body.step(dt, drive, duel.arena, duel.rng)) emit(duel, e);
 
   if (me.act) {
@@ -441,7 +478,7 @@ function release(duel, me, foe, spell) {
     cast(duel, me, spell.fx, x, g - me.spec.chest - me.air);
     if (Math.abs(foe.x - me.x) <= spell.range + foe.spec.halfWidth && Math.abs(foe.air - me.air) < foe.spec.body && foe.hp > 0) {
       if (blocks(foe, me.x, hit)) clash(duel, foe.x - me.face * 4, g - foe.spec.chest - foe.air, [foe]);
-      else if (hurt(duel, foe, hit, me.face, me.act.spell) && spell.shock) shock(duel, foe, SHOCK.chance);
+      else if (hurt(duel, foe, hit, me.face, me.act.spell) && spell.shock) addShock(duel, foe, me, 1);
     }
   } else if (spell.kind === "void") {
     const x = clamp(foe.x, duel.left + 10, duel.right - 10);
@@ -550,6 +587,17 @@ function hurt(duel, f, power, dir, spell) {
     emit(duel, { type: "dodge", x: f.x, y: f.air + f.spec.chest });
     return false;
   }
+  // a payoff spends the stacks of its status on f, a little more power for each
+  const pay = PAYOFF[spell];
+  if (pay) {
+    const stacks = pay.status === "shock" ? (f.shock?.stacks ?? 0) : f.chill;
+    power *= 1 + pay.per * stacks;
+    if (pay.status === "shock") f.shock = null;
+    else {
+      f.chill = 0;
+      f.chillT = 0;
+    }
+  }
   const crit = duel.rng() < by.stats.crit;
   const amount = damageOf(by, f, power, s?.type ?? "magic", crit, duel.rng());
   const share = take(duel, f, amount);
@@ -575,6 +623,7 @@ function hurt(duel, f, power, dir, spell) {
   if (s?.burn) f.burn = { t: BURN.time, tick: BURN.every, per: Math.round(by.stats.atk * (1 + FURY.per * by.fury) * BURN.share), by: by.index };
   if (s?.defDown) f.defDown = s.defDown;
   if (s?.silence) f.silence = s.silence;
+  if (s?.chill) addChill(duel, f, 1);
   if (s?.stealRage && f.rage > 0) {
     f.rage -= s.stealRage;
     gainRage(by, s.stealRage);
@@ -625,8 +674,19 @@ function gainRage(f, n) {
 }
 
 /** With `chance`, a shock paralyses f for a moment. */
-function shock(duel, f, chance) {
-  if (f.hp > 0 && duel.rng() < chance) f.shocked = SHOCK.time;
+/** f's shock stacks twitch, one a tick, faster the more there are. */
+function shocking(duel, f, dt) {
+  if (!f.shock) return;
+  f.shock.tick -= dt;
+  if (f.shock.tick > 0 || f.hp <= 0) return;
+  const by = duel.fighters[f.shock.by];
+  const amount = Math.round(by.stats.atk * SHOCK.share);
+  const share = take(duel, f, amount);
+  emit(duel, { type: "tick", by: by.index, damage: amount, share, x: f.x, y: f.air + f.spec.chest });
+  f.shocked = Math.max(f.shocked, SHOCK.hold);
+  f.shock.stacks--;
+  if (f.shock.stacks <= 0) f.shock = null;
+  else f.shock.tick = shockInterval(f.shock.stacks);
 }
 
 function clash(duel, x, y, fighters) {
@@ -708,7 +768,7 @@ function shot(duel, s, dt) {
     }
     if (overlaps(foe, s.x, s.y, 3)) {
       if (blocks(foe, s.x - s.vx, s.power)) clash(duel, s.x, g - s.y, []);
-      else if (hurt(duel, foe, s.power, Math.sign(s.vx), "bolt")) shock(duel, foe, SHOCK.chance);
+      else if (hurt(duel, foe, s.power, Math.sign(s.vx), "bolt")) addShock(duel, foe, duel.fighters[s.owner], 1);
       return endShot(duel, s);
     }
     if (s.x < duel.left - 40 || s.x > duel.right + 40) endShot(duel, s);
@@ -750,7 +810,7 @@ function shot(duel, s, dt) {
       const reaches = Math.abs(foe.x - s.x) < spell.radius + foe.spec.halfWidth && (spell.grounded ? foe.air < 10 : Math.abs(foe.air - s.air) < 22);
       if (reaches && hurt(duel, foe, s.power, Math.sign(foe.x - s.x) || 1, s.name)) {
         if (spell.freeze) foe.frozen = spell.freeze;
-        if (spell.shock) shock(duel, foe, spell.ultimate ? 1 : SHOCK.chance);
+        if (spell.shock) addShock(duel, foe, duel.fighters[s.owner], 1);
       }
     }
     if (s.t >= spell.impact + 0.2) duel.shots.splice(duel.shots.indexOf(s), 1);
@@ -758,8 +818,6 @@ function shot(duel, s, dt) {
     // the vortex drags the foe in, and burns while it stands under it
     const dx = s.x - foe.x;
     if (Math.abs(dx) < spell.reach && foe.hp > 0) foe.x += Math.sign(dx) * Math.min(Math.abs(dx), spell.pull * dt);
-    // frostfire slows whoever stands in it
-    if (spell.chill && Math.abs(dx) < spell.under) foe.chilled = 0.1;
     // it burns whoever stands under it, a tick every half second
     s.tick += dt;
     if (s.tick >= 0.5) {
@@ -769,6 +827,8 @@ function shot(duel, s, dt) {
         const amount = damageOf(by, foe, spell.tick, spell.type, false, duel.rng());
         const share = take(duel, foe, amount);
         emit(duel, { type: "tick", by: by.index, damage: amount, share, x: foe.x, y: foe.air + foe.spec.chest });
+        // a cold fire chills whoever stands in it, a stack a tick
+        if (spell.chill) addChill(duel, foe, 1);
       }
     }
     if (s.t >= spell.life) {
