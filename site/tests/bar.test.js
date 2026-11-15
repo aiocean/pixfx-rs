@@ -158,6 +158,21 @@ describe("draw rules", () => {
     expect(shocked).toBeGreaterThan(plain + 0.15);
   });
 
+  test("a new round's draws ignore the statuses the last round left on the foe", () => {
+    const nextBar = (seed, leftover) => {
+      const duel = arena(seed);
+      for (const f of duel.fighters) f.mind.hold(1e9);
+      const [thunder, frost] = duel.fighters;
+      if (leftover) addShock(duel, frost, thunder, 3);
+      frost.hp = 0;
+      const round = duel.round;
+      for (let i = 0; i < 60 * 10 && duel.round === round; i++) step(duel, 1 / 60);
+      expect(duel.round).toBe(round + 1);
+      return thunder.bar.map((slot) => slot.spell);
+    };
+    for (let seed = 1; seed <= 20; seed++) expect([seed, nextBar(seed, true)]).toEqual([seed, nextBar(seed, false)]);
+  });
+
   test("a draw never repeats a skill on the bar", () => {
     const duel = arena(11);
     const f = duel.fighters[1];

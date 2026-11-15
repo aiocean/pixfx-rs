@@ -378,11 +378,12 @@ function startRound(duel) {
     Object.assign(f, { hp: 100, qi: 100, act: null, guard: 0, medit: false, fly: false, hover: 0, rage: 0, sealed: 0, charges: 0, shieldT: 0, barrier: 0, barrierSpell: null, barrierKey: null, rang: 0, burn: null, defDown: 0, silence: 0, fury: 0, rose: false, dodged: 0, chill: 0, chillT: 0, shock: null, grit: 0, cool: {}, coolFull: {}, intent: { move: 0 } });
     f.mind.reset();
     f.bar = [];
-    for (let i = 0; i < BAR.slots; i++) draw(duel, f, i, i === 0);
     f.body.startRound(duel.left + span * (f.index === 0 ? 0.22 : 0.78));
     if (f.aura !== null) emit(duel, { type: "stop", key: f.aura });
     f.aura = null;
   }
+  // the draws come once both fighters are fresh: nothing the last round left on a foe steers them
+  for (const f of duel.fighters) for (let i = 0; i < BAR.slots; i++) draw(duel, f, i, i === 0);
 }
 
 /** Advance the duel by `dt` seconds; returns the effect commands for this step. */
