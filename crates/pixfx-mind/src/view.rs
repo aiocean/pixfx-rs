@@ -92,6 +92,7 @@ fn aged(doing: &Doing, by: f64) -> Doing {
         recover,
         reach,
         damage,
+        ultimate,
     } = *doing
     else {
         return doing.clone();
@@ -113,6 +114,7 @@ fn aged(doing: &Doing, by: f64) -> Doing {
         recover,
         reach,
         damage,
+        ultimate,
     }
 }
 
