@@ -156,25 +156,61 @@ impl Clip {
             if !on || f == c.from {
                 continue;
             }
-            let s = skeleton(body, &self.keyed(c.from), 0.0);
+            let planted = self.keyed(c.from);
+            let s = skeleton(body, &planted, 0.0);
             let end = match c.limb {
                 Limb4::RightArm => s.right_arm.end,
                 Limb4::LeftArm => s.left_arm.end,
                 Limb4::RightLeg => s.right_leg.end,
                 Limb4::LeftLeg => s.left_leg.end,
             };
-            let ((x0, y0), (x1, y1)) = (self.root_at(c.from), self.root_at(f));
-            let target = [end.x + x0 - x1, -end.y + y0 - y1, end.depth];
-            if let Some(l) = reach(body, &pose, c.limb, target) {
-                match c.limb {
-                    Limb4::RightArm => pose.right_arm = l,
-                    Limb4::LeftArm => pose.left_arm = l,
-                    Limb4::RightLeg => pose.right_leg = l,
-                    Limb4::LeftLeg => pose.left_leg = l,
+            let (dx, dy) = self.travel(c.from, f);
+            let target = [end.x - dx, -end.y - dy, end.depth];
+            let Some(l) = reach(body, &pose, c.limb, target) else {
+                continue;
+            };
+            // The hand or foot keeps the angle it landed at: the wrist or ankle takes up what the limb turned.
+            // A knee folds the shin back, an elbow folds the forearm forward.
+            let keep = |was: Limb, joint: f64, fold: f64| {
+                (was.raise + fold * was.bend + joint) - (l.raise + fold * l.bend)
+            };
+            match c.limb {
+                Limb4::RightArm => {
+                    pose.right_hand = keep(planted.right_arm, planted.right_hand, 1.0);
+                    pose.right_arm = l;
+                }
+                Limb4::LeftArm => {
+                    pose.left_hand = keep(planted.left_arm, planted.left_hand, 1.0);
+                    pose.left_arm = l;
+                }
+                Limb4::RightLeg => {
+                    pose.right_foot = keep(planted.right_leg, planted.right_foot, -1.0);
+                    pose.right_leg = l;
+                }
+                Limb4::LeftLeg => {
+                    pose.left_foot = keep(planted.left_leg, planted.left_foot, -1.0);
+                    pose.left_leg = l;
                 }
             }
         }
         pose
+    }
+
+    /// How far the root moves from frame `from` forward to frame `to`, round a loop's seam if it must: a loop's
+    /// whole cycle is its root key on frame `frames` (or its last key).
+    pub fn travel(&self, from: u32, to: u32) -> (f64, f64) {
+        let (a, b) = (self.root_at(from), self.root_at(to));
+        if to >= from || self.mode == Mode::Once {
+            return (b.0 - a.0, b.1 - a.1);
+        }
+        let fin = |v: f64| if v.is_finite() { v } else { 0.0 };
+        let cycle = self
+            .root
+            .iter()
+            .max_by_key(|r| r.0)
+            .map_or((0.0, 0.0), |r| (fin(r.1), fin(r.2)));
+        let start = self.root_at(0);
+        (cycle.0 - a.0 + b.0 - start.0, cycle.1 - a.1 + b.1 - start.1)
     }
 
     /// The root's motion on `frame`: `(dx, dy)` in pixels, 0 where nothing is keyed or a number is bad.
@@ -236,6 +272,7 @@ fn lerp_pose(a: &Pose, b: &Pose, t: f64) -> Pose {
         lie: lerp(a.lie, b.lie, t),
         lift: lerp(a.lift, b.lift, t),
         roll: lerp(a.roll, b.roll, t),
+        spin: lerp(a.spin, b.spin, t),
         right_foot: lerp(a.right_foot, b.right_foot, t),
         left_foot: lerp(a.left_foot, b.left_foot, t),
         right_hand: lerp(a.right_hand, b.right_hand, t),

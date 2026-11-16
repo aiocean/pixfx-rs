@@ -15,10 +15,10 @@
 #![forbid(unsafe_code)]
 
 mod font;
-pub mod presets;
 mod sheet;
 pub mod spec;
 
+pub use pixfx_body::presets;
 // The rig lives in pixfx-body; its names stay here so every script and spec keeps working.
 pub use pixfx_body::{
     Body, Bone, Head, Limb, LimbPoints, Point, Pose, Side, Skeleton, Sword, facing, skeleton,

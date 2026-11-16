@@ -92,3 +92,29 @@ fn an_old_json_body_and_pose_still_load() {
     let pose: Result<Pose, _> = serde_json::from_str(r#"{"lean":10}"#);
     assert!(pose.is_ok());
 }
+
+#[test]
+fn a_spin_of_180_turns_her_whole_body_round() {
+    let b = Body::default();
+    let s = skeleton(
+        &b,
+        &Pose {
+            spin: 180.0,
+            ..Pose::default()
+        },
+        facing::RIGHT,
+    );
+    let e = skeleton(&b, &Pose::default(), facing::LEFT);
+    assert!(
+        (s.nose.x - e.nose.x).abs() < 1e-9 && (s.right_leg.tip.x - e.right_leg.tip.x).abs() < 1e-9
+    );
+    assert_eq!(
+        Pose {
+            spin: 30.0,
+            ..Pose::default()
+        }
+        .mirrored()
+        .spin,
+        -30.0
+    );
+}

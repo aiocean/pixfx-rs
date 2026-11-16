@@ -85,6 +85,8 @@ pub struct Pose {
     pub lift: f64,
     /// The whole body turned about her forward axis toward her right (a cartwheel): 180 stands her on her head.
     pub roll: f64,
+    /// The whole body turned about the up axis toward her right (turning round): 180 faces her the other way.
+    pub spin: f64,
     /// Ankle: toes up (positive) or pointed down (negative) from flat.
     pub right_foot: f64,
     pub left_foot: f64,
@@ -110,6 +112,7 @@ impl Pose {
             right_leg: self.left_leg,
             left_leg: self.right_leg,
             roll: -self.roll,
+            spin: -self.spin,
             right_foot: self.left_foot,
             left_foot: self.right_foot,
             right_hand: self.left_hand,

@@ -179,3 +179,50 @@ fn a_clip_reads_from_json() {
     );
     assert!(c.is_ok(), "{c:?}");
 }
+
+#[test]
+fn a_planted_foot_across_the_loops_seam_stays_put_in_the_world() {
+    let b = Body::default();
+    let step = |r: f64| Pose {
+        right_leg: Limb::new(r, 0.0, 10.0),
+        left_leg: Limb::new(-r, 0.0, 10.0),
+        ..Pose::default()
+    };
+    // the right foot lands ahead on frame 6 and is planted round the seam until it is behind on frame 2; the
+    // cycle travels 22 pixels, keyed at its end
+    let mut c = clip(Mode::Loop, vec![key(2, step(-25.0)), key(6, step(25.0))]);
+    c.contacts = vec![Contact {
+        limb: Limb4::RightLeg,
+        from: 6,
+        to: 1,
+    }];
+    c.root = vec![(0, 0.0, 0.0), (8, 22.0, 0.0)];
+    let end = |f: u32| skeleton(&b, &c.pose_at(&b, f), 0.0).right_leg.end.x;
+    // where the foot is in the world: before the seam the root is root_at(f), after it a whole cycle on
+    let world = |f: u32| end(f) + c.root_at(f).0 + if f < 6 { 22.0 } else { 0.0 };
+    for f in [7, 0, 1] {
+        assert!(
+            (world(f) - world(6)).abs() < 0.5,
+            "frame {f}: {} vs {}",
+            world(f),
+            world(6)
+        );
+    }
+}
+
+#[test]
+fn a_planted_foot_stays_flat_on_the_ground() {
+    let b = Body::default();
+    let mut c = stride();
+    c.root = vec![(0, 0.0, 0.0), (4, 6.0, 0.0)];
+    for f in 0..=4 {
+        let s = skeleton(&b, &c.pose_at(&b, f), 0.0);
+        let (end, tip) = (s.right_leg.end, s.right_leg.tip);
+        let start = skeleton(&b, &c.pose_at(&b, 0), 0.0).right_leg;
+        let slope = |e: pixfx_body::Point, t: pixfx_body::Point| (t.y - e.y) / (t.x - e.x);
+        assert!(
+            (slope(end, tip) - slope(start.end, start.tip)).abs() < 1e-6,
+            "frame {f}"
+        );
+    }
+}

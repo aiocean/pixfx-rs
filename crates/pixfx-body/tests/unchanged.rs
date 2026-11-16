@@ -1,7 +1,7 @@
 //! Every preset at every facing keeps the joints it had when the rig moved to pixfx-body. `PIXFX_BLESS=1` writes
 //! the golden; otherwise each joint must match it.
 
-use pixfx_pose::{Body, facing, presets, skeleton};
+use pixfx_body::{Body, facing, presets, skeleton};
 use serde_json::{Map, Value};
 
 const GOLDEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/goldens/skeletons.json");

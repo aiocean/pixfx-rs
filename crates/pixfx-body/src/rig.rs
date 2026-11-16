@@ -482,7 +482,10 @@ fn side_sign(side: Side) -> f64 {
 
 /// The pelvis's frame and the upper body's, from the world's.
 fn body_frames(world: Frame, pose: &Pose) -> (Frame, Frame) {
-    let pelvis = world.pitched(-fin(pose.lie)).rolled(fin(pose.roll));
+    let pelvis = world
+        .yawed(fin(pose.spin))
+        .pitched(-fin(pose.lie))
+        .rolled(fin(pose.roll));
     let torso = pelvis
         .pitched(fin(pose.lean))
         .rolled(fin(pose.tilt))

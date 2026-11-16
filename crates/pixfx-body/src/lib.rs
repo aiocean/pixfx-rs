@@ -7,8 +7,10 @@
 
 mod body;
 mod camera;
+pub mod catalog;
 mod clip;
 mod pose;
+pub mod presets;
 mod rig;
 
 pub use body::Body;
