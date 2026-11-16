@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Duel: frame data (`docs/superpowers/specs/2026-11-16-duel-frames-design.md`, numbers in `pixfx_duel::data::FRAMES`).
+  A blow on a fighter gathering a cast is a COUNTER, on one recovering a PUNISH: 1.2x power and a longer stagger
+  (+0.10 s, +0.20 s), and the hit event says which (`how`). Dive, step, palm, burst and lotus recover longer and an
+  extra 0.15 s when guarded; jet, heal and the ultimates recover longer too. Casting drops a guard. An ultimate's first
+  0.30 s cannot be hit (the blow passes through as a dodge). A counter or a punish stops the fight 2 or 3 ticks
+  longer and floats its word over the damage (`pixfx_fighter::feel`). The policy sees each act's phase, the seconds
+  left in it and each skill's windup and recover (`OBS` 250 -> 354), and is retrained on these rules (3000 updates):
+  it beats the brain 94.8% and the first mind 95.3% over 150 seeds, with no round cut.
+- Duel: `examples/ladder.rs --telemetry` prints, for each mirror, what each school's skills did (casts, landed,
+  damage, guarded, broken, punished, final blows) and each school's totals.
+- Train: long runs go on a training machine as a launchd job (`train/long-run.sh`, which resumes from the last checkpoint
+  when the trainer dies); `train/README.md` "Training on a remote host".
+
 - Fighter: the duck, launched, tumble and fall poses are redrawn by hand from reference drawings
   (`pixfx-pixel` clean and read), each with the whole costume as the standing poses wear it: the crown and its
   ribbon, the crossed collar's gold edge over the red inner robe, the sash with its buckle, jade pendant and streaming

@@ -1,7 +1,15 @@
 # Duel frames: design
 
-Status: approved by the user 2026-11-16. Lands before the balance pass
-(`2026-11-16-duel-auto-balance-design.md`), and its observation change rides on that spec's base-model retrain.
+Status: shipped 2026-11-16 (main `629f9d1`, the page deployed with the policy retrained on these rules). Every number
+is in `pixfx_duel::data::FRAMES` and the spells' `recover`; the rules' tests are `crates/pixfx-duel/tests/frames.rs`.
+
+Built differently from the text below:
+
+- An ultimate gets no extra recovery when blocked: it falls as a zone, which no guard stops, so it is never blocked.
+  `FRAMES.unsafe_on_block` is dive, step, palm, burst and lotus.
+- The rules carry no hit-stop numbers. A blow says what kind it was (`Out::Hit.how`), and the feel decides how long it
+  stops (`pixfx_fighter::feel::Stop`: counter 2, punish 3 extra ticks) and floats the word (`NumberKind::Counter` /
+  `Punish`). `crates/pixfx-wasm/tests/hit_words.rs` keeps the duel's spelling of the kind and the feel's the same.
 
 ## Intent
 

@@ -18,6 +18,12 @@ take and which are legal now (`Act`, `legal`, `choice`), the network in plain `f
 `sample`), and `PolicyMind`, which sees as late and thinks as often as `Mind` and acts on the tick after it decides.
 The trainer that makes the weights is `train/`; the duel's weights live in `pixfx-duel`.
 
+The policy sees frame data (`docs/superpowers/specs/2026-11-16-duel-frames-design.md`): its own act (`Me.act`:
+winding up or recovering, and the seconds left), the foe's phase with the seconds left in it, its span and whether
+it is an ultimate (whose opening cannot be hit), and each slot's windup, recover and what it inflicts in sizes
+(`Inflicts`), so a slow recovery reads as an opening to punish. `observe.rs`'s header lists every float (`OBS` = 354);
+a change to it changes the weights file's input size and needs a retrain.
+
 ## Belongs here
 
 - How a fighter decides: postures, scoring, reading and learning the foe, reaction time, tempo.

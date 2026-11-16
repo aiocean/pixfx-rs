@@ -34,6 +34,9 @@ trained policy per corner (`seats`: `["policy" | "brain" | "first", ...]`, each 
 weights file (`crates/pixfx-duel/weights/*.bin`), which the page fetches beside the wasm (the wasm never carries the
 weights); its tables as
 the page reads (`duelSpells()`, `duelTraits()`, `duelStats()`, `duelConstants()`), `damageOf` and `orbOffset`.
+A `hit` event says what kind of blow it was (`how`: `"plain"`, `"counter"` on a fighter gathering a cast, `"punish"`
+on one recovering); `FightFeel.react` reads it, stops longer and floats the word (`tests/hit_words.rs` keeps the
+duel's and the feel's spelling the same).
 `Sprites.picture()` and `Lighting.paint()` return a `Picture` (`src/picture.rs`: the lit box's colour and light
 RGBA) that a shell draws. `Squash.step(dt, x, y, vx?, vy?)` works out velocity from movement.
 
