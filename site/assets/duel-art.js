@@ -140,9 +140,11 @@ const NUMBER = {
   heal: { size: 8, color: "#8dffa8" },
   ward: { size: 8, color: "#a6ecff" },
   dodge: { size: 9, color: "#b8b4c8" },
+  counter: { size: 11, color: "#ffd84a" },
+  punish: { size: 12, color: "#ff3d6a" },
 };
 
-/** The numbers over the fighters (from the engine's `FightFeel.numbers()`): damage, burns, heals, wards and dodges. */
+/** The numbers over the fighters (from the engine's `FightFeel.numbers()`): damage, burns, heals, wards, dodges and the words over counters and punishes. */
 export function drawNumbers(ctx, list, duel, s) {
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";

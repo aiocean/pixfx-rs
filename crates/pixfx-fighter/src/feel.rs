@@ -15,8 +15,8 @@ use pixfx_draw::math::{js_max, js_min, js_round, to_int32};
 
 /// Hit-stop, in frames at 60 a second, the way fighting games and Sakurai's Smash count it: both fighters freeze
 /// together, longer the heavier the blow (Street Fighter 6 gives its mediums 11 frames, its heavies 13); a blow of
-/// `medium_power` or more is a medium; a crit holds longer, a spell that struck from afar shorter, and no blow
-/// freezes the fight past the screen's `freeze_cap`.
+/// `medium_power` or more is a medium; a crit holds longer, a spell that struck from afar shorter, a counter or a
+/// punish longer still, and no blow freezes the fight past the screen's `freeze_cap`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stop {
     pub light: f64,
@@ -24,6 +24,8 @@ pub struct Stop {
     pub launch: f64,
     pub crit: f64,
     pub ranged: f64,
+    pub counter: f64,
+    pub punish: f64,
     pub medium_power: f64,
 }
 
@@ -72,7 +74,8 @@ pub struct FeelSpec {
     pub stop: Stop,
     /// The one struck shudders through the hit-stop: this many pixels at first, dying away by its end.
     pub jolt: f64,
-    /// Trauma, 0 to 1, a blow adds: its share of full life over `share_trauma`, plus `crit_trauma` for a crit.
+    /// Trauma, 0 to 1, a blow adds: its share of full life over `share_trauma`, plus `crit_trauma` for a crit and
+    /// again for a counter or a punish.
     pub share_trauma: f64,
     pub crit_trauma: f64,
     /// The screen's answer: shake, its drain, the freeze cap, the flash.
@@ -102,6 +105,8 @@ impl Default for FeelSpec {
                 launch: 11.0,
                 crit: 3.0,
                 ranged: -2.0,
+                counter: 2.0,
+                punish: 3.0,
                 medium_power: 9.0,
             },
             jolt: 2.0,
@@ -151,6 +156,9 @@ impl Default for FeelSpec {
     }
 }
 
+/// A counter's or a punish's word floats this many game pixels above its damage (a damage number is 9 tall).
+const WORD_ABOVE: f64 = 10.0;
+
 /// Dust specks: the light and the dark one, alternating.
 const DUST_LIGHT: Rgba = Rgba::hex24(0xa89a88);
 const DUST_DARK: Rgba = Rgba::hex24(0x6e6458);
@@ -163,7 +171,8 @@ const DUST_DARK: Rgba = Rgba::hex24(0x6e6458);
 #[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "lowercase"))]
 pub enum Cue {
     /// A blow landed. `power` weighs it (9 and up is a medium), `launch` threw the one struck, `ranged` struck from
-    /// afar (a bolt or an orb), `share` is the share of full life it took (0 to 100), `damage` the real amount.
+    /// afar (a bolt or an orb), `share` is the share of full life it took (0 to 100), `damage` the real amount,
+    /// `how` whether it caught the one struck mid-move or open after a miss (plain when the event does not say).
     Hit {
         by: usize,
         power: f64,
@@ -174,6 +183,8 @@ pub enum Cue {
         damage: f64,
         x: f64,
         y: f64,
+        #[cfg_attr(feature = "serde", serde(default))]
+        how: How,
     },
     /// Damage over time.
     Tick {
@@ -226,6 +237,30 @@ pub enum Cue {
     Ultimate,
 }
 
+/// How a blow landed, the fighting-game way: `Plain`; a `Counter`, struck while the one struck was starting a move
+/// of its own; a `Punish`, struck while it was open after a move of its own.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+pub enum How {
+    #[default]
+    Plain,
+    Counter,
+    Punish,
+}
+
+impl How {
+    /// The word that floats over such a blow, and its number's kind; none for a plain one.
+    pub fn word(self) -> Option<(&'static str, NumberKind)> {
+        match self {
+            How::Plain => None,
+            How::Counter => Some(("COUNTER!", NumberKind::Counter)),
+            How::Punish => Some(("PUNISH!", NumberKind::Punish)),
+        }
+    }
+}
+
 impl Cue {
     /// The `type` of each cue as data, so a host that mixes cues with its own events can tell which are cues.
     pub const TYPES: [&str; 13] = [
@@ -257,10 +292,15 @@ pub enum NumberKind {
     Heal,
     Ward,
     Dodge,
+    /// The word over a counter.
+    Counter,
+    /// The word over a punish.
+    Punish,
 }
 
 /// A floating number as drawn this frame: where it is (height above the ground), how faded (`alpha`), its text,
-/// who caused it (none for a dodge) and its kind.
+/// who caused it (none for a dodge) and its kind. A counter or a punish floats its word as a number of its own,
+/// just above the damage.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
@@ -344,7 +384,15 @@ pub struct Feel {
     tick: u64,
 }
 
-fn hit_stop(stop: &Stop, cap: f64, power: f64, launch: bool, crit: bool, ranged: bool) -> f64 {
+fn hit_stop(
+    stop: &Stop,
+    cap: f64,
+    power: f64,
+    launch: bool,
+    crit: bool,
+    ranged: bool,
+    how: How,
+) -> f64 {
     let mut frames = if launch {
         stop.launch
     } else if power >= stop.medium_power {
@@ -358,6 +406,11 @@ fn hit_stop(stop: &Stop, cap: f64, power: f64, launch: bool, crit: bool, ranged:
     if ranged {
         frames += stop.ranged;
     }
+    frames += match how {
+        How::Plain => 0.0,
+        How::Counter => stop.counter,
+        How::Punish => stop.punish,
+    };
     js_min(cap * 60.0, frames) / 60.0
 }
 
@@ -428,8 +481,17 @@ impl Feel {
                     damage,
                     x,
                     y,
+                    how,
                 } => {
-                    let stop = hit_stop(&s.stop, s.screen.freeze_cap, power, launch, crit, ranged);
+                    let stop = hit_stop(
+                        &s.stop,
+                        s.screen.freeze_cap,
+                        power,
+                        launch,
+                        crit,
+                        ranged,
+                        how,
+                    );
                     self.screen.freeze(stop);
                     // grounded, it shudders side to side; in the air, up and down (Sakurai)
                     self.jolt = Some(Jolt {
@@ -438,8 +500,11 @@ impl Feel {
                         full: stop,
                         air: y > 24.0,
                     });
+                    let caught = how != How::Plain;
                     self.screen.add_trauma(
-                        share / s.share_trauma + if crit { s.crit_trauma } else { 0.0 },
+                        share / s.share_trauma
+                            + if crit { s.crit_trauma } else { 0.0 }
+                            + if caught { s.crit_trauma } else { 0.0 },
                     );
                     let kind = if crit {
                         NumberKind::Crit
@@ -447,6 +512,9 @@ impl Feel {
                         NumberKind::Hit
                     };
                     self.number(x, y, Some(by), kind, js_text(damage));
+                    if let Some((word, kind)) = how.word() {
+                        self.word_over_last(word, kind);
+                    }
                 }
                 Cue::Tick { by, damage, x, y } => {
                     self.number(x, y, Some(by), NumberKind::Tick, js_text(damage))
@@ -510,6 +578,22 @@ impl Feel {
     fn answer(&mut self, a: Answer) {
         self.screen.freeze(a.stop);
         self.screen.add_trauma(a.trauma);
+    }
+
+    /// Float `word` just above the number pushed last, from the same one.
+    fn word_over_last(&mut self, word: &str, kind: NumberKind) {
+        let Some(last) = self.numbers.last() else {
+            return;
+        };
+        let word = Floating {
+            x: last.x,
+            y: last.y + WORD_ABOVE,
+            text: word.to_string(),
+            by: last.by,
+            kind,
+            t: 0.0,
+        };
+        self.numbers.push(word);
     }
 
     fn number(&mut self, x: f64, y: f64, by: Option<usize>, kind: NumberKind, text: String) {
