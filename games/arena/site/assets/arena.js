@@ -58,6 +58,7 @@ async function mountWatch() {
   usePolicies([house, house]);
   const hero = createHero(document.getElementById("scene"), new AbortController().signal, icons, engine, {
     seed: Number.isSafeInteger(asked) && asked > 0 ? asked : undefined,
+    replay: true,
   });
   seedInput.value = String(hero.seed());
   const names = ["house bot", "house bot"];

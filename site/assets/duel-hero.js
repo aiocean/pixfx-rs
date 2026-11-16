@@ -39,10 +39,10 @@ export async function loadPolicies(files) {
 /**
  * The live duel on `canvas`: the arena sized to the canvas, the rules from `duel.js`, the fighters, effects, light, HUD
  * and tooltips. `seed` is the first duel's (a random one when left out); each later rebuild, on a resize, takes the
- * next. Returns the view: `step(dt)` draws a frame, `restart(seed)` begins a fresh duel on that seed (with the
+ * next, or the same one again with `replay` (a page that shows one seed's fight). Returns the view: `step(dt)` draws a frame, `restart(seed)` begins a fresh duel on that seed (with the
  * policies `usePolicies` seated last), `seed()` is the seed of the duel now playing, `free()` lets it all go.
  */
-export function createHero(canvas, signal, icons, engine, { seed: first } = {}) {
+export function createHero(canvas, signal, icons, engine, { seed: first, replay = false } = {}) {
   const view = { canvas, icons, stage: null, duel: null, feel: null, sprites: null, lighting: null, lights: [], layout: null, handles: new Map(), wrapped: [] };
   const have = new Set(engine.effects());
   // a picture Rust painted (fighters, faces, light), drawn and let go at once
@@ -91,7 +91,7 @@ export function createHero(canvas, signal, icons, engine, { seed: first } = {}) 
     const sky = ground - (barTop + BARS_TALL + 13) - 46;
     if (view.duel) freeDuel(view.duel);
     playing = seed;
-    view.duel = createDuel({ seed: seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky });
+    view.duel = createDuel({ seed: replay ? seed : seed++, left: arena.left + lampInset, right: arena.right - lampInset, ground, has: (id) => have.has(id), sky });
     // each fighter's sprite as it was last painted, which the effects wrapped on it read
     view.wrapped = view.duel.fighters.map((f) => {
       return { body: null, rage: f.rage, surge: null, ring: null };
