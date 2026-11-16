@@ -6,9 +6,11 @@
 #![forbid(unsafe_code)]
 
 mod body;
+mod camera;
 mod pose;
 mod rig;
 
 pub use body::Body;
+pub use camera::{Camera, Dir4, Dir8, ISO_PITCH, TOPDOWN_PITCH};
 pub use pose::{Head, Limb, Pose, Side, Sword};
-pub use rig::{Bone, LimbPoints, Point, Skeleton, facing, skeleton};
+pub use rig::{Bone, LimbPoints, Point, Skeleton, facing, skeleton, skeleton_seen};

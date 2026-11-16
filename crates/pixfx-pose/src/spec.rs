@@ -20,10 +20,10 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use pixfx_body::Body;
-use pixfx_body::Pose;
 use crate::presets;
 use crate::sheet::{Cell, PoseSheet, turnaround};
+use pixfx_body::Body;
+use pixfx_body::Pose;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

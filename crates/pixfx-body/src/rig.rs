@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::body::Body;
+use crate::camera::Camera;
 use crate::pose::{Limb, Pose, Side};
 
 /// Which way the figure faces the viewer, in degrees: 0 faces screen right (a side view, her right side toward
@@ -176,6 +177,10 @@ impl LimbPoints {
 pub struct Skeleton {
     pub head: Point,
     pub head_radius: f64,
+    /// The ground point under the pelvis, where her soles stand (less a pose's `lift`): the pivot a clip keeps
+    /// still. On a pitched camera it is the projected point.
+    #[serde(default)]
+    pub ground: Point,
     /// A point on the face, a head radius ahead of its centre: which way she looks.
     pub nose: Point,
     /// Whether the nose is on the viewer's side of the head (false from behind).
@@ -273,6 +278,7 @@ impl Skeleton {
         let limb = |l: LimbPoints| l.shifted(dx, dy);
         Skeleton {
             head: self.head.shifted(dx, dy),
+            ground: self.ground.shifted(dx, dy),
             nose: self.nose.shifted(dx, dy),
             neck: self.neck.shifted(dx, dy),
             pelvis: self.pelvis.shifted(dx, dy),
@@ -320,16 +326,33 @@ fn bend(frame: Frame, d: V3, deg: f64) -> V3 {
 }
 
 /// The joints of `pose` on a figure built as `body`, seen at `facing` degrees (see [`facing`]), relative to the
-/// pelvis. Place it in a cell with [`Skeleton::placed`].
+/// pelvis: [`skeleton_seen`] from a side camera. Place it in a cell with [`Skeleton::placed`].
 pub fn skeleton(body: &Body, pose: &Pose, facing_deg: f64) -> Skeleton {
+    skeleton_seen(
+        body,
+        pose,
+        Camera {
+            yaw: facing_deg,
+            pitch: 0.0,
+        },
+    )
+}
+
+/// The joints of `pose` on a figure built as `body`, seen from `camera`, relative to the pelvis.
+pub fn skeleton_seen(body: &Body, pose: &Pose, camera: Camera) -> Skeleton {
+    let facing_deg = camera.yaw;
     let yaw = fin(facing_deg).to_radians();
     let (sy, cy) = libm::sincos(yaw);
-    // The viewer looks along -z: x right, y up, z toward the viewer.
+    // The viewer looks along -z: x right, y up, z toward the viewer. A pitched camera looks down: the world turns
+    // about screen x, so what is higher comes toward the viewer and what is nearer drops down the screen.
+    let (sp, cp) = libm::sincos(fin(camera.pitch).to_radians());
+    let view = |v: V3| V3(v.0, v.1 * cp - v.2 * sp, v.1 * sp + v.2 * cp);
     let world = Frame {
-        f: V3(cy, 0.0, sy),
-        u: V3(0.0, 1.0, 0.0),
-        r: V3(-sy, 0.0, cy),
+        f: view(V3(cy, 0.0, sy)),
+        u: view(V3(0.0, 1.0, 0.0)),
+        r: view(V3(-sy, 0.0, cy)),
     };
+    let up = world.u;
     let pelvis_frame = world.pitched(-fin(pose.lie));
     let torso = pelvis_frame
         .pitched(fin(pose.lean))
@@ -354,7 +377,7 @@ pub fn skeleton(body: &Body, pose: &Pose, facing_deg: f64) -> Skeleton {
         let mid = root.add(d.mul(body.upper_arm));
         (root, mid, mid.add(e.mul(body.forearm)), e)
     };
-    let leg = |side: Side| {
+    let leg3 = |side: Side| {
         let k = side_sign(side);
         let root = pelvis.add(pelvis_frame.r.mul(k * body.hip));
         let l = match side {
@@ -363,10 +386,14 @@ pub fn skeleton(body: &Body, pose: &Pose, facing_deg: f64) -> Skeleton {
         };
         let (d, e) = limb_dirs(pelvis_frame, k, l, -1.0);
         let mid = root.add(d.mul(body.thigh));
+        [root, mid, mid.add(e.mul(body.shin))]
+    };
+    let leg = |side: Side| {
+        let [root, mid, end] = leg3(side);
         LimbPoints {
             root: Point::of(root),
             mid: Point::of(mid),
-            end: Point::of(mid.add(e.mul(body.shin))),
+            end: Point::of(end),
         }
     };
     let (ra, la) = (arm(Side::Right), arm(Side::Left));
@@ -383,9 +410,31 @@ pub fn skeleton(body: &Body, pose: &Pose, facing_deg: f64) -> Skeleton {
         let blade = bend(torso, fore, fin(s.angle));
         [Point::of(hand), Point::of(hand.add(blade.mul(body.sword)))]
     });
+    // The ground: the lowest point of the body (the sword left out) measured along the world's up, less the lift.
+    let low = [
+        pelvis,
+        ra.0,
+        ra.1,
+        ra.2,
+        la.0,
+        la.1,
+        la.2,
+        neck,
+        head.add(up.mul(-body.head)),
+    ]
+    .iter()
+    .map(|v| v.dot(up))
+    .chain(
+        [Side::Right, Side::Left]
+            .into_iter()
+            .flat_map(|s| leg3(s).into_iter().map(|v| v.dot(up))),
+    )
+    .fold(f64::MAX, f64::min);
+    let ground = up.mul(low - fin(pose.lift).max(0.0));
     Skeleton {
         head: Point::of(head),
         head_radius: body.head,
+        ground: Point::of(ground),
         nose: Point::of(nose),
         nose_visible: nose_dir.2 > -0.25,
         neck: Point::of(neck),

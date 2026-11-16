@@ -6,8 +6,8 @@ use pixfx_draw::{Rgba, RgbaImage};
 use pixfx_pixel::sheet::{Layout, blank, cell_rect, check};
 use serde::{Deserialize, Serialize};
 
-use pixfx_body::Body;
 use crate::font;
+use pixfx_body::Body;
 use pixfx_body::Pose;
 use pixfx_body::{Bone, Point, Skeleton, facing, skeleton};
 
