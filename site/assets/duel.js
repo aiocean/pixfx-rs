@@ -38,7 +38,7 @@ export function useEngine(pkg) {
 /**
  * A new duel in the arena from `left` to `right` (game pixels), standing on `ground`, flying no higher than `sky`.
  * `has(id)` says whether an effect is in the registry. `seats`, for tests, seats another mind in a corner:
- * `["brain" | "first", "brain" | "first"]` (brains when left out).
+ * `["policy" | "brain" | "first", ...]` (the trained policy when left out).
  */
 export function createDuel({ seed = 1, left, right, ground, has, sky, seats }) {
   const pkg = loaded();

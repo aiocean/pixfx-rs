@@ -9,8 +9,11 @@ here; this file only says what this crate holds. The design is
 The landing duel's rules: two cultivators, Thunder and Frost, their stats and skills (`data`), the seeded dice every
 roll comes from (`rng`), the fighters (`fighter`), statuses (`status`), the rotating bar (`bar`), casts and blows
 (`act`), shots (`shot`), the round loop (`duel`), the seats that decide for each corner (`seat`: the brain from
-`pixfx-mind`, or `first_mind`, the yardstick a brain is measured against), what a mind senses (`sense`), and the duel
-as the page reads it (`view`). A seed replays the same fight on every target. The page (`site/assets/duel.js`, a
+`pixfx-mind`, the trained policy (`PolicySeat`, weights in `weights/policy.bin`), `first_mind`, the yardstick a brain is
+measured against, or the scripted fighters in `scripted`), each fighter's style (`style`), what a mind senses
+(`sense`), and the duel as the page reads it (`view`). For training and measuring the policy: the trainer's episodes
+and rewards (`train`, driven from Python through `crates/pixfx-duel-py`) and the ladder (`ladder`, printed by
+`examples/ladder.rs`). A seed replays the same fight on every target. The page (`site/assets/duel.js`, a
 wrapper over the wasm `Duel`) plays the effect commands and feels the events the duel returns; it decides nothing.
 
 ## Belongs here
@@ -41,6 +44,11 @@ wrapper over the wasm `Duel`) plays the effect commands and feels the events the
   the tests once to rewrite them.
 - `tests/fixtures/js_numbers.json` pins the tables, dice and formulas (`tests/data.rs`), one key per number: a
   deliberate change to a number edits its key there too.
+- `weights/policy.bin` is the trained policy (`train/export.py` writes it). A new one must pass
+  `tests/policy_export.rs` (Rust's forward pass against PyTorch's, `tests/fixtures/policy_check.json`, written with it)
+  and re-pins `goldens/policy_fight.json` (delete it and run the tests), which `site/tests/policy.test.js` checks
+  the wasm build against.
+- Styles are drawn on dice of their own (`style::draw`), never the rules' `Rng`: drawing them must not move a fight.
 - One extra or missing roll of the dice changes every fight after it.
 - JS maths: `Math.sign(0)` is 0 (never `f64::signum`), `Math.round` rounds half up (`js_round`), `**` is `powi`.
 

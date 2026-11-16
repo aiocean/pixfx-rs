@@ -13,6 +13,11 @@ and yomi levels (`habits`, `yomi`), postures chosen by scored considerations wit
 (`curve`, `posture`), candidate actions per skill kind and a rank-then-weight pick (`candidates`, `pick`), and the
 `Mind` that holds it all for a round (`mind`).
 
+A trained policy's runtime too (`policy`): what it sees (`observe`, a frame where the foe is ahead), the acts it can
+take and which are legal now (`Act`, `legal`, `choice`), the network in plain `f32` with its weights file (`Net`,
+`sample`), and `PolicyMind`, which sees as late and thinks as often as `Mind` and acts on the tick after it decides.
+The trainer that makes the weights is `train/`; the duel's weights live in `pixfx-duel`.
+
 ## Belongs here
 
 - How a fighter decides: postures, scoring, reading and learning the foe, reaction time, tempo.
@@ -35,7 +40,9 @@ and yomi levels (`habits`, `yomi`), postures chosen by scored considerations wit
 ## Traps
 
 - Pure: no clock (time comes in the `Sense`), no I/O, randomness only from the seed `Mind::new` takes.
-- `dt = 0` (hit-stop) must hold every clock of the mind still.
+- `dt = 0` (hit-stop) must hold every clock of the mind still (`PolicyMind` holds its queued act too).
+- `policy::Net` sums each row in 8 partial sums joined in a fixed tree: change that order and every target's bits,
+  the pinned hash in `tests/policy_net.rs`, and `train/net.py`'s match (within 1e-4) must all be checked.
 - A skill is known by its `SkillKind`, never its name: the name is only handed back in `Choice::Cast`.
 
 ## Before you finish
