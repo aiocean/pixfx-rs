@@ -31,6 +31,37 @@ pub struct Body {
     /// Sole under the ankle to the toes, forward along the ground.
     #[serde(default = "ruler_foot")]
     pub foot: f64,
+    /// Radius of an arm or a leg (the hull's capsules).
+    #[serde(default = "ruler_limb_r")]
+    pub limb_r: f64,
+    /// Width of the chest, across the shoulders' inside.
+    #[serde(default = "ruler_torso_w")]
+    pub torso_w: f64,
+    /// Width of the pelvis, across the hips.
+    #[serde(default = "ruler_pelvis_w")]
+    pub pelvis_w: f64,
+    /// Thickness of the body, front to back.
+    #[serde(default = "ruler_torso_d")]
+    pub torso_d: f64,
+}
+
+/// An arm or a leg as thick as the ruler's limb.
+fn ruler_limb_r() -> f64 {
+    f64::from(pixfx_draw::RULER.limb) / 2.0
+}
+
+/// The chest about a third of the standing figure's width (its arms take the rest).
+fn ruler_torso_w() -> f64 {
+    f64::from(pixfx_draw::RULER.width) * 0.35
+}
+
+fn ruler_pelvis_w() -> f64 {
+    f64::from(pixfx_draw::RULER.width) * 0.3
+}
+
+/// Front to back, about two thirds of the face.
+fn ruler_torso_d() -> f64 {
+    f64::from(pixfx_draw::RULER.head) * 0.6
 }
 
 fn ruler_hand() -> f64 {
@@ -72,6 +103,10 @@ impl Body {
             sword: height * 0.4,
             hand: unit * 0.3,
             foot: unit * 0.65,
+            limb_r: unit * 0.21,
+            torso_w: unit,
+            pelvis_w: unit * 0.85,
+            torso_d: unit * 0.6,
         }
     }
 
@@ -82,6 +117,10 @@ impl Body {
             sword: f64::from(r.blade),
             hand: f64::from(r.hand),
             foot: 1.5 * f64::from(r.limb),
+            limb_r: f64::from(r.limb) / 2.0,
+            torso_w: f64::from(r.width) * 0.35,
+            pelvis_w: f64::from(r.width) * 0.3,
+            torso_d: f64::from(r.head) * 0.6,
             ..Body::new(f64::from(r.figure()), r.heads())
         }
     }
