@@ -114,7 +114,7 @@ Dependencies point one way, top to bottom. A lower layer never depends on a high
 | Game | `pixfx-duel` | The landing duel's rules: fighters, skills, the rotating bar, statuses, shots, rounds, the seats that decide for each corner (the brain from `pixfx-mind`, or the first mind), and the view the page reads | Deterministic from a seed: no clock, no I/O, no host types. Every decision of the duel is here; the page plays the commands and events it returns. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
 | Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies | Pure and deterministic: no clock, no I/O, no host types. |
-| Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `blend`, `color`, `palette`, `math`) | Frames with colour and light, painting, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
+| Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `halo`, `blend`, `color`, `palette`, `math`) | Frames with colour and light, painting, painted glow, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
 
 Where a new piece of code goes:
 

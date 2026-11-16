@@ -32,7 +32,31 @@ const CODE_TARGET = "pixfx.code-target";
 const PALETTES = ["default", "fire", "ice", "poison", "holy", "shadow", "arcane", "blood", "electric", "nature", "gold"];
 
 /** Options each effect takes beyond the shared ones, for the controls. */
-const OWN = { "fire/campfire": [{ key: "height", label: "Height", min: 8, max: 40, step: 1, value: 22 }] };
+const OWN = {
+  "fire/campfire": [{ key: "height", label: "Height", min: 8, max: 40, step: 1, value: 22 }],
+  // where the blow lands on the seal, from the feet (arcane/restriction.rs HIT_X, HIT_Y)
+  "arcane/restriction": [
+    { key: "hitX", label: "Hit x", min: -30, max: 30, step: 1, value: 22 },
+    { key: "hitY", label: "Hit y", min: -60, max: 0, step: 1, value: -29 },
+  ],
+  // how long, wide and wavy the trail is (projectiles/trail.rs SECS, WIDTH, WAVE)
+  "projectiles/trail": [
+    { key: "secs", label: "Seconds", min: 0.02, max: 0.5, step: 0.01, value: 0.12 },
+    { key: "width", label: "Width", min: 1, max: 7, step: 1, value: 3 },
+    { key: "wave", label: "Wave", min: 0, max: 4, step: 0.1, value: 1.2 },
+    { key: "turn", label: "Turn with it", min: 0, max: 1, step: 1, value: 0 },
+  ],
+  // where the blow lands on the mirror, from the feet (arcane/bagua_mirror.rs HIT_X, HIT_Y)
+  "arcane/sword-slash": [
+    { key: "size", label: "Size", min: 1, max: 3, step: 0.5, value: 2 },
+    { key: "hitX", label: "Hit x", min: -40, max: 40, step: 1, value: 0 },
+    { key: "hitY", label: "Hit y", min: -60, max: 0, step: 1, value: -22 },
+  ],
+  "arcane/bagua-mirror": [
+    { key: "hitX", label: "Hit x", min: -40, max: 40, step: 1, value: 26 },
+    { key: "hitY", label: "Hit y", min: -50, max: -5, step: 1, value: -26 },
+  ],
+};
 
 /** Seconds a one-shot or a take rests before it plays again. */
 const REST = 0.6;
@@ -379,12 +403,20 @@ function createDuelView(canvas, id, m, role, room, told) {
             struck = true;
             impact(bout, key);
           })
+          // each shot of a volley it was ordered to launch strikes where the bout aimed it
+          .on("strike", () => {
+            struck = true;
+            impact(bout, key);
+          })
           // a one-shot that ends on its own is let go
           .on("complete", () => handles.delete(key));
         // an effect that reads the sprite it plays on wraps the fighter that plays it
         if (meta(c.fx).wrapsActor) handle.wrap(() => bodies[c.by] ?? null);
+        // a trail laid under it follows the way it moves
+        if (c.trail) handle.trail(c.trail.id, c.trail.opts);
         handles.set(key, handle);
       } else if (c.type === "move" && handles.has(c.key)) handles.get(c.key).setPosition(c.x, c.y);
+      else if (c.type === "order" && handles.has(c.key)) handles.get(c.key).attack(c.x, c.y, c.aim, c.caster);
       else if (c.type === "stop" && handles.has(c.key)) {
         handles.get(c.key).stop();
         handles.delete(c.key);
@@ -410,7 +442,20 @@ function createDuelView(canvas, id, m, role, room, told) {
     lights = stepLights(kindle(lights, lit(commands), ground, isLoop, putOutLight), run);
     // the fighters are painted before the effects play, so an effect wrapped on one grips this frame's pose
     paint();
+    declareBodies();
     stage.update(run);
+  }
+
+  /** Each standing fighter is a body the stage's volley pieces burst on (its index is its id), where it stands now. */
+  function declareBodies() {
+    for (const f of bout.fighters) {
+      if (f.dead) {
+        stage.clearBody(f.index);
+        continue;
+      }
+      const tall = f.duck > 0 ? f.spec.duck : f.spec.body;
+      stage.setBody(f.index, f.x - f.spec.halfWidth, ground - f.air - tall, f.spec.halfWidth * 2, tall);
+    }
   }
 
   /** Paint the fighters as they stand now (the one a blow struck shudders through the hit-stop), and keep each

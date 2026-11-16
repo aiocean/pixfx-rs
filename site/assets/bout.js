@@ -25,7 +25,7 @@ const JET_REACH = 0.75;
 /** How far apart the two stand for each role, before the arena's width caps it. */
 const DISTANCE = {
   strike: 72, projectile: 112, stream: 88, ward: 100, buff: 60, "ground-self": 40, "ground-foe": 70,
-  clash: 26, flight: 64, ambient: 30, blink: 70, death: 60,
+  clash: 26, flight: 64, ambient: 30, blink: 70, death: 60, volley: 150, trail: 140,
 };
 /** Knockback two blades that meet give each other (pixfx-duel `KNOCKBACK`). */
 const KNOCKBACK = 130;
@@ -69,7 +69,7 @@ function fighter(index, school, body) {
 export function createBout({ left, right, ground, Body, seed = 1 }) {
   const span = right - left;
   const bout = {
-    seed, rng: random(seed), left, right, ground, arena: { left, right, top: TOP }, Body, time: 0, key: 0, takes: 0, caster: null, take: null, done: true, caption: "", out: [], queued: [],
+    seed, rng: random(seed), left, right, ground, arena: { left, right, top: TOP }, Body, time: 0, key: 0, takes: 0, caster: null, take: null, done: true, caption: "", out: [], queued: [], after: [],
   };
   bout.fighters = [fighter(0, "thunder", new Body(left + span * 0.3)), fighter(1, "frost", new Body(left + span * 0.7))];
   bout.fighters[1].body.face = -1;
@@ -87,6 +87,7 @@ export function createBout({ left, right, ground, Body, seed = 1 }) {
 export function take(bout, fx, role, opts = {}, { caster: pick } = {}) {
   if (pick !== undefined && pick !== 0 && pick !== 1) throw new Error(`take: caster must be 0 or 1, got ${pick}`);
   if (bout.take) finish(bout, bout.take, bout.queued, true);
+  bout.after = [];
   const tune = typeof role === "string" ? { role } : role;
   const caster = bout.fighters[pick ?? (bout.caster === null ? 0 : 1 - bout.caster)];
   bout.caster = caster.index;
@@ -129,7 +130,9 @@ const CAPTIONS = {
   flight: "{c} flies on it and dives at {t}",
   ambient: "{c} and {t} spar beside it",
   blink: "{c} vanishes in it and strikes {t} from behind",
+  trail: "{c} and {t} glide back and forth, it trailing each",
   death: "{c} strikes {t} down, and {t} bursts apart",
+  volley: "{c} raises it, then sends it at {t} from afar",
 };
 
 function caption(tune, caster, target) {
@@ -175,6 +178,27 @@ function tick(bout, dt) {
   // one struck down is gone: its body neither moves nor stands in the way
   for (const [me, foe] of [[a, b], [b, a]]) if (!me.dead) move(bout, me, foe, dt, bout.out);
   if (!a.dead && !b.dead) bout.Body.separate(a.body, b.body, bout.arena);
+  // each afterimage rides its fighter, and ends when its time is up
+  for (const s of bout.after) {
+    if (bout.time >= s.until) {
+      if (bout.take) stopFx(bout.take, s.key, bout.out);
+    } else moveFx(bout, s.key, s.f.x, palm(s.f), bout.out);
+  }
+  bout.after = bout.after.filter((s) => bout.time < s.until);
+}
+
+/** The effect a fighter's afterimage is: it reads the body it plays on and smears its back edge as it moves. */
+const AFTERIMAGE = "projectiles/trail";
+
+/**
+ * Fighter f leaves an afterimage for `secs`: the trail effect played on it (wrapping its sprite), moved with it every
+ * tick, stopped when the time is up.
+ */
+function afterimage(bout, T, f, secs, out) {
+  const key = ++bout.key;
+  out.push({ type: "play", key, fx: AFTERIMAGE, x: Math.round(f.x), y: Math.round(bout.ground - palm(f)), opts: {}, by: f.index });
+  T.keys.push(key);
+  bout.after.push({ key, f, until: bout.time + secs });
 }
 
 /** One step of fighter me's body, driven as pixfx-duel drives it, and its act's clock. */
@@ -289,10 +313,11 @@ function released(f) {
 
 /** Play the take's effect at x, `height` up from the ground; a directional effect faces the way `by` faces. The
  *  command names `by` (its index): an effect that wraps a sprite plays on that fighter. */
-function playFx(bout, T, x, height, by, out, cue = true) {
+function playFx(bout, T, x, height, by, out, cue = true, extra = {}) {
   const key = ++bout.key;
-  const opts = T.tune.directional && by.face < 0 ? { ...T.opts, flip: true } : { ...T.opts };
-  out.push({ type: "play", key, fx: T.fx, x: Math.round(x), y: Math.round(bout.ground - height), opts, by: by.index });
+  const opts = T.tune.directional && by.face < 0 ? { ...T.opts, ...extra, flip: true } : { ...T.opts, ...extra };
+  // `trail`: an effect laid under it that follows the way it moves (`projectiles/trail`)
+  out.push({ type: "play", key, fx: T.fx, x: Math.round(x), y: Math.round(bout.ground - height), opts, by: by.index, trail: T.tune.trail });
   T.keys.push(key);
   T.firstPlay ??= bout.time;
   if (cue) T.cueKeys.add(key);
@@ -328,6 +353,8 @@ function hit(bout, T, by, f, power, dir, out, { freeze = 0, ranged = false, spel
   out.push({ type: "hit", by: by.index, spell, power, launch, ranged, damage, crit: false, share: (damage / f.stats.hp) * 100, x: f.x, y: f.air + f.spec.chest });
   // a killing blow throws nothing: what it struck is gone where it stood
   if (!kills) f.body.hit(power, dir, freeze > 0, f.fly);
+  // one thrown by a heavy blow leaves an afterimage as it flies back
+  if (launch && !kills && freeze === 0) afterimage(bout, T, f, 0.45, out);
   if (freeze > 0) f.frozen = freeze;
   f.fly = false;
   f.act = null;
@@ -393,6 +420,39 @@ const SCRIPTS = {
       foe.intent.move = 0;
       go(T, "rest");
     }
+  },
+
+  /**
+   * It appears at the caster and holds until the caster orders it at the foe (`attack` on the stage, any distance):
+   * its shots fly that way and burst on the first body they meet (the page declares each fighter's body to the
+   * stage, the caster's spared), and each strike the page passes back (`impact`) lands one of `blows` (seconds
+   * after the order, its own time when no strike says so). `hold`: seconds it holds before the order; `aim`: "converge" or
+   * "pierce".
+   */
+  volley(bout, T, dt, out) {
+    const { caster: me, target: foe, tune } = T;
+    if (T.phase === "begin") {
+      gather(me, tune.spell ?? "seal");
+      return go(T, "gather");
+    }
+    if (T.phase === "gather" && released(me)) {
+      T.shot = { key: playFx(bout, T, me.x, 0, me, out) };
+      return go(T, "hold");
+    }
+    if (T.phase === "hold" && T.t >= (tune.hold ?? 1.2)) {
+      gather(me, tune.spell ?? "seal");
+      return go(T, "order");
+    }
+    if (T.phase === "order" && released(me)) {
+      out.push({ type: "order", key: T.shot.key, x: Math.round(foe.x), y: Math.round(bout.ground - palm(foe)), aim: tune.aim ?? "converge", caster: me.index });
+      const blows = tune.blows ?? [0.6];
+      expect(bout, T, blows, (o, i) => {
+        hit(bout, T, me, foe, tune.power ?? 12, toward(me, foe), o, { ranged: true });
+        if (i === blows.length - 1) go(T, "after");
+      });
+      return go(T, "live");
+    }
+    if (T.phase === "after") go(T, "rest");
   },
 
   /** It leaves the caster's palm and flies at the foe, which reels when it is struck. */
@@ -610,7 +670,8 @@ const SCRIPTS = {
       me.fly = true;
       me.hover = 44;
       const [x, h] = back();
-      T.shot = { key: playFx(bout, T, x, h, me, out, false) };
+      // carried on the caster's back: an effect that reads how it is moved (`carried`) streams back as it flies
+      T.shot = { key: playFx(bout, T, x, h, me, out, false, tune.carried ? { carried: 1 } : {}) };
       return go(T, "fly");
     }
     if (T.phase === "fly") {
@@ -638,6 +699,36 @@ const SCRIPTS = {
   },
 
   /** The caster vanishes in it, comes out behind the foe and cuts it, then vanishes back to its place. */
+  /**
+   * It plays on each fighter, at the chest, moved with it as the two glide out toward each other and back in turn
+   * (the scene draws a trail played on its own along the way it is moved), for `life` seconds, then stops.
+   */
+  trail(bout, T, dt, out) {
+    const life = T.tune.life ?? 3.6;
+    if (T.phase === "begin") {
+      T.shot = bout.fighters.map((f) => ({ home: f.x, key: playFx(bout, T, f.x, palm(f), f, out, false) }));
+      return go(T, "glide");
+    }
+    if (T.phase !== "glide") return;
+    const mid = (T.shot[0].home + T.shot[1].home) / 2;
+    // out and back in `period` seconds, the two half a period apart; easing in and out of the take
+    const period = T.tune.period ?? 0.8;
+    const fade = Math.max(0, Math.min(1, T.t / 0.3, (life - T.t) / 0.3));
+    for (const [i, f] of bout.fighters.entries()) {
+      const s = T.shot[i];
+      const u = 0.5 - 0.5 * Math.cos((T.t / period) * 2 * Math.PI + i * Math.PI);
+      f.x = s.home + (mid - s.home) * 0.85 * u * fade;
+      moveFx(bout, s.key, f.x, palm(f), out);
+    }
+    if (T.t >= life) {
+      for (const [i, f] of bout.fighters.entries()) {
+        f.x = T.shot[i].home;
+        stopFx(T, T.shot[i].key, out);
+      }
+      go(T, "rest");
+    }
+  },
+
   blink(bout, T, dt, out) {
     const { caster: me, target: foe, tune } = T;
     const home = T.spots[me.index];

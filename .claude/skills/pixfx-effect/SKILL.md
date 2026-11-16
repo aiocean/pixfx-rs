@@ -95,6 +95,108 @@ impl EffectState for State {
   (clippy denies them). Randomness from the seed (`math::rand`, `hash`, `noise`, a seeded `Rng`). No `unwrap`.
 - A port keeps its source's number semantics: same order of operations, `js_*` helpers where JS differs (NaN in
   `Math.min`, `| 0`, clamped arrays). Do not tidy the maths. The module doc names the source file it ports.
+- An effect made here from an image model's sheet: skill `pixfx-ref` first (spec, parts sheet, moment sheets), then
+  write it here a function per part, comparing a held frame with the sheet side by side until they match.
+
+### Make it look hand-made
+
+- **Glow as steps of colour, not a blur.** Pixel artists paint a glow as solid rings round each stroke: white core,
+  pale, mid, dark, a dithered edge. Stamp strokes into `pixfx_draw::halo::Halo` with a heat and a kind,
+  `spread(fall)`, and paint each pixel with the ramp colour of its heat's step (`arcane/restriction.rs` `paint`).
+  Draw a stroke's own pixel in its own colour (kind) and let its heat only set how far its halo reaches, or thin
+  strokes drown in their glow. A flash or a hit raises the heat, so the halo grows. Additive `glow` stays as a faint
+  bloom on top; turning it up only blurs.
+- **Opaque solids, light as light.** Stacked translucent pieces wash out to white; draw them opaque and put the glow
+  in the light layer (`holy/lotus`).
+- **Depth.** A ring round the character: its far half on `Layer::Back` (mirrored glyphs, a little dimmer), its near
+  half on `Layer::Front`; a glyph seen edge-on shows only its middle stroke.
+- **Counts and motion belong to code.** Writing one rune at a time, a ring's spin, exactly three rings: an image
+  model will not keep these across frames, a timeline in code does (`written(r, k)`, `turn(r, t)`).
+- **A blow anywhere.** Number options in local pixels from the feet (`hitX`, `hitY`, `.within(...)`), defaulting to
+  where the reference drew the blow; from that point derive the struck piece, where the flare starts, the tilt, the
+  sparks and the `impact` cue. Render a few with `gif ... --num hitX=-20 --num hitY=-48`.
+- **Cost.** Work only over the box the strokes cover, and only for the layer being drawn: restriction's halo went
+  from 11.75 to 4.06 ms for 50 by both, pixels unchanged. Bench before and after.
+
+### Hit at any distance: an effect that takes orders
+
+An effect draws on its own canvas, so it cannot reach a foe far off. One that throws at a foe the game names (a
+sword formation, a volley of arrows, a talisman barrage) takes an **order**: it holds until the game calls
+`attack(x, y, aim, caster)`, then answers with pieces, each another registered effect, and the scene flies them
+(`pixfx_core::volley`, `Scene::order`). The point gives the direction, not where they burst: a piece flies its path
+and on past the point, and bursts on the first **body** it meets (the game declares bodies with `setBody` /
+`Scene::set_body`; the caster's is spared), or when the game calls `burst`. `arcane/sword-formation.rs` is the
+worked example.
+
+```rust
+// the formation: opens once, then loops while it waits for its order
+fn loop_from(&self) -> Option<f64> { Some(OPENED) }
+fn order(&self, opts: &Options, t: f64, at: (f64, f64), flip: bool, order: &Order) -> Vec<Launch> {
+    let shots: Vec<Shot> = (0..N).map(|k| {
+        let (x, y, a) = where_shot_k_is(k, t);                    // local pixels, the way it points
+        Shot { at: (at.0 + if flip { -x } else { x }, at.1 + y), heading: if flip { PI - a } else { a } }
+    }).collect();
+    VOLLEY.aim(&shots, order, opts.seed.unwrap_or(META.seed) as f64)
+}
+static VOLLEY: Volley = Volley {
+    piece: &FLYING_SWORD, hit: Some(&SWORD_STRIKE),               // effects of their own
+    held: Some(&HELD_SWORD), poise: 0.12,                         // hangs where it was, turning to its way, first
+    tail: Some(Tail { effect: &TRAIL, opts: tail }),              // a trail swept behind it (projectiles/trail)
+    gap: 0.1, speed: 300.0, min_secs: 0.2, max_secs: 2.4,         // launched in turn, nearest the target first
+    nose: 7.0, sink: 2.0,                                         // the piece strikes with its tip
+    bend: 0.2, bend_min: 12.0, bend_max: 28.0,                    // converge: a short swing out, then curving in
+    spread: (6.0, 12.0), ease: 1.0, beyond: 200.0,                // flies on this far past the point, then fades
+    lands: false,                                                 // true: it also strikes the point itself
+};
+```
+
+- `Volley::aim` plans any like shots: `converge` curves each into the point (it strikes and goes), `pierce` flies
+  straight through and on (it strikes as it passes). A path of your own: build `Launch`es yourself.
+- The piece is drawn pointing along +x from its origin, with no streak of its own: its trail is `projectiles/trail`
+  (a `tail`), a column swept along the way it really flew, so it curves with it. The scene turns the piece to its
+  heading in 32 steps, so frames are shared, mirrored as its caster is. The strike effect fires the `impact` cue; the game gets a `strike` event per shot
+  and decides the damage.
+- Once ordered, the formation is no longer drawn (its shots are it) and ends with its last shot; a second order
+  returns false.
+- Register the shot and the strike as effects of their own (JS workers find every effect by id), each behind
+  `cfg(any(feature = "<its own>", feature = "<the formation's>"))` in `mod.rs` and `EFFECTS`, so the formation
+  built alone brings them; shared drawing goes in a module under the same `any()` (`arcane/sword.rs`).
+- On the site it plays the `volley` role (`effect-roles.js`: `hold`, `aim`, `blows`, `power`); test the flight in
+  `crates/pixfx-scene/tests/order.rs` style: strikes near the point, in turn, and the formation gone after.
+
+### A streak, or an effect that reacts to how it moves
+
+A streak is a brush swept along a path, as a camera sees a bright thing waved in a long exposure: a point leaves a
+line, a column a ribbon, a turning bar a fan. Draw every streak with `pixfx_draw::sweep::sweep` (a `Brush`:
+`Brush::column(palette, width)`, or `Brush::from_column(frame, x, origin_y)` for a sprite's own pixels; a `Look`
+for how age colours, thins, waves and breaks it up), never with lines of your own. The path is the effect's own
+(a slash: a bar turned through an arc; a spark: a point along its flight) or the way it was really moved: ask for it
+with `Effect::traces(opts) -> Option<secs>` and take it in `EffectState::set_trace`; `trace.poses(secs)` feeds the
+sweep. Read motion from the trace with `pixfx_core::motion` (`velocity`, `speed`, `heading`, `turn`, `spin`,
+`acceleration`), never by differencing yourself, so every effect agrees (`fire/lib.rs` `carried`: a fire leans
+back against its velocity). An effect that reads its motion paints its own frames (no sharing), so ask only when an
+option says it is moved (`carried: 1`), and keep a port's pixels when it stands still (`fire/lib.rs` `nudge`).
+
+**The brush is the mover's cross-section: pick it by the mover's shape.**
+
+| Mover | Brush | Example |
+|---|---|---|
+| thin: a sword's point, a drop, a spark, a bolt | `Brush::column(palette, width)`, a few pixels wide, via `projectiles/trail` laid under it | `arcane/sword-formation` tail, `blood_spray` |
+| broad: a mirror, a shield, a disc | `Brush::edge(its pixels, 0)`: its back edge, as tall as itself, in its own colours, swept in its own draw over its own trace | `arcane/bagua-mirror-flying` (its jade rim) |
+| a character (a sprite) | `projectiles/trail` played on it: it wraps the sprite (`set_actor`) and smears its back edge one in from the outline (`Brush::edge(.., 1)`), upright (`Turn::Angle(0)`, poses' angles 0), since a body does not turn round when it walks back | the trail page: fighters gliding |
+| a blade that turns | `Brush::from_column(frame, x, origin_y)` with `Turn::Angle` | a slash smear |
+
+A narrow ribbon behind a broad body reads as a beam stuck on it, not as its motion: the bagua mirror's first
+shared trail was a 7-pixel jade band behind a 30-pixel mirror and looked worse than the hand-drawn lines it
+replaced, and a trail played on a fighter swept one point at palm height. An effect that rides a body must be aware
+of it, as a wrap is: read the sprite, never stand in for it with a point. Take the edge colour from the right pixel
+(a sprite's backmost pixel is its dark outline: the smear came out a shadow box until it read one in) and keep the
+brush upright on a body that does not turn (turned with its heading it swung round the fighter as they turned back).
+
+**Replacing a look that already exists** (a hand-drawn trail moved onto the shared sweep, any restyle): render the
+old and the new side by side where the game shows them (`stage` with `--order-at`, zoomed), and show the user before
+blessing or deploying. Shared code is a means; a change that looks worse than what it replaces is a regression even
+when it is more general.
 
 ## 2. Register it (all four, or `tests/features.rs` fails)
 
@@ -104,6 +206,10 @@ impl EffectState for State {
    category also goes into `all`.
 3. `src/lib.rs`: `#[cfg(feature = "fire-ember")] &fire::EMBER,` in `EFFECTS`.
 4. Check once with every effect: `cargo test -p pixfx-effects --test features`.
+
+On the site an effect's page stages it by its role: one with a blow at a set time (a shield) gets an entry in
+`site/assets/effect-roles.js` (`role: "ward", blows: [<its HIT>], directional: true`), and its own number options a
+slider each in `site/assets/effect.js` `OWN`. Rebuild with `site/build.sh`.
 
 ## 3. Test it alone
 
@@ -152,3 +258,5 @@ cargo run -p pixfx-export --example parity -- arcane/hex-shield                 
 | Golden blessed before looking at the frames | Look at the gif first; bless records whatever is drawn |
 | `f64::floor`, `x.round()`, `rand::random` | `libm::floor`, `js_round`, the seed |
 | Fixing a parity FAIL by changing the source's maths order | Match the source's operations, including its JS quirks |
+| Matching a reference's glow by turning `glow` up | Read its colour and light layers; paint the halo in steps (`pixfx_draw::halo`) |
+| A blow fixed to one side | `hitX` / `hitY` options and everything derived from that point |

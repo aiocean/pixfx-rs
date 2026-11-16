@@ -25,7 +25,7 @@ function sourceIds() {
 const BUILT = new Set(effects());
 const ALL = [...new Set([...sourceIds(), ...BUILT])].sort();
 /** Roles in which the effect (or the blow it gives the caster) strikes the other fighter. */
-const HITTING = new Set(["strike", "projectile", "stream", "buff", "ground-self", "ground-foe", "flight", "blink", "ambient", "death"]);
+const HITTING = new Set(["strike", "projectile", "stream", "buff", "ground-self", "ground-foe", "flight", "blink", "ambient", "death", "volley"]);
 
 const arena = (seed) => createBout({ left: 20, right: 300, ground: 150, Body, seed });
 
@@ -167,8 +167,25 @@ describe("bout", () => {
     const hits = commands.filter((c) => c.type === "hit").map((c) => c.by);
     expect(hits).toEqual([0, 1]);
     // Frost on the right shoots leftward: the bolt is flipped
-    const plays = commands.filter((c) => c.type === "play");
+    const plays = commands.filter((c) => c.type === "play" && c.fx === "projectiles/laser-bolt");
     expect(plays.map((c) => !!c.opts.flip)).toEqual([false, true]);
+  });
+
+  test("a fighter thrown back by a heavy blow leaves an afterimage that rides it and ends", () => {
+    const { commands } = run("projectiles/laser-bolt");
+    const hit = commands.find((c) => c.type === "hit");
+    const after = commands.find((c) => c.type === "play" && c.fx === "projectiles/trail");
+    // the trail plays on the fighter struck, so it wraps that fighter's sprite
+    expect(after?.by).toBe(hit?.by === 0 ? 1 : 0);
+    expect(commands.some((c) => c.type === "move" && c.key === after?.key)).toBe(true);
+    expect(commands.some((c) => c.type === "stop" && c.key === after?.key)).toBe(true);
+  });
+
+  test("an effect whose role says it is carried plays carried; others are not handed the option", () => {
+    const pack = run("scifi/jetpack").commands.find((c) => c.type === "play" && c.fx === "scifi/jetpack");
+    expect(pack?.opts.carried).toBe(1);
+    const bolt = run("projectiles/laser-bolt").commands.find((c) => c.type === "play" && c.fx === "projectiles/laser-bolt");
+    expect(bolt?.opts.carried).toBeUndefined();
   });
 
   test("a take may name its caster; without one, the turns go on from whoever cast last", () => {

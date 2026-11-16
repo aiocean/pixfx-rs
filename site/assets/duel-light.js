@@ -15,6 +15,8 @@ const REACH = {
   "arcane/rune-circle": 34,
   "impacts/parry": 30,
   "spawn/poof": 28,
+  // a trail rides on a fighter: a faint glow, or the fighter is lit white all the while
+  "projectiles/trail": 12,
 };
 const REACH_DEFAULT = 36;
 /** A one-shot's light lasts this long; a looping effect's lasts until it stops, then goes out over `OUT`. */

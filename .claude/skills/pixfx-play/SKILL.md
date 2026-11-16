@@ -67,6 +67,18 @@ adapter object), `setPosition`, `setDepths(back, front)` (Phaser, Pixi), `wrap(.
 - A world bigger than the screen (Canvas 2D, Pixi): `pixfx.setView(x, y, w, h)` so off-screen effects cost no
   painting. Phaser reads the main camera itself.
 - Many effects at once: `setDrawBudget(n)`.
+- Throw at a foe at any distance (`arcane/sword-formation`, an effect tagged `volley`): play it where it gathers
+  (at the caster, `follow` keeps it there); declare every body a piece may hit with `pixfx.setBody(id, x, y, w, h)`
+  (world pixels, each frame it moves; `clearBody(id)` when gone), then `effect.attack(x, y, "converge" | "pierce",
+  casterId)`: the point gives the direction, the pieces fly on past it and burst on the first body they meet (the
+  caster's spared). Each strike emits `"strike"` (`{index, x, y, body}`, `body` the id struck): the game applies
+  damage there. `effect.burst()` bursts a piece where it is. `attack` returns false for an effect that takes no
+  orders or was ordered already; the effect completes after its last piece.
+- A trail (`projectiles/trail`): `effect.trail("projectiles/trail", opts)` lays one under any moving effect; or play
+  it on its own and move it with a sprite (`setPosition` each frame): it draws the way it went, behind the
+  character, and ends after `stop()`. `turn: 1` turns it with its mover's angle.
+- A fire carried along (`fire/campfire`, `fire/brazier` with `carried: 1`), moved with `setPosition`: it bends back
+  as it moves.
 
 ## Game feel: the game must answer it
 
@@ -110,7 +122,8 @@ fx.end_frame(window)?;                          // once, after every effect pain
 ```
 
 With threads, an effect's first frame shows one window frame late. `set_actor(h, Some(actor))` each frame plays on
-a character.
+a character. An effect that takes orders: `fx.order(h, x, y, Aim::Converge)?` (`x`/`y` from its origin), paint each
+of `fx.launched(h)` where you paint `h` (they outlive it), and read `StageEvent::Strike` from `fx.events()`.
 
 ## When it goes wrong
 

@@ -2,6 +2,69 @@
 
 ## Unreleased
 
+- `arcane/sword-slash` (new): a spirit sword appears beside the foe, winds back and cuts down through it in one fast
+  arc. The blade sweeps a crescent of its own pixels (each blade row's edge colour, `pixfx_draw::sweep` with the brush
+  turned with the blade), white at the blade and cooling to steel behind it; the impact cue fires as the blade points
+  through `hitX`, `hitY`; it overshoots and crumbles from the tip. `size` (1 to 3, 2 by default) draws the spirit
+  sword that many times its size. On the site it is a strike: the caster summons it on the foe.
+
+- Motion and sweep: every streak is one brush swept along a path, as a camera sees a bright thing waved in a long
+  exposure. `pixfx_draw::sweep` paints a `Brush` (a column of cells, each a colour and a light; `Brush::column`
+  from a palette and a width for a thin mover, `Brush::edge` for a broad body's back edge (`inset` steps in, past a sprite's outline), or
+  `Brush::from_column` from a sprite's own column) along poses, square to the way
+  it goes or turned with the thing's angle (a turning bar sweeps a fan), each pixel showing the cell that passed it
+  last, its colour, width, wave, dither and light set by how long ago (`Look`); no holes however fast it turns.
+  `pixfx_core::motion` reads a `Trace` (now with each point's angle) once for everyone: `at`, `velocity`,
+  `speed`, `heading`, `turn`, `spin`, `acceleration`, `poses`. `projectiles/trail` (new) is a column swept
+  along its mover's trace (`Scene::trail`): straight or curving with it, longer the faster it went, waving and
+  breaking up toward its end, behind the character; played on its own and moved by the game it trails itself, and
+  played on a character it wraps the sprite and smears the body itself (its back edge, upright, in its own colours: a
+  fighter gliding leaves an afterimage), and `turn` 1 turns it with its mover's angle. `fire/campfire`, `fire/brazier`,
+  `fire/candle` and `scifi/jetpack` take `carried` 1: carried along, their flames and plumes bend back against the
+  motion (and the brazier's and the candle's smoke drift back); not carried or standing still, their pixels are
+  unchanged. `explosions/body-burst` smears each flying chunk's back edge along its arc. The `blood_spray` script
+  (`crates/pixfx-export/examples`) throws drops in arcs, each a `projectiles/trail` in blood colours that it moves as
+  a game moves any mover, and `carry` carries any effect back and forth with `carried` 1. On the site the trail
+  rides the two fighters as they glide, with sliders for its seconds, width and wave; a fighter thrown back by a heavy
+  blow leaves an afterimage as it flies; the jetpack is played carried, so its plumes lean as it flies.
+
+- `arcane/bagua-mirror` and `arcane/bagua-mirror-strike` (new): the bagua mirror, an octagonal bronze mirror ringed
+  with the eight trigrams round a jade face, in two forms. Both wrap the sprite they play on: the mirror is sized and
+  placed from its body, spins up out of a point of light behind the character's back, and a jade line washes down its
+  outline. The shield form sways and lights its trigrams in turn; a blow (`hitX`, `hitY`) flashes its face, flares
+  the outline, knocks the mirror away so it trembles, squashes and springs back, fires an impact cue (shake,
+  hit-stop) and is thrown back as a beam; it ends by spinning down to a point. The strike form holds the same way
+  until the game orders it (`Scene::order`): `arcane/bagua-mirror-flying` leaves from behind the caster spinning
+  like a thrown coin, its jade rim smeared behind it along the way it flies (`pixfx_draw::sweep` over the trace the
+  scene hands it), shrinking to half, and bursts on the target as `arcane/bagua-mirror-burst`
+  (white flash, octagonal shock ring, the trigrams flung out, shards, a heavy impact cue). The mirror painter and the
+  outline are shared in `arcane/bagua.rs`, with colours from the drawn parts sheet. Made from `pixfx-ref` sheets
+  (`examples/specs/shield/bagua-mirror.json`). On the site the shield is a `ward` with hit sliders and the strike a
+  `volley`.
+- `pixfx_core::render_frames_on_actor` and `gif --show-actor` draw the sprite too, between the effect's back and
+  front layers, so a sprite-aware effect can be previewed on its character. The `stage` script
+  (`crates/pixfx-export/examples/stage.rs`) plays an effect on a stage between two characters, orders it at the
+  target (`--order-at`) and answers its cues as a game does (`--feel`: hit-stop and screen shake).
+- Effects that take orders, for any distance (`pixfx_core::volley`): an effect can answer `Effect::order` (a point,
+  an aim, `converge` or `pierce`, and the caster's body) with a volley of pieces, each another effect; `Volley::aim`
+  plans one for any like pieces (nearest the target first, a gap apart). The point gives the direction, not where a
+  piece bursts: each piece hangs where it was (`held`), turned toward its way, then flies along its path and on past
+  the point, and the scene strikes it on the first body it meets (`Scene::set_body`, the caster's spared): a
+  `strike` event naming the body and the hit effect played there; a piercing piece flies through every body, and
+  the game can burst a piece itself (`Scene::burst`). A piece that meets nothing fades out past the point. Pieces
+  keep their caster's mirroring and turn to their heading (32 headings, so frames are shared); each can carry a
+  trail (`tail`). The ordered effect ends with its last piece. A looping effect can
+  open once and then loop only what follows (`Effect::loop_from`). JS: `effect.attack(x, y, aim, caster)`, `pixfx.setBody`
+  and `clearBody` on every shell, `effect.burst()` and the effect's `"strike"` event (`body`: the one struck);
+  gpui: `FxScene::order`, `set_body`, `burst`, `launched` and `events`. Workers paint any effect the scene plays,
+  its spec made from its clip (`options_json`), so `scene.play` no longer takes `frames`.
+- `arcane/sword-formation` (new): eight flying swords gather one by one behind the caster, fan out together into a
+  ring and turn there until ordered; then each hangs where it is, turning to its way (`arcane/held-sword`, new), and
+  they fly one after another, 0.1 s apart, at 300 pixels a second, curving in on the point and on past it, bursting
+  on the first body they meet. Its pieces are `arcane/flying-sword` (new: opens with a flash and specks) trailing
+  `projectiles/trail`, and, where each strikes, `arcane/sword-strike` (new). Made here from `pixfx-ref`
+  sheets (`examples/specs/arcane/sword-formation.json`); the count, order and paths are in code. On the site it
+  plays the `volley` role: it gathers at the caster, holds, then is ordered at the foe 150 px away.
 - The landing duel plays a rotating skill bar: three slots, each a skill drawn at random from the school's pool
   (now 11 for Thunder and 12 for Frost, seven of them new) with 1 to 4 casts (fewer hit harder); a spent slot counts
   down and draws again, and a skill whose partner is on the bar evolves. Chill and shock stack, payoff skills spend
@@ -33,6 +96,32 @@
   entry of a palette the frames share (32 colour, 16 light). `extract` writes it as `matrix.json` (text maps per
   frame, exact values, palettes) and the review page shows the palette and each frame through it; its
   swatches are colour pickers with a hue slider, and the player's recoloured layer repaints every frame live.
+- `pixfx-ref` sheets are drawn for redrawing: with `grid` every cell shows its pixel grid (64 art pixels a side for
+  the shields) and the prompt asks for whole squares in flat colour from a small shared palette; with `parts` a
+  PARTS row comes first, the effect taken apart (the main object, its pieces, the small effects, the light), each
+  drawn alone and whole. `extract` cuts a grid sheet on the template's columns and the label lines, so boxed labels,
+  cell frames and squashed rows do not move it, and names the parts `parts-<name>`, leaving them out of diffs,
+  in-betweens and the player. `pixfx_ref::entropy` measures each step's change as conditional entropy, and
+  `pixfx_ref::compare` with its `compare` script puts an effect's frames beside the sheet's cells at the same scale
+  with the steps of both. The eleven shield specs are grid sheets with parts; the skill teaches the whole loop.
+  A part can have `forms` (each shape it takes, a row of its own) and a `pivot` the model marks in green and
+  `extract` reads; a spec with `layers` is drawn as a parts sheet, then a sheet per moment built from it, each
+  moment once per layer (`SOLID`, `FX`, `LIGHT`). `extract` finds cells from the cyan frames the model keeps and,
+  on cells it drew not square, its own pixel size; a pivot per green mark, marks painted over in every cell, and
+  frame lines the model draws through a cell cleared. A moment's prompt keeps the main object at MAIN's shape, number
+  of pieces and size, with damaged forms only where it is struck or ends. The `whole` script plays every moment's
+  whole frames in order as `whole.gif` and `whole.png`.
+- `holy/lotus` (new, feature `holy-lotus`): a pink lotus bud rises from its pad, breathes, shivers open under a blow
+  and drifts apart in petals; written from the parts of its grid sheet. Made here, no parity source.
+- `arcane/restriction` (new, feature `arcane-restriction`): three rune rings write themselves round the character one
+  character at a time from the ground up, each ring spinning on its own; a blow lands anywhere (`hitX`, `hitY`) and
+  the nearest ring flares from that point, tilts away from it and throws sparks; the rings unravel from the top, rune
+  by rune. Its glow is painted in steps of its ramp round every stroke, as on the reference sheet, with
+  `pixfx_draw::halo` (new: strokes stamped with a heat and a kind, spread a fixed fall a pixel as a rounded octagon,
+  walked only over the box they cover). Written from the
+  parts sheet of its `pixfx-ref` spec. Made here, no parity source. The gif, sheet, bake and mp4 scripts take
+  `--num NAME=V` for an effect's own number options.
+- `holy/golden-bell` redrawn in flat bands of five golds with a one-pixel outline, a waist band and a white flash.
 - Skills for an agent working in the repo, in `.claude/skills/`: `pixfx` (where to start), `pixfx-effect`,
   `pixfx-play`, `pixfx-render`, `pixfx-perf`; `pixfx-pixel` moves there from `skills/`. The export scripts take
   `--seed N`, and `pixfx_export::write_video` with its `mp4` script writes a video through ffmpeg.

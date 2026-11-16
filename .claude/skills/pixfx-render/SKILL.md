@@ -14,10 +14,11 @@ library.
 
 | Output | Command | Writes (`<name>` = id with `/` as `_`) |
 |---|---|---|
-| Sprite sheets + beanfx JSON | `cargo run -p pixfx-export --example sprite_sheet -- <id> [--seed N] [--palette WORD] [--out DIR]` | `<name>.png`, `_color.png`, `_light.png`, `.json` |
-| Looping gif | `cargo run -p pixfx-export --example gif -- <id> [--scale N] [--seed N] [--palette WORD] [--actor PNG,PNG... [--actor-every N]] [--out DIR]` | `<name>.gif` (over a dark backdrop); `--actor` plays an effect that reads its sprite on these sprite frames, feet on the origin |
-| Video (ffmpeg on `PATH`) | `cargo run -p pixfx-export --example mp4 -- <id> [--scale N] [--loops N] [--seed N] [--palette WORD] [--out DIR]` | `<name>.mp4`; `write_video` takes `.webm` and others by extension |
-| Baked clip for `loadBaked` | `cargo run -p pixfx-export --example bake -- <id> [--seed N] [--palette WORD] [--out DIR]` | `<name>.bake.json`, `<name>.bake.<n>.png` |
+| Sprite sheets + beanfx JSON | `cargo run -p pixfx-export --example sprite_sheet -- <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]` | `<name>.png`, `_color.png`, `_light.png`, `.json` |
+| Looping gif | `cargo run -p pixfx-export --example gif -- <id> [--scale N] [--seed N] [--palette WORD] [--num NAME=V] [--actor PNG,PNG... [--actor-every N] [--show-actor]] [--out DIR]` | `<name>.gif` (over a dark backdrop); `--actor` plays an effect that reads its sprite on these sprite frames, feet on the origin; `--show-actor` draws the sprite too, between the back and front layers |
+| An effect in play, on a stage | `cargo run -p pixfx-export --example stage -- <id> [--actor PNG] [--target DX,DY] [--order-at SECS] [--aim converge\|pierce] [--feel] [--secs N] [--scale N] [--out DIR]` | `<name>.stage.gif`: the effect on a caster with a target facing them, through `pixfx-scene`; `--order-at` orders a volley at the target, `--feel` shows the hit-stop and screen shake its cues ask for |
+| Video (ffmpeg on `PATH`) | `cargo run -p pixfx-export --example mp4 -- <id> [--scale N] [--loops N] [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]` | `<name>.mp4`; `write_video` takes `.webm` and others by extension |
+| Baked clip for `loadBaked` | `cargo run -p pixfx-export --example bake -- <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]` | `<name>.bake.json`, `<name>.bake.<n>.png` |
 | Fighter pose sheet | `cargo run -p pixfx-fighter --example poses -- <thunder\|frost\|alchemist> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]` | `<look>-poses.png`, or `<look>-<POSE>.png` and its cells |
 | Parity side-by-side | `cargo run -p pixfx-export --example parity -- <id> [--pixelfx DIR]` (a pixelfx port needs a pixelfx checkout: `--pixelfx`, else `$PIXELFX`, else `./pixelfx`) | `target/parity/<id>.side.gif` (see `pixfx-effect`) |
 
@@ -25,8 +26,8 @@ library.
   `gold`.
 - Run from the repo root. `--out` defaults to `target/out` (`out` for `poses`). A bad flag exits 2 with the usage.
 - Effect ids: `pixfx_effects::EFFECTS`, or `rg -n 'id: "' crates/pixfx-effects/src`.
-- An effect's own option (`height`, `wood`, ...) or a glow margin has no flag: set it in the script's `Options`
-  (`opts.extra`) or copy the script.
+- An effect's own number option takes `--num NAME=V`, once per option (`--num hitX=-20 --num hitY=-48`); a ramp,
+  a colour or a glow margin has no flag: set it in the script's `Options` or copy the script.
 - A bake written into a game: `--out <game>/public/fx`, then `await loadBaked("fx/<name>.bake.json")`.
 
 ## A new output (a frame strip, a report, another format)

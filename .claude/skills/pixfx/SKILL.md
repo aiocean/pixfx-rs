@@ -16,7 +16,8 @@ yourself, and run or edit scripts.
 |---|---|
 | Add, port or change an effect | `pixfx-effect` |
 | An effect that reads the sprite it plays on (outline, glow round it, bleed from it) | `pixfx-sprite-aware` |
-| Design a new effect from a picture an image model draws first | `pixfx-ref` |
+| A new effect from an idea: storyboard, sketch, questions, then the whole way to the library | `pixfx-new-effect` |
+| Reference sheets from an image model: spec, template, draw, extract, compare | `pixfx-ref` |
 | Play effects in a game (Phaser, Canvas 2D, Pixi, Rust/gpui) | `pixfx-play` |
 | Make files: sprite sheet, gif, baked clip, pose sheet, a new output | `pixfx-render` |
 | Measure or improve speed | `pixfx-perf` |
@@ -40,6 +41,11 @@ Rust decides, a shell draws. Dependencies point down this table only.
 - A new output (a file, a video, a report): logic in the library crate that owns it, plus a short script in that
   crate's `examples/` (shared helpers only in that crate's `examples/common/mod.rs`). Never a CLI or binary crate.
 - The same rule in two shells moves down to the lowest layer both reach.
+- Something thrown across the stage (an effect's pieces, at any distance): `pixfx_core::volley` plans it,
+  `Scene::order` flies it and strikes it on the bodies the game declares; every shell gets it through `attack` and
+  `setBody` / `FxScene::order` and `set_body`. Never a canvas sized to the distance.
+- A streak or a trail: a brush swept along a path (`pixfx_draw::sweep`); how something moves: `pixfx_core::motion`
+  read off its trace. Never a line or a velocity of an effect's own.
 - Each crate's `AGENTS.md` says what it holds and what it does not; read it before editing that crate.
 
 ## Tests: each crate tests itself

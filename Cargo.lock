@@ -263,6 +263,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pixfx-duel"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "pixfx-draw",
+ "pixfx-effects",
+ "pixfx-fighter",
+ "pixfx-mind",
+ "serde",
+ "serde_json",
+ "tsify",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "pixfx-effects"
 version = "0.1.0"
 dependencies = [
@@ -278,9 +293,11 @@ name = "pixfx-export"
 version = "0.1.0"
 dependencies = [
  "gif",
+ "libm",
  "pixfx-core",
  "pixfx-draw",
  "pixfx-effects",
+ "pixfx-scene",
  "png",
  "serde",
  "serde_json",
@@ -348,6 +365,7 @@ dependencies = [
 name = "pixfx-ref"
 version = "0.1.0"
 dependencies = [
+ "gif",
  "libm",
  "pixfx-core",
  "pixfx-draw",
@@ -363,6 +381,7 @@ dependencies = [
 name = "pixfx-scene"
 version = "0.1.0"
 dependencies = [
+ "libm",
  "pixfx-core",
  "pixfx-draw",
  "pixfx-effects",
@@ -379,6 +398,7 @@ dependencies = [
  "js-sys",
  "pixfx-core",
  "pixfx-draw",
+ "pixfx-duel",
  "pixfx-effects",
  "pixfx-export",
  "pixfx-fighter",
