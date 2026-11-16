@@ -7,8 +7,8 @@ here; this file only says what this crate holds. The design is
 ## Job
 
 The landing duel's rules: two cultivators, Thunder and Frost, their stats and skills (`data`), the seeded dice every
-roll comes from (`rng`), the fighters (`fighter`), statuses (`status`), the rotating bar (`bar`), casts and blows
-(`act`), shots (`shot`), the round loop (`duel`), the seats that decide for each corner (`seat`: the brain from
+roll comes from (`pixfx_mind::Rng`), the fighters (`fighter`), statuses (`status`), the rotating bar (`bar`), casts
+and blows (`act`), shots (`shot`), the round loop (`duel`), the seats that decide for each corner (`seat`: the brain from
 `pixfx-mind`, the trained policy (`PolicySeat`, weights in `weights/policy.bin`), `first_mind`, the yardstick a brain is
 measured against, or the scripted fighters in `scripted`), each fighter's style (`style`), what a mind senses
 (`sense`), and the duel as the page reads it (`view`). For training and measuring the policy: the trainer's episodes

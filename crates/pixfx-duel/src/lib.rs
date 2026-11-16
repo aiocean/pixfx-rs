@@ -13,7 +13,6 @@ pub mod fighter;
 pub mod first_mind;
 pub mod ladder;
 pub mod out;
-pub mod rng;
 pub mod scripted;
 pub mod seat;
 pub mod sense;
