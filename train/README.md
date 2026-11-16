@@ -21,3 +21,21 @@ cargo run --release -p pixfx-duel --example ladder -- --seeds 150
   `cargo test -p pixfx-duel --test policy_export` checks against Rust's own forward pass.
 
 `runs/` stays out of git; the shipped weights go in.
+
+## Training on a remote host
+
+A full run trains on a training machine, not a laptop: the training machine runs about 42K env steps/s (a laptop 6K-12K), so
+3000 updates take about 45 minutes, and a crash or sleep on a laptop cannot stop it.
+
+- Reach it as `ssh <train-host>`.
+- The code must already be on that machine (clone or sync it); `.venv` is not copied, so `long-run.sh` builds it there.
+- Start a run detached, so it outlives the ssh session and the training machine does not sleep:
+  ```
+  ssh <train-host> 'cd pixfx-rs/train &&
+    nohup caffeinate -is ./long-run.sh frames > ~/train-frames.log 2>&1 < /dev/null &'
+  ```
+  `long-run.sh` builds the rules, runs pytest, trains, and resumes from `runs/<run>/last.pt` (saved every 25
+  updates) if the trainer dies. Its log ends in `TRAIN-DONE` or `FAIL`.
+- Progress is `runs/<run>/log.jsonl`, which syncs back to a laptop with the rest of `runs/`; export and the ladder run
+  on a laptop.
+- One run at a time: check `pgrep -fl "ppo.py"` on the training machine before starting, since another session may be training.
