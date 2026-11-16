@@ -56,34 +56,34 @@
     "b66268509bc720f3"
   ],
   "pose/cast@side_e": [
-    "022306aa25277884"
+    "f14a03025b9ce18a"
   ],
   "pose/cast@topdown_s": [
-    "a88c2eab3fc9c3f9"
+    "43ff033caf43e6ed"
   ],
   "pose/crouch@side_e": [
-    "89ac8e58b27403bc"
+    "deea30ec9f3e84e0"
   ],
   "pose/crouch@topdown_s": [
-    "4979a3f03999d5d0"
+    "71ba21a793f5c8ca"
   ],
   "pose/down@side_e": [
-    "e131afef8b36a7a8"
+    "5d2c9909e9a8c99c"
   ],
   "pose/down@topdown_s": [
-    "4c0177459385af4c"
+    "840562c7c382ebfc"
   ],
   "pose/guard@side_e": [
-    "b6e02dcd11d828f0"
+    "46376d20b8c6f27b"
   ],
   "pose/guard@topdown_s": [
-    "c6cd7fb7690328e0"
+    "9a3e858712058246"
   ],
   "pose/hurt@side_e": [
-    "b5a9858f0429494a"
+    "36b1feaae70e8837"
   ],
   "pose/hurt@topdown_s": [
-    "7978fa5ea52f011d"
+    "07fa9df6c6fe6248"
   ],
   "pose/idle@side_e": [
     "43945a02d1d80e4b"
@@ -98,10 +98,10 @@
     "776a82c1316c827c"
   ],
   "pose/kneel@side_e": [
-    "d671a02ee74ce0c7"
+    "2d30bdff2d2e8be0"
   ],
   "pose/kneel@topdown_s": [
-    "4e0062602f6d4453"
+    "9b5ca10f4fea9487"
   ],
   "pose/rest@side_e": [
     "28473e29fc39baa0"
@@ -110,34 +110,34 @@
     "3a9e063fa2c09399"
   ],
   "pose/run@side_e": [
-    "ac02cf6c098f1592"
+    "ec09b5435e04f709"
   ],
   "pose/run@topdown_s": [
-    "cc1e163df7e53da8"
+    "647557e84f170e3c"
   ],
   "pose/slash@side_e": [
-    "54949e63160de77c"
+    "b07db5184ae0bb88"
   ],
   "pose/slash@topdown_s": [
-    "0b7c03298b005d4e"
+    "d9b0a5c3457b1e5a"
   ],
   "pose/thrust@side_e": [
-    "e47351f37915bb97"
+    "e3a8240ebbd3390b"
   ],
   "pose/thrust@topdown_s": [
-    "57f74a5ff9602df7"
+    "19cd674d057cb2c7"
   ],
   "pose/walk@side_e": [
-    "d42c694aa8a1897b"
+    "f1384582663f5aec"
   ],
   "pose/walk@topdown_s": [
-    "7c4c6a6fa3504d6b"
+    "564bcf055c8ff66d"
   ],
   "pose/windup@side_e": [
-    "10d92b01858a8036"
+    "7678308308b8406e"
   ],
   "pose/windup@topdown_s": [
-    "0ac71c6d422ad72e"
+    "cc937d17db6f0b27"
   ],
   "run@side_e": [
     "8c60f0d03a083fda",

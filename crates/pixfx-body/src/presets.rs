@@ -12,7 +12,7 @@ pub const NAMES: [&str; 14] = [
 
 /// A preset by name, `phase` used by the cyclic ones; `None` for a name not in [`NAMES`].
 pub fn by_name(name: &str, phase: f64) -> Option<Pose> {
-    Some(match name {
+    let pose = match name {
         "rest" => Pose::default(),
         "idle" => idle(),
         "walk" => walk(phase),
@@ -28,7 +28,34 @@ pub fn by_name(name: &str, phase: f64) -> Option<Pose> {
         "down" => down(),
         "cast" => cast(),
         _ => return None,
+    };
+    Some(if pose.lift > 0.0 {
+        pose
+    } else {
+        carry_flat(pose)
     })
+}
+
+/// On the ground every foot that reaches the floor (its ankle within a pixel of the lowest) lies flat: its ankle
+/// takes up the shin's slope. A raised or airborne foot keeps its point.
+fn carry_flat(p: Pose) -> Pose {
+    let s = crate::rig::skeleton(&crate::Body::default(), &p, 0.0);
+    let low = s.right_leg.end.y.max(s.left_leg.end.y);
+    let level = |l: crate::Limb| l.bend - l.raise;
+    let on = |y: f64| low - y <= 1.0;
+    Pose {
+        right_foot: if on(s.right_leg.end.y) {
+            level(p.right_leg)
+        } else {
+            p.right_foot
+        },
+        left_foot: if on(s.left_leg.end.y) {
+            level(p.left_leg)
+        } else {
+            p.left_foot
+        },
+        ..p
+    }
 }
 
 const fn sword(angle: f64) -> Option<Sword> {

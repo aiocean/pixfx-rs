@@ -554,6 +554,9 @@ pub(crate) fn reach(body: &Body, pose: &Pose, limb: Limb4, target: [f64; 3]) -> 
             old,
         )
     };
+    if !(l1 > 0.0 && l2 > 0.0 && l1.is_finite() && l2.is_finite()) {
+        return None;
+    }
     let rel = V3(target[0], target[1], target[2]).add(root.mul(-1.0));
     let (tf, tu) = (rel.dot(frame.f), rel.dot(frame.u));
     let phi = libm::atan2(tf, -tu).to_degrees();

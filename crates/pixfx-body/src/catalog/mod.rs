@@ -61,6 +61,7 @@ pub fn family(name: &str) -> Option<&'static str> {
     })
 }
 
+/// A preset as a one-frame clip.
 fn still(name: &str, pose: Pose) -> Option<Clip> {
     Some(Clip {
         name: name.to_string(),
