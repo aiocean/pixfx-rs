@@ -109,6 +109,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &transitions::BURN_AWAY,
     #[cfg(feature = "transitions-crt-off")]
     &transitions::CRT_OFF,
+    #[cfg(feature = "shadow-blood-shield")]
+    &shadow::BLOOD_SHIELD,
     #[cfg(feature = "shadow-void-orb")]
     &shadow::VOID_ORB,
     #[cfg(feature = "water-water-jet")]

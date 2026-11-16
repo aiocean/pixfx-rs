@@ -1,0 +1,75 @@
+{
+  "id": "shield/blood-detail-a",
+  "name": "Blood shield parts a",
+  "look": "Blood shield from dark cultivation fantasy. Blood rises from a pool under the character's feet and closes into a tall thin dome round them: a bright crimson rim, dark red veins branching across a see-through film, droplets sliding down, a dull red glow inside.",
+  "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "RIM",
+      "text": "only the dome's outer rim alone, a bright crimson arc one to two squares thick with a pale pink highlight line along its top, no veins and no fill",
+      "pivot": "the centre of its base",
+      "forms": [
+        "thin and dim, just closed",
+        "normal",
+        "swollen one square thicker and brighter, at a heartbeat",
+        "broken at the right where a blow lands, its ends bent inward"
+      ]
+    },
+    {
+      "name": "VEIN",
+      "text": "one dark red vein alone, branching upward like a root from its foot",
+      "pivot": "its foot",
+      "forms": [
+        "a short stub just growing",
+        "half grown with two branches",
+        "fully grown with four branches",
+        "thick and bright, pulsing",
+        "thinning and dripping, fading"
+      ]
+    },
+    {
+      "name": "DRIP",
+      "text": "one drip of blood alone, hanging from a line at the top of the cell",
+      "pivot": "where it hangs",
+      "forms": [
+        "a small bulge forming",
+        "stretched long, a bead at its end",
+        "the bead breaking off, a thin neck",
+        "the bead falling, a short tail above it"
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow and no droplets"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: droplets, splashes and mist puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft red light round the dome, the pool and the droplets, with no solid shape drawn",
+      "light": true
+    }
+  ],
+  "rows": [
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the dome holds, veins flowing, droplets sliding",
+      "frames": 1
+    }
+  ],
+  "rules": [
+    "The effect grows from almost nothing: never jump from an empty cell to a half-formed shape.",
+    "The dome is see-through: draw its rim and veins solid and leave the inside empty, its red is light, not paint.",
+    "Take only the pixel size and the way the glow is made from the second image, not its colours: every colour is a crimson or dark red from the look, the lightest a pale pink highlight; no outline in black, no gradients wider than a few pixels."
+  ]
+}

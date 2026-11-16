@@ -1,0 +1,72 @@
+{
+  "id": "shield/blood-detail-b",
+  "name": "Blood shield parts b",
+  "look": "Blood shield from dark cultivation fantasy. Blood rises from a pool under the character's feet and closes into a tall thin dome round them: a bright crimson rim, dark red veins branching across a see-through film, droplets sliding down, a dull red glow inside.",
+  "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "DROPLET",
+      "text": "one round blood droplet alone with a pale highlight",
+      "forms": [
+        "one square",
+        "two by two",
+        "three squares round with a highlight",
+        "sliding down a surface, a short trail above it",
+        "flying right, a tail behind it",
+        "landed, flattened into a small splat"
+      ]
+    },
+    {
+      "name": "SPLASH",
+      "text": "a splash of blood alone where a blow lands, flying to the right",
+      "forms": [
+        "a flash, a small bright burst",
+        "a crown of droplets thrown out",
+        "the droplets spread and falling",
+        "a few last droplets"
+      ]
+    },
+    {
+      "name": "MIST",
+      "text": "a puff of faint red mist alone",
+      "forms": [
+        "small and dense",
+        "spreading",
+        "thin and fading"
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow and no droplets"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: droplets, splashes and mist puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft red light round the dome, the pool and the droplets, with no solid shape drawn",
+      "light": true
+    }
+  ],
+  "rows": [
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the dome holds, veins flowing, droplets sliding",
+      "frames": 1
+    }
+  ],
+  "rules": [
+    "The effect grows from almost nothing: never jump from an empty cell to a half-formed shape.",
+    "The dome is see-through: draw its rim and veins solid and leave the inside empty, its red is light, not paint.",
+    "Take only the pixel size and the way the glow is made from the second image, not its colours: every colour is a crimson or dark red from the look, the lightest a pale pink highlight; no outline in black, no gradients wider than a few pixels."
+  ]
+}

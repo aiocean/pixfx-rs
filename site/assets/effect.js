@@ -56,6 +56,11 @@ const OWN = {
     { key: "hitX", label: "Hit x", min: -40, max: 40, step: 1, value: 26 },
     { key: "hitY", label: "Hit y", min: -50, max: -5, step: 1, value: -26 },
   ],
+  // where the blow lands on the dome, from the feet (shadow/blood_shield.rs HIT_X, HIT_Y)
+  "shadow/blood-shield": [
+    { key: "hitX", label: "Hit x", min: -60, max: 60, step: 1, value: 38 },
+    { key: "hitY", label: "Hit y", min: -90, max: 6, step: 1, value: -34 },
+  ],
 };
 
 /** Seconds a one-shot or a take rests before it plays again. */

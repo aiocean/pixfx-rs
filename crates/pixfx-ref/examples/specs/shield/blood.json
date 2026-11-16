@@ -1,7 +1,7 @@
 {
   "id": "shield/blood",
-  "name": "Blood",
-  "look": "Blood shield from dark cultivation fantasy. A thin dark crimson film shaped like a tall dome surrounds the character, veins of bright red flowing through it.",
+  "name": "Blood shield",
+  "look": "Blood shield from dark cultivation fantasy. Blood rises from a pool under the character's feet and closes into a tall thin dome round them: a bright crimson rim, dark red veins branching across a see-through film, droplets sliding down, a dull red glow inside.",
   "subject": "shield",
   "grid": true,
   "cell": 64,
@@ -11,44 +11,54 @@
   "parts": [
     {
       "name": "MAIN",
-      "text": "the whole crimson dome alone, its film and veins, no glow and no droplets",
+      "text": "the whole blood dome alone, as it stands fully formed: a bright crimson rim one to two squares thick, dark red veins branching across it from the base upward, the inside of the dome mostly empty so the character shows through; no glow and no droplets",
       "pivot": "the centre of its base",
       "forms": [
         "whole, standing still",
-        "bulging inward at the right where a blow lands",
-        "sagging and melting down, half drained"
+        "dented inward on its right side where a blow lands, ripple rings round the dent",
+        "sagging and melting down, half drained, drips hanging from its lower edge"
       ]
     },
     {
-      "name": "VEIN",
-      "text": "one stretch of bright red vein alone, branching",
+      "name": "STREAM",
+      "text": "one stream of blood alone, rising from the ground",
+      "pivot": "its foot on the ground",
       "forms": [
-        "a thin stream of blood rising from the ground",
-        "a thick stream rising and curling over",
-        "a stream dripping down into the ground"
+        "a thin stream just rising, a short curl",
+        "a thick stream rising tall and curling over at its top",
+        "a stream dripping back down into the ground, thinning"
+      ]
+    },
+    {
+      "name": "POOL",
+      "text": "the flat pool of blood on the ground under the feet, seen from a low angle, a wide thin ellipse with a bright rim",
+      "forms": [
+        "small, just spreading",
+        "full width",
+        "shrinking, drying at its edges"
       ]
     },
     {
       "name": "FX",
-      "text": "the small effects alone, spread out so none overlap: blood droplets, a splash, red mist puffs"
+      "text": "the small effects alone, spread out so none overlap: round blood droplets of 1 to 3 squares with a light highlight, a splash of droplets flying right, two faint red mist puffs"
     },
     {
       "name": "LIGHT",
-      "text": "only the glow of the dome, the light it gives off, with no solid shape drawn"
+      "text": "only the dull red glow of the dome and the pool, the light they give off, with no solid shape drawn"
     }
   ],
   "layers": [
     {
       "name": "SOLID",
-      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+      "text": "the solid shapes, opaque, with no glow and no droplets"
     },
     {
       "name": "FX",
-      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+      "text": "the small effects: droplets, splashes and mist puffs, with no solid shape and no glow"
     },
     {
       "name": "LIGHT",
-      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "text": "the glow: the soft red light round the dome, the pool and the droplets, with no solid shape drawn",
       "light": true
     }
   ],
@@ -56,35 +66,59 @@
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "blood rises from the ground in streams and spreads into the dome",
+      "text": "a pool spreads under the feet, six streams rise from its rim and curl up round the character, meet over the head and the film fills the dome from the bottom up",
+      "frames": 6,
       "notes": [
-        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
-        "",
-        "",
-        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+        "only a small pool under the feet and a few faint specks: no stream yet",
+        "the pool at full width, six thin streams just rising at its rim",
+        "six streams rising to waist height, curling",
+        "the streams tall and curling inward, meeting over the head",
+        "the film filling from the bottom up to the chest, veins spreading",
+        "the whole dome fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
       ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "the film holds, red veins flowing slowly across it and droplets sliding down; it loops",
-      "frames": 3
+      "text": "the dome holds; dark veins flow slowly upward through it, droplets slide down its sides, the rim swells and brightens once like a heartbeat; it loops",
+      "frames": 4,
+      "notes": [
+        "the dome as MAIN",
+        "veins brighter, flowing up, a droplet sliding down the left side",
+        "the rim swollen and brighter, a heartbeat",
+        "back as MAIN, the droplet lower"
+      ]
     },
     {
       "name": "HIT",
       "caption": "blow lands from the right",
-      "text": "a blow strikes from the right; the film bulges inward at the impact point and droplets splatter out to the right"
+      "text": "a blow strikes the right side at chest height; the film dents inward there, ripple rings spread from the dent across the dome, droplets splatter out to the right, then the dent springs back",
+      "frames": 5,
+      "notes": [
+        "the blow lands: a bright flash on the right side at chest height, the rim bending inward",
+        "the dent at its deepest, ripple rings round it, droplets thrown out to the right",
+        "the dent springing back, ripples spreading over the dome, droplets falling",
+        "the dome bulging slightly outward past its shape, then settling",
+        "the dome whole as MAIN, a few droplets on the ground at the right"
+      ]
     },
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the film loses its shape and drains down into the ground as dripping streams",
+      "text": "the film loses its shape, sags and melts down into dripping streams that drain into the pool; the pool shrinks and is gone",
+      "frames": 5,
       "notes": [
-        "",
-        "",
-        "only scattered fragments left",
-        "a few last faint specks, under 20 pixels"
+        "the dome as MAIN but dimmer, drips forming on its lower edge",
+        "the dome sagging, drips hanging long",
+        "half drained: only the lower half of the dome, streams running down into the pool",
+        "only the pool and a few drips left, about a third of the pixels of the first frame",
+        "a few last faint specks over a small dark stain, under 20 pixels"
       ]
     }
+  ],
+  "rules": [
+    "The effect grows from almost nothing: never jump from an empty cell to a half-formed shape.",
+    "The dome is see-through: draw its rim and veins solid and leave the inside empty, its red is light, not paint.",
+    "Take only the pixel size and the way the glow is made from the second image, not its colours: every colour is a crimson or dark red from the look, the lightest a pale pink highlight; no outline in black, no gradients wider than a few pixels."
   ]
 }

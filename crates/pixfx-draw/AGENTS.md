@@ -12,6 +12,9 @@ mover's cross-section: `column` for a thin mover, `edge` for a broad body's back
 blade), `color` (`Rgba`,
 `hex`), `palette` presets, `RgbaImage` (plain RGBA bytes: a sprite leaving the engine or a picture
 coming in), and the JS-number maths in `math` (`js_round`, `js_max`, `js_min`, `clamp`). Every other crate paints through it.
+`growth` grows branching trees for veins, lightning, cracks and roots: `dbm` (dielectric breakdown) and `colonize`
+(space colonization), `Tree::path` for a path you set, `murray` for fork angles, and `radii` with `stroke` for
+tapered, shaded strokes. Every setting is a field.
 
 ## Belongs here
 

@@ -6,6 +6,7 @@
 pub mod blend;
 pub mod color;
 pub mod frame;
+pub mod growth;
 pub mod halo;
 pub mod image;
 pub mod math;

@@ -44,6 +44,7 @@ Rust decides, a shell draws. Dependencies point down this table only.
 - Something thrown across the stage (an effect's pieces, at any distance): `pixfx_core::volley` plans it,
   `Scene::order` flies it and strikes it on the bodies the game declares; every shell gets it through `attack` and
   `setBody` / `FxScene::order` and `set_body`. Never a canvas sized to the distance.
+- Veins, lightning, cracks, roots: a branching tree from `pixfx_draw::growth` (`dbm`, `colonize_from` off a `Tree::path` you set, `murray` fork angles, `radii` + `stroke` for tapered tubes; `shadow/blood_shield.rs` is the worked example)
 - A streak or a trail: a brush swept along a path (`pixfx_draw::sweep`); how something moves: `pixfx_core::motion`
   read off its trace. Never a line or a velocity of an effect's own.
 - Each crate's `AGENTS.md` says what it holds and what it does not; read it before editing that crate.

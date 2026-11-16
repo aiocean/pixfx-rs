@@ -75,6 +75,8 @@ const TABLE = {
   "arcane/restriction": { role: "ward", blows: [1.8], spell: "ward", directional: true },
   // the bagua mirror's shield form throws the blow back as a beam at 1.6 s (arcane/bagua_mirror.rs HIT)
   "arcane/bagua-mirror": { role: "ward", blows: [1.6], spell: "ward", directional: true },
+  // the blood shield takes its blow at 1.6 s (shadow/blood_shield.rs HIT, where `hitX` and `hitY` default)
+  "shadow/blood-shield": { role: "ward", blows: [1.6], spell: "ward", directional: true },
   // the strike form holds behind the caster, then is thrown and bursts on the foe's chest (one shot)
   "arcane/bagua-mirror-strike": { role: "volley", hold: 1.2, aim: "converge", blows: [0.6], power: 14, spell: "seal", directional: true },
   // power-up bursts 0.32 s in (feedback/power_up.rs BURST)

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Effects: `shadow/blood-shield`, a dome of blood with veins (dark cultivation fantasy), made from `pixfx-ref` sheets.
+  A pool spreads under the feet, veins grow out of it up round the character with glowing tips, and a see-through
+  film fills in behind them. The dome is lit from the upper left, has a Fresnel rim and a highlight crescent, and holds
+  with a heartbeat that pulses out along the veins. A blow (`hitX`, `hitY`) flashes, dents, ripples and splatters.
+  At the end the bubble pops: the rim breaks into shards and drops, then the veins draw back into the pool and the pool
+  shrinks away. On the site it plays as a ward with its blow at 1.6 s, with hit sliders.
+- Drawing: `pixfx_draw::growth`, branching growth for veins, lightning, cracks and roots. Every setting is a field.
+  `dbm` is the dielectric breakdown model (a Laplace field relaxed on a grid: `eta`, grounded or insulating walls,
+  `drift`, `noise`, an optional target). `colonize` and `colonize_from` are space colonization (`attractors`,
+  `influence`, `kill`, `bias`, `jitter`, `branch_chance`, `max_turn`, `fork_angle`). `Tree::path` lays a path you
+  set, so growth branches off it. `jag` wanders a line by midpoint displacement. `Tree::prune` drops stubs, and
+  `Tree::murray` sets fork angles by Murray's law from branch thickness. `Tree::radii` and `stroke` taper the strokes
+  smoothly from trunk to tip and pass each pixel's normal for shading. `examples/growth.rs` draws a panel of each.
+
 - Duel: frame data (`docs/superpowers/specs/2026-11-16-duel-frames-design.md`, numbers in `pixfx_duel::data::FRAMES`).
   A blow on a fighter gathering a cast is a COUNTER, on one recovering a PUNISH: 1.2x power and a longer stagger
   (+0.10 s, +0.20 s), and the hit event says which (`how`). Dive, step, palm, burst and lotus recover longer and an
