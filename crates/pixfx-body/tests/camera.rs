@@ -115,7 +115,7 @@ fn directions_name_their_yaw() {
         Camera::topdown(Dir8::N),
         Camera {
             yaw: 270.0,
-            pitch: 60.0
+            pitch: 45.0
         }
     );
 }

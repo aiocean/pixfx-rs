@@ -282,11 +282,8 @@ impl Skeleton {
         bounds(&pts)
     }
 
-    /// The skeleton moved into a cell `w` x `h` pixels: the pelvis centred across, the lowest point of the body
-    /// `lift` pixels above `ground` (a y in the cell).
-    pub fn placed(&self, w: f64, ground: f64, lift: f64) -> Skeleton {
-        let [_, _, _, bottom] = self.body_bounds();
-        let (dx, dy) = (w / 2.0 - self.pelvis.x, ground - lift - bottom);
+    /// Every point moved by `(dx, dy)`.
+    pub fn shifted(&self, dx: f64, dy: f64) -> Skeleton {
         let limb = |l: LimbPoints| l.shifted(dx, dy);
         Skeleton {
             head: self.head.shifted(dx, dy),
@@ -303,6 +300,13 @@ impl Skeleton {
                 .map(|[a, b]| [a.shifted(dx, dy), b.shifted(dx, dy)]),
             ..*self
         }
+    }
+
+    /// The skeleton moved into a cell `w` x `h` pixels: the pelvis centred across, the lowest point of the body
+    /// `lift` pixels above `ground` (a y in the cell).
+    pub fn placed(&self, w: f64, ground: f64, lift: f64) -> Skeleton {
+        let [_, _, _, bottom] = self.body_bounds();
+        self.shifted(w / 2.0 - self.pelvis.x, ground - lift - bottom)
     }
 }
 

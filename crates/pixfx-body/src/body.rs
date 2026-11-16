@@ -59,9 +59,9 @@ fn ruler_pelvis_w() -> f64 {
     f64::from(pixfx_draw::RULER.width) * 0.3
 }
 
-/// Front to back, about two thirds of the face.
+/// Front to back, most of the face's width.
 fn ruler_torso_d() -> f64 {
-    f64::from(pixfx_draw::RULER.head) * 0.6
+    f64::from(pixfx_draw::RULER.head) * 0.8
 }
 
 fn ruler_hand() -> f64 {
@@ -106,7 +106,7 @@ impl Body {
             limb_r: unit * 0.21,
             torso_w: unit,
             pelvis_w: unit * 0.85,
-            torso_d: unit * 0.6,
+            torso_d: unit * 0.8,
         }
     }
 
@@ -120,7 +120,7 @@ impl Body {
             limb_r: f64::from(r.limb) / 2.0,
             torso_w: f64::from(r.width) * 0.35,
             pelvis_w: f64::from(r.width) * 0.3,
-            torso_d: f64::from(r.head) * 0.6,
+            torso_d: f64::from(r.head) * 0.8,
             ..Body::new(f64::from(r.figure()), r.heads())
         }
     }

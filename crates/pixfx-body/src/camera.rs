@@ -15,8 +15,8 @@ pub struct Camera {
 
 /// Pitch of an isometric view.
 pub const ISO_PITCH: f64 = 30.0;
-/// Pitch of a top-down view.
-pub const TOPDOWN_PITCH: f64 = 60.0;
+/// Pitch of a top-down view: the three-quarter look of a top-down RPG's sprites.
+pub const TOPDOWN_PITCH: f64 = 45.0;
 
 impl Camera {
     /// A side view (a platformer's) facing one of four ways.
