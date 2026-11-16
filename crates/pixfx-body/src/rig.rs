@@ -365,11 +365,7 @@ pub fn skeleton_seen(body: &Body, pose: &Pose, camera: Camera) -> Skeleton {
         r: view(V3(-sy, 0.0, cy)),
     };
     let up = world.u;
-    let pelvis_frame = world.pitched(-fin(pose.lie)).rolled(fin(pose.roll));
-    let torso = pelvis_frame
-        .pitched(fin(pose.lean))
-        .rolled(fin(pose.tilt))
-        .yawed(fin(pose.twist));
+    let (pelvis_frame, torso) = body_frames(world, pose);
     let head_frame = torso.pitched(fin(pose.head.nod)).yawed(fin(pose.head.turn));
 
     let pelvis = V3(0.0, 0.0, 0.0);
@@ -482,4 +478,89 @@ fn side_sign(side: Side) -> f64 {
         Side::Right => 1.0,
         Side::Left => -1.0,
     }
+}
+
+/// The pelvis's frame and the upper body's, from the world's.
+fn body_frames(world: Frame, pose: &Pose) -> (Frame, Frame) {
+    let pelvis = world.pitched(-fin(pose.lie)).rolled(fin(pose.roll));
+    let torso = pelvis
+        .pitched(fin(pose.lean))
+        .rolled(fin(pose.tilt))
+        .yawed(fin(pose.twist));
+    (pelvis, torso)
+}
+
+/// One of the four limbs a contact can plant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Limb4 {
+    RightArm,
+    LeftArm,
+    RightLeg,
+    LeftLeg,
+}
+
+/// The angles that put `limb`'s end (wrist or sole) on `target`, in the side view's body space (x toward her
+/// front at facing 0, y up, depth toward the viewer, the pelvis at 0): two-bone analytic IK in the limb's
+/// forward-up plane, its `spread` kept (exact when it is 0). Out of reach, the limb points straight at the target.
+/// `None` when the target is not a finite point.
+pub(crate) fn reach(body: &Body, pose: &Pose, limb: Limb4, target: [f64; 3]) -> Option<Limb> {
+    if !target.iter().all(|v| v.is_finite()) {
+        return None;
+    }
+    let world = Frame {
+        f: V3(1.0, 0.0, 0.0),
+        u: V3(0.0, 1.0, 0.0),
+        r: V3(0.0, 0.0, 1.0),
+    };
+    let (pelvis, torso) = body_frames(world, pose);
+    let (side, arm) = match limb {
+        Limb4::RightArm => (Side::Right, true),
+        Limb4::LeftArm => (Side::Left, true),
+        Limb4::RightLeg => (Side::Right, false),
+        Limb4::LeftLeg => (Side::Left, false),
+    };
+    let k = side_sign(side);
+    let (root, frame, l1, l2, old) = if arm {
+        let neck = torso.u.mul(body.torso);
+        let old = match side {
+            Side::Right => pose.right_arm,
+            Side::Left => pose.left_arm,
+        };
+        (
+            neck.add(torso.r.mul(k * body.shoulder)),
+            torso,
+            body.upper_arm,
+            body.forearm,
+            old,
+        )
+    } else {
+        let old = match side {
+            Side::Right => pose.right_leg,
+            Side::Left => pose.left_leg,
+        };
+        (
+            pelvis.r.mul(k * body.hip),
+            pelvis,
+            body.thigh,
+            body.shin,
+            old,
+        )
+    };
+    let rel = V3(target[0], target[1], target[2]).add(root.mul(-1.0));
+    let (tf, tu) = (rel.dot(frame.f), rel.dot(frame.u));
+    let phi = libm::atan2(tf, -tu).to_degrees();
+    let d = libm::sqrt(tf * tf + tu * tu).clamp((l1 - l2).abs() + 1e-6, l1 + l2);
+    let acos = |c: f64| libm::acos(c.clamp(-1.0, 1.0)).to_degrees();
+    let inner = acos((l1 * l1 + l2 * l2 - d * d) / (2.0 * l1 * l2));
+    let alpha = acos((l1 * l1 + d * d - l2 * l2) / (2.0 * l1 * d));
+    // An elbow folds forward, so the upper arm sits behind the line to the target; a knee folds back, so the
+    // thigh sits ahead of it.
+    let raise = if arm { phi - alpha } else { phi + alpha };
+    let bend = 180.0 - inner;
+    Some(Limb {
+        raise: fin(raise),
+        spread: old.spread,
+        bend: if bend.abs() < 1e-6 { 0.0 } else { fin(bend) },
+    })
 }

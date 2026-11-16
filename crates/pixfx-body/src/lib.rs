@@ -7,10 +7,12 @@
 
 mod body;
 mod camera;
+mod clip;
 mod pose;
 mod rig;
 
 pub use body::Body;
 pub use camera::{Camera, Dir4, Dir8, ISO_PITCH, TOPDOWN_PITCH};
+pub use clip::{Clip, Contact, Ease, Key, Mode};
 pub use pose::{Head, Limb, Pose, Side, Sword};
-pub use rig::{Bone, LimbPoints, Point, Skeleton, facing, skeleton, skeleton_seen};
+pub use rig::{Bone, Limb4, LimbPoints, Point, Skeleton, facing, skeleton, skeleton_seen};
