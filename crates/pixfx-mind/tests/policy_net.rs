@@ -70,6 +70,48 @@ fn a_truncated_or_foreign_file_is_refused() {
     assert!(Net::load(b"PK\x03\x04 not a network").is_err());
 }
 
+/// A file's head: the magic and a tensor count.
+fn head(count: u32) -> Vec<u8> {
+    let mut b = b"PXNET1\0\0".to_vec();
+    b.extend(count.to_le_bytes());
+    b
+}
+
+#[test]
+fn a_tensor_claiming_a_huge_rank_is_refused_without_reserving_for_it() {
+    let mut bytes = head(1);
+    bytes.extend(1_u32.to_le_bytes());
+    bytes.extend(b"x");
+    bytes.extend(u32::MAX.to_le_bytes());
+    assert!(Net::load(&bytes).is_err());
+}
+
+#[test]
+fn a_tensor_whose_dims_overflow_is_refused() {
+    let mut bytes = head(1);
+    bytes.extend(1_u32.to_le_bytes());
+    bytes.extend(b"x");
+    bytes.extend(4_u32.to_le_bytes());
+    for _ in 0..4 {
+        bytes.extend(u32::MAX.to_le_bytes());
+    }
+    assert!(Net::load(&bytes).is_err());
+}
+
+#[test]
+fn an_extra_tensor_is_ignored() {
+    let net = Net::seeded(7);
+    let mut tensors = net.tensors();
+    tensors.push(("value.w".to_string(), vec![2, 3], vec![1.0; 6]));
+    let back = Net::load(&Net::write(&tensors));
+    assert!(
+        back.as_ref()
+            .is_ok_and(|b| b.logits(&obs(1.0)) == net.logits(&obs(1.0))),
+        "{:?}",
+        back.err()
+    );
+}
+
 #[test]
 fn hand_set_weights_give_the_logits_worked_by_hand() {
     // the policy head reads only its bias, and its first row sums the 16 simplices (each sums to 1)

@@ -193,17 +193,29 @@ impl Net {
             return Err(NetError::Magic);
         }
         let count = r.u32("the tensor count")?;
+        let wanted = layout();
         let mut found: Vec<Tensor> = Vec::new();
         for _ in 0..count {
             let len = r.u32("a tensor name")? as usize;
             let name = String::from_utf8_lossy(r.take(len, "a tensor name")?).into_owned();
+            // every size below is checked against the bytes left before anything is reserved for it, so a file can
+            // claim no more memory than it holds
             let rank = r.u32(&name)? as usize;
-            let mut dims = Vec::with_capacity(rank);
-            for _ in 0..rank {
-                dims.push(r.u32(&name)?);
+            let dims: Vec<u32> = r
+                .take(rank.saturating_mul(4), &name)?
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|b| u32::from_le_bytes(*b))
+                .collect();
+            let n = dims
+                .iter()
+                .try_fold(4_usize, |n, &d| n.checked_mul(d as usize))
+                .unwrap_or(usize::MAX);
+            let raw = r.take(n, &name)?;
+            if !wanted.iter().any(|(w, _)| *w == name) {
+                continue;
             }
-            let n: usize = dims.iter().map(|&d| d as usize).product();
-            let raw = r.take(n.saturating_mul(4), &name)?;
             let data = raw
                 .as_chunks::<4>()
                 .0
@@ -230,7 +242,7 @@ impl Net {
             Ok(data)
         };
         let mut tensors = Vec::new();
-        for (name, dims) in layout() {
+        for (name, dims) in wanted {
             let data = take(&name, &dims)?;
             tensors.push((name, dims, data));
         }
