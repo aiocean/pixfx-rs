@@ -2,8 +2,7 @@
 //! rules' dice are untouched; the trained policy reads it in its tag and was paid by it in training.
 
 use crate::data::School;
-use crate::rng::Rng;
-use pixfx_mind::policy::TAG;
+use pixfx_mind::{Rng, policy::TAG};
 
 /// A fighter's style.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

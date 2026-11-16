@@ -4,7 +4,7 @@ use pixfx_duel::data::{
     self, Blow, Kind, LUCKY, PAYOFF, RARITY, Rarity, School, Status, TRAITS, Trait, block_chance,
     fits, orb_offset, shock_interval, slot_power,
 };
-use pixfx_duel::rng::Rng;
+use pixfx_mind::Rng;
 use serde_json::{Map, Value, json};
 
 fn fixture() -> Value {

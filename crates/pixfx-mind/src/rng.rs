@@ -1,7 +1,7 @@
-//! The mind's dice: mulberry32, the duel's own generator (`pixfx_duel::rng`), bit for bit.
+//! The dice of the mind and the duel: mulberry32, so a seed replays the same fight on every target.
 
 /// A seeded generator: the same seed gives the same numbers on every target.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rng(u32);
 
 impl Rng {
