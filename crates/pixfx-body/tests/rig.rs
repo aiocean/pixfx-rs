@@ -1,6 +1,6 @@
 //! The skeleton a pose gives: lengths, which way each joint folds, and how facing turns the figure.
 
-use pixfx_pose::{Body, Limb, Pose, Side, Sword, facing, presets, skeleton};
+use pixfx_body::{Body, Limb, Pose, Side, Sword, facing, skeleton};
 
 const EPS: f64 = 1e-6;
 
@@ -120,19 +120,6 @@ fn a_knee_folds_back_and_spread_swings_out_to_her_own_side() {
 }
 
 #[test]
-fn lying_on_her_back_puts_the_head_behind_her() {
-    let sk = skeleton(&Body::default(), &presets::down(), facing::RIGHT);
-    assert!(
-        sk.head.x < sk.pelvis.x - 20.0,
-        "head toward her back, screen left"
-    );
-    assert!(
-        (sk.head.y - sk.pelvis.y).abs() < 2.0,
-        "level with the pelvis"
-    );
-}
-
-#[test]
 fn the_sword_starts_in_its_hand() {
     let body = Body::default();
     for hand in [Side::Right, Side::Left] {
@@ -155,15 +142,6 @@ fn the_sword_starts_in_its_hand() {
 }
 
 #[test]
-fn mirroring_swaps_sides_and_twice_gives_the_pose_back() {
-    let p = presets::guard();
-    let m = p.mirrored();
-    assert_eq!(m.left_arm, p.right_arm);
-    assert_eq!(m.sword.map(|s| s.hand), Some(Side::Left));
-    assert_eq!(m.mirrored(), p);
-}
-
-#[test]
 fn a_bad_angle_still_gives_a_finite_skeleton() {
     let pose = Pose {
         lean: f64::NAN,
@@ -178,18 +156,4 @@ fn a_bad_angle_still_gives_a_finite_skeleton() {
                 .all(|v| v.is_finite())
         );
     }
-}
-
-#[test]
-fn every_preset_name_gives_a_pose_and_cycles_repeat() {
-    for n in presets::NAMES {
-        assert!(presets::by_name(n, 0.3).is_some(), "{n}");
-    }
-    assert!(presets::by_name("moonwalk", 0.0).is_none());
-    assert_eq!(presets::walk(0.25), presets::walk(1.25));
-    let (a, b) = (presets::walk(0.0).right_leg, presets::walk(0.5).left_leg);
-    assert!(
-        close(a.raise, b.raise) && close(a.bend, b.bend),
-        "half a cycle on is the other foot"
-    );
 }

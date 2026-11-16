@@ -1,0 +1,20 @@
+[package]
+name = "pixfx-body"
+description = "One rig for every pose, direction and animation: a figure posed by joint angles, seen from any camera, played as timed clips, its hull painted as a part-coloured mannequin on the ruler"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm.workspace = true
+pixfx-draw = { path = "../pixfx-draw" }
+serde.workspace = true
+
+[dev-dependencies]
+# PNG and GIF for the example scripts only; the library itself does no I/O
+pixfx-core = { path = "../pixfx-core" }
+pixfx-export = { path = "../pixfx-export" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

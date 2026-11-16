@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 libm.workspace = true
+pixfx-body = { path = "../pixfx-body" }
 pixfx-draw = { path = "../pixfx-draw" }
 pixfx-pixel = { path = "../pixfx-pixel" }
 serde.workspace = true

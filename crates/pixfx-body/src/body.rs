@@ -1,5 +1,6 @@
 //! How long each bone is.
 
+use pixfx_draw::Ruler;
 use serde::{Deserialize, Serialize};
 
 /// Bone lengths of a figure, in sprite pixels. [`Body::new`] gives a figure of a height and a head count; change a
@@ -57,6 +58,15 @@ impl Body {
         }
     }
 
+    /// The figure of a game's ruler: its painted body ([`Ruler::figure`], outline left off) at its head count, the
+    /// head as wide as its face, holding a blade as long as its own.
+    pub fn from_ruler(r: &Ruler) -> Body {
+        Body {
+            sword: f64::from(r.blade),
+            ..Body::new(f64::from(r.figure()), r.heads())
+        }
+    }
+
     /// Height standing upright, head top to soles.
     pub fn height(&self) -> f64 {
         2.0 * self.head + self.neck + self.torso + self.thigh + self.shin
@@ -64,8 +74,9 @@ impl Body {
 }
 
 impl Default for Body {
-    /// A 56-pixel game hero, six heads tall: fills a 64x64 cell.
+    /// The duel's fighter (`pixfx_draw::RULER`): 38 pixels painted, about 5.4 heads tall, in a 64x64 cell,
+    /// so a character drawn on it has the size of every sprite and effect beside it.
     fn default() -> Self {
-        Body::new(56.0, 6.0)
+        Body::from_ruler(&pixfx_draw::RULER)
     }
 }

@@ -14,15 +14,13 @@
 //! is `pixfx_pixel::sheet`'s, so `pixfx_pixel::sheet::cut` takes the model's drawing back apart cell by cell.
 #![forbid(unsafe_code)]
 
-mod body;
 mod font;
-mod pose;
 pub mod presets;
-mod rig;
 mod sheet;
 pub mod spec;
 
-pub use body::Body;
-pub use pose::{Head, Limb, Pose, Side, Sword};
-pub use rig::{Bone, LimbPoints, Point, Skeleton, facing, skeleton};
+// The rig lives in pixfx-body; its names stay here so every script and spec keeps working.
+pub use pixfx_body::{
+    Body, Bone, Head, Limb, LimbPoints, Point, Pose, Side, Skeleton, Sword, facing, skeleton,
+};
 pub use sheet::{Cell, Drawn, HEAD, PoseSheet, captions, colour, legend, turnaround};

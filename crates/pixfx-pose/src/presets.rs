@@ -2,7 +2,7 @@
 //! writing a pose from the rest pose. Cyclic ones (`walk`, `run`) take a phase: 0 and 1 are the same moment, 0.5
 //! the same moment on the other foot.
 
-use crate::pose::{Head, Limb, Pose, Side, Sword};
+use pixfx_body::{Head, Limb, Pose, Side, Sword};
 
 /// Every preset name [`by_name`] knows.
 pub const NAMES: [&str; 14] = [

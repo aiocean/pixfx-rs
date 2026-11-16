@@ -11,11 +11,9 @@ captioned sheet, one skeleton a cell, every limb in its own colour.
 
 | Module | Holds |
 |---|---|
-| `body` | `Body`: bone lengths; `Body::new(height, heads)` |
-| `pose` | `Pose`, `Limb` (raise, spread, bend), `Head`, `Sword`, `Side`; `Pose::mirrored` |
-| `rig` | 3D forward kinematics and the view: `skeleton(body, pose, facing)`, `Skeleton` (named joints, depth), `Bone`, `facing` |
+| `pixfx_body` (re-exported) | `Body`, `Pose`, `Limb`, `Head`, `Sword`, `Side`, `skeleton`, `Skeleton`, `Bone`, `facing`: the rig lives in `crates/pixfx-body`; its names stay here so specs and scripts keep working |
 | `presets` | Ready poses for a sword fighter (`NAMES`, `by_name`), walk and run cycles by phase |
-| `sheet` | `PoseSheet::render` (image + `pixfx_pixel::sheet::Layout` + skeletons), `colour`, `legend`, `turnaround` |
+| `sheet` | `PoseSheet::render` (image + `pixfx_pixel::sheet::Layout` + skeletons), `colour`, `legend`, `turnaround`; the default sheet is the ruler's 64 cell with the soles on its feet row |
 | `spec` | A sheet as JSON, presets with field-by-field overrides |
 | `font` | The 5x7 caption font |
 

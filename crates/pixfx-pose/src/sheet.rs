@@ -6,10 +6,10 @@ use pixfx_draw::{Rgba, RgbaImage};
 use pixfx_pixel::sheet::{Layout, blank, cell_rect, check};
 use serde::{Deserialize, Serialize};
 
-use crate::body::Body;
+use pixfx_body::Body;
 use crate::font;
-use crate::pose::Pose;
-use crate::rig::{Bone, Point, Skeleton, facing, skeleton};
+use pixfx_body::Pose;
+use pixfx_body::{Bone, Point, Skeleton, facing, skeleton};
 
 /// The colour of the head circle and the nose dot.
 pub const HEAD: Rgba = Rgba(160, 0, 255, 255);
@@ -74,15 +74,20 @@ pub struct PoseSheet {
 }
 
 impl Default for PoseSheet {
-    /// 64x64 cells four across, a 56-pixel figure, a gap of 8 for two caption lines, drawn 8x.
+    /// The duel's ruler (`pixfx_draw::RULER`): its 64x64 cell, its figure ([`Body::default`]) with the
+    /// soles on its feet row; four across, a gap of 8 for two caption lines, drawn 8x.
     fn default() -> Self {
+        let r = pixfx_draw::RULER;
+        let feet_up = r
+            .cell
+            .saturating_sub(u32::try_from(r.feet.1 + 1).unwrap_or(0));
         PoseSheet {
             body: Body::default(),
-            cell: (64, 64),
+            cell: (r.cell, r.cell),
             cols: 4,
             gap: 8,
             scale: 8,
-            ground: 2,
+            ground: feet_up,
             cells: Vec::new(),
         }
     }

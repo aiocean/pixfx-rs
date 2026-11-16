@@ -2,7 +2,7 @@
 //!
 //! ```json
 //! {
-//!   "body": { "height": 56, "heads": 6 },
+//!   "body": { "height": 38, "heads": 5.4 },
 //!   "cell": [64, 64], "cols": 4, "gap": 8, "scale": 8, "ground": 2,
 //!   "cells": [
 //!     { "caption": "IDLE: standing at ease", "preset": "idle" },
@@ -20,8 +20,8 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::body::Body;
-use crate::pose::Pose;
+use pixfx_body::Body;
+use pixfx_body::Pose;
 use crate::presets;
 use crate::sheet::{Cell, PoseSheet, turnaround};
 
@@ -94,7 +94,7 @@ fn pose_of(c: &CellSpec, n: usize) -> Result<Pose, String> {
     if let (Some(Value::Null), Some(Value::Object(_))) = (v.get("sword"), over.get("sword"))
         && let Some(obj) = v.as_object_mut()
     {
-        let grip = serde_json::to_value(crate::pose::Sword::default())
+        let grip = serde_json::to_value(pixfx_body::Sword::default())
             .map_err(|e| format!("cell {n}: {e}"))?;
         obj.insert("sword".into(), grip);
     }
