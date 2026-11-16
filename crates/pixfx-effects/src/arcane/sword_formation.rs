@@ -7,7 +7,7 @@
 //! and on, through every body it meets. A sword that meets nothing flies on 200 pixels past the point and fades.
 //!
 //! Made here from the sheets of `pixfx-ref`'s `examples/specs/arcane/sword-formation.json`: the look is the
-//! model's, the count, the order and the paths are set here. It has no source, so no parity check; its golden hashes
+//! model's, the count, the order and the paths are set here. Its golden hashes
 //! pin it. It opens once (gathering, fanning out) and loops from `FAN_END`: the ring turns an eighth of a turn
 //! each loop, so with eight like swords every loop starts where the last ended. The ring and the gathering are
 //! behind the character.
@@ -32,7 +32,7 @@ pub static SWORD_FORMATION: SwordFormation = SwordFormation;
 const META: Meta = Meta {
     id: "arcane/sword-formation",
     name: "Sword formation",
-    desc: "Eight flying swords gather one by one behind the caster, fan out into a ring and turn there until the game orders a strike: then they dive one after another, 0.1 s apart, at the point it names, curving in together (converge) or straight through it (pierce), to any distance.",
+    desc: "Eight flying swords gather one by one behind the caster, fan out into a ring and turn there until the game orders a strike: then they dive one after another, 0.1 s apart, at the point it names, curving in together (converge), once round it on a ring first (orbit) or straight through it (pierce), to any distance.",
     tags: &[
         "arcane",
         "swords",
@@ -165,6 +165,9 @@ static VOLLEY: Volley = Volley {
     ease: 1.0,
     beyond: BEYOND,
     lands: false,
+    // once round on a ring 1.2 fighters out (the fighter is 40 rows, RULER), clear of a body standing at the point
+    orbit_turns: 1.0,
+    orbit_radius: 48.0,
 };
 
 /// Each flying sword's trail: in the sword's colours, white at the guard to steel, five pixels wide, as long as

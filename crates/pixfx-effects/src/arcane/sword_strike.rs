@@ -1,7 +1,7 @@
 //! Sword strike: where a flying sword strikes, a four-point star flashes and shrinks, sparks fly back the way the
 //! sword came (along -x: the scene turns it to the sword's heading) and three chips of the blade fall. It fires the
-//! impact cue. Made here from the FX part of `pixfx-ref`'s `examples/specs/arcane/sword-formation.json`; no source,
-//! so no parity check; its golden hashes pin it.
+//! impact cue. Made here from the FX part of `pixfx-ref`'s `examples/specs/arcane/sword-formation.json`; its
+//! golden hashes pin it.
 
 use core::f64::consts::PI;
 

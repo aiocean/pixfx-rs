@@ -5,7 +5,7 @@
 //! (`arcane/bagua-mirror-strike`'s volley, or a game moving it itself). It leaves at the full size it stood at behind
 //! the caster, on the back layer for its first moment so it comes out from behind them, and shrinks to half
 //! (`FLIGHT_R`). Made here from `pixfx-ref`'s
-//! `examples/specs/shield/bagua-mirror.json` sheets; no source, so no parity check; its golden hashes pin it.
+//! `examples/specs/shield/bagua-mirror.json` sheets; its golden hashes pin it.
 
 use std::sync::Arc;
 

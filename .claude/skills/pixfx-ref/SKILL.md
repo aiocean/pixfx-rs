@@ -92,8 +92,14 @@ A spec holds:
 - `id`, `name`; `look`: what it is and looks like, a name then a sentence or two; `subject`: the thing that keeps its
   size and place in every frame (`bud`, `bell`).
 - `grid: true`, `cell: 64`, `scale: 6`, `gap: 10`: every cell is a 64 x 64 grid of art pixels, drawn 6 sheet pixels
-  each, and the model is asked to fill whole squares. 64 art pixels hold the guide figure 27 pixels tall; in the
-  engine the figure is the duel's 40 pixels, so **one art pixel is 1.5 engine pixels** (`pixfx_ref::compare`).
+  each, and the model is asked to fill whole squares. A cell always covers 96 engine pixels round the duel's
+  fighter (`pixfx_draw::RULER`, the guide figure, feet at 88), so at 64 squares **one art pixel is 1.5 engine
+  pixels**: the fighter is 27 squares, its head 5, its eye still 1. The prompt says those sizes, from
+  `compare::art_ruler(cell)`, so the model draws every object at the character's scale. At `cell: 96` a square is an
+  engine pixel and the sizes are the ruler's own (40, 7, 1); it needs about 1.5 times the sheet pixels a cell, so
+  keep `scale` and the rows a sheet holds small enough for the model's ~1536 x 1152 answer (see the Traps of
+  `crates/pixfx-ref/AGENTS.md`). When writing painter code from a 64-square sheet, size each object from the ruler
+  (a part and a ratio), not by copying the sheet's squares as engine pixels.
 - `parts`: the PARTS row, first on the sheet, a cell each: `name` (upper case) and `text` (what the cell holds, one
   sentence). Ask for:
   - `MAIN`: the main object alone, whole, fully formed, "with no glow, no specks";
@@ -114,7 +120,8 @@ A spec holds:
   cell's label, `text` (one sentence, no full stop), and optionally `frames` (its own cell count) and `notes` (what
   each frame must show, `""` for nothing).
 - `frames` (cells a row), `rules` (lines for the whole effect), `figure` (the stick figure, in a 96-pixel cell's
-  coordinates, scaled to `cell`).
+  coordinates, scaled to `cell`; the default is the duel's fighter at the ruler, so leave it unless the effect plays
+  on another character).
 
 A spec without `grid` and `parts` keeps the first prompt the shields were drawn from (the old 96-pixel sheets).
 
@@ -123,6 +130,7 @@ A spec without `grid` and `parts` keeps the first prompt the shields were drawn 
 | Left alone, the model... | So |
 |---|---|
 | draws a character over the stick figure | the prompt names the figure as a size guide only and says not to draw it |
+| draws a sword, ring or talisman at a size of its own, out of scale with the character | on a grid the prompt gives the character's height, head, hand and eye in squares (`compare::art_ruler`) and asks for everything at that scale, nothing under one square |
 | paints a dark backdrop that blends into every glow | the request asks for a transparent background (`gpt-image` honours it; Gemini, the `hero` tier, does not) |
 | blends colours across pixels and draws its own pixel size | the grid: "fill whole squares with one flat colour each ... a small palette of about 8 colours plus 4 glow colours" |
 | gives you a finished picture with nothing to take apart | the PARTS row: each part "alone, whole, at the same size as it appears in the other rows" |
@@ -159,8 +167,11 @@ colour pickers that recolour every frame, to try a palette before writing it.
 
 ## Writing the effect from the parts
 
-1. Measure each part on its map: its size in art pixels (times 1.5 for engine pixels), where it is widest, its
-   tones from outline to highlight. Take the palette from the exact values.
+1. Measure each part on its map: its size in art pixels (times `96 / cell` for engine pixels: 1.5 at 64), where it
+   is widest, its tones from outline to highlight. Take the palette from the exact values. Then check its size
+   against the ruler (skill `pixfx`, "One scale: the ruler"): name the body part it is measured against and the
+   ratio, and when the sheet's size and the ruler's disagree, the ruler wins (`Ruler::size(part, ratio)`); write
+   the part and the ratio in a comment by the part's function.
 2. Write a function per part with the part's own parameters (a petal takes a lean, a curl, a length and a width), and
    draw every use of it through that function: the bud's petals, the drifting petals and the flecks of a blow are
    the same petal at other sizes.
@@ -204,4 +215,4 @@ effect's (its glow and specks change every frame), so compare the shape of the t
 ## Not this skill
 
 - A character, a pose, a sprite to redraw or split: `pixfx-pixel`, `pixfx-pose`.
-- Porting an existing effect from pixelfx or Sprite Fusion: `pixfx-effect` (parity, no image model).
+- Porting an existing effect from pixelfx or Sprite Fusion: `pixfx-effect` (no image model).

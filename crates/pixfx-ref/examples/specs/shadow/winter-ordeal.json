@@ -1,0 +1,170 @@
+{
+  "id": "shadow/winter-ordeal",
+  "name": "Winter ordeal",
+  "look": "Winter ordeal, the winter shadow of heaven: a xianxia art where a cultivator turns winter into night: the whole night sky above the enemy cracks like a pane of black glass, and its pieces fall as black snow. Every flake is not ice but a small shard of the sky's own shadow, the colour of night, with only a thin cold violet-white edge where starlight catches it; caught in a palm it cuts and hurts. In the cracks of the sky an eye seems about to open. The snow screams as it falls, faster and denser. The mood is silent, cold and final: black on black, a few cold glints, no warm colour and no white snow at all.",
+  "subject": "black snow",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 6,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the cracked pane of night sky alone, as it hangs over the enemy at its fullest: a wide, slightly curved dark pane, wider than the enemy is tall, broken into about twelve angular shards by thin violet-white cracks that meet at a closed eye in its middle; no snow, no glow, no specks",
+      "pivot": "the centre of the pane"
+    },
+    {
+      "name": "PANE",
+      "text": "the night pane alone at each stage of breaking, the same size as MAIN",
+      "pivot": "the centre of the pane",
+      "forms": [
+        "whole and smooth, a flat dark pane with no crack",
+        "one thin crack running across it",
+        "a web of cracks, the shards still in place, as MAIN",
+        "the bottom row of shards gone, holes showing",
+        "only the top edge left, a ragged dark rim",
+        "empty: only a few loose shards along the broken rim"
+      ]
+    },
+    {
+      "name": "FLAKE",
+      "text": "one black six-pointed flake of night with a one-pixel cold violet-white edge, small, as it falls (its shapes and angles are on a sheet of their own)",
+      "pivot": "its middle"
+    },
+    {
+      "name": "EYE",
+      "text": "the eye the cracks draw in the pane, alone: almond-shaped, its lids made of crack lines of violet-white light",
+      "pivot": "its centre",
+      "forms": [
+        "shut, a thin curved line",
+        "a sliver open, a thread of light",
+        "half open, the dark beneath showing",
+        "open, a black pupil ringed by a faint violet iris",
+        "open and staring down, the lids bright",
+        "closing as the pane empties, fading"
+      ]
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: black specks, tiny violet-white glints, a thin pale crack line, a puff of dark frost where a flake lands, a cold sparkle"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the cold violet-white glow of the cracks, the eye and the flakes' edges, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes: the night pane, its shards and the black flakes, opaque, with no glow and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: specks, glints, crack lines and frost puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the cold violet-white light of the cracks and the flake edges, with no solid shape drawn",
+      "light": true
+    },
+    {
+      "name": "LINES",
+      "text": "line art only, for the programmer: one-pixel lines in pure red (#ff0000), nothing else and no glow. Draw the crack network as lines, the outline of every shard of the pane, the eye's two lids as two curves, and for every falling flake a dotted red line from the pane to where the flake is now. The lines lie exactly on the shapes of the SOLID row of the same frame."
+    }
+  ],
+  "rows": [
+    {
+      "name": "DARKEN",
+      "caption": "night gathers",
+      "text": "above the enemy the air darkens into a flat pane of night that grows wide; nothing is cracked yet",
+      "frames": 6,
+      "notes": [
+        "only a faint dark smudge above the enemy's head, under 30 pixels",
+        "a small dark patch, the size of the enemy's head",
+        "the patch spreading sideways, ragged edges",
+        "a dark pane half as wide as MAIN",
+        "the pane as wide as MAIN, whole and smooth (PANE form 1)",
+        "the pane whole, a faint cold sheen along its lower edge"
+      ]
+    },
+    {
+      "name": "CRACK",
+      "caption": "the sky cracks",
+      "text": "cracks run across the pane from its middle until it is broken into shards as in MAIN; they draw a shut eye in the middle",
+      "frames": 6,
+      "notes": [
+        "one thin crack (PANE form 2)",
+        "three cracks branching from the middle",
+        "a web of cracks, the eye's shut line forming in the middle",
+        "the pane as MAIN, the eye shut (EYE form 1)",
+        "a bright flash along every crack at once",
+        "the cracks dim again, a few shards at the bottom edge loosening"
+      ]
+    },
+    {
+      "name": "EYE",
+      "caption": "the eye opens",
+      "text": "the eye in the middle of the pane slowly opens and looks down at the enemy; the first shards drop from the bottom edge",
+      "frames": 6,
+      "notes": [
+        "the eye a thread of light (EYE form 2)",
+        "the eye half open (EYE form 3)",
+        "the eye open (EYE form 4), two shards dropping",
+        "the eye staring down (EYE form 5), five shards falling as flakes",
+        "the eye staring, the bottom row of shards gone (PANE form 4)",
+        "the eye staring, flakes falling under the whole pane"
+      ]
+    },
+    {
+      "name": "FALL",
+      "caption": "black snow falls",
+      "text": "the shards fall as black flakes onto the enemy, faster and denser, the pane emptying from the bottom up, the flakes spinning",
+      "frames": 6,
+      "notes": [
+        "a few black flakes falling, spinning",
+        "many flakes, the lowest at the enemy's head height",
+        "a dense fall round the enemy, the pane half gone",
+        "the fall at its densest, flakes stretched into short streaks",
+        "the pane only a rim (PANE form 5), streaks reaching the ground",
+        "the last flakes nearly down, the eye closing (EYE form 6)"
+      ]
+    },
+    {
+      "name": "BLOW",
+      "caption": "the ordeal strikes",
+      "text": "every flake strikes the enemy at once: a burst of black specks and dark frost round the enemy, then it collapses into the drift",
+      "frames": 6,
+      "notes": [
+        "all streaks converging on the enemy",
+        "the blow: a tight burst of black specks and frost puffs where the enemy stands, cold glints flying out",
+        "the burst at its widest",
+        "the specks falling back",
+        "black snow settling round the feet",
+        "the pane gone, the drift lying"
+      ]
+    },
+    {
+      "name": "SETTLE",
+      "caption": "the night melts",
+      "text": "the black drift round the enemy's feet melts into shadow and fades",
+      "frames": 6,
+      "notes": [
+        "the drift as DRIFT form 2",
+        "the drift sinking",
+        "a flat pool of shadow",
+        "the pool shrinking, a few glints",
+        "only a faint stain",
+        "a few last faint specks, under 15 pixels"
+      ]
+    }
+  ],
+  "rules": [
+    "The snow is black, the colour of night, with only a thin cold violet-white edge: never white snow, never a warm colour.",
+    "The figure is the enemy: the pane hangs above it, the eye looks down at it and the snow falls on it. Do not draw the figure.",
+    "The pane keeps MAIN's size and its twelve shards until its row says it breaks; shards that fall are gone from the pane.",
+    "Pure red (#ff0000) appears only in the LINES row, and the LINES row uses nothing else.",
+    "Keep the colours of the second image's palette: no outline in black, no gradients wider than a few pixels."
+  ],
+  "figure": "46,48 50,48\n50,48 50,54\n50,54 46,54\n46,54 46,48\n48,54 48,72\n48,58 42,68\n48,58 54,68\n48,72 44,88\n48,72 52,88\n"
+}

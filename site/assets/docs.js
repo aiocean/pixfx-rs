@@ -19,7 +19,7 @@ const SECTIONS = [
   ]],
   ["Develop", [
     ["writing-effects.html", "Write an effect"],
-    ["parity.html", "Parity and tests"],
+    ["tests.html", "Tests"],
     ["credits.html", "Credits and license"],
   ]],
 ];

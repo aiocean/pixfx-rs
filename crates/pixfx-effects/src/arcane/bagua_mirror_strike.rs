@@ -2,7 +2,7 @@
 //! there, and when the game orders a strike (`Scene::order`) it is thrown at the point: `arcane/bagua-mirror-flying`
 //! spins across to it, shrinking to half, and bursts there as `arcane/bagua-mirror-burst`. The scene flies it to any
 //! distance and stops drawing this effect once it is thrown. Made here from `pixfx-ref`'s
-//! `examples/specs/shield/bagua-mirror.json` sheets; it has no source, so no parity check; its golden hashes pin it.
+//! `examples/specs/shield/bagua-mirror.json` sheets; its golden hashes pin it.
 //!
 //! It wraps its actor: the mirror is sized from the sprite's body and stands behind its upper body, and a jade line
 //! washes down the character's outline as it forms, then a pulse runs down it while it holds. It opens once (the
@@ -109,6 +109,8 @@ static VOLLEY: Volley = Volley {
     ease: 1.3,
     beyond: 0.0,
     lands: true,
+    orbit_turns: 0.0,
+    orbit_radius: 0.0,
 };
 
 impl Effect for BaguaMirrorStrike {

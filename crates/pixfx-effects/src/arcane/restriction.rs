@@ -1,6 +1,6 @@
 //! Restriction: a seal of three rune rings round the character at knee, waist and head height (the
 //! cultivation-fantasy restriction barrier). Made here from the parts sheet of `pixfx-ref`'s
-//! `examples/specs/shield/restriction.json`. It has no source, so no parity check; its golden hashes pin it.
+//! `examples/specs/shield/restriction.json`. Its golden hashes pin it.
 //!
 //! The runes are written one character at a time, ring by ring from the ground up, each flashing as it appears, the
 //! ribbon under them drawn behind the pen. Every ring spins on its own, the middle one against the other two, and a

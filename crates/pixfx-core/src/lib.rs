@@ -6,6 +6,7 @@ pub mod actor;
 pub mod cue;
 pub mod effect;
 pub mod feel;
+pub mod fluid;
 pub mod frames;
 pub mod hit_flash;
 pub mod key;
@@ -45,4 +46,4 @@ pub use sim::{
 pub use squash::{Blink, Moving, Squash, SquashSpec};
 pub use state::{Creature, StateError, StateMeta};
 pub use trace::{Step, Trace, TracePoint};
-pub use volley::{Aim, Launch, Order, Path, Shot, Tail, Volley};
+pub use volley::{Aim, Launch, Order, Shot, Tail, Volley};

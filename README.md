@@ -9,10 +9,9 @@ It has two modes:
 - **Play live.** Run the same effect in a browser, through plain JS bindings, a self-driving Canvas 2D
   renderer, or inside gpui.
 
-Effects are ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS), or of
-[Sprite Fusion's pixel art VFX](https://www.spritefusion.com/pixel-art-vfx) (TypeScript) where pixelfx has no such
-effect, and use the [beanfx](NOTICE.md) sheet layout. Every effect in `pixfx_effects::EFFECTS` is a port that passes
-the parity gate against its source.
+Many effects started as ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) or of
+[Sprite Fusion's pixel art VFX](https://www.spritefusion.com/pixel-art-vfx) (TypeScript); the rest are made here.
+They use the [beanfx](NOTICE.md) sheet layout, and each effect's golden frame hashes pin its pixels.
 
 ## How you use it
 
@@ -35,11 +34,10 @@ test), `pixfx-effect`, `pixfx-play`, `pixfx-render`, `pixfx-perf`, `pixfx-pixel`
 | `cargo run -p pixfx-export --example gif -- <id>` | A looping gif |
 | `cargo run -p pixfx-export --example mp4 -- <id>` | A video (needs ffmpeg) |
 | `cargo run -p pixfx-export --example render_clip -- <id>` | A rendered clip hosts play without drawing (`loadClip`) |
-| `cargo run -p pixfx-export --example parity -- <id>` | The parity gate for one effect |
 | `cargo run --release -p pixfx-effects --example bench` | What a frame of effects costs natively |
 | `cargo run -p pixfx-fighter --example poses -- <look>` | Every pose of a fighter look on one sheet |
 | `cargo run -p pixfx-body --example clip_sheet -- <clip> [--camera side\|iso\|topdown]` | A catalog clip (walk, run, crouch...) as a mannequin sheet, a row per direction: composite, hull, bones and part map PNGs, a GIF and the frames' joints as JSON (skill `.claude/skills/pixfx-body/SKILL.md`); `--example catalog` writes every clip |
-| `cargo run -p pixfx-pixel --example <step> -- ...` | The agent's pixel steps: `clean`, `read`, `draw`, `view`, `critique`, `sheet`, `cut`, `parts`, `diff` (skill `.claude/skills/pixfx-pixel/SKILL.md`) |
+| `cargo run -p pixfx-pixel --example <step> -- ...` | The agent's pixel steps: `clean`, `read`, `draw`, `view`, `critique`, `ramp`, `sheet`, `cut`, `parts`, `diff` (skill `.claude/skills/pixfx-pixel/SKILL.md`) |
 | `cargo run -p pixfx-ref --example <step> -- ...` | A new effect's reference from an image model: `template` (sheet and prompt from a spec), `generate` (the OpenRouter call), `extract` (colour and light layers per frame, a review page), `gallery` (skill `.claude/skills/pixfx-ref/SKILL.md`) |
 
 Each script's first lines say what it takes and writes.
@@ -48,14 +46,14 @@ Each script's first lines say what it takes and writes.
 
 | Crate | What it is |
 |---|---|
-| `crates/pixfx-draw` | Drawing, the lowest layer: frame with colour and additive light, painter, shapes, blending, `composite`, `frame_hash`, palette presets, the JS-number maths (`math`). Knows nothing of effects or hosts. |
+| `crates/pixfx-draw` | Drawing, the lowest layer: frame with colour and additive light, painter, shapes, blending, `composite`, `frame_hash`, palette presets, the JS-number maths (`math`), and `RULER`, the duel's fighter in pixels that every sprite, effect and reference sheet is drawn to (`ruler`). Knows nothing of effects or hosts. |
 | `crates/pixfx-core` | The engine on top of `pixfx-draw`: `Effect`/`Instance`, particles, `render_frames`, `Player`, the frame key and store; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`; sprite awareness: `Actor`, `Silhouette` (skill `.claude/skills/pixfx-sprite-aware/SKILL.md`). |
 | `crates/pixfx-scene` | What a stage shows and where, for every shell: `Scene` (effects playing, placement, layers, the view outside which nothing is drawn, the answer to their cues, events), `Frames` (the frames every scene of a game shares, and the `Painter` that paints them, on the spot or on another thread) and the `Shell` contract (`make`, `refill`, `show`, `free`). No browser or gpui types. |
 | `crates/pixfx-body` | The rig: a figure on the ruler (`Body`) posed by joint angles (`Pose`), seen by any camera (`Camera::side`, `iso`, `topdown`, 4 or 8 directions), animated by clips with easing, root motion and planted feet (`Clip`, `catalog`), and painted as a mannequin: a hull of shapes per body part, the bones inside it, a part map (`sprite`, `clip_sheet`). |
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
 | `crates/pixfx-pixel` | Pixels for agents, not shipped in a game: a picture (an image model's, an artist's, a customer's sprite) cleaned to its pixel grid, read as text and drawn back, viewed, critiqued, split into parts; blank sheets for an image model (`pixfx_pixel::tool`, a script per step in `examples/`, skill `.claude/skills/pixfx-pixel/SKILL.md`). |
 | `crates/pixfx-ref` | Effect references from an image model, not shipped in a game: a spec of an effect's look and moments becomes a labelled template sheet and a prompt, the OpenRouter request is built and read, and the sheet the model drew is cut back into frames as colour and light layers with a review page (a script per step in `examples/`, the xianxia shields as worked specs, skill `.claude/skills/pixfx-ref/SKILL.md`). |
-| `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF, rendered clips, and the parity check (`parity`); the scripts that write them in `examples/`. |
+| `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF, rendered clips, and the character a script plays an effect on (`Actors`); the scripts that write them in `examples/`. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
 | `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
 | `packages/pixfx-canvas2d` | Canvas 2D shell over `pixfx-web`: `createPixfx(ctx, { scale }).play(id, x, y, opts)`, then each frame `update(dt)` and `drawLayer("back")` / `drawLayer("front")` among your own drawing, `warp()` for a heavy blow's ring, `drawPicture()` for fighters and scene light Rust painted; workers paint. See its [README](packages/pixfx-canvas2d/README.md); demo in `packages/pixfx-canvas2d/demo/`. |
@@ -83,8 +81,7 @@ Effects say what an impact should do to the screen, and every host answers the s
   (explosions, dirt, plasma, implosion, parry, icicle fall, poof, feather burst) fire them by weight through
   `cue::impact`: each hit adds 0.3 (a light poof) to 0.6 (an explosion) trauma, and an explosion also stops,
   ripples and flashes. Their `feel`
-  option (0 to 2, default 1) scales the cues, and `feel: 0` silences them. pixelfx fires none of these, so parity
-  is unchanged.
+  option (0 to 2, default 1) scales the cues, and `feel: 0` silences them.
 - **`Feel`** (core) turns cues and the game's own impacts (`add_trauma`, `freeze`, `slow`) into one answer:
   `advance(dt)` returns the seconds that play (none in a hit-stop, a fraction in slow motion), `shake(strength)`
   gives a whole-pixel offset and `roll(strength)` a tilt in radians (strength is the player's setting, 0 holds
@@ -195,34 +192,6 @@ display frame spent updating every clock, then per effect its frame size (canvas
 drew, and the milliseconds spent drawing and turning the lit box into RGBA. Run it on an idle machine; the numbers are
 native, and wasm in a browser is slower. `bun run perf` in `packages/pixfx-phaser` measures the browser.
 
-## Parity against pixelfx
-
-Parity compares every pixel of every frame with pixelfx's own render. It needs Node and a pixelfx checkout.
-
-```sh
-git clone https://github.com/patch-gg/pixelfx /tmp/pixelfx
-git -C /tmp/pixelfx checkout 044e12a
-cargo run -p pixfx-export --example parity -- fire/candle --pixelfx /tmp/pixelfx --out target/parity
-```
-
-The ports match pixelfx commit `044e12a` (0.3.1); a later pixelfx may have changed an effect. Only `water/water-jet`
-differs from pixelfx, in 0.01% of its colour pixels, because libm `pow` and V8 `Math.pow` can disagree in the last bit;
-the other 24 effects match pixel for pixel.
-
-It prints `colour x% differ, light y% differ` and `PASS` or `FAIL` (gate: both at most 0.5%), and writes a
-side-by-side `target/parity/<id>.side.gif`. Without `--pixelfx` it uses `$PIXELFX`, then `./pixelfx`. Exit
-code 0 is PASS, 1 is FAIL, 2 means the comparison could not run. Effects that ship below the gate are listed in
-`parity/LEDGER.md`; it is empty.
-
-An effect ported from Sprite Fusion has its source vendored verbatim at `tools/spritefusion/<id>.ts`, and the parity
-script checks it against that file instead (through `tools/spritefusion-ref.mjs`, which needs Node 22.6 or later to run
-TypeScript; no pixelfx checkout). The source runs on the port's canvas, fps and seed, sub-stepped at 120 Hz as
-pixelfx steps its effects. `arcane/hex-shield` and `feedback/power-up` match their sources pixel for pixel.
-
-An effect that wraps its character (`feedback/power-up`) is checked on one as well: `--actor idle.png,cast.png`
-stands each PNG with its feet on the effect's origin and shows them in turn, `--actor-every N` render frames each
-(default 6). Both the port and the source see the same sprite on the same frame.
-
 ## Determinism test
 
 Frame hashes of each effect are checked against goldens, natively and in wasm, each effect against its own entry
@@ -304,7 +273,7 @@ The first build takes about 5 minutes; later builds take seconds.
 
 ## Site
 
-The landing page and docs are static HTML in `site/`, live at https://pixfx.pages.dev.
+The landing page and docs are static HTML in `site/`, live at https://pixfx.aiocean.io.
 
 ```sh
 site/build.sh --serve        # build site/dist (pages + the pixfx-canvas2d bundle), serve on http://127.0.0.1:8770/

@@ -12,7 +12,8 @@ shows and write painter code by hand, as the existing poses are written. Never p
 
 Run from `tools/pixfx-rs`: `cargo run -q -p pixfx-pixel --example <step> -- ...`. Every step writes into `--out`
 (default `target/pixel`) and prints what it wrote. `--palette` takes hex colours
-split by commas or a fighter look (`thunder`, `frost`); a look names each colour in the legend (`a robe0 #f4efe2`).
+split by commas, a fighter look (`thunder`, `frost`), or a palette file (`.gpl` with names, as `ramp` writes, or
+`.hex`); a look or a `.gpl` names each colour in the legend (`a robe0 #f4efe2`, `a skin-2 #c88d64`).
 
 | Step | Does |
 |---|---|
@@ -20,7 +21,8 @@ split by commas or a fighter look (`thunder`, `frost`); a look names each colour
 | `read <png> [--palette P] [--region X,Y,W,H] [--rects]` | A sprite as text: a letter per cell under a legend, column and row numbers; `--rects` the cells merged into rects (what painter code fills). |
 | `draw <txt>` | The text (edited or not) back to a PNG. |
 | `view <png> [--region X,Y,W,H] [--max-side 512]` | A picture sized to what it costs you to look at; grid lines from 8x, an overview when too big. |
-| `critique <png>... [--frames] [--intended X,Y;X,Y]` | Issues with cells and a fix each, and a score (100 − 30 an error, 12 a warning, 4 a note); `--frames` checks drift across a row; exits 1 on an error. |
+| `critique <png>... [--frames] [--intended X,Y;X,Y]` | Issues with cells and a fix each, and a score (100 − 30 an error, 12 a warning, 4 a note); `--frames` checks drift across a row; exits 1 on an error. Besides colours, specks, noise, outline and pillow shading it checks the craft of lines: `stray` (a cell sticking out of the shape), `doubled_corner` (an L in a one-cell line), `jagged_line` (a short run between longer ones, run lengths printed) and `banding` (a one-cell band between a darker and a lighter colour). An eye or a blade's tip is a stray on purpose: list it in `--intended`. Against the game's ruler (`pixfx_draw::RULER`): `--standing` is an error when a standing character is not its 40 rows, `--against PART*RATIO` a warning when a thing is not that many times a body part (`eye*2` glasses, `head*1.5` a hat brim, `blade*1` a sword). |
+| `ramp skin=#d99a6c cloth=#3355aa... [--steps 5] [--name ramps]` | Ramps, one per material, from dark and cool to light and warm round its base colour, written as one named palette (`<name>.gpl`) for `--palette`: `clean` snaps a drawing onto it, `read` names each letter by material and step. |
 | `sheet --cell WxH --grid CxR [--scale 8] [--gap 2] [--pixel-lines] [--bones FILE]` or `sheet --directions <png> [--scale 8]` | A blank sheet for an image model (`sheet.png` + `sheet.json`); bones (`X,Y X,Y` per line) drawn into each cell as a skeleton to draw on. `--directions` is a 3x3 round the sprite with a gap of 2. |
 | `cut <drawn.png> <sheet.json>` | Each cell the model drew, back to one pixel a cell (`cell-C-R.png`). |
 | `parts <png> <spec.txt> [--palette P]` | A sprite split into named parts with a parent and a pivot each (`<part>.png`, `<part>.txt`). |
@@ -44,13 +46,16 @@ they differ), and in `pixfx-fighter`, `cargo run -q -p pixfx-fighter --example p
    ```
    A new `--out-dir` each call (a rerun costs money); `--dry-run` shows the request for free. Ask the user before
    spending on `hero`.
-3. `clean <drawing> --cut 40 --height <the sprite's rows> --palette <look>`. Check the confidence it prints (the mean over
+3. `clean <drawing> --cut 40 --height <the sprite's rows> --palette <look>`; a standing character of the game is the
+   ruler's 40 rows (skill `pixfx`, "One scale: the ruler"), a pose that crouches or lies takes the rows the same
+   pose of the fighter takes (`poses` shows them). Check the confidence it prints (the mean over
    painted cells): below about 0.8 the grid is doubtful, so `view` the result before trusting it.
 4. `read` the clean sprite with the same palette (and `--rects`), then write the pose as painter code in the
    fighter's painter, the way the neighbouring poses are written. Copy shapes and proportions, not every cell.
 5. Paint the result (`poses --pose P`), compare one cell with the clean drawing,
    `diff <clean.png> target/pixel/thunder-down/r0-m1.png --anchor feet`, and `critique` that cell (or
-   `critique --frames r0-m0.png r0-m1.png r0-m2.png` for the three moments). Fix, repeat.
+   `critique --frames r0-m0.png r0-m1.png r0-m2.png` for the three moments; `--standing` on a standing pose). Fix,
+   repeat.
 
 ## Parts: effects that act on a sprite
 

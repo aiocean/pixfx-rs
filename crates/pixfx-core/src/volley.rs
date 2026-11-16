@@ -7,7 +7,10 @@
 //! so every shell gets the same flight.
 
 use crate::effect::{Effect, Options};
+use core::f64::consts::TAU;
+
 use pixfx_draw::math::{clamp, rand};
+use pixfx_draw::path::Path;
 
 /// How a volley flies toward its point.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,14 +23,19 @@ pub enum Aim {
     Converge,
     /// Every piece flies straight at the point and on past it, through every body it meets, striking each once.
     Pierce,
+    /// Every piece flies out, goes round the point [`Volley::orbit_turns`] times on a ring about
+    /// [`Volley::orbit_radius`] pixels out, then curves in onto it as [`Aim::Converge`] does. A volley that does not
+    /// orbit (no turns) converges.
+    Orbit,
 }
 
 impl Aim {
-    /// `"converge"` or `"pierce"`; none for anything else.
+    /// `"converge"`, `"pierce"` or `"orbit"`; none for anything else.
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "converge" => Some(Self::Converge),
             "pierce" => Some(Self::Pierce),
+            "orbit" => Some(Self::Orbit),
             _ => None,
         }
     }
@@ -41,76 +49,6 @@ pub struct Order {
     pub y: f64,
     pub aim: Aim,
     pub caster: Option<u32>,
-}
-
-/// A quadratic curve in stage pixels: from `from`, bent toward `via`, to `to`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Path {
-    pub from: (f64, f64),
-    pub via: (f64, f64),
-    pub to: (f64, f64),
-}
-
-impl Path {
-    /// A straight path.
-    pub fn line(from: (f64, f64), to: (f64, f64)) -> Self {
-        Self {
-            from,
-            via: ((from.0 + to.0) / 2.0, (from.1 + to.1) / 2.0),
-            to,
-        }
-    }
-
-    /// The point `u` (0 to 1) along it.
-    pub fn at(&self, u: f64) -> (f64, f64) {
-        let u = clamp(u, 0.0, 1.0);
-        let v = 1.0 - u;
-        (
-            v * v * self.from.0 + 2.0 * v * u * self.via.0 + u * u * self.to.0,
-            v * v * self.from.1 + 2.0 * v * u * self.via.1 + u * u * self.to.1,
-        )
-    }
-
-    /// The way it heads at `u`, radians (0 along +x, y down); its overall way where it has none there.
-    pub fn heading(&self, u: f64) -> f64 {
-        let u = clamp(u, 0.0, 1.0);
-        let dx = 2.0 * (1.0 - u) * (self.via.0 - self.from.0) + 2.0 * u * (self.to.0 - self.via.0);
-        let dy = 2.0 * (1.0 - u) * (self.via.1 - self.from.1) + 2.0 * u * (self.to.1 - self.via.1);
-        if dx * dx + dy * dy > 1e-12 {
-            libm::atan2(dy, dx)
-        } else {
-            libm::atan2(self.to.1 - self.from.1, self.to.0 - self.from.0)
-        }
-    }
-
-    /// Its length in pixels, near enough (`PIECES` straight pieces).
-    pub fn length(&self) -> f64 {
-        self.u_at(f64::INFINITY).1
-    }
-
-    /// The `u` (0 to 1) `dist` pixels along it, near enough (`PIECES` straight pieces), and its whole length.
-    pub fn u_at(&self, dist: f64) -> (f64, f64) {
-        const PIECES: u32 = 32;
-        let mut len = 0.0;
-        let mut last = self.from;
-        let mut found = None;
-        for i in 1..=PIECES {
-            let u = f64::from(i) / f64::from(PIECES);
-            let p = self.at(u);
-            let step = libm::hypot(p.0 - last.0, p.1 - last.1);
-            if found.is_none() && len + step >= dist {
-                let k = if step > 1e-12 {
-                    (dist - len) / step
-                } else {
-                    0.0
-                };
-                found = Some((f64::from(i - 1) + clamp(k, 0.0, 1.0)) / f64::from(PIECES));
-            }
-            len += step;
-            last = p;
-        }
-        (found.unwrap_or(1.0), len)
-    }
 }
 
 /// One piece of a volley. While it waits `after` seconds, the scene shows `held` (else `effect`) where `path` starts,
@@ -152,16 +90,13 @@ impl Launch {
     pub fn point(&self, dist: f64) -> ((f64, f64), f64) {
         let reach = self.reach();
         if dist <= reach && reach > 1e-9 {
-            let (u, _) = self.path.u_at(dist.max(0.0));
-            return (self.path.at(u), self.path.heading(u));
+            return (self.path.at(dist), self.path.heading(dist));
         }
-        let a = self.path.heading(1.0);
+        let a = self.path.end_heading();
         let more = dist - reach;
+        let end = self.path.end();
         (
-            (
-                self.path.to.0 + libm::cos(a) * more,
-                self.path.to.1 + libm::sin(a) * more,
-            ),
+            (end.0 + libm::cos(a) * more, end.1 + libm::sin(a) * more),
             a,
         )
     }
@@ -204,7 +139,8 @@ pub struct Shot {
 /// Every piece turns to its way over `poise` seconds; the one nearest the point goes first, the rest `gap` seconds
 /// apart. [`Aim::Converge`]: each flies out the way it points, then curves onto the point (spread by up to
 /// `spread` pixels), easing in by `ease`, so its tip (`nose` pixels ahead of its origin) would sink `sink`
-/// pixels into it, and flies on `beyond` pixels past. [`Aim::Pierce`]: each flies straight at the point and
+/// pixels into it, and flies on `beyond` pixels past. [`Aim::Orbit`]: each flies out, goes round the point
+/// `orbit_turns` times, then curves in as a converging piece. [`Aim::Pierce`]: each flies straight at the point and
 /// `beyond` pixels on. A volley that `lands` strikes the point itself (a thrown thing); one that does not strikes
 /// only what it meets.
 #[derive(Clone, Copy)]
@@ -240,6 +176,11 @@ pub struct Volley {
     pub beyond: f64,
     /// It strikes the point itself, and a converging piece goes there.
     pub lands: bool,
+    /// How many times an orbiting piece goes round the point (0: it converges), and the radius of the ring it goes
+    /// round on, in pixels; each piece's ring is a little wider or narrower (0.85 to 1.15 of it), so they do not
+    /// fly one line. Keep the ring wider than what stands at the point, or a piece strikes it on its first turn.
+    pub orbit_turns: f64,
+    pub orbit_radius: f64,
 }
 
 impl Volley {
@@ -256,6 +197,7 @@ impl Volley {
                 match order.aim {
                     Aim::Converge => self.converge(p, target, k as f64, seed, after),
                     Aim::Pierce => self.pierce(p, target, after),
+                    Aim::Orbit => self.orbit(p, target, k as f64, seed, after),
                 }
             })
             .collect()
@@ -293,29 +235,88 @@ impl Volley {
         }
     }
 
-    fn converge(&self, p: Shot, target: (f64, f64), k: f64, seed: f64, after: f64) -> Launch {
-        let hit = (
+    /// Where piece `k` aims: the point, spread.
+    fn spread_hit(&self, target: (f64, f64), k: f64, seed: f64) -> (f64, f64) {
+        (
             target.0 + (rand(&[k, seed, 3.0]) - 0.5) * self.spread.0,
             target.1 + (rand(&[k, seed, 5.0]) - 0.5) * self.spread.1,
-        );
+        )
+    }
+
+    /// Where a piece at `p` first flies out to, the way it points, aiming at `hit`.
+    fn out(&self, p: Shot, hit: (f64, f64)) -> (f64, f64) {
         let from = p.at;
         let d = libm::hypot(hit.0 - from.0, hit.1 - from.1).max(1.0);
-        // out the way it points first, then curving in
         let reach = clamp(d * self.bend, self.bend_min, self.bend_max);
-        let via = (
+        (
             from.0 + libm::cos(p.heading) * reach,
             from.1 + libm::sin(p.heading) * reach,
-        );
+        )
+    }
+
+    /// Where a piece last bent toward `via` ends: short of `hit` by its nose, sunk in.
+    fn short_of(&self, via: (f64, f64), hit: (f64, f64)) -> (f64, f64) {
         let (dx, dy) = (hit.0 - via.0, hit.1 - via.1);
         let len = libm::hypot(dx, dy).max(1e-6);
-        // its origin ends the curve short of the point by its nose, sunk in
         let short = self.nose - self.sink;
-        let to = (hit.0 - dx / len * short, hit.1 - dy / len * short);
-        let path = Path { from, via, to };
+        (hit.0 - dx / len * short, hit.1 - dy / len * short)
+    }
+
+    /// A converging launch along `path`: on past its end unless it lands, striking where its tip reaches the end.
+    fn converging(&self, p: Shot, path: Path, after: f64) -> Launch {
         let on = if self.lands { 0.0 } else { self.beyond };
         // where its tip reaches the point, before it sinks in
         let mark = (path.length() - self.sink).max(0.0);
         self.launch(p.heading, path, on, after, self.ease, false, Some(mark))
+    }
+
+    fn converge(&self, p: Shot, target: (f64, f64), k: f64, seed: f64, after: f64) -> Launch {
+        let hit = self.spread_hit(target, k, seed);
+        // out the way it points first, then curving in
+        let via = self.out(p, hit);
+        let path = Path::quad(p.at, via, self.short_of(via, hit));
+        self.converging(p, path, after)
+    }
+
+    /// Out the way it points onto a ring round the point, meeting it on a tangent; round it `orbit_turns` times,
+    /// the way the point lies from where it points (clockwise when it is to its right); then curving in from the
+    /// ring onto the point. Converges where it cannot orbit: no turns, or the point too near to ring.
+    fn orbit(&self, p: Shot, target: (f64, f64), k: f64, seed: f64, after: f64) -> Launch {
+        let hit = self.spread_hit(target, k, seed);
+        let via = self.out(p, hit);
+        let (vx, vy) = (via.0 - hit.0, via.1 - hit.1);
+        let dv = libm::hypot(vx, vy);
+        // a ring of its own, inside where it flies out to so it meets the ring on a tangent
+        let r = (self.orbit_radius * (0.85 + 0.3 * rand(&[k, seed, 7.0]))).min(dv * 0.8);
+        if self.orbit_turns <= 0.0 || r < 1.0 {
+            return self.converge(p, target, k, seed, after);
+        }
+        let (h0, h1) = (libm::cos(p.heading), libm::sin(p.heading));
+        let side = if h0 * (hit.1 - p.at.1) - h1 * (hit.0 - p.at.0) >= 0.0 {
+            1.0
+        } else {
+            -1.0
+        };
+        let round = |phi: f64| (-libm::sin(phi) * side, libm::cos(phi) * side);
+        let on_ring = |phi: f64| (hit.0 + r * libm::cos(phi), hit.1 + r * libm::sin(phi));
+        let (theta, alpha) = (libm::atan2(vy, vx), libm::acos(r / dv));
+        // of the two tangent points, the one it reaches already going round the right way
+        let Some(phi) = [theta + alpha, theta - alpha].into_iter().find(|&phi| {
+            let (t, w) = (on_ring(phi), round(phi));
+            (t.0 - via.0) * w.0 + (t.1 - via.1) * w.1 > 0.0
+        }) else {
+            return self.converge(p, target, k, seed, after);
+        };
+        let sweep = side * self.orbit_turns * TAU;
+        let leave = phi + sweep;
+        let (exit, way) = (on_ring(leave), round(leave));
+        // on the way it goes round, bending in
+        let bend = (exit.0 + way.0 * r * 0.7, exit.1 + way.1 * r * 0.7);
+        let path = Path::begin(p.at)
+            .quad_to(via, on_ring(phi))
+            .turn(hit, sweep)
+            .quad_to(bend, self.short_of(bend, hit));
+        self.converging(p, path, after)
     }
 
     fn pierce(&self, p: Shot, target: (f64, f64), after: f64) -> Launch {

@@ -8,7 +8,9 @@ anything here; this file only says what this crate holds.
 Pixel fighters, from the site's duel: a drawn fighter with a pose for each thing it can be doing (`paint`, `pose`,
 `look`; every pose is painter code written by hand, the `pixfx-pixel` scripts reading reference art for it;
 `poses` lays every pose out as sheet cells), a body that takes hits the way fighting games do (`body`), the
-screen's answer to a blow (`feel`) and the marks that hang on a fighter (`status`).
+screen's answer to a blow (`feel`) and the marks that hang on a fighter (`status`). The painted fighter is the
+game's ruler (`pixfx_draw::RULER`): `tests/ruler.rs` measures the idle pose against it (height, width, feet, face,
+eye, hand, blade), so a change to the standing fighter changes the ruler in the same commit, or fails.
 
 ## Belongs here
 

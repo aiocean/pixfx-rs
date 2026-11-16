@@ -141,7 +141,6 @@ cargo run -p pixfx-export --example gif -- fire/ember --scale 4
 cargo run --release -p pixfx-effects --no-default-features --features fire-ember --example bench</code></pre>
 <ol>
   <li>Look at the gif (<code>target/out/fire_ember.gif</code>) before you bless: blessing records what is drawn, right or wrong. Blessing with one effect built rewrites only its entry in <code>tests/goldens/frame_hashes.json</code>.</li>
-  <li>For a port, run <a href="parity.html">parity</a> against its source (pixelfx or the vendored Sprite Fusion file).</li>
   <li>A change shared by many effects (<code>pixfx-core</code>, <code>pixfx-draw</code>, a category's <code>lib.rs</code>) runs the same tests without the feature flags, and the wasm check once: <code>wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignored</code>.</li>
 </ol>
     </main>

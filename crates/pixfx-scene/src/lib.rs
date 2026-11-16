@@ -832,7 +832,7 @@ impl<S> Scene<S> {
                 angle,
                 ..launch.opts.clone()
             };
-            let (x, y) = launch.path.from;
+            let (x, y) = launch.path.start();
             let launch_heading = launch.path.heading(0.0);
             let tip = launch.tip((x, y), launch_heading);
             let held = if launch.after > 0.0 {
@@ -941,7 +941,7 @@ impl<S> Scene<S> {
         for (i, f) in flights.iter_mut().enumerate() {
             let l = &f.launch;
             if f.flying.is_none() {
-                let (x, y) = l.path.from;
+                let (x, y) = l.path.start();
                 let aim = l.path.heading(0.0);
                 if self.time < f.due {
                     // held, turning from where it pointed to where it will leave

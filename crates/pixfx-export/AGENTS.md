@@ -7,13 +7,14 @@ changing anything here; this file only says what this crate holds.
 
 An effect written out as files: sprite sheets (composite, colour and light PNG) with beanfx's Aseprite-style JSON
 (`write_sheet`), a GIF (`write_gif`), a video through ffmpeg on `PATH` (`write_video`), rendered clips that hosts play without drawing (`render_clip`, `write_clip`,
-`decode`), and the parity check of a port against its source (`parity`: `compare`, `read_reference`,
-`write_side_gif`, `ParityOpts`, `Actors`; `gif --actor` reads its sprite frames through `Actors` too).
+`decode`), a still of an effect beside the character it plays on for checking scale (`board`: `busiest`, `still`), and the character a script plays an effect on (`Actors`: sprite
+frames read from PNGs, shown in turn; `gif --actor`, `stage` and `scale_board` read it).
 
-`examples/` holds the scripts that write them: `sprite_sheet`, `gif`, `mp4`, `bake`, `parity`, `stage` (an effect
+`examples/` holds the scripts that write them: `sprite_sheet`, `gif`, `mp4`, `render_clip`, `stage` (an effect
 on a stage between two characters, played through `pixfx-scene`: ordered at the target, cues answered with a `Feel`),
 `blood_spray` (drops thrown in arcs, each a `projectiles/trail` in blood colours that the script moves, as a game
-moves any mover) and `carry` (an effect carried back and forth with `carried` 1, written as `<id>.carry.gif`)
+moves any mover), `carry` (an effect carried back and forth with `carried` 1, written as `<id>.carry.gif`) and
+`scale_board` (every effect's busiest frame on the fighter's sprite, with a page, to see which are out of scale)
 (`cargo run -p
 pixfx-export --example <name> -- ...`), sharing `examples/common/mod.rs`. A script reads its arguments, calls the
 library and writes files; anything worth testing moves into the library.
@@ -45,5 +46,4 @@ shell: no crate below the shell layer may depend on it (see "Known drift" in `cr
 
 ```
 cargo test -p pixfx-export
-cargo run -p pixfx-export --example parity -- <id> --pixelfx /tmp/pixelfx   # when parity code changed
 ```

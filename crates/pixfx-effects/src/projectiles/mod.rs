@@ -13,3 +13,9 @@ mod trail;
 
 #[cfg(any(feature = "projectiles-trail", feature = "arcane-sword-formation"))]
 pub use trail::TRAIL;
+
+#[cfg(feature = "projectiles-drop-dart")]
+mod drop_dart;
+
+#[cfg(feature = "projectiles-drop-dart")]
+pub use drop_dart::DROP_DART;

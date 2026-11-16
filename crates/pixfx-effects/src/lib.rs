@@ -21,6 +21,7 @@ pub mod projectiles;
 pub mod scifi;
 pub mod shadow;
 pub mod spawn;
+pub mod tone;
 pub mod transitions;
 pub mod water;
 pub mod weather;
@@ -79,6 +80,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &arcane::BAGUA_MIRROR_BURST,
     #[cfg(feature = "critters-wisp")]
     &critters::WISP,
+    #[cfg(feature = "feedback-heal-sparkle")]
+    &feedback::HEAL_SPARKLE,
     #[cfg(feature = "feedback-outline")]
     &feedback::OUTLINE,
     #[cfg(feature = "feedback-power-up")]
@@ -109,18 +112,46 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &transitions::BURN_AWAY,
     #[cfg(feature = "transitions-crt-off")]
     &transitions::CRT_OFF,
+    #[cfg(feature = "shadow-blood-gush")]
+    &shadow::BLOOD_GUSH,
     #[cfg(feature = "shadow-blood-shield")]
     &shadow::BLOOD_SHIELD,
     #[cfg(feature = "shadow-void-orb")]
     &shadow::VOID_ORB,
     #[cfg(feature = "shadow-winter-ordeal")]
     &shadow::WINTER_ORDEAL,
+    #[cfg(feature = "water-splash")]
+    &water::SPLASH,
     #[cfg(feature = "water-water-jet")]
     &water::WATER_JET,
     #[cfg(feature = "weather-snow")]
     &weather::SNOW,
     #[cfg(feature = "weather-fireflies")]
     &weather::FIREFLIES,
+    #[cfg(feature = "arcane-blade-pinwheel")]
+    &arcane::BLADE_PINWHEEL,
+    #[cfg(feature = "impacts-star-converge")]
+    &impacts::STAR_CONVERGE,
+    #[cfg(feature = "impacts-twin-converge")]
+    &impacts::TWIN_CONVERGE,
+    #[cfg(feature = "projectiles-drop-dart")]
+    &projectiles::DROP_DART,
+    #[cfg(feature = "arcane-comet-rings")]
+    &arcane::COMET_RINGS,
+    #[cfg(feature = "arcane-comma-seal")]
+    &arcane::COMMA_SEAL,
+    #[cfg(feature = "arcane-shuriken-seal")]
+    &arcane::SHURIKEN_SEAL,
+    #[cfg(feature = "arcane-vortex-ring")]
+    &arcane::VORTEX_RING,
+    #[cfg(feature = "explosions-swirl-blast")]
+    &explosions::SWIRL_BLAST,
+    #[cfg(feature = "spawn-swirl-portal")]
+    &spawn::SWIRL_PORTAL,
+    #[cfg(feature = "arcane-twin-shuriken")]
+    &arcane::TWIN_SHURIKEN,
+    #[cfg(feature = "explosions-puff-burst")]
+    &explosions::PUFF_BURST,
 ];
 
 /// The effect with this id (`fire/candle`).

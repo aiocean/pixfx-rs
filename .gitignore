@@ -1,4 +1,7 @@
 target/
+
+# cloned reference repos (dimforge, bevy), read-only, never built or committed
+references/
 .superpowers/
 
 # wasm-pack output for the pixfx-wasm demo

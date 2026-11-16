@@ -13,13 +13,14 @@ is to Zed: the games are the product, and the engine grows only what a real game
 - **Strong.** Effects look hand-made and land with weight: light, cues for shake, hit-stop, ripple, flash and sound,
   and bodies that react to a hit. Sprites and UI share the same look.
 - **Convenient.** A game draws with a few calls and plain-data options, from TypeScript or from Rust.
+- **Composable.** Every new building block is generic and atomic: it does one thing, works for any effect, sprite or object — not just the one that first needed it — and composes at the right layer. Reuse happens by pulling shared code down to the lowest layer every caller can reach (`pixfx-draw`, `pixfx-core`, a category's `lib.rs`), never by coupling one effect to another. The Unix principle applies: small pieces that each do one thing well; the game and scene compose them. Performance is non-negotiable: a change that claims better reuse must not regress any benchmark.
 - **Fast.** Many sprites and effects at once on a mid-range phone at 60 fps. Play speed comes before download size: a
   download happens once, every frame pays for slow code, so release builds keep `opt-level = 3` with fat LTO
   (`Cargo.toml` `[profile.release]`), and a game cuts size by building only the effects it plays. "Fast" is a
   measurement: a change that claims it shows `bun run perf` (`packages/pixfx-phaser/perf/`) or a gpui measurement
   before and after.
 - **Everywhere, identical.** Written once in Rust; the same frames natively, in WebAssembly and on every shell.
-  `frame_hash` and the parity gate prove it.
+  `frame_hash` and the golden hashes prove it.
 - **Source, not a package.** A user clones this repo and works in it with an agent. The agent imports the crates and
   the JS packages, builds the wasm itself (`bun run build:wasm`), and runs or edits the scripts in each crate's
   `examples/` to make files. There is no command-line tool: an output a game needs is a script over the library,
@@ -100,7 +101,7 @@ the number of effects, so they leave it:
   needs no atlas. Handing it `ImageBitmap`s a worker made would save only that copy: 28 ms/s on the landing duel at
   6× CPU throttling.
 - A new output (a terminal in ASCII, an OLED screen, the DOM) is a new shell; deciding and painting stay as they are.
-  Embedded targets would also need `no_std` crates, room for frames, and a way round `f64` maths, which parity keeps.
+  Embedded targets would also need `no_std` crates, room for frames, and a way round `f64` maths, which determinism keeps.
 
 ## Layers and where code goes
 
@@ -115,7 +116,7 @@ one: its rules, trainer and its own wasm; this site's landing and effect pages e
 | JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it, by way of `pixfx-web`. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
 | Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter`, `pixfx-body` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies; the rig every pose, direction and clip is made with, and its mannequin | Pure and deterministic: no clock, no I/O, no host types. |
-| Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `halo`, `blend`, `color`, `palette`, `math`) | Frames with colour and light, painting, painted glow, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
+| Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `halo`, `blend`, `color`, `palette`, `math`, `ruler`) | Frames with colour and light, painting, painted glow, compositing, the ruler every sprite and effect is drawn to (`RULER`) | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
 
 Where a new piece of code goes:
 
@@ -146,7 +147,7 @@ Where a new piece of code goes:
 
 ## Out of place today
 
-Each item is a refactor. Each lands with every test green, the parity gate passing and `frame_hash` unchanged; a
+Each item is a refactor. Each lands with every test green and `frame_hash` unchanged; a
 change to a JS shell also shows `bun run perf` before and after.
 
 Nothing is out of place now. Code found on the wrong side of a boundary is listed here, one numbered item each,
@@ -154,11 +155,14 @@ until its refactor lands.
 
 ## Rules
 
-- Parity: every port in `pixfx_effects::EFFECTS` passes the parity gate against its source (`cargo run -p pixfx-export --example parity -- <id>`): pixelfx,
-  or the Sprite Fusion file vendored at `tools/spritefusion/<id>.ts` for an effect pixelfx does not have. An effect
-  made here (`feedback/outline`) has no source; its golden hashes pin it.
-- Determinism: the same scene, options and time give the same `frame_hash` on every target.
+- Scale: every sprite, effect and reference sheet made here is drawn to one ruler, `pixfx_draw::RULER` (the duel's
+  fighter: 40 rows on screen, face 7, eye 1 x 2, blade 16), one game pixel per pixel; a new thing is sized against a
+  body part (`Ruler::size(part, ratio)`, never under 1 pixel). `pixfx-fighter`'s `tests/ruler.rs` keeps the ruler
+  equal to the painted fighter. The skill `pixfx` ("One scale: the ruler") says how.
+- Determinism: the same scene, options and time give the same `frame_hash` on every target; each effect's golden
+  hashes (`crates/pixfx-effects/tests/goldens/frame_hashes.json`) pin its frames.
 - Lints: clippy `unwrap_used`, `expect_used` and `panic` are denied; `unsafe_code` is forbidden.
+- Reusability has no performance budget: a new shared primitive earns its place only when 2+ callers already exist and no benchmark regresses. "More reusable" is never a reason to slow a frame. Push shared code down (to `pixfx-draw`, `pixfx-core`, a category `lib.rs`); never couple effect A to effect B. Each primitive does one thing; `Scene` and the game compose them. A change that moves code to a lower layer keeps `frame_hash` and `bun run perf` unchanged.
 - Tests live in the crate or package they test, and there is no repo-wide gate: a change runs the tests of what it
   changed (each crate's and package's "Before you finish"), and a speed claim shows that crate's own measurement
   before and after (`bench` for effects, `bun run perf` for Phaser, the gpui measurements). One effect builds,

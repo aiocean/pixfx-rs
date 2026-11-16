@@ -1,9 +1,10 @@
 //! An effect's frames beside the sheet's cells: the loop that turns a reference into painter code. Draw, render,
 //! put each frame next to the cell of the same moment at the same scale, measure, fix, again.
 //!
-//! A template cell holds the guide figure 40 sprite pixels tall in a 96-pixel cell, the size of the duel's fighters
-//! in engine pixels; so a cell covers [`ENGINE_CELL`] engine pixels whatever its own resolution, the figure's feet
-//! [`FEET`] pixels down, centred across. [`effect_cell`] cuts that window round an effect frame's origin and
+//! A template cell holds the guide figure at the duel's ruler (`pixfx_draw::RULER`) in a 96-pixel cell,
+//! engine pixels for engine pixels; so a cell covers [`ENGINE_CELL`] engine pixels whatever its own resolution, the
+//! figure's feet [`FEET`] pixels down, centred across. A cell of `n` squares draws one square as `96 / n` engine
+//! pixels ([`art_ruler`] gives the ruler in squares). [`effect_cell`] cuts that window round an effect frame's origin and
 //! averages it down to the cell's size, so the two are compared pixel for pixel; [`board`] lays the pairs out.
 
 use crate::RgbaImage;
@@ -12,6 +13,12 @@ use crate::RgbaImage;
 pub const ENGINE_CELL: u32 = 96;
 /// Engine pixels from the cell's top to where the feet stand (the origin).
 pub const FEET: u32 = 88;
+
+/// The duel's ruler as a template of `cell` squares a side draws it: every length times `cell / ENGINE_CELL`,
+/// never under one square. At 96 a square is an engine pixel; at 64 the 40-pixel fighter is 27 squares tall.
+pub fn art_ruler(cell: u32) -> pixfx_draw::Ruler {
+    pixfx_draw::RULER.scaled(f64::from(cell) / f64::from(ENGINE_CELL))
+}
 
 /// The window of an effect frame a cell covers, `[x0, y0]` of an [`ENGINE_CELL`] square, from the frame's origin.
 pub fn window(origin: (i32, i32)) -> [i32; 2] {

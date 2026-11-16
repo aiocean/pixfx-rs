@@ -127,7 +127,7 @@ stage.drawLayer("front");</code></pre>
 });</code></pre>
 
 <h2>Determinism</h2>
-<p>Everything an effect draws comes from its seed, its options and the steps it was given. pixfx reproduces JavaScript's number semantics (rounding, min/max with NaN, 32-bit integer conversions, clamped byte stores) and uses its own math functions instead of the platform's, so a native build and a wasm build of the same effect produce the same pixels, bit for bit. A frame-hash test checks this; see <a href="parity.html">Parity and tests</a>.</p>
+<p>Everything an effect draws comes from its seed, its options and the steps it was given. pixfx reproduces JavaScript's number semantics (rounding, min/max with NaN, 32-bit integer conversions, clamped byte stores) and uses its own math functions instead of the platform's, so a native build and a wasm build of the same effect produce the same pixels, bit for bit. A frame-hash test checks this; see <a href="tests.html">Tests</a>.</p>
     </main>
     <aside class="toc" aria-label="On this page"></aside>
   </div>

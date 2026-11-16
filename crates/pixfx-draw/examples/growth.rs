@@ -1,9 +1,10 @@
 //! Draws the growth algorithms side by side, so their settings can be judged by eye:
 //! `cargo run --release -p pixfx-draw --example growth -- [OUT.ppm]` (default `target/out/growth.ppm`).
 //! Panels: dbm at eta 1, 3 and 6 grown up from the bottom; dbm aimed at a point (lightning); dbm from the middle out
-//! (cracks); colonize in a dome (veins). Width follows weight; brightness follows the step a node was born on.
+//! (cracks); colonize in a dome (veins); a vein laid three quarters round a ring (a `Path`), branching off it inward. Width follows weight; brightness follows the step a node was born on.
 
-use pixfx_draw::growth::{Colonize, Dbm, Tree, colonize, dbm};
+use pixfx_draw::growth::{Colonize, Dbm, Tree, colonize, colonize_from, dbm};
+use pixfx_draw::path::Path;
 
 const S: i32 = 96;
 
@@ -87,6 +88,31 @@ fn main() -> std::io::Result<()> {
                     && y < 45.0
             },
         ),
+        // a vein laid round a ring from its left, clockwise three quarters of the way (a Path), then branches
+        // colonizing the band inside it
+        {
+            let mut t = Tree::default();
+            let way = Path::begin((-38.0, 0.0)).turn((0.0, 0.0), 1.5 * core::f64::consts::PI);
+            t.path(&way.points(1.5), 1.5);
+            colonize_from(
+                t,
+                Colonize {
+                    attractors: 300,
+                    step: 2.0,
+                    influence: 9.0,
+                    kill: 2.5,
+                    steps: 80,
+                    bias: (0.0, 0.0),
+                    jitter: 0.2,
+                    branch_chance: 1.0,
+                    max_turn: core::f64::consts::PI,
+                    fork_angle: (0.0, core::f64::consts::PI),
+                    bounds: (-46.0, -46.0, 46.0, 46.0),
+                    seed: 4.0,
+                },
+                |x, y| (18.0 * 18.0..40.0 * 40.0).contains(&(x * x + y * y)),
+            )
+        },
     ];
     let (w, h) = ((S + 4) as usize * panels.len(), S as usize);
     let mut px = vec![0u8; w * h * 3];

@@ -19,7 +19,7 @@ down, and one model rearranged the grid. A caption naming each pose and a colour
 Write a spec (any field but `cells` may be left out):
 
 ```json
-{ "body": { "height": 56, "heads": 6 }, "cell": [64, 64], "cols": 4, "gap": 8, "scale": 8,
+{ "cell": [64, 64], "cols": 4, "gap": 8, "scale": 8,
   "cells": [
     { "caption": "1 IDLE, side view facing right", "preset": "idle" },
     { "caption": "2 IDLE, front view", "preset": "idle", "facing": 90 },
@@ -33,6 +33,12 @@ Write a spec (any field but `cells` may be left out):
 cargo run -p pixfx-pose --example pose_sheet -- spec.json --out target/art/<name>/sheet
 cargo run -p pixfx-pose --example pose_sheet -- --presets [--facing 45] --out target/pose   # see every preset
 ```
+
+The figure is the game's ruler by default (`pixfx_draw::RULER`, skill `pixfx`, "One scale: the ruler"): the duel's
+fighter, 38 pixels painted crown to soles, about 5.4 heads, the head as wide as its 7-pixel face, a 16-pixel blade,
+the soles on row 60 of a 64 cell. A character drawn on it comes out at the size of every sprite and effect beside
+it, so leave `body` out for a character of this game. Give `"body": { "height": H, "heads": N }` only for a
+character of another game or another build (a chibi, a giant boss), and fill in that game's ruler too.
 
 It writes `sheet.png` (send it to the model), `sheet.json` (the grid `pixfx_pixel::sheet::cut` takes back),
 `skeletons.json` (each cell's joints, to check the drawing against) and `legend.txt` (the colour key for the
@@ -79,4 +85,33 @@ Model choice (spike 2026-11-14): GPT image (`--tier draft`) keeps the grid and f
 Look at every cell against its skeleton: which arm holds the sword, which leg is forward, which knee is down, the
 facing. A dress hides the legs, so a share-of-skeleton-covered score cannot tell a right pose from a wrong one;
 judge by limb. Watch for skeleton colours leaking into the art (a dark-teal leg from the right shin's colour).
-Then cut the cells with `pixfx-pixel` (see the `pixfx-pixel` skill).
+Then cut the cells with `pixfx-pixel` (see the `pixfx-pixel` skill), resampled to the ruler's height
+(`clean --height 40`), and check each standing cell with `critique --standing`.
+
+## Ballpoint layer: the lines to trace
+
+The colour sheet loses the lines an agent needs to write painter code: where an arm crosses the body, where
+clothes overlap, folds, the face. A second call traces the drawn sheet in ballpoint pen. The traced sheet is a
+guide for the agent and never goes into a sprite or the game, so its lines do not break "no outline" in a sprite.
+
+1. Once the colour sheet passes the check above, make a directory holding `template.png` (the colour sheet the
+   model drew), `style.png` (the character picture) and `prompt.txt`:
+
+   "The first image is a sheet of boxes, each holding the same character drawn in a different pose; the second
+   image is that character. Trace every box as a ballpoint pen drawing: thin dark blue-black ink lines only, on a
+   transparent background. Draw every contour and every inner line: where a limb crosses the body or another limb,
+   where clothes overlap, folds, hair, eyes, nose, mouth, fingers, the sword's edge and guard. No colour, no fill,
+   no shading, no hatching. Keep the layout exactly: same boxes, same proportions, thin cyan borders; each figure
+   the same size and in the same place as in the first image, every line exactly on the edge it traces. Do not
+   draw the captions."
+
+2. `cargo run -p pixfx-ref --example generate -- <dir> --tier draft` (it always asks for a transparent background,
+   which ink lines need).
+3. Cut the answer on the colour sheet's own `sheet.json`:
+   `cargo run -p pixfx-pixel --example cut -- <dir>/draw-1/image-01.png sheet.json --out <art>/ballpoint`.
+   `cell-C-R.png` there and in the colour cut is the same pose.
+4. Read each ballpoint cell beside its colour cell before tracing from it. Lines off the colour edges, or a
+   different pose, mean the layer drifted: draw it again rather than trace a drifted layer.
+
+Not drawn yet (2026-11-16): the prompt is a first version. `cut` brings a cell down to one pixel a cell, so a thin
+ink line may break there; read the full drawn sheet when a line seems missing.

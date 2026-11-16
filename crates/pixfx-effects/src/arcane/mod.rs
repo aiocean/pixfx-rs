@@ -101,3 +101,42 @@ pub use sword_strike::SWORD_STRIKE;
 
 #[cfg(feature = "arcane-sword-formation")]
 pub use sword_formation::SWORD_FORMATION;
+
+#[cfg(feature = "arcane-blade-pinwheel")]
+mod blade_pinwheel;
+
+#[cfg(feature = "arcane-blade-pinwheel")]
+pub use blade_pinwheel::BLADE_PINWHEEL;
+
+#[cfg(feature = "arcane-comet-rings")]
+mod comet_rings;
+
+#[cfg(feature = "arcane-comet-rings")]
+pub use comet_rings::COMET_RINGS;
+
+#[cfg(feature = "arcane-comma-seal")]
+mod comma_seal;
+
+#[cfg(feature = "arcane-comma-seal")]
+pub use comma_seal::COMMA_SEAL;
+
+#[cfg(feature = "arcane-shuriken-seal")]
+mod shuriken_seal;
+
+#[cfg(feature = "arcane-shuriken-seal")]
+pub use shuriken_seal::SHURIKEN_SEAL;
+
+#[cfg(feature = "arcane-vortex-ring")]
+mod vortex_ring;
+
+#[cfg(feature = "arcane-vortex-ring")]
+pub use vortex_ring::VORTEX_RING;
+
+#[cfg(any(feature = "arcane-shuriken-seal", feature = "arcane-twin-shuriken"))]
+mod shuriken;
+
+#[cfg(feature = "arcane-twin-shuriken")]
+mod twin_shuriken;
+
+#[cfg(feature = "arcane-twin-shuriken")]
+pub use twin_shuriken::TWIN_SHURIKEN;

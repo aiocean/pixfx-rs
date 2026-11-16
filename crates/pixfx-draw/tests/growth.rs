@@ -1,4 +1,5 @@
 use pixfx_draw::growth::{Colonize, Dbm, Tree, colonize, dbm};
+use pixfx_draw::path::Path;
 
 fn disc(x: i32, y: i32) -> bool {
     x * x + y * y <= 30 * 30
@@ -265,4 +266,26 @@ fn murray_forks_an_even_split_symmetrically_and_a_thin_branch_wider() {
     let mut walled = fork(20, 20);
     walled.murray(1.0, 1.0, 0, |_, y| y > -10.5);
     assert_eq!(at(&walled), at(&before));
+}
+
+#[test]
+fn growth_laid_along_a_path_goes_round_it_from_its_start() {
+    // from (-20, 0) over the top of a ring to (20, 0), not straight across
+    let way = Path::begin((-20.0, 0.0)).turn((0.0, 0.0), core::f64::consts::PI);
+    let mut t = Tree::default();
+    t.path(&way.points(1.0), 1.0);
+    for pair in t.nodes.windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        assert!(
+            (libm::hypot(b.x, b.y) - 20.0).abs() < 0.2,
+            "off the ring at ({}, {})",
+            b.x,
+            b.y
+        );
+        assert!(b.y <= 1e-9, "over the top only");
+        // born one after another the way round, left to right
+        assert!(b.born == a.born + 1 && b.x > a.x);
+    }
+    let end = t.nodes.last().map_or((f64::NAN, 0.0), |n| (n.x, n.y));
+    assert!(libm::hypot(end.0 - 20.0, end.1) < 1e-6, "{end:?}");
 }

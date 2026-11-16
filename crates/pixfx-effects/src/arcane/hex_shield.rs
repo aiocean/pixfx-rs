@@ -1,6 +1,5 @@
 //! Hex shield: port of Sprite Fusion's shield (https://www.spritefusion.com/pixel-art-vfx/shield), MIT License,
-//! Copyright (c) 2026 Hugo Duprez. The source is vendored verbatim at `tools/spritefusion/arcane/hex-shield.ts`
-//! and is this port's parity reference (`tools/spritefusion-ref.mjs`).
+//! Copyright (c) 2026 Hugo Duprez. The source is vendored verbatim at `tools/spritefusion/arcane/hex-shield.ts`.
 //!
 //! The source works in world units of 2 art pixels (its `PX`); this port works in art pixels, and halving is exact
 //! in floating point, so the numbers are the same. Its particles move as pixfx-core's [`Particles`] (pixelfx's

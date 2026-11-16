@@ -1,7 +1,7 @@
 //! Bagua mirror, the shield form: a large octagonal bronze mirror ringed with the eight trigrams stands behind the
 //! character's back and throws a blow back as a beam of light (the cultivation-fantasy protective treasure). Made here
-//! from `pixfx-ref`'s `examples/specs/shield/bagua-mirror.json` sheets; it has no source, so no parity check; its
-//! golden hashes pin it. The mirror itself is [`super::bagua`], shared with `arcane/bagua-mirror-strike`.
+//! from `pixfx-ref`'s `examples/specs/shield/bagua-mirror.json` sheets; its golden
+//! hashes pin it. The mirror itself is [`super::bagua`], shared with `arcane/bagua-mirror-strike`.
 //!
 //! It wraps its actor: the mirror is sized from the sprite's body (`SIZE` of its height) and stands behind its upper
 //! body, its foot near the ground, so the character stays in front of it; once it has formed a jade line washes down

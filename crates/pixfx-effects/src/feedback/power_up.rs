@@ -1,6 +1,5 @@
 //! Power up: port of Sprite Fusion's power up (https://www.spritefusion.com/pixel-art-vfx/power-up), MIT License,
-//! Copyright (c) 2026 Hugo Duprez. The source is vendored verbatim at `tools/spritefusion/feedback/power-up.ts` and
-//! is this port's parity reference (`tools/spritefusion-ref.mjs`).
+//! Copyright (c) 2026 Hugo Duprez. The source is vendored verbatim at `tools/spritefusion/feedback/power-up.ts`.
 //!
 //! The source works in world units of 2 art pixels (its `PX`) with the feet at world (0, 0); this port works in
 //! art pixels around the feet, and halving is exact in floating point, so the numbers are the same. Each engine

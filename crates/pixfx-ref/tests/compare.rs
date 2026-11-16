@@ -2,6 +2,38 @@ use pixfx_ref::RgbaImage;
 use pixfx_ref::compare::{ENGINE_CELL, FEET, Pair, board, effect_cell};
 
 #[test]
+fn the_guide_figure_is_the_duels_fighter_in_engine_pixels() -> Result<(), String> {
+    let r = pixfx_draw::RULER;
+    let bones = pixfx_pixel::sheet::parse_bones(pixfx_ref::spec::FIGURE)?;
+    let pts: Vec<(u32, u32)> = bones.iter().flat_map(|(_, b)| [b[0], b[1]]).collect();
+    let (top, bottom) = (pts.iter().map(|p| p.1).min(), pts.iter().map(|p| p.1).max());
+    let (left, right) = (pts.iter().map(|p| p.0).min(), pts.iter().map(|p| p.0).max());
+    assert_eq!(bottom, Some(FEET), "soles on the feet row");
+    assert_eq!(
+        bottom.zip(top).map(|(b, t)| b - t + 1),
+        Some(r.figure()),
+        "crown to soles"
+    );
+    assert_eq!(
+        left.zip(right).map(|(l, rr)| (l + rr) / 2),
+        Some(ENGINE_CELL / 2),
+        "centred"
+    );
+    let crown: Vec<u32> = pts
+        .iter()
+        .filter(|p| Some(p.1) == top)
+        .map(|p| p.0)
+        .collect();
+    let head = crown
+        .iter()
+        .max()
+        .zip(crown.iter().min())
+        .map(|(a, b)| a - b + 1);
+    assert_eq!(head, Some(r.head), "the head as wide as the face");
+    Ok(())
+}
+
+#[test]
 fn the_effects_origin_lands_where_the_figure_stands_in_the_cell() {
     // a 128 x 120 effect frame with its origin at (64, 106), a white 3 x 3 block on it
     let (w, h, origin) = (128u32, 120u32, (64i32, 106i32));

@@ -16,7 +16,7 @@ mod common;
 
 use common::{Args, effect, exit, file_name};
 use pixfx_core::{render_frames_on_actor, render_frames_with_actor};
-use pixfx_export::parity::Actors;
+use pixfx_export::Actors;
 use pixfx_export::write_gif;
 
 const USAGE: &str = "usage: gif <id> [--scale N] [--seed N] [--palette WORD] [--num NAME=V] [--actor PNG,PNG... [--actor-every N] [--show-actor]] [--out DIR]";

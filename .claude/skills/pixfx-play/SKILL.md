@@ -69,8 +69,8 @@ adapter object), `setPosition`, `setDepths(back, front)` (Phaser, Pixi), `wrap(.
 - Many effects at once: `setDrawBudget(n)`.
 - Throw at a foe at any distance (`arcane/sword-formation`, an effect tagged `volley`): play it where it gathers
   (at the caster, `follow` keeps it there); declare every body a piece may hit with `pixfx.setBody(id, x, y, w, h)`
-  (world pixels, each frame it moves; `clearBody(id)` when gone), then `effect.attack(x, y, "converge" | "pierce",
-  casterId)`: the point gives the direction, the pieces fly on past it and burst on the first body they meet (the
+  (world pixels, each frame it moves; `clearBody(id)` when gone), then `effect.attack(x, y, "converge" | "pierce" | "orbit",
+  casterId)` (`"orbit"`: round the point on a ring first, then in): the point gives the direction, the pieces fly on past it and burst on the first body they meet (the
   caster's spared). Each strike emits `"strike"` (`{index, x, y, body}`, `body` the id struck): the game applies
   damage there. `effect.burst()` bursts a piece where it is. `attack` returns false for an effect that takes no
   orders or was ordered already; the effect completes after its last piece.

@@ -37,6 +37,71 @@ impl Palette {
             colors,
         })
     }
+
+    /// A palette file: a GIMP palette (`.gpl`: a `GIMP Palette` head, then `R G B name` lines, `#` comments) or a
+    /// hex list (`.hex`: one `#rrggbb` a line, `#` optional, `;` comments).
+    pub fn parse_file(text: &str) -> Result<Self, String> {
+        let mut lines = text.lines().map(str::trim).filter(|l| !l.is_empty());
+        let gimp = lines.clone().next() == Some("GIMP Palette");
+        let mut out = Self {
+            colors: Vec::new(),
+            names: Vec::new(),
+        };
+        if gimp {
+            lines.next();
+        }
+        for line in lines {
+            if gimp {
+                if line.starts_with('#') || line.contains(':') {
+                    continue;
+                }
+                let mut words = line.split_whitespace();
+                let mut channel = || -> Result<u8, String> {
+                    words.next().and_then(|w| w.parse().ok()).ok_or(format!(
+                        "palette: \"{line}\" is not R G B (0 to 255) and a name"
+                    ))
+                };
+                let c = Rgba(channel()?, channel()?, channel()?, 255);
+                out.colors.push(c);
+                out.names.push(words.collect::<Vec<_>>().join(" "));
+            } else {
+                if line.starts_with(';') {
+                    continue;
+                }
+                out.colors
+                    .push(hex(line).map_err(|e| format!("palette: one #rrggbb a line: {e}"))?);
+                out.names.push(String::new());
+            }
+        }
+        if out.colors.is_empty() {
+            return Err("palette: the file holds no colour".to_string());
+        }
+        Ok(out)
+    }
+
+    /// Ramps from base colours, each `steps` long: `name-1` (dark, cool) to `name-N` (light, warm).
+    pub fn ramps(bases: &[(String, Rgba)], steps: usize) -> Self {
+        let mut out = Self {
+            colors: Vec::new(),
+            names: Vec::new(),
+        };
+        for (name, base) in bases {
+            for (i, c) in crate::ramp::ramp(*base, steps).into_iter().enumerate() {
+                out.colors.push(c);
+                out.names.push(format!("{name}-{}", i + 1));
+            }
+        }
+        out
+    }
+
+    /// As a GIMP palette (`.gpl`) titled `title`, which [`Palette::parse_file`] reads back with its names.
+    pub fn gpl(&self, title: &str) -> String {
+        let mut out = format!("GIMP Palette\nName: {title}\n#\n");
+        for (c, name) in self.colors.iter().zip(&self.names) {
+            out.push_str(&format!("{:3} {:3} {:3}\t{name}\n", c.0, c.1, c.2));
+        }
+        out
+    }
 }
 
 /// How [`clean`] treats a picture.

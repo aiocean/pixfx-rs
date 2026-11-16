@@ -13,16 +13,16 @@ with each step's change measured as entropy.
 
 | Module | Holds |
 |---|---|
-| `spec` | `Spec` (`grid`, `parts`, `sheet_rows`), `Part`, `Row` (a moment: name, caption, text, its own frame count, a note per frame), `rules`; `FIGURE`, `PARTS`, `is_part` |
+| `spec` | `Spec` (`grid`, `parts`, `sheet_rows`), `Part`, `Row` (a moment: name, caption, text, its own frame count, a note per frame), `rules`; `FIGURE` (the duel's fighter at the ruler, `pixfx_draw::RULER`, in engine pixels), `PARTS`, `is_part` |
 | `template` | The sheet's `layout` (the PARTS row first), the cells' `labels`, `render` (on `pixfx_pixel::sheet`, labels by `pixfx_pose::captions`): the pixel grid (`MINOR`, `DARK` every `MAJOR`), no figure in the parts row, the figure scaled from a 96-pixel cell |
-| `prompt` | The prompt from a spec: figure as a guide only, transparent background, rows, notes, rules; with a grid or parts, `sheet_prompt` (whole squares in flat colour, a small shared palette, each part alone and whole, moments built from the parts) |
+| `prompt` | The prompt from a spec: figure as a guide only, transparent background, rows, notes, rules; with a grid or parts, `sheet_prompt` (whole squares in flat colour, a small shared palette, each part alone and whole, moments built from the parts); on a grid, the character's height, head, hand and eye in squares, so every object is drawn at its scale |
 | `openrouter` | `Tier`, `Request`, `body`, `data_url`, `parse_answer`; `ENDPOINT`, `KEY_VAR` |
 | `base64` | RFC 4648 encode and decode |
 | `extract` | Cells: on a grid sheet the template's columns scaled to the sheet and each row's top and bottom from the label lines (`grid_cells`), the grid known (`known_grid`); on an old sheet from the labels, the model's own pixel grid (`pixfx_pixel::frames`) and frames lined up on one origin (`pixfx_pixel::register`). The cell frames taken out, colour and light layers per pixel, parts named `parts-<name>`, frame diffs |
 | `matrix` | Every frame as a pixel matrix (`Px`: empty, colour or light, its exact value and a palette entry), the palettes the frames share (32 colour, 16 light, by `pixfx_pixel::reduce`), `paletted`, `to_json` (`matrix.json`) |
 | `tween` | Frames between the drawn ones of a row, made by moving their pixels: a coarse block motion, pixel pairs, a dense field each way, a growth front for pixels with no partner, gathered so no cell is left empty; unlike colours swap at a time of their own instead of mixing (`motion`, `between`, `tweens`) |
 | `entropy` | Each pixel as a symbol (empty or a brightness level), `change` (H(b given a), 0 to 1), `steps` along a row: the agent's gauge of timing |
-| `compare` | `effect_cell` (an effect frame's window round its origin, `ENGINE_CELL` engine pixels a cell, feet at `FEET`, averaged to the cell's size), `board` (sheet cells over effect frames) |
+| `compare` | `effect_cell` (an effect frame's window round its origin, `ENGINE_CELL` engine pixels a cell, feet at `FEET`, averaged to the cell's size), `board` (sheet cells over effect frames), `art_ruler` (the ruler in a cell's squares) |
 | `review` | The effect page (a player with in-betweens, then every frame's columns and the diffs), the gallery, `report` JSON, the file name of each column |
 
 `examples/` holds a script per step (`template`, `generate`, `extract`, `compare`, `gallery`), sharing
@@ -81,7 +81,9 @@ reference). No HTTP crate: `generate` runs `curl`, handing it the key on stdin.
 - The shields' specs are grid sheets at `cell: 64`; their earlier draws in `target/ref/shield_*/draw-*` were made
   from 96-pixel templates without a grid and no longer match the spec. Draw again before extracting.
 - A template cell covers 96 engine pixels whatever its resolution (`compare::ENGINE_CELL`): one art pixel of a
-  64 cell is 1.5 engine pixels.
+  64 cell is 1.5 engine pixels, so the 40-pixel fighter is 27 squares and its 7-pixel head 5 (`compare::art_ruler`).
+  Painter code sizes each object from the ruler, never by reading the sheet's squares as engine pixels. A `cell: 96`
+  grid draws a square per engine pixel but needs 1.5 times the sheet pixels a cell; it has not been drawn yet.
 - The sheet's entropy steps run higher than a clean effect's (glow and specks change every frame): compare the
   shape of the two rows of steps, not their size.
 - `extract` on an old sheet finds the cells from the labels the model redraws, not from the template's coordinates:

@@ -3,7 +3,7 @@
 //! own pixels: each blade row's edge colour, swept with the blade's angle (`pixfx_draw::sweep`, `Brush` turned by
 //! `Turn::Angle`), white at the blade and cooling along the sword's palette behind it. It fires the impact cue
 //! where the cut crosses `hitX`, `hitY`, overshoots, slows, and crumbles from the tip as the sword ring's swords do.
-//! Made here; no source, so no parity check; its golden hashes pin it.
+//! Made here; its golden hashes pin it.
 
 use core::f64::consts::PI;
 

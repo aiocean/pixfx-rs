@@ -1,0 +1,71 @@
+{
+  "id": "shadow/winter-ordeal-angles",
+  "name": "Winter ordeal: angles",
+  "look": "Winter ordeal, the winter shadow of heaven: a xianxia art where a cultivator turns winter into night: the whole night sky above the enemy cracks like a pane of black glass, and its pieces fall as black snow. Every flake is not ice but a small shard of the sky's own shadow, the colour of night, with only a thin cold violet-white edge where starlight catches it; caught in a palm it cuts and hurts. In the cracks of the sky an eye seems about to open. The snow screams as it falls, faster and denser. The mood is silent, cold and final: black on black, a few cold glints, no warm colour and no white snow at all.",
+  "subject": "black snow",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 6,
+  "parts": [
+    {
+      "name": "PANE",
+      "text": "the cracked pane of night sky with its closed eye, as MAIN of the winter ordeal, seen from several angles",
+      "pivot": "the centre of the pane",
+      "forms": [
+        "seen straight on from the front",
+        "seen from below, looking up at it from the enemy's feet",
+        "seen from three-quarters, turned to the left",
+        "seen edge-on from the side, a thin dark line with cracks",
+        "tilted forward, its lower edge nearer",
+        "seen from far above, a dark shape over the enemy"
+      ]
+    },
+    {
+      "name": "EYE",
+      "text": "the open eye of cracks, at several angles",
+      "pivot": "its centre",
+      "forms": [
+        "straight on, looking at us",
+        "looking down",
+        "looking down and to the left",
+        "looking down and to the right",
+        "seen from below, staring down at us",
+        "narrowed, angry"
+      ]
+    },
+    {
+      "name": "DRIFT",
+      "text": "the black snow lying on the ground round the enemy's feet alone: a low uneven drift of black flakes, a few cold glints on its top",
+      "forms": [
+        "a thin scatter of black flakes on the ground",
+        "a low drift, the full width",
+        "the drift melting into a flat pool of shadow",
+        "only a faint shadow stain and a few specks"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "name": "SPIN",
+      "caption": "a flake falls",
+      "text": "one black flake falls from the top of the cell to the bottom, spinning through the angles of the FLAKE row, with a faint short trail",
+      "frames": 6,
+      "notes": [
+        "near the top, flat",
+        "lower, turned a quarter",
+        "middle, edge-on",
+        "lower, turned the other way",
+        "near the bottom, a short streak",
+        "landing, breaking into three specks"
+      ]
+    }
+  ],
+  "rules": [
+    "The snow is black, the colour of night, with only a thin cold violet-white edge: never white snow, never a warm colour.",
+    "The figure is the enemy: the pane hangs above it, the eye looks down at it and the snow falls on it. Do not draw the figure.",
+    "Keep the colours of the second image's palette: no outline in black, no gradients wider than a few pixels."
+  ],
+  "figure": "46,48 50,48\n50,48 50,54\n50,54 46,54\n46,54 46,48\n48,54 48,72\n48,58 42,68\n48,58 54,68\n48,72 44,88\n48,72 52,88\n"
+}

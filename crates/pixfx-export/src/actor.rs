@@ -1,7 +1,6 @@
-//! The character a parity check plays an effect on (`--actor`): sprite frames read from PNGs, each standing with its
-//! feet (the middle of its bottom row) on the effect's origin, shown in turn for `every` render frames each. Both
-//! sides of the check see the same sprite on the same frame: the port through
-//! [`pixfx_core::render_frames_with_actor`], the reference script through the JSON [`Actors::to_json`] writes.
+//! The character an effect plays on in a script (`--actor`): sprite frames read from PNGs, each standing with its
+//! feet (the middle of its bottom row) on the effect's origin, shown in turn for `every` render frames each, for
+//! [`pixfx_core::render_frames_with_actor`].
 
 use std::path::Path;
 use std::sync::Arc;
@@ -46,30 +45,5 @@ impl Actors {
         let n = self.frames.len() as u64;
         let i = (k / self.every) % n.max(1);
         self.frames.get(i as usize).cloned()
-    }
-
-    /// What `tools/spritefusion-ref.mjs --actor` reads: `{"every": n, "frames": [{x, y, w, h, data: [word, ...]}]}`,
-    /// each word an ABGR colour.
-    pub fn to_json(&self) -> String {
-        let frames: Vec<String> = self
-            .frames
-            .iter()
-            .map(|a| {
-                let data: Vec<String> = a.pixels().iter().map(u32::to_string).collect();
-                format!(
-                    r#"{{"x":{},"y":{},"w":{},"h":{},"data":[{}]}}"#,
-                    a.x(),
-                    a.y(),
-                    a.w(),
-                    a.h(),
-                    data.join(",")
-                )
-            })
-            .collect();
-        format!(
-            r#"{{"every":{},"frames":[{}]}}"#,
-            self.every,
-            frames.join(",")
-        )
     }
 }

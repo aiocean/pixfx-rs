@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Parity and tests · pixfx docs</title>
-  <meta name="description" content="Two checks keep the pixels honest: parity compares ports with pixelfx itself, and the determinism test pins native and wasm builds to one set of frame hashes.">
+  <title>Tests · pixfx docs</title>
+  <meta name="description" content="The determinism test pins native and wasm builds to one set of frame hashes, and each crate and package tests itself.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
@@ -23,39 +23,8 @@
   <div class="docs-shell">
     <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
     <main class="doc">
-<h1>Parity and tests</h1>
-<p class="lead">Two checks keep the pixels honest: parity compares ports with pixelfx itself, and the determinism test pins native and wasm builds to one set of frame hashes.</p>
-
-<h2>Parity against pixelfx</h2>
-<p>Parity renders an effect with pixelfx (under Node) and with its pixfx port, then compares every pixel of every frame of both layers. It needs Node and a pixelfx checkout:</p>
-<pre><code>git clone https://github.com/patch-gg/pixelfx /tmp/pixelfx
-git -C /tmp/pixelfx checkout 044e12a
-cargo run -p pixfx-export --example parity -- fire/candle --pixelfx /tmp/pixelfx --out target/parity</code></pre>
-<p>Output:</p>
-<pre><code>fire/candle: colour 0.00% differ, light 0.00% differ → PASS</code></pre>
-<ul>
-  <li>The gate: colour and light each differ on at most 0.5% of pixels. Exit code 0 is PASS, 1 is FAIL, 2 means the comparison could not run.</li>
-  <li><code>target/parity/&lt;id&gt;.side.gif</code> shows pixelfx on the left and pixfx on the right.</li>
-  <li>If the two renders differ in frame count or size, it says so on stderr.</li>
-  <li>Without <code>--pixelfx</code>, it uses <code>$PIXELFX</code>, then <code>./pixelfx</code>.</li>
-</ul>
-<p>The reference render comes from <code>tools/pixelfx-ref.mjs</code>, which runs pixelfx's own <code>renderFrames</code> with no backdrop and no stand-in actor, at the effect's default options, edge fade applied.</p>
-
-<h3>Current results</h3>
-<p>Against pixelfx commit <code>044e12a</code> (version 0.3.1). A later pixelfx may have changed an effect.</p>
-<div class="table-wrap">
-<table>
-  <thead><tr><th>Effect</th><th>Colour</th><th>Light</th><th>Result</th></tr></thead>
-  <tbody>
-    <tr><td><code>fire/candle</code></td><td>0 pixels</td><td>0 pixels</td><td>PASS</td></tr>
-    <tr><td><code>fire/campfire</code></td><td>0 pixels</td><td>0 pixels</td><td>PASS</td></tr>
-    <tr><td><code>fire/brazier</code></td><td>0 pixels</td><td>0 pixels</td><td>PASS</td></tr>
-  </tbody>
-</table>
-</div>
-
-<h3>The ledger</h3>
-<p>An effect that ships below the gate must be listed in <code>parity/LEDGER.md</code>, one line each: <code>&lt;id&gt; · &lt;date&gt; · colour x% light y% · approved by owner</code>, after the owner has approved it by eye. The ledger is empty.</p>
+<h1>Tests</h1>
+<p class="lead">The determinism test pins native and wasm builds to one set of frame hashes, and each crate and package tests itself.</p>
 
 <h2>Determinism</h2>
 <p>Frame hashes of each effect, for seeds 1, 2 and 7 and frames first, second, a quarter, middle and last, are checked against its own entry in <code>crates/pixfx-effects/tests/goldens/frame_hashes.json</code>, natively and in wasm. A hash is FNV-1a 64 over every colour word then every light word. The test is ignored by default; built with one effect's feature it checks that effect alone.</p>
@@ -73,7 +42,7 @@ wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignor
   <tbody>
     <tr><td><code>crates/pixfx-core/tests</code></td><td>Painter, instances and time steps, compositing, simulation helpers.</td></tr>
     <tr><td><code>crates/pixfx-effects/tests/fire.rs</code></td><td>Fire effects' behaviour.</td></tr>
-    <tr><td><code>crates/pixfx-export/tests</code></td><td>Sheets, bakes, the parity comparison and its options.</td></tr>
+    <tr><td><code>crates/pixfx-export/tests</code></td><td>Sheets, clips, boards and videos.</td></tr>
     <tr><td><code>crates/pixfx-wasm/tests/web.rs</code></td><td>The JS bindings, under <code>wasm-pack test --node</code>.</td></tr>
     <tr><td><code>crates/pixfx-scene/tests</code></td><td>The scene's decisions: placement, shared frames, the frame budget, the view, hit-stop.</td></tr>
     <tr><td><code>packages/pixfx-web/tests</code></td><td>The JS runtime under <code>bun test</code> against the real wasm, including frames painted on workers against frames painted on the spot.</td></tr>

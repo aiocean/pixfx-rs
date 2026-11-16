@@ -85,6 +85,8 @@ const TABLE = {
   "feedback/power-up": { role: "buff", impact: 0.32, power: 16, spell: "ward" },
   // the ring marks the caster as it gathers, and stays on it through the blow
   "feedback/outline": { role: "buff", impact: 0.3, power: 16, spell: "ward" },
+  // the star bursts on frame 7 of 70 ms (feedback/heal_sparkle.rs STEP)
+  "feedback/heal-sparkle": { role: "buff", impact: 0.49, power: 16, spell: "ward" },
   "arcane/rune-circle": { role: "ground-self", power: 18, spell: "void", distance: 40 },
   "nature/poison-cloud": { role: "ground-foe", life: 2.4, power: 8, spell: "frostfire", mark: "defDown" },
   // frostfire: a pale fire lit under the foe that burns and slows it (duel.js SPELLS.frostfire)
@@ -95,6 +97,19 @@ const TABLE = {
   "impacts/parry": { role: "clash", spell: "slash" },
   "scifi/jetpack": { role: "flight", power: 11, spell: "dive", life: 1.4, carried: true },
   "spawn/poof": { role: "blink", power: 15, spell: "step" },
+  // the Free pack, Part 1: each bursts on the foe's chest about 0.3 s in (sheet frame 5 of 60 ms)
+  "arcane/vortex-ring": { role: "strike", at: "chest", impact: 0.3, power: 20, spell: "seal" },
+  "arcane/blade-pinwheel": { role: "strike", at: "chest", impact: 0.24, power: 18, spell: "slash" },
+  "arcane/comma-seal": { role: "strike", at: "chest", impact: 0.3, power: 18, spell: "seal" },
+  "arcane/comet-rings": { role: "strike", at: "chest", impact: 0.3, power: 18, spell: "seal" },
+  "arcane/shuriken-seal": { role: "strike", at: "chest", impact: 0.42, power: 18, spell: "slash" },
+  "arcane/twin-shuriken": { role: "strike", at: "chest", impact: 0.42, power: 18, spell: "slash" },
+  "impacts/star-converge": { role: "strike", at: "chest", impact: 0.54, power: 20, spell: "seal" },
+  "impacts/twin-converge": { role: "strike", at: "chest", impact: 0.54, power: 20, spell: "seal" },
+  "projectiles/drop-dart": { role: "strike", at: "chest", impact: 0.48, power: 16, spell: "bolt" },
+  "explosions/swirl-blast": { role: "strike", at: "chest", impact: 0.3, power: 22, spell: "seal" },
+  "explosions/puff-burst": { role: "strike", at: "ground", impact: 0.3, power: 18, spell: "seal" },
+  "spawn/swirl-portal": { role: "strike", at: "chest", impact: 0.3, power: 18, spell: "seal" },
   "fire/campfire": { role: "ambient", at: "side" },
   "fire/candle": { role: "ambient", at: "side" },
   "fire/brazier": { role: "ambient", at: "side" },

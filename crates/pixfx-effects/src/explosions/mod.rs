@@ -23,3 +23,15 @@ pub use implosion::IMPLOSION;
 pub use plasma_explosion::PLASMA_EXPLOSION;
 #[cfg(feature = "explosions-small-explosion")]
 pub use small_explosion::SMALL_EXPLOSION;
+
+#[cfg(feature = "explosions-swirl-blast")]
+mod swirl_blast;
+
+#[cfg(feature = "explosions-swirl-blast")]
+pub use swirl_blast::SWIRL_BLAST;
+
+#[cfg(feature = "explosions-puff-burst")]
+mod puff_burst;
+
+#[cfg(feature = "explosions-puff-burst")]
+pub use puff_burst::PUFF_BURST;

@@ -55,10 +55,29 @@ const PILLOW_DIR: f64 = 0.25;
 /// Frames: painted-cell count may differ from the average by this share; the bottom row may move this many rows.
 const VOLUME_DRIFT: f64 = 0.22;
 const GROUND_DRIFT: u32 = 2;
+/// Stray: at least this many of a cell's eight neighbours are empty, so it sits outside the shape.
+const STRAY_EMPTY: usize = 5;
+/// Doubled corner: an L whose two arms both run this many cells is a box corner, drawn on purpose.
+const CORNER_ARM: u32 = 2;
+/// Jagged line: the middle run is shorter than both runs beside it by at least this many cells.
+const JAG_STEP: u32 = 2;
+/// Banding: a one-cell band between a darker and a lighter colour, at least this many cells long.
+const BAND: u32 = 4;
 
 const N4: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+const N8: [(i64, i64); 8] = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+];
 
-/// The picture's checks: colours, alpha, orphans, noise, outline, jaggies and pillow shading.
+/// The picture's checks: colours, alpha, orphans and strays, noise, outline, jaggies, pillow shading, and the craft
+/// of one-cell lines and shading bands (doubled corners, jagged lines, banding).
 pub fn critique(img: &RgbaImage, intended: &[(u32, u32)]) -> Report {
     let pic = Pic::new(img);
     let mut issues = Vec::new();
@@ -81,6 +100,10 @@ pub fn critique(img: &RgbaImage, intended: &[(u32, u32)]) -> Report {
     issues.extend(weak_outline(&pic));
     issues.extend(jaggies(&pic));
     issues.extend(pillow_shading(&pic));
+    issues.extend(stray(&pic, intended));
+    issues.extend(doubled_corner(&pic, intended));
+    issues.extend(jagged_line(&pic));
+    issues.extend(banding(&pic));
     report(issues)
 }
 
@@ -596,6 +619,360 @@ fn correlation(pts: &[(f64, f64, f64)], f: impl Fn(&(f64, f64, f64)) -> f64) -> 
     } else {
         cov / libm::sqrt(va * vb)
     }
+}
+
+// The craft of lines and bands, after klad's pixel check (tools/klad, crates/core/src/pixelcheck.rs).
+
+type Cell = (i64, i64);
+
+/// The cells round `c` (of its eight) that hold colour `k`.
+fn same8(pic: &Pic, c: Cell, k: u32) -> Vec<Cell> {
+    N8.iter()
+        .map(|(dx, dy)| (c.0 + dx, c.1 + dy))
+        .filter(|n| pic.at(n.0, n.1) == Some(k))
+        .collect()
+}
+
+/// How many cells of colour `k` follow `c` in direction `d`.
+fn arm(pic: &Pic, c: Cell, d: Cell, k: u32) -> u32 {
+    let most = i64::from(pic.w.max(pic.h));
+    (1..=most)
+        .take_while(|n| pic.at(c.0 + d.0 * n, c.1 + d.1 * n) == Some(k))
+        .count() as u32
+}
+
+fn meant_set(intended: &[(u32, u32)]) -> BTreeSet<(u32, u32)> {
+    intended.iter().copied().collect()
+}
+
+/// Single cells sticking out of the shape: no neighbour of their colour, and most neighbours empty. A cell inside the
+/// shape with no neighbour of its colour is `orphan`'s.
+fn stray(pic: &Pic, intended: &[(u32, u32)]) -> Vec<Issue> {
+    let meant = meant_set(intended);
+    let cells: Vec<(u32, u32)> = pic
+        .cells()
+        .filter(|&(x, y, k)| {
+            let c = (i64::from(x), i64::from(y));
+            let empty = N8
+                .iter()
+                .filter(|(dx, dy)| pic.at(c.0 + dx, c.1 + dy).is_none())
+                .count();
+            let painted4 = N4
+                .iter()
+                .filter(|(dx, dy)| pic.at(c.0 + dx, c.1 + dy).is_some())
+                .count();
+            !meant.contains(&(x, y))
+                && same8(pic, c, k).is_empty()
+                && empty >= STRAY_EMPTY
+                && painted4 < 3
+        })
+        .map(|(x, y, _)| (x, y))
+        .collect();
+    if cells.is_empty() {
+        return Vec::new();
+    }
+    vec![Issue {
+        check: "stray",
+        severity: Severity::Warning,
+        message: format!(
+            "{} single cells stick out of the shape with no neighbour of their colour: {}",
+            cells.len(),
+            list(&cells)
+        ),
+        fix: "remove each, or join it to the shape it belongs to; list the meant ones (a spark, a blade's tip) in --intended"
+            .into(),
+        cells: capped(cells),
+    }]
+}
+
+/// `c` as the corner of an L: its two same-colour side neighbours at right angles, the cell between them not of its
+/// colour, and not a box corner (both arms run `CORNER_ARM` or more). The two arm cells when it is.
+fn elbow(pic: &Pic, c: Cell, k: u32) -> Option<[Cell; 2]> {
+    let arms: Vec<Cell> = N4
+        .iter()
+        .filter(|(dx, dy)| pic.at(c.0 + dx, c.1 + dy) == Some(k))
+        .copied()
+        .collect();
+    let [a, b] = arms.as_slice() else {
+        return None;
+    };
+    let square = a.0 * b.0 + a.1 * b.1 == 0;
+    let inside = pic.at(c.0 + a.0 + b.0, c.1 + a.1 + b.1) == Some(k);
+    let boxed = arm(pic, c, *a, k) >= CORNER_ARM && arm(pic, c, *b, k) >= CORNER_ARM;
+    (square && !inside && !boxed).then_some([(c.0 + a.0, c.1 + a.1), (c.0 + b.0, c.1 + b.1)])
+}
+
+/// Whether a neighbour of another colour is darker than `k`: the L is where two shades meet, not a drawn line.
+fn darker_beside(pic: &Pic, c: Cell, k: u32) -> bool {
+    let own = lab(rgba(k)).l;
+    N8.iter()
+        .filter_map(|(dx, dy)| pic.at(c.0 + dx, c.1 + dy))
+        .filter(|&o| o != k)
+        .any(|o| lab(rgba(o)).l < own)
+}
+
+/// An L in a one-cell line: the corner cell touches both its neighbours, so the line reads thick there.
+fn doubled_corner(pic: &Pic, intended: &[(u32, u32)]) -> Vec<Issue> {
+    let meant = meant_set(intended);
+    let mut cells = Vec::new();
+    let mut shading = 0usize;
+    for (x, y, k) in pic.cells() {
+        let c = (i64::from(x), i64::from(y));
+        let Some(arms) = elbow(pic, c, k) else {
+            continue;
+        };
+        let thin = same8(pic, c, k).len() <= 3;
+        let alone = arms.iter().all(|a| elbow(pic, *a, k).is_none());
+        let goes_on = arms.iter().any(|a| {
+            same8(pic, *a, k)
+                .iter()
+                .any(|n| *n != c && !arms.contains(n))
+        });
+        if !(thin && alone && goes_on) || meant.contains(&(x, y)) {
+            continue;
+        }
+        if darker_beside(pic, c, k) {
+            shading += 1;
+        } else {
+            cells.push((x, y));
+        }
+    }
+    if cells.is_empty() {
+        return Vec::new();
+    }
+    let left_out = match shading {
+        0 => String::new(),
+        n => format!("; {n} more where two shades meet are left out"),
+    };
+    vec![Issue {
+        check: "doubled_corner",
+        severity: Severity::Warning,
+        message: format!(
+            "{} corners where a one-cell line turns in an L and reads thick: {}{left_out}",
+            cells.len(),
+            list(&cells)
+        ),
+        fix: "remove each listed corner cell, so each cell of the line touches the next at a side or a corner, never both"
+            .into(),
+        cells: capped(cells),
+    }]
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Lie {
+    Across,
+    Down,
+    Dot,
+}
+
+/// A straight run of a one-cell line.
+#[derive(Clone, Copy, Debug)]
+struct Stretch {
+    lie: Lie,
+    first: Cell,
+    last: Cell,
+    length: u32,
+}
+
+/// The one-cell lines of colour `k`, each as its cells in order: thin cells (two or fewer neighbours of the colour)
+/// walked from an end, the nearest unwalked neighbour first.
+fn chains(pic: &Pic, k: u32, cells: &[Cell]) -> Vec<Vec<Cell>> {
+    let thin: BTreeSet<Cell> = cells
+        .iter()
+        .filter(|c| same8(pic, **c, k).len() <= 2)
+        .copied()
+        .collect();
+    let next_of = |c: Cell, seen: &BTreeSet<Cell>| -> Option<Cell> {
+        N8.iter()
+            .map(|(dx, dy)| (c.0 + dx, c.1 + dy))
+            .filter(|n| thin.contains(n) && !seen.contains(n))
+            .min_by_key(|n| ((n.0 - c.0).abs() + (n.1 - c.1).abs(), n.1, n.0))
+    };
+    let ends: Vec<Cell> = thin
+        .iter()
+        .filter(|c| {
+            N8.iter()
+                .filter(|(dx, dy)| thin.contains(&(c.0 + dx, c.1 + dy)))
+                .count()
+                <= 1
+        })
+        .copied()
+        .collect();
+    let mut seen = BTreeSet::new();
+    let mut made = Vec::new();
+    for start in ends.iter().chain(thin.iter()) {
+        if !seen.insert(*start) {
+            continue;
+        }
+        let mut chain = vec![*start];
+        let mut at = *start;
+        while let Some(next) = next_of(at, &seen) {
+            seen.insert(next);
+            chain.push(next);
+            at = next;
+        }
+        made.push(chain);
+    }
+    made
+}
+
+/// A line's cells as its straight runs.
+fn stretches(chain: &[Cell]) -> Vec<Stretch> {
+    let mut made: Vec<Stretch> = Vec::new();
+    for &c in chain {
+        let joins = made.last().and_then(|run| {
+            let (dx, dy) = ((c.0 - run.last.0).abs(), (c.1 - run.last.1).abs());
+            match (run.lie, dx, dy) {
+                (Lie::Dot | Lie::Across, 1, 0) => Some(Lie::Across),
+                (Lie::Dot | Lie::Down, 0, 1) => Some(Lie::Down),
+                _ => None,
+            }
+        });
+        match (joins, made.last_mut()) {
+            (Some(lie), Some(run)) => {
+                run.lie = lie;
+                run.last = c;
+                run.length += 1;
+            }
+            _ => made.push(Stretch {
+                lie: Lie::Dot,
+                first: c,
+                last: c,
+                length: 1,
+            }),
+        }
+    }
+    made
+}
+
+/// Whether the middle of three runs breaks the line's rhythm: all three lie the same way and step the same way, and
+/// the middle is shorter than both others by `JAG_STEP` or more (4, 1, 4).
+fn breaks_rhythm(a: &Stretch, b: &Stretch, c: &Stretch) -> bool {
+    let lies = a.lie == c.lie && a.lie != Lie::Dot && (b.lie == a.lie || b.lie == Lie::Dot);
+    let along = |run: &Stretch| match a.lie {
+        Lie::Down => (run.last.1 - run.first.1).signum(),
+        _ => (run.last.0 - run.first.0).signum(),
+    };
+    let aside = |from: &Stretch, to: &Stretch| match a.lie {
+        Lie::Down => (to.first.0 - from.last.0).signum(),
+        _ => (to.first.1 - from.last.1).signum(),
+    };
+    let onward = along(a) == along(c) && (b.length == 1 || along(b) == along(a));
+    let one_way = aside(a, b) == aside(b, c) && aside(a, b) != 0;
+    lies && onward && one_way && b.length + JAG_STEP <= a.length && b.length + JAG_STEP <= c.length
+}
+
+/// A short run between two longer ones in a one-cell line: a step where the eye expects a sweep.
+fn jagged_line(pic: &Pic) -> Vec<Issue> {
+    let mut by_key: BTreeMap<u32, Vec<Cell>> = BTreeMap::new();
+    for (x, y, k) in pic.cells() {
+        by_key
+            .entry(k)
+            .or_default()
+            .push((i64::from(x), i64::from(y)));
+    }
+    let mut cells = Vec::new();
+    let mut runs = Vec::new();
+    for (&k, own) in &by_key {
+        for chain in chains(pic, k, own) {
+            let line = stretches(&chain);
+            for w in line.windows(3) {
+                if let [a, b, c] = w
+                    && breaks_rhythm(a, b, c)
+                {
+                    let at = (
+                        b.first.0.min(b.last.0) as u32,
+                        b.first.1.min(b.last.1) as u32,
+                    );
+                    cells.push(at);
+                    runs.push(format!(
+                        "{} between {} and {} at {},{}",
+                        b.length, a.length, c.length, at.0, at.1
+                    ));
+                }
+            }
+        }
+    }
+    if cells.is_empty() {
+        return Vec::new();
+    }
+    vec![Issue {
+        check: "jagged_line",
+        severity: Severity::Note,
+        message: format!(
+            "{} short runs break their line's rhythm (run lengths: {})",
+            cells.len(),
+            runs.iter().take(MAX_CELLS).cloned().collect::<Vec<_>>().join("; ")
+        ),
+        fix: "even out the run lengths: a straight line repeats one run (2,2,2), a curve grows and shrinks them (1,2,3,3,2,1)"
+            .into(),
+        cells: capped(cells),
+    }]
+}
+
+/// A one-cell band, lighter than one side and darker than the other, that follows the edge beside it for `BAND`
+/// cells or more: it reads as a contour line, not as a form.
+fn banding(pic: &Pic) -> Vec<Issue> {
+    let light = |k: u32| lab(rgba(k)).l;
+    let sides = |c: Cell, down: bool| -> Option<(u32, u32, u32)> {
+        let (before, after) = match down {
+            true => ((c.0 - 1, c.1), (c.0 + 1, c.1)),
+            false => ((c.0, c.1 - 1), (c.0, c.1 + 1)),
+        };
+        let (a, b, z) = (
+            pic.at(before.0, before.1)?,
+            pic.at(c.0, c.1)?,
+            pic.at(after.0, after.1)?,
+        );
+        (a != b && b != z && a != z).then_some((a, b, z))
+    };
+    let between = |(a, b, z): (u32, u32, u32)| {
+        let (la, lb, lz) = (light(a), light(b), light(z));
+        (la < lb && lb < lz) || (la > lb && lb > lz)
+    };
+    let (w, h) = (i64::from(pic.w), i64::from(pic.h));
+    let mut cells = Vec::new();
+    let mut bands = Vec::new();
+    for down in [false, true] {
+        let (outer, inner) = if down { (w, h) } else { (h, w) };
+        for fixed in 0..outer {
+            let cell = |m: i64| if down { (fixed, m) } else { (m, fixed) };
+            let mut start = 0;
+            while start < inner {
+                let Some(first) = sides(cell(start), down) else {
+                    start += 1;
+                    continue;
+                };
+                let length = (start..inner)
+                    .take_while(|m| sides(cell(*m), down) == Some(first))
+                    .count() as i64;
+                if length >= i64::from(BAND) && between(first) {
+                    let (a, z) = (cell(start), cell(start + length - 1));
+                    bands.push(format!("{},{}..{},{}", a.0, a.1, z.0, z.1));
+                    cells.extend((start..start + length).map(|m| {
+                        let c = cell(m);
+                        (c.0 as u32, c.1 as u32)
+                    }));
+                }
+                start += length;
+            }
+        }
+    }
+    if bands.is_empty() {
+        return Vec::new();
+    }
+    vec![Issue {
+        check: "banding",
+        severity: Severity::Warning,
+        message: format!(
+            "{} one-cell bands between a darker and a lighter colour follow the edge beside them: {}",
+            bands.len(),
+            bands.join(" ")
+        ),
+        fix: "vary the band's width, let the two steps meet at an angle, or merge it into a neighbour; a rim light meant as a band can stay"
+            .into(),
+        cells: capped(cells),
+    }]
 }
 
 /// The lowest painted cell of a frame, leftmost on its row.

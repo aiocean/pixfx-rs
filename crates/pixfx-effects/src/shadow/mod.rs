@@ -2,6 +2,8 @@
 
 pub mod lib;
 
+#[cfg(feature = "shadow-blood-gush")]
+mod blood_gush;
 #[cfg(feature = "shadow-blood-shield")]
 mod blood_shield;
 #[cfg(feature = "shadow-blood-shield")]
@@ -13,6 +15,8 @@ mod winter_ordeal;
 #[cfg(feature = "shadow-winter-ordeal")]
 mod winter_ordeal_sky;
 
+#[cfg(feature = "shadow-blood-gush")]
+pub use blood_gush::BLOOD_GUSH;
 #[cfg(feature = "shadow-blood-shield")]
 pub use blood_shield::BLOOD_SHIELD;
 #[cfg(feature = "shadow-void-orb")]

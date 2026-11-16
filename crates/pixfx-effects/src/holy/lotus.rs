@@ -1,7 +1,7 @@
 //! Lotus: a lotus throne barrier of pink-white petals of light that close round the character into a tall bud
 //! (cultivation fantasy). Made here, drawn after the parts an image model drew for it on a pixel grid
 //! (`target/ref/spike_lotus-layers`): the petal's lens shape, its outline, white rim and tones, the bud's five
-//! petals, the scalloped pad, the specks and the warm light inside. It has no source, so no parity check; its golden
+//! petals, the scalloped pad, the specks and the warm light inside. Its golden
 //! hashes pin it.
 //!
 //! A pad opens under the feet and five petals rise from it and fold into a bud; it breathes with specks rising

@@ -1,7 +1,7 @@
 //! Held sword: one spirit sword hanging still, pointing along +x, glinting as it takes aim: what stands where a
 //! sword of `arcane/sword-formation` was while it waits its turn to leave (the volley's `held` piece), turned by
 //! the scene from the way it pointed in the ring to the way it will fly. Drawn exactly as the ring draws a sword, so
-//! the handover shows no seam. Made here; no source, so no parity check; its golden hashes pin it.
+//! the handover shows no seam. Made here; its golden hashes pin it.
 
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
 use pixfx_draw::Painter;

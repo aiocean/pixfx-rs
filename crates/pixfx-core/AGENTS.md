@@ -11,8 +11,9 @@ The effect model and game feel, painted with `pixfx-draw`:
   (`render_frames`, `edge_fade`), `player` (`Player`: one effect on its own canvas), `key` (`ClipKey`, `FrameId`),
   `frames` (`FrameStore`, `FRAME_BUDGET`), `state` (`Creature`), `light_color` (the colour an effect lights its
   surroundings in).
-- Orders: `volley` (`Order` with the caster's body, `Aim`, `Launch`, `Path`, `Tail`, and `Volley::aim`, which plans
-  like pieces toward a point: converge or pierce, each held first, flying on past the point, with a tail). An effect
+- Orders: `volley` (`Order` with the caster's body, `Aim`, `Launch`, `Tail`, and `Volley::aim`, which plans
+  like pieces toward a point along a `pixfx_draw::path::Path`: converge, pierce, or orbit (round the point
+  `orbit_turns` times on a ring, then in), each held first, flying on past the point, with a tail). An effect
   answers `Effect::order`; `pixfx-scene` flies what it returns and strikes it on bodies. `Effect::loop_from`
   lets a loop open once and then repeat only what follows.
 - Motion: `trace` (`Trace`, `TracePoint` with its angle, `steps`) and `motion` (`at`, `velocity`, `speed`,
@@ -55,7 +56,6 @@ The effect model and game feel, painted with `pixfx-draw`:
   Randomness is seeded and passed in.
 - A hit-stop is `dt = 0`: nothing may advance and no velocity may spike from dividing by it.
 - Float maths through `libm` (`clippy.toml`); rounding through `pixfx_draw::math::js_round`.
-- Effects are ports of pixelfx with JS number semantics. "Simplifying" maths here breaks parity.
 
 ## Before you finish
 

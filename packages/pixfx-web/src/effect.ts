@@ -17,9 +17,10 @@ export interface FollowTarget {
 
 /**
  * How an ordered volley flies toward its point: every piece curving onto the line through it and bursting on the
- * first body it meets, or straight at it and on through every body.
+ * first body it meets (converge), straight at it and on through every body (pierce), or round it on a ring first
+ * and then in as converge (orbit).
  */
-export type Aim = "converge" | "pierce";
+export type Aim = "converge" | "pierce" | "orbit";
 
 /**
  * Where one piece of an ordered volley struck, in world pixels: `index` counts the volley's pieces from 0, `body` is

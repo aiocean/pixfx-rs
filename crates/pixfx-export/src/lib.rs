@@ -1,18 +1,20 @@
 //! pixfx export: a rendered effect as sprite sheets plus beanfx's Aseprite-style JSON ([`write_sheet`]), as
-//! a gif ([`write_gif`]), a video through ffmpeg ([`write_video`]), or as a rendered clip for hosts to play without drawing ([`render_clip`], [`write_clip`], [`decode`]). Layout and JSON values are pure functions ([`Grid`], [`beanfx_json`]); only
+//! a gif ([`write_gif`]), a still beside the character for checking scale ([`board`], the character read by [`Actors`]), a video through ffmpeg ([`write_video`]), or as a rendered clip for hosts to play without drawing ([`render_clip`], [`write_clip`], [`decode`]). Layout and JSON values are pure functions ([`Grid`], [`beanfx_json`]); only
 //! the `write_*` functions touch files.
 #![forbid(unsafe_code)]
 
+mod actor;
 pub mod clip;
+pub mod board;
 mod gif;
 mod json;
-pub mod parity;
 mod sheet;
 mod video;
 
 use std::fmt;
 use std::io;
 
+pub use actor::Actors;
 pub use clip::{decode, render_clip, write_clip};
 pub use gif::write_gif;
 pub use json::{FileNames, beanfx_json};

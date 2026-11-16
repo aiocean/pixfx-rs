@@ -47,6 +47,29 @@ draw only inside the cells, with the {} the same size and in the same place in e
     )
 }
 
+/// The ruler in grid squares (`compare::art_ruler`): how big the character the effect plays on is, so every
+/// object is drawn at its size beside that character, part for part.
+fn scale(cell: u32) -> String {
+    let r = crate::compare::art_ruler(cell);
+    let squares = |n: u32| {
+        if n == 1 {
+            "1 square".to_string()
+        } else {
+            format!("{n} squares")
+        }
+    };
+    format!(
+        " The character this effect plays on is {} tall on this grid: its head is {} wide, its hand {} and its eye \
+{}. Draw everything at that scale, as big as it would be beside that character (a lens as wide as the eye, a sword \
+as long as {}), and nothing smaller than one square.",
+        squares(r.height),
+        squares(r.head),
+        squares(r.hand),
+        squares(r.eye.0),
+        squares(r.blade)
+    )
+}
+
 /// The prompt for a sheet with a pixel grid, parts, or both: the grid first (whole squares, one flat colour each, a
 /// small shared palette, lines not drawn), the effect, the parts each alone (`- PARTS 1, MAIN: <text>.`), then the
 /// moments round the figure, built from the parts.
@@ -57,7 +80,8 @@ pub fn sheet_prompt(spec: &Spec) -> String {
             " Every cell is a grid of {n} by {n} squares: each square is one pixel of the art. Draw pixel art on that \
 grid: fill whole squares with one flat colour each, never part of a square, never a colour blended across squares. Use \
 a small palette of about 8 colours plus 4 glow colours, the same palette in every cell. The grid lines are a guide \
-only: do not draw them, and leave every square you do not fill transparent."
+only: do not draw them, and leave every square you do not fill transparent.{}",
+            scale(n)
         )
     } else {
         String::new()

@@ -11,10 +11,14 @@ Pixels and nothing else: `Frame` with a colour layer and an additive light layer
 mover's cross-section: `column` for a thin mover, `edge` for a broad body's back edge, `from_column` for a turning
 blade), `color` (`Rgba`,
 `hex`), `palette` presets, `RgbaImage` (plain RGBA bytes: a sprite leaving the engine or a picture
-coming in), and the JS-number maths in `math` (`js_round`, `js_max`, `js_min`, `clamp`). Every other crate paints through it.
-`growth` grows branching trees for veins, lightning, cracks and roots: `dbm` (dielectric breakdown) and `colonize`
-(space colonization), `Tree::path` for a path you set, `murray` for fork angles, and `radii` with `stroke` for
-tapered, shaded strokes. Every setting is a field.
+coming in), the JS-number maths in `math` (`js_round`, `js_max`, `js_min`, `clamp`), and `ruler` (`Ruler`: a
+character's measurements in pixels; `RULER`: the duel's fighter, the scale every sprite, effect and reference sheet
+is drawn to, here so every crate reaches it; `Ruler::size` sizes a thing against a body part). Every other crate
+paints through it. `growth` grows branching trees for veins, lightning, cracks and roots: `dbm` (dielectric breakdown)
+and `colonize` (space colonization), `Tree::path` for a path you set, `murray` for fork angles, and `radii` with
+`stroke` for tapered, shaded strokes. Every setting is a field. `path` (`Path`): a way from one place to another
+made of lines, quadratic curves and turns round a centre (circle arcs, spirals), read by pixels along it (`at`,
+`heading`, `points`): a volley's flight (`pixfx_core::volley`) and growth laid round a ring (`Tree::path`).
 
 ## Belongs here
 

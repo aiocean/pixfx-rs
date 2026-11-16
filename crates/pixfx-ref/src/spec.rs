@@ -3,19 +3,22 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The stick figure every moment cell holds, a guide to where a character stands and how tall it is: 40 sprite pixels
-/// from the top of the head (48) to the feet (88) of a 96-pixel cell, the size of the duel's fighters. In
-/// `pixfx_pixel::sheet::parse_bones` form, in a 96-pixel cell's coordinates: a cell of another size scales it.
+/// The stick figure every moment cell holds, a guide to where a character stands and how tall it is: the duel's
+/// fighter standing (`pixfx_draw::RULER`) in engine pixels, its soles on the feet row
+/// ([`crate::compare::FEET`], 88) of a 96-pixel cell, centred across. The head is a box as wide as the face (7) from
+/// the crown (51) to the chin (64), the body as tall as the painted fighter (38 rows, crown to soles); the hand
+/// ends where the fighter's hangs. In `pixfx_pixel::sheet::parse_bones` form, in a 96-pixel cell's coordinates: a
+/// cell of another size scales it.
 pub const FIGURE: &str = "\
-46,48 50,48
-50,48 50,54
-50,54 46,54
-46,54 46,48
-48,54 48,72
-48,58 42,68
-48,58 54,68
-48,72 44,88
-48,72 52,88
+45,51 51,51
+51,51 51,64
+51,64 45,64
+45,64 45,51
+48,64 48,79
+48,66 43,74
+48,66 53,74
+48,79 45,88
+48,79 51,88
 ";
 
 /// One row of the sheet: a moment of the effect, shown in `frames` cells left to right.

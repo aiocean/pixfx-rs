@@ -15,7 +15,7 @@
 //! moved. It draws on the back layer, behind a character.
 //!
 //! With no trace handed over (its gif, sheet or page) it draws the trail of a mover flying straight along +x at
-//! 200 pixels a second. Made here; no source, so no parity check; its golden hashes pin it.
+//! 200 pixels a second. Made here; its golden hashes pin it.
 
 use std::sync::Arc;
 

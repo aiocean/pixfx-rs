@@ -1,7 +1,7 @@
 //! Bagua mirror burst: where the thrown bagua mirror lands it explodes. A white flash, a jade shock ring in the
 //! mirror's octagon racing out, the eight trigrams thrown out from the middle each spinning away, bronze shards and
 //! jade sparks falling, and a last glow. It fires a heavy impact cue. Made here from `pixfx-ref`'s
-//! `examples/specs/shield/bagua-mirror.json` sheets; no source, so no parity check; its golden hashes pin it.
+//! `examples/specs/shield/bagua-mirror.json` sheets; its golden hashes pin it.
 
 use core::f64::consts::{FRAC_PI_4, PI, TAU};
 

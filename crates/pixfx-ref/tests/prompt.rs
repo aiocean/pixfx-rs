@@ -34,6 +34,17 @@ fn frame_notes_rules_and_a_row_frame_count_reach_the_prompt() -> Result<(), Stri
 }
 
 #[test]
+fn a_grid_of_96_squares_draws_the_ruler_engine_pixel_for_engine_pixel() -> Result<(), String> {
+    let p =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/specs/shield/lotus.json");
+    let mut s = Spec::parse(&std::fs::read_to_string(p).map_err(|e| e.to_string())?)?;
+    s.cell = 96;
+    let p = prompt(&s);
+    assert!(p.contains("plays on is 40 squares tall on this grid: its head is 7 squares wide, its hand 2 squares and its eye 1 square."));
+    Ok(())
+}
+
+#[test]
 fn a_grid_and_parts_ask_for_whole_squares_and_each_part_alone() -> Result<(), String> {
     let p =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/specs/shield/lotus.json");
@@ -41,6 +52,9 @@ fn a_grid_and_parts_ask_for_whole_squares_and_each_part_alone() -> Result<(), St
     let p = prompt(&s);
     assert!(p.contains("Every cell is a grid of 64 by 64 squares"));
     assert!(p.contains("fill whole squares with one flat colour each"));
+    // the duel's ruler at 64 squares for 96 engine pixels: the 40-pixel fighter is 27 squares, its 7-pixel head 5
+    assert!(p.contains("The character this effect plays on is 27 squares tall on this grid: its head is 5 squares wide, its hand 1 square and its eye 1 square."));
+    assert!(p.contains("a sword as long as 11 squares"));
     assert!(p.contains("- PARTS 1, MAIN: the closed bud alone, every petal in place, with no glow, no specks and no pad; mark the centre of its base with one pure green (#00ff00) square.\n- PARTS 2, PETAL:"));
     assert!(p.contains("mark its base with one pure green (#00ff00) square, in every form."));
     assert!(p.contains("- the PETAL row: the same petal in 6 forms"));

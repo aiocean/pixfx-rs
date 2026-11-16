@@ -1,7 +1,7 @@
 //! `explosions/body-burst`: the character it wraps blows apart into a handful of big chunks of its own sprite, flung
 //! out from the body's middle. Each chunk cracks into smaller ones after a moment or when it hits the floor, and those
 //! crack again, down to single pixels that bounce and heap up as dust on the floor; then the heap crumbles away. A fast
-//! chunk smears its back edge behind it (`pixfx_draw::sweep`): it flies upright, so the smear stands upright too. Made here, not ported: no source to check parity against; its golden
+//! chunk smears its back edge behind it (`pixfx_draw::sweep`): it flies upright, so the smear stands upright too. Made here, not ported; its golden
 //! hashes pin it.
 //!
 //! It wraps its actor ([`Effect::wraps_actor`]) and destroys it ([`Effect::replaces_actor`]): it draws the body

@@ -44,8 +44,8 @@ Rust decides, a shell draws. Dependencies point down this table only.
 | JS binding | `crates/pixfx-wasm` | wasm-bindgen translation only |
 | Scene | `crates/pixfx-scene` | what plays where, layers, which frame shows, shared frames |
 | Engine | `pixfx-core`, `pixfx-effects`, `pixfx-light`, `pixfx-fighter`, `pixfx-body` | effects, particles, cues, `Feel`, bodies. Pure: no clock, no I/O |
-| Drawing | `crates/pixfx-draw` | frames (colour + additive light), painter, palette |
-| Agent tools | `pixfx-pixel`, `pixfx-pose` | read pictures for an agent; never painted from |
+| Drawing | `crates/pixfx-draw` | frames (colour + additive light), painter, palette, `Ruler` |
+| Agent tools | `pixfx-pixel`, `pixfx-pose`, `pixfx-ref` | read pictures for an agent; never painted from |
 
 - A new output (a file, a video, a report): logic in the library crate that owns it, plus a short script in that
   crate's `examples/` (shared helpers only in that crate's `examples/common/mod.rs`). Never a CLI or binary crate.
@@ -54,9 +54,47 @@ Rust decides, a shell draws. Dependencies point down this table only.
   `Scene::order` flies it and strikes it on the bodies the game declares; every shell gets it through `attack` and
   `setBody` / `FxScene::order` and `set_body`. Never a canvas sized to the distance.
 - Veins, lightning, cracks, roots: a branching tree from `pixfx_draw::growth` (`dbm`, `colonize_from` off a `Tree::path` you set, `murray` fork angles, `radii` + `stroke` for tapered tubes; `shadow/blood_shield.rs` is the worked example)
+- A way to follow (a loop before the target, a ring, a spiral; growth laid along it): `pixfx_draw::path::Path`,
+  read by pixels along it. Never a curve of an effect's own.
 - A streak or a trail: a brush swept along a path (`pixfx_draw::sweep`); how something moves: `pixfx_core::motion`
   read off its trace. Never a line or a velocity of an effect's own.
 - Each crate's `AGENTS.md` says what it holds and what it does not; read it before editing that crate.
+
+## One scale: the ruler
+
+Every sprite, effect and reference sheet in a game is drawn to one ruler: its character, measured in pixels. One
+pixel then means the same size on everything, so a thing drawn beside the character keeps the size it would have
+beside a real one: a lens is as wide as the eye, so glasses round a 1-pixel eye are 2 pixels of lens. The ruler
+is `pixfx_draw::RULER`, the duel's fighter, in the lowest layer so effects, fighters and tools all reach it;
+`crates/pixfx-fighter/tests/ruler.rs` measures the painted fighter against it:
+
+| Part | Pixels |
+|---|---|
+| Cell | 64 x 64, feet at (32, 60) |
+| Standing, outline included | 40 rows x 20 columns (38 painted, 1 of outline above and below) |
+| Head (face) | 7 x 7, about 5.4 heads to the body |
+| Eye, open | 1 x 2 |
+| Hand | 2 x 2 |
+| Arm or leg | 3 thick |
+| Blade | 16 |
+
+- Rust paints at one game pixel per pixel and a shell scales the whole picture by a whole number, so every sprite
+  and effect has the same pixel size. Never paint one thing at another pixel size (a "mixel"): no half-scale
+  sprite, no 2x2 blocks standing for one pixel.
+- Size a new thing against a body part, never in centimetres: name the part and the ratio (a lens as wide as the
+  eye, a hat brim 1.5 heads, a spear 1.5 blades), take `Ruler::size(part, ratio)` (rounded, never under 1 pixel), and
+  write the part and the ratio in a comment by the painter code. Pixel art enlarges small features (the eye is 1 of
+  the face's 7 columns), and measuring against the drawn parts enlarges a new thing by the same amount.
+- Anything under one pixel on the ruler is drawn at one pixel or left out, the same way everywhere.
+- An effect's canvas is as big as the effect needs (a beam 256 wide, a screen 320 x 180); the things in it keep the
+  ruler.
+- Every effect keeps the ruler.
+- Check it by eye: `scale_board` (skill `pixfx-render`) lays every effect's busiest frame on the fighter's sprite.
+- The tools take the ruler: `pixfx-pose`'s default figure, `pixfx-ref`'s guide figure and the sizes its prompt
+  asks for (`pixfx_ref::compare::art_ruler`), and `pixfx-pixel`'s `critique --standing` and
+  `--against PART*RATIO`.
+- A game with another character fills in its own `Ruler`, measured off its painted sprite, with a test like
+  `tests/ruler.rs` that keeps the two equal.
 
 ## Tests: each crate tests itself
 
@@ -78,7 +116,7 @@ gate, and keep every test: a slow loop is fixed by running less, not by deleting
 - No platform float maths in engine code (`clippy.toml` bans `f64::sin`, `sqrt`, `round`...): use `libm::*` and
   `pixfx_draw::math::js_round` and friends. Randomness only from the seed.
 - Determinism: same options and time give the same `frame_hash` natively and in wasm.
-- Parity: every effect matches its source (pixelfx, or a vendored Sprite Fusion file) within 0.5% of pixels.
+- Golden hashes: each effect's frames are pinned in `crates/pixfx-effects/tests/goldens/frame_hashes.json`.
 
 ## Several sessions share this tree
 

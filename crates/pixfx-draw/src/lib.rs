@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 pub mod blend;
+pub mod blob;
 pub mod color;
 pub mod frame;
 pub mod growth;
@@ -12,6 +13,7 @@ pub mod image;
 pub mod math;
 pub mod painter;
 pub mod palette;
+pub mod path;
 pub mod ruler;
 pub mod shapes;
 pub mod shatter;

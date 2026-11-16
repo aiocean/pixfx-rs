@@ -277,3 +277,151 @@ fn a_real_fighter_pose_has_no_error() -> Result<(), String> {
     );
     Ok(())
 }
+
+/// A sprite from rows of letters: `i` the ink (darkest), `a` `b` `c` greys from dark to light, `.` empty.
+fn rows(rows: &[&str]) -> RgbaImage {
+    let grid: Vec<Vec<char>> = rows.iter().map(|r| r.chars().collect()).collect();
+    let w = grid.first().map_or(0, Vec::len) as u32;
+    fill(w, grid.len() as u32, |x, y| {
+        let grey = |v: u8| Some([v, v, v, 255]);
+        match grid.get(y as usize).and_then(|r| r.get(x as usize)) {
+            Some('i') => grey(10),
+            Some('a') => grey(60),
+            Some('b') => grey(130),
+            Some('c') => grey(220),
+            _ => None,
+        }
+    })
+}
+
+fn cells_of(r: &Report, check: &str) -> Vec<(u32, u32)> {
+    of(r, check).iter().flat_map(|i| i.cells.clone()).collect()
+}
+
+#[test]
+fn a_cell_sticking_out_of_the_shape_is_stray_unless_meant() {
+    let img = rows(&["i....", ".bb..", ".bb.i", "....."]);
+    assert_eq!(
+        cells_of(&critique(&img, &[]), "stray"),
+        vec![(0, 0), (4, 2)]
+    );
+    assert_eq!(cells_of(&critique(&img, &[(4, 2)]), "stray"), vec![(0, 0)]);
+    let speck = rows(&["bbbbb", "bbibb", "bbbbb"]);
+    assert!(
+        of(&critique(&speck, &[]), "stray").is_empty(),
+        "a speck inside the shape is orphan's, not stray's"
+    );
+}
+
+#[test]
+fn an_l_in_a_one_cell_line_is_a_doubled_corner_but_a_box_corner_is_not() {
+    let corner = |r: &[&str]| cells_of(&critique(&rows(r), &[]), "doubled_corner");
+    assert_eq!(corner(&["i....", ".ii..", "..i..", "...i."]), vec![(2, 1)]);
+    assert!(corner(&["i....", ".i...", "..i..", "...i."]).is_empty());
+    assert!(
+        corner(&["ii...", ".ii..", "..ii.", "...ii"]).is_empty(),
+        "steps all the way are a diagonal two cells wide"
+    );
+    assert!(
+        corner(&["iiiii", "i...i", "i...i", "iiiii"]).is_empty(),
+        "a box corner is meant"
+    );
+    assert_eq!(
+        corner(&["iiiii", "....i", "....."]),
+        vec![(4, 0)],
+        "a short arm is not a box"
+    );
+    assert!(
+        corner(&["ii.", "i..", "..."]).is_empty(),
+        "three cells are a cluster, not a line"
+    );
+    assert!(
+        corner(&["..iii", "iii..", "ii...", "i...."]).is_empty(),
+        "the stepped edge of a shape is not a line"
+    );
+    assert!(
+        corner(&["cbbbb", "bccbb", "bbcbb", "bbbcb"]).is_empty(),
+        "a light L beside a darker shade is shading, not a line"
+    );
+    assert_eq!(corner(&["ibbbb", "biibb", "bbibb", "bbbib"]), vec![(2, 1)]);
+}
+
+#[test]
+fn a_short_run_between_longer_ones_is_a_jagged_line() -> Result<(), String> {
+    let jag = |r: &[&str]| cells_of(&critique(&rows(r), &[]), "jagged_line");
+    let i = one(
+        &critique(
+            &rows(&[
+                "iiii.........",
+                "....i........",
+                ".....iiii....",
+                ".............",
+            ]),
+            &[],
+        ),
+        "jagged_line",
+    )?;
+    assert_eq!(i.cells, vec![(4, 1)]);
+    assert!(i.message.contains("1 between 4 and 4"), "{}", i.message);
+    assert_eq!(i.severity, Severity::Note);
+    assert!(
+        jag(&["iii......", "...iii...", "......iii"]).is_empty(),
+        "even runs are a straight line"
+    );
+    assert!(
+        jag(&[
+            "i........",
+            ".i.......",
+            "..ii.....",
+            "....iiii.",
+            "........i"
+        ])
+        .is_empty(),
+        "runs that grow along a curve are fine"
+    );
+    assert_eq!(
+        jag(&[
+            "i..", "i..", "i..", "i..", ".i.", "..i", "..i", "..i", "..i"
+        ]),
+        vec![(1, 4)],
+        "the same down a column"
+    );
+    assert!(
+        jag(&["iiii.iiii", "....i...."]).is_empty(),
+        "a notch that comes back is not a step"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_one_cell_band_between_a_darker_and_a_lighter_colour_is_banding() {
+    let band = |r: &[&str]| cells_of(&critique(&rows(r), &[]), "banding");
+    assert_eq!(
+        band(&["aaaaaa", "bbbbbb", "cccccc"]),
+        (0..6).map(|x| (x, 1)).collect::<Vec<_>>()
+    );
+    assert!(
+        band(&["aaaaaa", "bbbbbb", "bbbbbb", "cccccc"]).is_empty(),
+        "two cells wide is a shape"
+    );
+    assert!(
+        band(&["cccccc", "iiiiii", "cccccc"]).is_empty(),
+        "a line through one colour is a detail"
+    );
+    assert!(
+        band(&["bbbbbb", "iiiiii", "cccccc"]).is_empty(),
+        "darker than both sides is a line"
+    );
+    assert!(
+        band(&["aaa", "bbb", "ccc"]).is_empty(),
+        "shorter than four cells"
+    );
+    assert!(
+        band(&["......", "bbbbbb", "cccccc"]).is_empty(),
+        "an edge next to nothing is not a band"
+    );
+    assert_eq!(
+        band(&["abc", "abc", "abc", "abc"]),
+        (0..4).map(|y| (1, y)).collect::<Vec<_>>()
+    );
+}

@@ -2,7 +2,7 @@
 //! face where it goes (`arcane/sword-formation`'s volley, which lays `projectiles/trail` under it, or a game moving
 //! it itself). It opens once as it leaves (`OPEN`): the blade flashes white and specks burst off it; then it loops,
 //! the blade glinting. Its streak is the trail's, so it bends with the flight. Made here from the SWORD part of
-//! `pixfx-ref`'s `examples/specs/arcane/sword-formation.json`; no source, so no parity check; its golden hashes pin it.
+//! `pixfx-ref`'s `examples/specs/arcane/sword-formation.json`; its golden hashes pin it.
 
 use pixfx_core::{Effect, EffectState, Layer, Meta, Options};
 use pixfx_draw::Painter;

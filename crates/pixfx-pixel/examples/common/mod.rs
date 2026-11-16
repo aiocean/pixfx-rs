@@ -83,11 +83,15 @@ impl Args {
             .ok_or_else(|| self.error(&format!("{name} expects WxH: {v}")))
     }
 
-    /// `--palette`: a fighter look's name (its colours come named), or colours as `#rrggbb` split by commas.
+    /// `--palette`: a fighter look's name (its colours come named), a palette file (`.gpl` with names, as the `ramp`
+    /// script writes, or `.hex`), or colours as `#rrggbb` split by commas.
     pub fn palette(&mut self) -> Result<Option<Palette>, String> {
         self.value("--palette")?
             .map(|v| match Look::preset(&v) {
                 Some(look) => Ok(Palette::named(look.colors())),
+                None if Path::new(&v).is_file() => {
+                    Palette::parse_file(&read_text(Path::new(&v))?).map_err(|e| format!("{v}: {e}"))
+                }
                 None => Palette::parse_hex(&v),
             })
             .transpose()

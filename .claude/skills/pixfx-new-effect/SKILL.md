@@ -67,7 +67,10 @@ The storyboard has these parts, in order, in your reply:
    as an **order** (`effect.attack(x, y, "converge" | "pierce")`), never a target option sized to the canvas.
 6. **Look**: palette (from a `pixfx_draw::palette` preset or the nearest effect), glow painted in steps
    (`pixfx_draw::halo`), category and id.
-7. **Cost**: sheets to draw (a parts sheet and one per moment, about $0.07 each).
+7. **Scale**: each object's size against the ruler, as a body part and a ratio (skill `pixfx`, "One scale: the
+   ruler"): "the bell's rim 3 heads wide: 21 px", "each sword one blade: 16 px", "a talisman 2 hands tall: 4 px".
+   Nothing under 1 px.
+8. **Cost**: sheets to draw (a parts sheet and one per moment, about $0.07 each).
 
 Then **sketch it**: write the spec (`crates/pixfx-ref/examples/specs/<category>/<name>.json`, from
 `TEMPLATE.json`; the moments' captions are the rows' `notes`) and run
@@ -118,5 +121,6 @@ finished step now, open it, and stop there.
 | Paths to PNGs and gifs listed in chat as the review | A `review-<n>-<step>.html` page that holds them all, opened in Chrome |
 | Ten questions at once | At most 3; the rest are your calls, stated in the storyboard |
 | Taking a count or a motion from the sheets | Write it in code; say so in "Exact in code" |
+| Sizing an object by eye, or copying the sheet's size at 64 squares as engine pixels | Size it against the ruler (a part and a ratio, `Ruler::size`); a 64-square sheet draws 2/3 of engine size |
 | A new spec for something already drawn | Search `target/ref` and the specs first |
 | A `targetX`/`targetY` option for a foe that may stand far off (the canvas caps the reach) | An effect that takes orders: the game calls `attack(x, y, aim)` and the scene flies the shots (skill `pixfx-effect`, "Hit at any distance") |

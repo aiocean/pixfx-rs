@@ -1,6 +1,6 @@
 ---
 name: pixfx-effect
-description: Use when adding a new pixfx effect, porting one from pixelfx or Sprite Fusion's pixel art VFX, or changing how an existing effect looks, moves, fires cues or takes options - including when its golden frame hashes, parity check or feature registration fail.
+description: Use when adding a new pixfx effect, porting one from pixelfx or Sprite Fusion's pixel art VFX, or changing how an existing effect looks, moves, fires cues or takes options - including when its golden frame hashes or feature registration fail.
 ---
 
 # Write or change a pixfx effect
@@ -83,6 +83,9 @@ impl EffectState for State {
 
 - `size` must hold the light: the canvas reaches past the origin by at least each glow's radius, or the light is
   cut at the canvas edge. Look at the gif.
+- Things beside or on a character keep the ruler (skill `pixfx`, "One scale: the ruler"): size each against a body
+  part of `pixfx_draw::RULER` with `Ruler::size(part, ratio)`, and say the part and the ratio in a
+  comment. One pixel is one game pixel: never draw blocks standing for one pixel. A port keeps its source's sizes.
 - Draw in local space: `(0, 0)` is the origin, y grows down. The instance places, flips, rotates, fades and scales
   light; the effect never does.
 - Draw from `t` and the seed when you can (any frame on its own, loops close exactly). Real physics keeps state in
@@ -93,8 +96,7 @@ impl EffectState for State {
   returning `pixfx_core::impact(t, weight, x, y, opts)`, and lists `pixfx_core::FEEL.spec()` in its options.
 - Maths: `libm::*`, `pixfx_draw::math::{js_round, js_min, js_max, clamp, smooth}`; never `f64::sin`/`sqrt`/`round`
   (clippy denies them). Randomness from the seed (`math::rand`, `hash`, `noise`, a seeded `Rng`). No `unwrap`.
-- A port keeps its source's number semantics: same order of operations, `js_*` helpers where JS differs (NaN in
-  `Math.min`, `| 0`, clamped arrays). Do not tidy the maths. The module doc names the source file it ports.
+- A port's module doc names the source file it ports and keeps its attribution and licence lines.
 - An effect made here from an image model's sheet: skill `pixfx-ref` first (spec, parts sheet, moment sheets), then
   write it here a function per part, comparing a held frame with the sheet side by side until they match.
 
@@ -245,22 +247,6 @@ A change shared by many effects (a category's `lib.rs`, `pixfx-core`, `pixfx-dra
 the feature flags (every effect), plus the wasm check once:
 `wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignored`.
 
-## 4. Parity, for a port
-
-```sh
-cargo run -p pixfx-export --example parity -- fire/candle --pixelfx /tmp/pixelfx    # a pixelfx port
-cargo run -p pixfx-export --example parity -- arcane/hex-shield                      # a Sprite Fusion port
-```
-
-- pixelfx: clone `https://github.com/patch-gg/pixelfx` to `/tmp/pixelfx`, checkout `044e12a`; needs Node.
-- Sprite Fusion: vendor the source verbatim at `tools/spritefusion/<category>/<name>.ts` (Node 22.6+); the parity
-  script finds it there and runs it on the port's canvas, fps and seed. An effect that wraps a character checks with
-  `--actor idle.png,cast.png [--actor-every 6]`.
-- PASS is at most 0.5% of colour and of light pixels differing; it writes `target/parity/<id>.side.gif` (source
-  left, port right). Exit 0 PASS, 1 FAIL, 2 could not run. Shipping below the gate needs the owner's approval and a
-  line in `parity/LEDGER.md`.
-- An effect made here (no source) has no parity check; say so in its module doc.
-
 ## Common mistakes
 
 | Mistake | Fix |
@@ -269,6 +255,6 @@ cargo run -p pixfx-export --example parity -- arcane/hex-shield                 
 | A test naming a specific effect breaks single-effect builds | `required-features` in `Cargo.toml`, or `tests/built/mod.rs`'s `built(id)` |
 | Golden blessed before looking at the frames | Look at the gif first; bless records whatever is drawn |
 | `f64::floor`, `x.round()`, `rand::random` | `libm::floor`, `js_round`, the seed |
-| Fixing a parity FAIL by changing the source's maths order | Match the source's operations, including its JS quirks |
 | Matching a reference's glow by turning `glow` up | Read its colour and light layers; paint the halo in steps (`pixfx_draw::halo`) |
 | A blow fixed to one side | `hitX` / `hitY` options and everything derived from that point |
+| A sword, ring or talisman sized by eye, too big or too small beside the fighter | Its size from the ruler (`Ruler::size(RULER.blade, 1.0)`); look at it beside the fighter: `gif ... --actor <idle.png> --show-actor` |

@@ -1,6 +1,6 @@
 //! Golden bell: a temple bell of golden qi that covers the character (the cultivation-fantasy Golden Bell shield).
 //! Made here, in a plain pixel style: flat banded tones lit from the upper left, a bold dark outline, a waist band
-//! of diamonds and a rim band. It has no source, so no parity check; its golden hashes pin it.
+//! of diamonds and a rim band. Its golden hashes pin it.
 //!
 //! The bell drops onto the character and lands with a white flash and a puff of dust; it holds with a glint
 //! sweeping across it; a blow on its right makes it flash, wobble and send out a ring of light; at the end it

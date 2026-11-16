@@ -21,10 +21,11 @@ library.
 | Rendered clip for `loadClip` | `cargo run -p pixfx-export --example render_clip -- <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]` | `<name>.clip.json`, `<name>.clip.<n>.png` |
 | Mannequin clip sheet | `cargo run -p pixfx-body --example clip_sheet -- <clip> [--camera side\|iso\|topdown] [--out DIR]`; `--example catalog [--camera ...]` for every clip | `target/body/<clip>/`: `composite.png`, `hull.png`, `bones.png`, `parts.png`, `<clip>.gif`, `<clip>.json` (skill `pixfx-body`) |
 | Fighter pose sheet | `cargo run -p pixfx-fighter --example poses -- <thunder\|frost\|alchemist> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]` | `<look>-poses.png`, or `<look>-<POSE>.png` and its cells |
-| Parity side-by-side | `cargo run -p pixfx-export --example parity -- <id> [--pixelfx DIR]` (a pixelfx port needs a pixelfx checkout: `--pixelfx`, else `$PIXELFX`, else `./pixelfx`) | `target/parity/<id>.side.gif` (see `pixfx-effect`) |
-
+| Every effect beside the fighter, to check scale | `cargo run -p pixfx-fighter --example poses -- thunder --pose idle --states --out target/pixel`, then `cargo run --release -p pixfx-export --example scale_board -- --actor target/pixel/thunder-idle/r0-m0.png [--scale N] [--screens] [--id ID]... [--out DIR]` | `target/scale/<name>.png` (the busiest frame on the sprite; the sprite shows only inside the effect's canvas) and `index.html` |
 - `--palette` takes a preset: `fire`, `ice`, `poison`, `holy`, `shadow`, `arcane`, `blood`, `electric`, `nature`,
   `gold`.
+- `--scale N` blows a gif or video up by a whole number, nearest neighbour, for looking; files a game loads (sheets,
+  clips) are at one game pixel per pixel, the ruler's size (skill `pixfx`, "One scale: the ruler").
 - Run from the repo root. `--out` defaults to `target/out` (`out` for `poses`). A bad flag exits 2 with the usage.
 - Effect ids: `pixfx_effects::EFFECTS`, or `rg -n 'id: "' crates/pixfx-effects/src`.
 - An effect's own number option takes `--num NAME=V`, once per option (`--num hitX=-20 --num hitY=-48`); a ramp,

@@ -41,10 +41,8 @@ An effect never knows which shell shows it.
 
 ## Traps
 
-- Parity: every port in `EFFECTS` must pass the parity script (`crates/pixfx-export/examples/parity.rs`) against
-  its source: pixelfx, or the Sprite Fusion file vendored at `tools/spritefusion/<id>.ts`. An effect made here has no
-  source; its golden hashes pin its pixels, and its module doc says it is made here. A port keeps its source's
-  JS number semantics: same order of operations, `js_round`, `libm`. Do not tidy maths.
+- Golden hashes pin every effect's pixels (`tests/goldens/frame_hashes.json`). Maths goes through `libm` and
+  `pixfx_draw::math` (`js_round` and friends) so native and wasm give the same frames.
 - An effect that reads the sprite it wraps reads it through `pixfx_core::Silhouette` and `Actor::opaque`, built once
   in `set_actor`, never per drawn frame (`.claude/skills/pixfx-sprite-aware/SKILL.md`).
 - Determinism: same options and time give the same `frame_hash` on every target. No `HashMap` iteration order, no
@@ -64,7 +62,6 @@ effects is left out, and the golden check covers that effect only:
 cargo test -p pixfx-effects --no-default-features --features fire-candle --all-targets
 cargo test -p pixfx-effects --no-default-features --features fire-candle --test determinism -- --ignored
 cargo run --release -p pixfx-effects --no-default-features --features fire-candle --example bench
-cargo run -p pixfx-export --example parity -- fire/candle --pixelfx /tmp/pixelfx --out target/parity
 ```
 
 A change shared by many effects (`lib` modules, a category's helpers) runs the same with the default `all`, and the

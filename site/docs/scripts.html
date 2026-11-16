@@ -36,7 +36,6 @@
     <tr><td><code>pixfx-export</code> <code>sprite_sheet &lt;id&gt;</code></td><td>Composite, colour and light PNGs and the beanfx-layout JSON.</td></tr>
     <tr><td><code>pixfx-export</code> <code>gif &lt;id&gt;</code></td><td>A looping GIF.</td></tr>
     <tr><td><code>pixfx-export</code> <code>render_clip &lt;id&gt;</code></td><td>A rendered clip that the JS shells play without drawing (<code>loadClip</code>).</td></tr>
-    <tr><td><code>pixfx-export</code> <code>parity &lt;id&gt;</code></td><td>The parity check of one effect against its source.</td></tr>
     <tr><td><code>pixfx-effects</code> <code>bench</code></td><td>What a frame of effects costs natively (run with <code>--release</code>).</td></tr>
     <tr><td><code>pixfx-fighter</code> <code>poses &lt;look&gt;</code></td><td>Every pose of a fighter look on one sheet.</td></tr>
     <tr><td><code>pixfx-pixel</code> <code>clean</code>, <code>read</code>, <code>draw</code>, <code>view</code>, <code>critique</code>, <code>sheet</code>, <code>cut</code>, <code>parts</code>, <code>diff</code></td><td>An agent's steps for reading pictures as pixels.</td></tr>
@@ -83,30 +82,14 @@
 </div>
 <p>Frame delay is <code>1/fps</code> rounded to GIF's hundredths of a second.</p>
 
-<h2>parity</h2>
-<p>Render an effect with its source and with its pixfx port and compare every pixel of every frame. See <a href="parity.html">Parity and tests</a> for setup.</p>
-<pre><code>cargo run -p pixfx-export --example parity -- fire/candle --pixelfx /tmp/pixelfx --out target/parity</code></pre>
-<div class="table-wrap">
-<table>
-  <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
-  <tbody>
-    <tr><td><code>--pixelfx DIR</code></td><td><code>$PIXELFX</code>, else <code>./pixelfx</code></td><td>A pixelfx checkout. Needs Node on the path.</td></tr>
-    <tr><td><code>--opt key=value</code></td><td></td><td>An option set on both sides: <code>seed</code>, <code>flip</code> (0 or 1), or a numeric option of the effect. Repeatable.</td></tr>
-    <tr><td><code>--actor PNG,PNG...</code></td><td></td><td>Play the effect on a character, the PNGs its frames; Sprite Fusion sources only. <code>--actor-every N</code> (default 6) render frames per sprite frame.</td></tr>
-    <tr><td><code>--out DIR</code></td><td><code>target/parity</code></td><td>Where the reference render and the side-by-side GIF go.</td></tr>
-  </tbody>
-</table>
-</div>
-<p>It prints <code>&lt;id&gt;: colour x% differ, light y% differ → PASS</code> (or <code>FAIL</code>) and writes <code>&lt;out&gt;/&lt;id&gt;.side.gif</code>, the source on the left and pixfx on the right.</p>
-
 <h2>Exit codes</h2>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
   <tbody>
-    <tr><td><code>0</code></td><td>Success; for <code>parity</code>, PASS.</td></tr>
-    <tr><td><code>1</code></td><td><code>parity</code> ran and FAILed the gate (or <code>critique</code> and <code>diff</code> found an error or a difference).</td></tr>
-    <tr><td><code>2</code></td><td>Could not run: bad arguments, an unknown effect id, a write error, or a reference render that failed. The message is on stderr.</td></tr>
+    <tr><td><code>0</code></td><td>Success.</td></tr>
+    <tr><td><code>1</code></td><td><code>critique</code> or <code>diff</code> found an error or a difference.</td></tr>
+    <tr><td><code>2</code></td><td>Could not run: bad arguments, an unknown effect id or a write error. The message is on stderr.</td></tr>
   </tbody>
 </table>
 </div>

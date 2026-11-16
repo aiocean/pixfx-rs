@@ -51,7 +51,12 @@ already placed there, scaled and flipped as the game shows it; the scene mirrors
    options as outline has.
 5. **Draw from it** in `draw`: `p.px(x, y, colour)` per cell, on `Layer::Back` for what goes behind the sprite (a
    ring, an aura) and `Layer::Front` for what goes over it (a tint, sparks in front).
-6. **Animate with time, not by re-reading.** Keep the cells; vary colour, reach or alpha with `t` (see power-up's
+6. **Keep the sprite's pixel size.** What the effect adds (an outline, a mote, a spark, a drip) is in the sprite's
+   own pixels: one effect pixel is one sprite pixel, so a 1-pixel outline stays 1 pixel and a mote is the size of a
+   body part it is measured against (skill `pixfx`, "One scale: the ruler"; a mote no bigger than the eye). Never
+   draw blocks standing for one pixel. Sizes that follow the sprite (an aura's reach) come from the silhouette, not
+   from a fixed number for one character.
+7. **Animate with time, not by re-reading.** Keep the cells; vary colour, reach or alpha with `t` (see power-up's
    aura reach and noise).
 
 Determinism holds as long as randomness comes from the effect's seeded `Rng` (`pick` takes it) and nothing iterates a
@@ -76,6 +81,3 @@ gpui: `FxScene::set_actor(fx, Some(actor))` with an `Actor` placed in effect pix
 - Then in a game: play it in a shell's demo (`packages/pixfx-canvas2d/demo/main.ts` plays power-up on a hero whose
   pose changes) and watch it follow each frame.
 - Its golden hashes (`crates/pixfx-effects/tests/goldens/frame_hashes.json`) pin its frames once you bless them.
-- A port of an effect from pixelfx or Sprite Fusion also passes parity, with sprites:
-  `cargo run -p pixfx-export --example parity -- <id> --actor a.png,b.png --actor-every 4`. An effect made here
-  has no source to check against.

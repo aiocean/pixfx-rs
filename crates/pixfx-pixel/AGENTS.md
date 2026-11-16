@@ -17,13 +17,15 @@ drew:
 | `cut`, `grid` | A picture out of its background; pixels as palette indices (`nearest`, `colors`), `shrink`, `rects`, `Map` |
 | `oklab`, `reduce` | Perceptual colour distance; colours merged down to a count, or snapped to a palette |
 | `show`, `view` | A map as text with a (named) legend and back (`text_named`, `parse`); as a picture sized to its token cost (`view`, `zoom`) |
-| `critique` | Checks with cells and a fix each, and a score; drift across frames |
+| `critique` | Checks with cells and a fix each, and a score, the line craft (stray, doubled corner, jagged line, banding) after klad's pixel check; drift across frames |
+| `ramp` | A material's hue-shifted shades from one base colour (`oklab::rgb` takes OKLab back to sRGB) |
 | `sheet` | Blank sheets for an image model, guides (pivot, ground, bones, a sprite), cells cut back; `sheet.json` and bones text |
 | `parts` | A sprite split into named parts with parents and pivots, from a spec the agent writes |
 | `diff` | Pixels two pictures differ by; `feet` stands two figures on the same spot first |
-| `tool` | The agent's steps as pure functions: `clean`, `read`, `draw`, `view`, `sheet`, `cut`, `parts`, `Palette` |
+| `scale` | A sprite against the game's ruler (`pixfx_draw::Ruler`): `standing` (a standing character's height and width), `against` (a thing as many cells as a body part times a ratio), `part` (a part by name); `critique --standing` and `--against PART*RATIO` |
+| `tool` | The agent's steps as pure functions: `clean`, `read`, `draw`, `view`, `sheet`, `cut`, `parts`, `Palette` (from a look, hex, a `.gpl` or `.hex` file, or ramps; written as `.gpl`) |
 
-`examples/` holds a script per step (`clean`, `read`, `draw`, `view`, `critique`, `sheet`, `cut`, `parts`, `diff`;
+`examples/` holds a script per step (`clean`, `read`, `draw`, `view`, `critique`, `ramp`, `sheet`, `cut`, `parts`, `diff`;
 `cargo run -p pixfx-pixel --example <step> -- ...`), sharing `examples/common/mod.rs`, and scripts an agent wrote
 when no step fit (`split_by_colour`). The skill `.claude/skills/pixfx-pixel/SKILL.md` is the agent's guide.
 

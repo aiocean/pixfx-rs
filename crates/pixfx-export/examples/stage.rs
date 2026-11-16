@@ -6,7 +6,7 @@
 //! as `_`.
 //!
 //!   cargo run -p pixfx-export --example stage -- <id> [--actor PNG] [--target DX,DY] [--order-at SECS]
-//!       [--aim converge|pierce] [--feel] [--secs N] [--scale N] [--seed N] [--palette WORD] [--num NAME=V]
+//!       [--aim converge|pierce|orbit] [--feel] [--secs N] [--scale N] [--seed N] [--palette WORD] [--num NAME=V]
 //!       [--out DIR]
 //!
 //! `--actor` is the sprite both stand as (the target mirrored); the effect wraps the caster's. `--target` is where
@@ -23,11 +23,11 @@ use common::{Args, effect, exit, file_name};
 use pixfx_core::volley::{Aim, Order};
 use pixfx_core::{Actor, Clip, Feel, Layer, Rendered};
 use pixfx_draw::Frame;
-use pixfx_export::parity::Actors;
+use pixfx_export::Actors;
 use pixfx_export::write_gif;
 use pixfx_scene::{Body, Frames, InlinePainter, Pass, Shell};
 
-const USAGE: &str = "usage: stage <id> [--actor PNG] [--target DX,DY] [--order-at SECS] [--aim converge|pierce] [--feel] [--secs N] [--scale N] [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]";
+const USAGE: &str = "usage: stage <id> [--actor PNG] [--target DX,DY] [--order-at SECS] [--aim converge|pierce|orbit] [--feel] [--secs N] [--scale N] [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]";
 
 const FPS: u32 = 30;
 /// Room round the two on the stage, and how high above its feet the target is struck.
@@ -74,9 +74,10 @@ fn run() -> Result<bool, String> {
     let felt = args.flag("--feel");
     let secs = f64::from(args.count("--secs", 4)?);
     let aim = match args.value("--aim")?.as_deref() {
-        None | Some("converge") => Aim::Converge,
-        Some("pierce") => Aim::Pierce,
-        Some(other) => return Err(format!("--aim {other}: converge or pierce")),
+        None => Aim::Converge,
+        Some(name) => {
+            Aim::parse(name).ok_or_else(|| format!("--aim {name}: converge, pierce or orbit"))?
+        }
     };
     let opts = args.look()?;
     let out = args.out("target/out")?;
