@@ -3,13 +3,16 @@
 //! The layered flame tongue is adapted from Sprite Fusion's open-source fire
 //! (https://www.spritefusion.com/pixel-art-vfx/fire), MIT License, Copyright (c) 2026 Hugo Duprez.
 
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, RampOpt};
+use std::sync::Arc;
+
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, RampOpt, Trace};
 use pixfx_draw::Painter;
 use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
 use pixfx_draw::math::{clamp, js_max, js_min, js_round, smooth};
 
 use super::lib::{
-    Hot, Life, LoopNoise, drift, flame_tongue, floor_light, hot_first, looped, smoke_puff,
+    Hot, Life, LoopNoise, carried, drift, flame_tongue, floor_light, hot_first, looped, nudge,
+    smoke_puff,
 };
 
 pub struct Candle;
@@ -28,7 +31,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 2,
     state: None,
-    options: &[ROOT.spec(), WAX.spec(), BRASS.spec()],
+    options: &[ROOT.spec(), WAX.spec(), BRASS.spec(), CARRIED.spec()],
 };
 
 // meta.options
@@ -73,6 +76,10 @@ const BRASS: RampOpt = RampOpt::new(
     ],
 );
 
+/// 1: the game carries it along: its flame bends back and its smoke trails behind as it moves
+/// (`super::lib::carried`).
+const CARRIED: NumOpt = NumOpt::new("carried", 0.0).within(0.0, 1.0);
+
 const D: f64 = META.duration;
 const NL: LoopNoise = LoopNoise(D);
 const TOP: f64 = -16.0;
@@ -101,7 +108,11 @@ impl Effect for Candle {
             x: ramp(&opts.ramp(&WAX)),
             b: ramp(&opts.ramp(&BRASS)),
             s: seed as f64,
+            trace: None,
         })
+    }
+    fn traces(&self, opts: &Options) -> Option<f64> {
+        (opts.num(&CARRIED) >= 0.5).then_some(0.2)
     }
 }
 
@@ -111,9 +122,13 @@ struct State {
     x: [Rgba; 6],
     b: [Rgba; 5],
     s: f64,
+    trace: Option<Arc<Trace>>,
 }
 
 impl EffectState for State {
+    fn set_trace(&mut self, trace: Option<Arc<Trace>>) {
+        self.trace = trace;
+    }
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
         if layer != Layer::Back {
             draw(p, t, self);
@@ -224,7 +239,12 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
     let fl = 0.86 + 0.08 * NL.at(t, 2.0, s + 1.0, 0.0) + 0.06 * NL.at(t, 7.0, s + 2.0, 0.0);
     let stretch = js_max(0.0, NL.at(t, 0.75, s + 3.0, 0.0) - 0.3) * 0.6;
     let fh = 12.0 * (1.0 + stretch) * (0.94 + 0.06 * fl);
-    let sway = NL.at(t, 0.5, s + 4.0, 0.0) * 1.6 + NL.at(t, 1.5, s + 5.0, 0.0) * 0.5;
+    // carried along, the tip leans back by `bend` of the flame's height and the smoke drifts back
+    let (bend, wind) = carried(o.trace.as_deref());
+    let sway = nudge(
+        NL.at(t, 0.5, s + 4.0, 0.0) * 1.6 + NL.at(t, 1.5, s + 5.0, 0.0) * 0.5,
+        bend * fh,
+    );
     let glow = mix(mix(h[3], h[4], 0.5), WHITE, 0.3);
     let cy = WICK - fh * 0.4;
 
@@ -294,7 +314,17 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
             s: r.range(0.8, 1.2),
         },
         |q, age, _| {
-            let [x, y, ..] = drift(sway, WICK - fh, q.vx, q.vy, age, 1.0, -6.0, 1.0, 0.8);
+            let [x, y, ..] = drift(
+                sway,
+                WICK - fh,
+                nudge(q.vx, wind),
+                q.vy,
+                age,
+                1.0,
+                -6.0,
+                1.0,
+                0.8,
+            );
             smoke_puff(
                 p,
                 x + NL.at(t - age, 0.6, s + 60.0, 0.0) * (1.0 + age * 2.0),

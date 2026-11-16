@@ -3,14 +3,19 @@
 //! The exhaust (flame puffs cooling down the fire ramp into smoke, a warm light over the smoke) follows Sprite
 //! Fusion's open-source fire (https://www.spritefusion.com/pixel-art-vfx/fire), MIT License,
 //! Copyright (c) 2026 Hugo Duprez.
+//!
+//! Made here on top of the port: `carried` 1 leans the plumes back against the way the game moves it (its trace);
+//! not carried, or standing still, it paints exactly as its source.
 
 use core::f64::consts::PI;
 
 use pixfx_core::sim::{Flags, Kind};
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, RampOpt};
+use std::sync::Arc;
+
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, RampOpt, Trace};
 use pixfx_draw::Painter;
 use pixfx_draw::color::{Rgba, WHITE, ramp};
-use pixfx_draw::math::{Rng, TAU, js_round, lerp, rand, tile_fbm, to_uint32};
+use pixfx_draw::math::{Rng, TAU, clamp, js_round, lerp, rand, tile_fbm, to_uint32};
 
 use super::lib::{Birth, Ghosts};
 
@@ -32,7 +37,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 30,
     state: None,
-    options: &[METAL.spec(), LENGTH.spec()],
+    options: &[METAL.spec(), LENGTH.spec(), CARRIED.spec()],
 };
 
 // meta.options
@@ -58,6 +63,8 @@ const METAL: RampOpt = RampOpt::new(
     ],
 );
 const LENGTH: NumOpt = NumOpt::new("length", 26.0);
+/// 1: the game carries it along (a character flying): its plumes stream back against the way it moves.
+const CARRIED: NumOpt = NumOpt::new("carried", 0.0).within(0.0, 1.0);
 
 const D: f64 = META.duration;
 const GAP: f64 = 8.0;
@@ -77,7 +84,11 @@ impl Effect for Jetpack {
             length,
             s,
             ghosts: ghosts(&f, length, s),
+            trace: None,
         })
+    }
+    fn traces(&self, opts: &Options) -> Option<f64> {
+        (opts.num(&CARRIED) >= 0.5).then_some(0.2)
     }
 }
 
@@ -87,9 +98,19 @@ struct State {
     length: f64,
     s: f64,
     ghosts: Ghosts,
+    trace: Option<Arc<Trace>>,
+}
+
+/// How far the plumes lean back, pixels sideways per pixel down, against the velocity it was carried at over its
+/// last 0.1 s: 0.5 at 200 pixels a second, at most 0.8 either way; 0 at rest, so its pixels are the source's.
+fn lean(trace: Option<&Trace>) -> f64 {
+    trace.map_or(0.0, |t| clamp(-t.velocity(0.0, 0.1).0 / 400.0, -0.8, 0.8))
 }
 
 impl EffectState for State {
+    fn set_trace(&mut self, trace: Option<Arc<Trace>>) {
+        self.trace = trace;
+    }
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
         if layer != Layer::Back {
             draw(p, t, self);
@@ -241,6 +262,8 @@ fn draw(p: &mut Painter, t: f64, st: &State) {
     // smoke and spent flame behind, then the plumes
     let g = st.ghosts.at(t);
     g.draw(p, Layer::Back);
+    // carried along, each plume's axis leans back from its nozzle (`bend` pixels across per pixel down)
+    let bend = lean(st.trace.as_deref());
     for sd in [-1.0, 1.0] {
         let cx = sd * GAP
             + if rand(&[s, fr, sd]) < 0.15 {
@@ -253,45 +276,54 @@ fn draw(p: &mut Painter, t: f64, st: &State) {
                 + 0.08 * libm::sin(TAU * 7.0 * ph + sd)
                 + 0.06 * (rand(&[s, fr, sd, 1.0]) - 0.5));
         // the flame: a cone of heat torn ragged by noise streaming down it, white at its heart, red at its edges
-        p.shade(cx - 7.0, dy, cx + 7.0, dy + l + 4.0, |x, y, out| {
-            let v = (y - dy) / l;
-            let w = lerp(3.4, 0.6, v) + 1.4 * libm::sin(v * PI) * if v < 1.0 { 1.0 } else { 0.0 };
-            let n = tile_fbm(
-                (x - cx) / 3.0 + sd * 5.0,
-                (y - dy) / 4.0 - ph * 20.0,
-                0.0,
-                10.0,
-                s + if sd > 0.0 { 9.0 } else { 0.0 },
-                2,
-            );
-            let q = libm::fabs(x - cx) / w + n * 0.45;
-            if v > 1.15 || q > 1.2 {
-                return None;
-            }
-            let heat = (1.0 - v) * 1.15 - q * 0.9 + n * 0.25;
-            // a dark red rim round the flame, so it reads as a shape and not a smear
-            if q > 0.95 {
-                out.c = if heat > 0.2 { f[3] } else { f[2] };
-                if heat < -0.3 {
-                    out.a = 0.5;
+        let reach = libm::fabs(bend) * (l + 4.0);
+        p.shade(
+            cx - 7.0 - reach,
+            dy,
+            cx + 7.0 + reach,
+            dy + l + 4.0,
+            |x, y, out| {
+                let v = (y - dy) / l;
+                let cx = cx + bend * (y - dy);
+                let w =
+                    lerp(3.4, 0.6, v) + 1.4 * libm::sin(v * PI) * if v < 1.0 { 1.0 } else { 0.0 };
+                let n = tile_fbm(
+                    (x - cx) / 3.0 + sd * 5.0,
+                    (y - dy) / 4.0 - ph * 20.0,
+                    0.0,
+                    10.0,
+                    s + if sd > 0.0 { 9.0 } else { 0.0 },
+                    2,
+                );
+                let q = libm::fabs(x - cx) / w + n * 0.45;
+                if v > 1.15 || q > 1.2 {
+                    return None;
                 }
-                return None;
-            }
-            out.c = if heat > 0.82 {
-                WHITE
-            } else if heat > 0.62 {
-                f[6]
-            } else if heat > 0.42 {
-                f[5]
-            } else if heat > 0.22 {
-                f[4]
-            } else if heat > 0.02 {
-                f[3]
-            } else {
-                f[2]
-            };
-            None
-        });
+                let heat = (1.0 - v) * 1.15 - q * 0.9 + n * 0.25;
+                // a dark red rim round the flame, so it reads as a shape and not a smear
+                if q > 0.95 {
+                    out.c = if heat > 0.2 { f[3] } else { f[2] };
+                    if heat < -0.3 {
+                        out.a = 0.5;
+                    }
+                    return None;
+                }
+                out.c = if heat > 0.82 {
+                    WHITE
+                } else if heat > 0.62 {
+                    f[6]
+                } else if heat > 0.42 {
+                    f[5]
+                } else if heat > 0.22 {
+                    f[4]
+                } else if heat > 0.02 {
+                    f[3]
+                } else {
+                    f[2]
+                };
+                None
+            },
+        );
         // shock diamonds: bright knots strung down the core, breathing
         for i in 0..3 {
             let fi = f64::from(i);
@@ -313,17 +345,17 @@ fn draw(p: &mut Painter, t: f64, st: &State) {
                         } else {
                             f[5]
                         };
-                        p.px(cx + xx, y + yy, c);
+                        p.px(cx + bend * (y - dy) + xx, y + yy, c);
                     }
                     xx += 1.0;
                 }
                 yy += 1.0;
             }
-            p.glow(cx, y, 6.0, f[6], 0.35);
+            p.glow(cx + bend * (y - dy), y, 6.0, f[6], 0.35);
         }
         // light: hot at the nozzle, warm down the plume
         p.glow(cx, dy + 2.0, 9.0, WHITE, 0.45);
-        p.glow(cx, dy + l * 0.45, l * 0.8, f[4], 0.35);
+        p.glow(cx + bend * l * 0.45, dy + l * 0.45, l * 0.8, f[4], 0.35);
     }
     pack(p, h, f, dy);
     g.draw(p, Layer::Front);

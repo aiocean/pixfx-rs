@@ -94,9 +94,19 @@ fn players_on_the_same_frame_id_draw_the_same_frame() -> Result<(), String> {
         );
         let place = a.placement();
         // b reaches the same clock by another road: a loop one whole loop ahead (it comes round to the same
-        // frame), and every step split in three
+        // frame), and every step split in three. An effect that opens once loops only the frames after its
+        // opening: both start past it.
         if fx.meta().looping {
-            let mut left = fx.meta().duration;
+            let open = fx.loop_from().unwrap_or(0.0);
+            for p in [&mut a, &mut b] {
+                let mut left = open;
+                while left > 0.0 {
+                    let dt = left.min(0.2);
+                    p.update(dt);
+                    left -= dt;
+                }
+            }
+            let mut left = fx.meta().duration - open;
             while left > 0.0 {
                 let dt = left.min(0.2);
                 b.update(dt);

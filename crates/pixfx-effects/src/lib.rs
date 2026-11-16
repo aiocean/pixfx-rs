@@ -49,6 +49,32 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &arcane::RUNE_CIRCLE,
     #[cfg(feature = "arcane-hex-shield")]
     &arcane::HEX_SHIELD,
+    #[cfg(feature = "arcane-restriction")]
+    &arcane::RESTRICTION,
+    #[cfg(feature = "arcane-sword-formation")]
+    &arcane::SWORD_FORMATION,
+    #[cfg(any(feature = "arcane-flying-sword", feature = "arcane-sword-formation"))]
+    &arcane::FLYING_SWORD,
+    #[cfg(any(feature = "arcane-held-sword", feature = "arcane-sword-formation"))]
+    &arcane::HELD_SWORD,
+    #[cfg(any(feature = "arcane-sword-strike", feature = "arcane-sword-formation"))]
+    &arcane::SWORD_STRIKE,
+    #[cfg(feature = "arcane-sword-slash")]
+    &arcane::SWORD_SLASH,
+    #[cfg(feature = "arcane-bagua-mirror")]
+    &arcane::BAGUA_MIRROR,
+    #[cfg(feature = "arcane-bagua-mirror-strike")]
+    &arcane::BAGUA_MIRROR_STRIKE,
+    #[cfg(any(
+        feature = "arcane-bagua-mirror-flying",
+        feature = "arcane-bagua-mirror-strike"
+    ))]
+    &arcane::BAGUA_MIRROR_FLYING,
+    #[cfg(any(
+        feature = "arcane-bagua-mirror-burst",
+        feature = "arcane-bagua-mirror-strike"
+    ))]
+    &arcane::BAGUA_MIRROR_BURST,
     #[cfg(feature = "critters-wisp")]
     &critters::WISP,
     #[cfg(feature = "feedback-outline")]
@@ -59,6 +85,10 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &spawn::POOF,
     #[cfg(feature = "holy-feather-burst")]
     &holy::FEATHER_BURST,
+    #[cfg(feature = "holy-golden-bell")]
+    &holy::GOLDEN_BELL,
+    #[cfg(feature = "holy-lotus")]
+    &holy::LOTUS,
     #[cfg(feature = "ice-icicle-fall")]
     &ice::ICICLE_FALL,
     #[cfg(feature = "scifi-jetpack")]
@@ -71,6 +101,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &pickups::COIN_SPIN,
     #[cfg(feature = "projectiles-laser-bolt")]
     &projectiles::LASER_BOLT,
+    #[cfg(any(feature = "projectiles-trail", feature = "arcane-sword-formation"))]
+    &projectiles::TRAIL,
     #[cfg(feature = "transitions-burn-away")]
     &transitions::BURN_AWAY,
     #[cfg(feature = "transitions-crt-off")]

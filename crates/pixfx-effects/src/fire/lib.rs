@@ -7,10 +7,28 @@
 //! Port of pixelfx `src/fx/fire/_lib.js`: the functions candle, campfire and brazier use (`flameBlade`,
 //! `flicker` and `simDraw` arrive with the effects that need them).
 
+use pixfx_core::Trace;
 use pixfx_core::sim::SMOKE_RAMP;
 use pixfx_draw::Painter;
 use pixfx_draw::color::{Rgba, WHITE, mix, step_at};
 use pixfx_draw::math::{Rng, clamp, js_max, js_min, js_round, noise, or_one, rand, rng, wrap};
+
+/// How a fire carried along bends and blows, from the way it moved (`trace`, over its last 0.1 s): the flame leans
+/// back against its velocity (`bend`, added to its lean: 0.5 at 200 pixels a second, at most 0.6 either way) and
+/// what leaves it drifts back (`wind`, pixels a second added to its wind, 0.3 of the velocity). Both 0 without a
+/// trace or standing still, so a fire that is not carried paints exactly as its source.
+pub fn carried(trace: Option<&Trace>) -> (f64, f64) {
+    let Some(t) = trace else {
+        return (0.0, 0.0);
+    };
+    let (vx, _) = t.velocity(0.0, 0.1);
+    (clamp(-vx / 400.0, -0.6, 0.6), -vx * 0.3)
+}
+
+/// `v` moved by `by`, the same bits when `by` is 0 (a port's maths untouched while nothing moves it).
+pub fn nudge(v: f64, by: f64) -> f64 {
+    if by == 0.0 { v } else { v + by }
+}
 
 /// A fire ramp hot-first: `H[0]` white .. `H[8]` smouldering.
 pub type Hot = [Rgba; 9];
@@ -467,6 +485,8 @@ pub struct Burn<'a> {
     pub y: f64,
     /// [0.1]
     pub lean: f64,
+    /// Lean added while it is carried along ([`carried`]), 0 at rest.
+    pub bend: f64,
     /// How wide embers and smoke leave [6].
     pub spread: f64,
     /// Light strength [1].
@@ -508,7 +528,10 @@ impl Fire<'_> {
         0.74 + 0.16 * nl.at(tt, 7.3, s + 1.0, 0.0) + 0.1 * nl.at(tt, 19.0, s + 2.0, 0.0)
     }
     fn lean(&self, tt: f64) -> f64 {
-        self.o.nl.at(tt, 0.67, self.o.s + 90.0, 0.0) * self.o.lean
+        nudge(
+            self.o.nl.at(tt, 0.67, self.o.s + 90.0, 0.0) * self.o.lean,
+            self.o.bend,
+        )
     }
     fn tongue(&self, i: usize) -> Option<&BurnTongue> {
         self.tt.get(i)

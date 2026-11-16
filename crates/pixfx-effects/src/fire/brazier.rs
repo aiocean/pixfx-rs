@@ -5,13 +5,16 @@
 
 use core::f64::consts::PI;
 
-use pixfx_core::{Effect, EffectState, Layer, Meta, Options, RampOpt};
+use std::sync::Arc;
+
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, RampOpt, Trace};
 use pixfx_draw::Painter;
 use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
 use pixfx_draw::math::{js_max, js_min, js_round, rand};
 
 use super::lib::{
-    Burn, Hot, Life, LoopNoise, Tongue, burn, drift, ember, floor_light, hot_first, looped, spark,
+    Burn, Hot, Life, LoopNoise, Tongue, burn, carried, drift, ember, floor_light, hot_first,
+    looped, nudge, spark,
 };
 
 pub struct Brazier;
@@ -32,7 +35,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 8,
     state: None,
-    options: &[IRON.spec()],
+    options: &[IRON.spec(), CARRIED.spec()],
 };
 
 // meta.options
@@ -87,17 +90,28 @@ impl Effect for Brazier {
             f: ramp(&opts.palette_or(&PALETTE)),
             i: ramp(&opts.ramp(&IRON)),
             s: seed as f64,
+            trace: None,
         })
     }
+    fn traces(&self, opts: &Options) -> Option<f64> {
+        (opts.num(&CARRIED) >= 0.5).then_some(0.2)
+    }
 }
+
+/// 1: the game carries it (a torch in a hand): it bends back and blows as it moves (`super::lib::carried`).
+const CARRIED: NumOpt = NumOpt::new("carried", 0.0).within(0.0, 1.0);
 
 struct State {
     f: Hot,
     i: [Rgba; 5],
     s: f64,
+    trace: Option<Arc<Trace>>,
 }
 
 impl EffectState for State {
+    fn set_trace(&mut self, trace: Option<Arc<Trace>>) {
+        self.trace = trace;
+    }
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
         if layer != Layer::Back {
             draw(p, t, self);
@@ -264,6 +278,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
         },
         1.0,
     );
+    let (bend, wind) = carried(o.trace.as_deref());
     let o = Burn {
         h: &h,
         d: D,
@@ -273,6 +288,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
         y: RIM,
         height: 32.0,
         lean: 0.1,
+        bend,
         spread: 7.0,
         puffs: 8.0,
         licks: 4.0,
@@ -282,7 +298,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
         embers: 10.0,
         glow_r: 58.0,
         glow: 1.4,
-        wind: 3.0,
+        wind: nudge(3.0, wind),
     };
     burn(p, t, &TONGUES, &o, |p, _| {
         coals(p, i, &h, t, s);

@@ -5,14 +5,16 @@
 
 use core::f64::consts::PI;
 
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, RampOpt};
+use std::sync::Arc;
+
+use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options, RampOpt, Trace};
 use pixfx_draw::Painter;
 use pixfx_draw::color::{Rgba, WHITE, mix, ramp};
 use pixfx_draw::math::{Rng, clamp, js_max, js_min, js_round, rand, to_uint32};
 
 use super::lib::{
-    BACK_LAYERS, Hot, LAYERS, Layers, Life, LoopNoise, drift, ember, fire_puff_up, flame_tongue,
-    floor_light, hot_first, lick, looped, smoke_puff, spark, spark_at,
+    BACK_LAYERS, Hot, LAYERS, Layers, Life, LoopNoise, carried, drift, ember, fire_puff_up,
+    flame_tongue, floor_light, hot_first, lick, looped, nudge, smoke_puff, spark, spark_at,
 };
 
 pub struct Campfire;
@@ -33,7 +35,7 @@ const META: Meta = Meta {
     fps: 30,
     seed: 3,
     state: None,
-    options: &[WOOD.spec(), HEIGHT.spec()],
+    options: &[WOOD.spec(), HEIGHT.spec(), CARRIED.spec()],
 };
 
 // meta.options
@@ -60,6 +62,8 @@ const WOOD: RampOpt = RampOpt::new(
     ],
 );
 const HEIGHT: NumOpt = NumOpt::new("height", 22.0);
+/// 1: the game carries it along: its flames bend back as it moves (`super::lib::carried`).
+const CARRIED: NumOpt = NumOpt::new("carried", 0.0).within(0.0, 1.0);
 
 const D: f64 = META.duration;
 const NL: LoopNoise = LoopNoise(D);
@@ -114,7 +118,11 @@ impl Effect for Campfire {
             w: ramp(&opts.ramp(&WOOD)),
             height: opts.num(&HEIGHT),
             s: seed as f64,
+            trace: None,
         })
+    }
+    fn traces(&self, opts: &Options) -> Option<f64> {
+        (opts.num(&CARRIED) >= 0.5).then_some(0.2)
     }
 }
 
@@ -123,9 +131,13 @@ struct State {
     w: [Rgba; 6],
     height: f64,
     s: f64,
+    trace: Option<Arc<Trace>>,
 }
 
 impl EffectState for State {
+    fn set_trace(&mut self, trace: Option<Arc<Trace>>) {
+        self.trace = trace;
+    }
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
         if layer != Layer::Back {
             draw(p, t, self);
@@ -274,6 +286,8 @@ struct Tongue {
 struct Fire {
     t: Vec<Tongue>,
     s: f64,
+    /// Lean added while it is carried along, 0 at rest.
+    bend: f64,
 }
 
 impl Fire {
@@ -282,7 +296,7 @@ impl Fire {
         0.74 + 0.16 * NL.at(tt, 7.3, s + 1.0, 0.0) + 0.1 * NL.at(tt, 19.0, s + 2.0, 0.0)
     }
     fn lean(&self, tt: f64) -> f64 {
-        NL.at(tt, 0.67, self.s + 90.0, 0.0) * 0.12
+        nudge(NL.at(tt, 0.67, self.s + 90.0, 0.0) * 0.12, self.bend)
     }
     fn height(&self, q: &Tongue, tt: f64) -> f64 {
         let (h, n) = (q.h, q.n);
@@ -449,6 +463,7 @@ fn draw(p: &mut Painter, t: f64, o: &State) {
             })
             .collect(),
         s,
+        bend: carried(o.trace.as_deref()).0,
     };
     let fl = fire.fla(t);
     let n_t = fire.t.len();

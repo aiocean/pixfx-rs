@@ -1,6 +1,7 @@
 //! `explosions/body-burst`: the character it wraps blows apart into a handful of big chunks of its own sprite, flung
 //! out from the body's middle. Each chunk cracks into smaller ones after a moment or when it hits the floor, and those
-//! crack again, down to single pixels that bounce and heap up as dust on the floor; then the heap crumbles away. Made here, not ported: no source to check parity against; its golden
+//! crack again, down to single pixels that bounce and heap up as dust on the floor; then the heap crumbles away. A fast
+//! chunk smears its back edge behind it (`pixfx_draw::sweep`): it flies upright, so the smear stands upright too. Made here, not ported: no source to check parity against; its golden
 //! hashes pin it.
 //!
 //! It wraps its actor ([`Effect::wraps_actor`]) and destroys it ([`Effect::replaces_actor`]): it draws the body
@@ -19,6 +20,7 @@ use pixfx_core::{
 use pixfx_draw::Painter;
 use pixfx_draw::color::{Rgba, WHITE, mix};
 use pixfx_draw::math::{Rng, TAU, clamp, smooth, to_uint32};
+use pixfx_draw::sweep::{Brush, Look, Pose, Turn, sweep};
 
 pub struct BodyBurst;
 
@@ -517,6 +519,57 @@ impl State {
     }
 }
 
+/// Seconds of a chunk's flight its smear reaches back, and how fast it must fly to leave one.
+const SMEAR: f64 = 0.1;
+const SMEAR_SPEED: f64 = 60.0;
+
+/// Chunk `ch`'s smear: a broad piece that flies without turning, so its back edge (away from the way it goes) is
+/// swept upright through its middle along where it was over the last `SMEAR` seconds (its flight run back under
+/// gravity), in its own colours, dissolving behind it (`pixfx_draw::sweep`, `Brush::edge`).
+fn smear(p: &mut Painter, ch: &Chunk) {
+    let speed = libm::hypot(ch.vx, ch.vy);
+    if speed < SMEAR_SPEED || ch.cells.is_empty() {
+        return;
+    }
+    let n = ch.cells.len() as f64;
+    let (sx, sy) = ch.cells.iter().fold((0.0, 0.0), |(a, b), &(x, y, _)| {
+        (a + f64::from(x), b + f64::from(y))
+    });
+    let (mx, my) = (sx / n, sy / n);
+    let (c, s) = (ch.vx / speed, ch.vy / speed);
+    let mut brush = Brush::edge(
+        ch.cells.iter().map(|&(x, y, color)| {
+            let (x, y) = (f64::from(x) - mx, f64::from(y) - my);
+            (x * c + y * s, y, color, 0.0)
+        }),
+        0,
+    );
+    brush.turn = Turn::Angle(0.0);
+    let poses: Vec<Pose> = (0..=6)
+        .map(|i| {
+            let age = SMEAR * f64::from(i) / 6.0;
+            Pose {
+                x: mx + ch.dx - ch.vx * age,
+                y: my + ch.dy - ch.vy * age + 0.5 * GRAVITY * age * age,
+                angle: 0.0,
+                age,
+            }
+        })
+        .collect();
+    let look = Look {
+        secs: SMEAR,
+        fade: 0.0,
+        taper: 1.0,
+        wave: 0.0,
+        phase: 0.0,
+        breakup: 0.25,
+        shift: 0.0,
+        light: 0.0,
+        skip: 0.0,
+    };
+    sweep(p, &poses, &brush, &[], &look);
+}
+
 impl EffectState for State {
     fn update(&mut self, dt: f64) {
         self.step(dt);
@@ -548,6 +601,10 @@ impl EffectState for State {
                 c
             }
         };
+        // each chunk's smear under the chunks: its back edge swept along the last moment of its flight
+        for ch in &self.chunks {
+            smear(p, ch);
+        }
         for ch in &self.chunks {
             let (ox, oy) = (libm::floor(ch.dx), libm::floor(ch.dy));
             for &(x, y, c) in &ch.cells {
