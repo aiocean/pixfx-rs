@@ -1,11 +1,14 @@
 //! The ladder: the trained policy against the brain, the first mind, the scripted fighters and itself, printed as
 //! the "Done when" table of `docs/superpowers/specs/2026-11-15-duel-rules-in-rust-design.md`.
 //!
-//! `cargo run --release -p pixfx-duel --example ladder -- [--seeds 150] [--rounds 3] [--limit 120] [--weights FILE]`
+//! `cargo run --release -p pixfx-duel --example ladder -- [--seeds 150] [--rounds 3] [--limit 120] [--weights FILE]
+//! [--telemetry]`
+//!
+//! `--telemetry` adds, for each mirror, what each school's skills did, Thunder beside Frost.
 
 use pixfx_duel::duel::{Duel, DuelConfig, TICK};
 use pixfx_duel::first_mind::FirstMind;
-use pixfx_duel::ladder::{Match, Record, match_up};
+use pixfx_duel::ladder::{Match, Record, SchoolLog, SkillLog, match_up};
 use pixfx_duel::scripted::Scripted;
 use pixfx_duel::seat::{Brain, MakeSeat, PolicySeat, policy_mind, shipped};
 use pixfx_duel::sense::sense_of;
@@ -28,6 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let seeds: u32 = arg("--seeds").map_or(Ok(150), |s| s.parse())?;
     let rounds: u32 = arg("--rounds").map_or(Ok(3), |s| s.parse())?;
     let limit: f64 = arg("--limit").map_or(Ok(120.0), |s| s.parse())?;
+    let telemetry = args.iter().any(|a| a == "--telemetry");
     let net: Rc<Net> = match arg("--weights") {
         Some(path) => Rc::new(Net::load(&std::fs::read(&path)?)?),
         None => shipped()?,
@@ -53,48 +57,65 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "{:<34} {:>7} {:>9} {:>7} {:>7} {:>5} {:>6} {:>7} {:>6}",
         "match", "win", "thunder", "frost", "len s", "cut", "top", "attack", "dist"
     );
-    let rows: Vec<(&str, Maker<'_>, Maker<'_>)> = vec![
+    // each row: its name, its seats, and whether it is a mirror whose schools the telemetry compares
+    let rows: Vec<(&str, Maker<'_>, Maker<'_>, bool)> = vec![
         (
             "balanced vs brain (>=75%, 65% each)",
             Box::new(styled(Style::Balanced)),
             Box::new(Brain::make),
+            false,
         ),
         (
             "balanced vs first mind (>=80%)",
             Box::new(styled(Style::Balanced)),
             Box::new(FirstMind::make),
+            false,
         ),
         (
             "balanced vs aggressive script",
             Box::new(styled(Style::Balanced)),
             Box::new(Scripted::aggressive),
+            false,
         ),
         (
             "balanced vs turtle script",
             Box::new(styled(Style::Balanced)),
             Box::new(Scripted::turtle),
+            false,
         ),
         (
             "mirror, styles drawn (45-55%)",
             Box::new(drawn),
             Box::new(drawn),
+            true,
         ),
         (
             "brain vs first mind (baseline)",
             Box::new(Brain::make),
             Box::new(FirstMind::make),
+            false,
         ),
         (
             "brain mirror (school baseline)",
             Box::new(Brain::make),
             Box::new(Brain::make),
+            true,
         ),
     ];
-    for (name, a, b) in &rows {
+    let mut mirrors = Vec::new();
+    for (name, a, b, mirror) in &rows {
         let r = match_up(a.as_ref(), b.as_ref(), &m);
         print_row(name, &r);
+        if *mirror {
+            mirrors.push((*name, r));
+        }
     }
     println!("\nmirrors: the win column is Thunder's share of the rounds in the thunder column\n");
+    if telemetry {
+        for (name, r) in &mirrors {
+            print_telemetry(name, r);
+        }
+    }
     decision_cost(&net, &effects);
     Ok(())
 }
@@ -118,6 +139,154 @@ fn print_row(name: &str, r: &Record) {
         pct(r.attack_share()),
         r.mean_distance,
     );
+}
+
+/// What each school did in a mirror, Thunder beside Frost: per skill, then per school.
+fn print_telemetry(name: &str, r: &Record) {
+    let [t, f] = &r.schools;
+    let wins = [r.won[0] + r.lost[1], r.won[1] + r.lost[0]];
+    let rounds = wins[0] + wins[1];
+    println!(
+        "telemetry: {name}, {rounds} rounds (Thunder won {}, Frost {})",
+        wins[0], wins[1]
+    );
+    println!(
+        "  dmg: lives of the foe taken (1.00 = one life), chip and field ticks included; dmg% of the school's total. \
+         grd/bar/wrd/ddg/clh: blows the foe's guard held, its barrier turned, a ward erased, it dodged, blades met. \
+         brk: casts broken while gathering. pun: struck while recovering. fin: last blow of a round it won."
+    );
+    let cols = [
+        "cast", "land", "dmg", "dmg%", "grd", "bar", "wrd", "ddg", "clh", "brk", "pun", "fin",
+    ];
+    let head: String = cols
+        .iter()
+        .map(|c| {
+            let w = if *c == "dmg" { 8 } else { 6 };
+            format!("{c:>w$}")
+        })
+        .collect();
+    println!("  {:<12} | {:^74} | {:^74}", "", "Thunder", "Frost");
+    println!("  {:<12} |{head} |{head}", "skill");
+    let mut names: Vec<&str> = t.skills.keys().chain(f.skills.keys()).copied().collect();
+    names.sort_unstable();
+    names.dedup();
+    // the heaviest hitters first, by the two schools' damage together
+    let dmg = |s: &SchoolLog, n: &str| s.skills.get(n).map_or(0.0, |k| k.damage);
+    names.sort_by(|a, b| (dmg(t, b) + dmg(f, b)).total_cmp(&(dmg(t, a) + dmg(f, a))));
+    for n in names {
+        println!("  {n:<12} |{} |{}", skill_cells(t, n), skill_cells(f, n));
+    }
+    for status in ["burn", "shock"] {
+        let cell = |s: &SchoolLog| {
+            let d = s.statuses.get(status).copied().unwrap_or(0.0);
+            let fin = s.finals.get(status).copied().unwrap_or(0);
+            format!(
+                "{:>12}{:>8.2}{:>6.1}{:>48}{fin:>6}",
+                "",
+                d / 100.0,
+                pct(d, s.dealt()),
+                ""
+            )
+        };
+        println!("  {status:<12} |{} |{}", cell(t), cell(f));
+    }
+    let line = |label: &str, v: &dyn Fn(&SchoolLog) -> String| {
+        println!("  {label:<34} {:>14} {:>14}", v(t), v(f));
+    };
+    println!("  {:<34} {:>14} {:>14}", "per school", "Thunder", "Frost");
+    let per_round = |x: f64| x / f64::from(rounds.max(1));
+    line("lives dealt", &|s| format!("{:.2}", s.dealt() / 100.0));
+    line("lives lost", &|s| format!("{:.2}", s.life_lost / 100.0));
+    line("lives healed", &|s| format!("{:.2}", s.healed / 100.0));
+    line("dealt per round, % of a life", &|s| {
+        format!("{:.1}", per_round(s.dealt()))
+    });
+    line("status share of dealt", &|s| {
+        format!("{:.1}%", pct(s.statuses.values().sum(), s.dealt()))
+    });
+    line("chip share of dealt", &|s| {
+        format!(
+            "{:.1}%",
+            pct(s.skills.values().map(|k| k.chip).sum(), s.dealt())
+        )
+    });
+    line("casts per round", &|s| {
+        format!("{:.1}", per_round(f64::from(sum(s, |k| k.casts))))
+    });
+    line("hits landed per round", &|s| {
+        format!("{:.1}", per_round(f64::from(sum(s, |k| k.landed))))
+    });
+    line("casts broken / punished", &|s| {
+        format!("{} / {}", sum(s, |k| k.broken), sum(s, |k| k.punished))
+    });
+    line("its blows guarded/barrier/ward/dodged", &|s| {
+        format!(
+            "{}/{}/{}/{}",
+            sum(s, |k| k.guarded),
+            sum(s, |k| k.barrier),
+            sum(s, |k| k.ward),
+            sum(s, |k| k.dodged)
+        )
+    });
+    line("qi on casts per round", &|s| {
+        format!("{:.0}", per_round(s.qi_spent))
+    });
+    line("ultimates / rage spent", &|s| {
+        let u = s
+            .skills
+            .iter()
+            .filter(|(n, _)| pixfx_duel::data::spell(n).is_some_and(|sp| sp.ultimate))
+            .map(|(_, k)| k.casts)
+            .sum::<u32>();
+        format!("{u} / {:.0}", s.rage_spent)
+    });
+    line("ultimate damage, lives", &|s| {
+        let d = s
+            .skills
+            .iter()
+            .filter(|(n, _)| pixfx_duel::data::spell(n).is_some_and(|sp| sp.ultimate))
+            .map(|(_, k)| k.damage)
+            .sum::<f64>();
+        format!("{:.2}", d / 100.0)
+    });
+    line("time meditating", &|s| {
+        format!("{:.1}%", pct(s.meditating, s.seconds))
+    });
+    line("time guarding", &|s| {
+        format!("{:.1}%", pct(s.guarding, s.seconds))
+    });
+    line("time flying", &|s| {
+        format!("{:.1}%", pct(s.flying, s.seconds))
+    });
+    println!();
+}
+
+/// One school's cells for skill `n`.
+fn skill_cells(s: &SchoolLog, n: &str) -> String {
+    let k = s.skills.get(n).cloned().unwrap_or_default();
+    let fin = s.finals.get(n).copied().unwrap_or(0);
+    format!(
+        "{:>6}{:>6}{:>8.2}{:>6.1}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{fin:>6}",
+        k.casts,
+        k.landed,
+        k.damage / 100.0,
+        pct(k.damage, s.dealt()),
+        k.guarded,
+        k.barrier,
+        k.ward,
+        k.dodged,
+        k.clashed,
+        k.broken,
+        k.punished,
+    )
+}
+
+fn sum(s: &SchoolLog, of: impl Fn(&SkillLog) -> u32) -> u32 {
+    s.skills.values().map(of).sum()
+}
+
+fn pct(a: f64, b: f64) -> f64 {
+    if b == 0.0 { 0.0 } else { a / b * 100.0 }
 }
 
 /// The time one policy decision takes, natively, over 5,000 decisions of a real fight.

@@ -158,6 +158,45 @@ pub enum Out {
     },
 }
 
+/// What the rules note for whoever measures the duel (the ladder's telemetry), beside what the page reads: how a blow
+/// that did not land ended, what a status took, what a heal gave, and a cast broken while it gathered. Shares are of
+/// full life (0-100). The rules never read a note, and drawing one rolls no dice.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Note {
+    /// The foe of fighter `by` stopped its blow of `spell`, `how`; a guard still lets `chip` through.
+    Stopped {
+        by: usize,
+        spell: &'static str,
+        how: Stop,
+        chip: f64,
+    },
+    /// A burn, a shock or a field (`cause`: "burn", "shock" or the field's spell) of fighter `by`'s took `share` of
+    /// its foe's life.
+    Ticked {
+        by: usize,
+        cause: &'static str,
+        share: f64,
+    },
+    /// Fighter `by` healed `share` of its life.
+    Healed { by: usize, share: f64 },
+    /// Fighter `who`'s cast of `spell` was broken while it gathered.
+    Broken { who: usize, spell: &'static str },
+}
+
+/// How a blow was stopped.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stop {
+    /// Its guard held.
+    Guard,
+    /// Its barrier turned the blow aside (or sent a bolt back).
+    Barrier,
+    /// A ward's charge erased it.
+    Ward,
+    Dodge,
+    /// Two blades met.
+    Clash,
+}
+
 impl From<pixfx_fighter::body::Event> for Out {
     fn from(e: pixfx_fighter::body::Event) -> Out {
         match e {

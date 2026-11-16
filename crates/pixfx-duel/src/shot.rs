@@ -6,7 +6,7 @@
 use crate::act::{blocks, burst, cast, clash, hurt, play, turn_aside, zone_height};
 use crate::data::{Blow, Spell, orb_offset, school, spell};
 use crate::fighter::State;
-use crate::out::{Out, PlayOpts};
+use crate::out::{Note, Out, PlayOpts, Stop};
 use crate::status::{ControlKind, add_chill, add_shock, control, damage_of, take};
 use pixfx_draw::math::{js_min, js_sign, or_one};
 
@@ -108,6 +108,12 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
             let reflects =
                 f.barrier > 0.0 && f.barrier_spell.and_then(spell).is_some_and(|b| b.reflect);
             if reflects && overlaps(state, foe, x, y, 9.0) {
+                state.note(Note::Stopped {
+                    by: s.owner,
+                    spell: s.name,
+                    how: Stop::Barrier,
+                    chip: 0.0,
+                });
                 s.owner = foe;
                 vx = -vx;
                 x += js_sign(vx) * 10.0;
@@ -126,7 +132,7 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
                 return true;
             }
             if overlaps(state, foe, x, y, 3.0) {
-                if !s.pierce && blocks(state, foe, x - vx, s.power, blow) {
+                if !s.pierce && blocks(state, foe, x - vx, s.power, blow, s.name) {
                     clash(state, x, g - y, &[]);
                 } else if hurt(state, foe, s.power, js_sign(vx), s.name, s.stacks) && sp.shock {
                     add_shock(state, foe, s.owner, s.stacks);
@@ -149,7 +155,7 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
             }
             let (bx, by) = orb_at(s);
             if overlaps(state, foe, bx, -by, sp.radius.unwrap_or(0.0)) {
-                if !s.pierce && blocks(state, foe, bx, s.power, blow) {
+                if !s.pierce && blocks(state, foe, bx, s.power, blow, s.name) {
                     clash(state, bx, g + by, &[]);
                 } else {
                     let dir = or_one(js_sign(state.fighters[foe].body.x - bx));
@@ -308,6 +314,11 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
                         share,
                         x: fx,
                         y: fy,
+                    });
+                    state.note(Note::Ticked {
+                        by,
+                        cause: s.name,
+                        share,
                     });
                     // a cold fire chills whoever stands in it, a stack a tick
                     if sp.chill {

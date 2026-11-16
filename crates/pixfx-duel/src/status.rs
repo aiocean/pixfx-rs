@@ -6,7 +6,7 @@ use crate::data::{
     shock_interval,
 };
 use crate::fighter::{Fighter, Shocked, State};
-use crate::out::Out;
+use crate::out::{Note, Out};
 use pixfx_draw::math::{js_max, js_min, js_round};
 
 /// A hard control: frozen (no moving, no acting), held by a shock, or stunned.
@@ -97,6 +97,11 @@ pub fn shocking(state: &mut State, f: usize, dt: f64) {
         x,
         y,
     });
+    state.note(Note::Ticked {
+        by,
+        cause: "shock",
+        share,
+    });
     control(state, f, ControlKind::Hold, SHOCK.hold);
     let me = &mut state.fighters[f];
     let Some(mut shock) = me.shock else { return };
@@ -128,6 +133,11 @@ pub fn burning(state: &mut State, f: usize, dt: f64) {
             share,
             x,
             y,
+        });
+        state.note(Note::Ticked {
+            by: burn.by,
+            cause: "burn",
+            share,
         });
     }
     if burn.t <= 0.0 {

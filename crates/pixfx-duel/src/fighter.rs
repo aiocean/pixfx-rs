@@ -1,7 +1,7 @@
 //! A fighter of the duel and the duel's whole state.
 
 use crate::data::{Luck, Rarity, School, Stats, Trait, stats};
-use crate::out::Out;
+use crate::out::{Note, Out};
 use crate::rng::Rng;
 use crate::shot::Shot;
 use crate::style::Style;
@@ -277,6 +277,8 @@ pub struct State {
     pub shot_id: u32,
     pub fighters: [Fighter; 2],
     pub out: Vec<Out>,
+    /// What this step noted for a measure of the duel, each beside how many of `out` came before it.
+    pub notes: Vec<(usize, Note)>,
     /// The effects in the registry: a spell whose effect is missing is never cast.
     pub effects: Vec<String>,
     /// The arena shows its lamps and night.
@@ -313,6 +315,7 @@ impl State {
             shot_id: 0,
             fighters,
             out: Vec::new(),
+            notes: Vec::new(),
             effects,
             decor: false,
             told: Vec::new(),
@@ -335,6 +338,11 @@ impl State {
 
     pub fn emit(&mut self, out: Out) {
         self.out.push(out);
+    }
+
+    /// Note something for a measure of the duel.
+    pub fn note(&mut self, note: Note) {
+        self.notes.push((self.out.len(), note));
     }
 
     /// Tell fighter `me`'s mind something.
