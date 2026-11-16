@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Fighter: the duck, launched, tumble and fall poses are redrawn by hand from reference drawings
+  (`pixfx-pixel` clean and read), each with the whole costume as the standing poses wear it: the crown and its
+  ribbon, the crossed collar's gold edge over the red inner robe, the sash with its buckle, jade pendant and streaming
+  tail, the sword in its scabbard with hilt and tassel, gold cuffs, the hem, the boots. The duck is a deep squat with
+  an arm over the head instead of a low block; launched and fall are a size with the other poses (50x39 and 49x34
+  instead of 56x46 and 59x35) and keep their details on the slant. Diagonal bands of one colour are drawn with the
+  new `Pen::line4`, whose pixels touch by an edge, so they read as one stroke: the poses' single loose pixels drop
+  from 44 to 12 (launched) and from 36 to 6 (fall). `Pen::quad` fills a shape with any number of corners.
+  The limbs no longer swing every few frames in these poses (`flail` is gone, with `Pen::disc` and `Pen::leg`,
+  which only they used).
+
 - The duel's trained policy is a file of its own: the wasm no longer carries `policy.bin` (1.35 MB to 660 KB gzip),
   and the painting workers no longer hold a copy of it. Each corner seats a policy of its own. `pixfx-wasm`:
   `new Policy(bytes)` reads a weights file once; `Duel.withPolicies(config, seats?, left, right)` seats one per corner

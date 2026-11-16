@@ -295,6 +295,27 @@ impl Pen<'_> {
         }
     }
 
+    /// A line whose pixels touch by an edge: a diagonal step fills its corner too, so a band one pixel wide (a hem,
+    /// a collar's edge, a scabbard) reads as one stroke instead of loose dots.
+    fn line4(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, col: Rgba) {
+        let n = js_max(js_max((x1 - x0).abs(), (y1 - y0).abs()), 1.0);
+        let mut last: Option<(f64, f64)> = None;
+        let mut i = 0.0;
+        while i <= n {
+            let x = js_round(x0 + ((x1 - x0) * i) / n);
+            let y = js_round(y0 + ((y1 - y0) * i) / n);
+            if let Some((lx, ly)) = last
+                && lx != x
+                && ly != y
+            {
+                self.dot(x, ly, col);
+            }
+            self.dot(x, y, col);
+            last = Some((x, y));
+            i += 1.0;
+        }
+    }
+
     /// A sleeve standing out from the robe behind it, edged dark along its back and top.
     fn sleeve(&mut self, dx: f64, dy: f64, w: f64, h: f64, shade: usize) {
         let c = self.c;
@@ -360,8 +381,8 @@ impl Pen<'_> {
         }
     }
 
-    /// The convex shape with corners `p` filled, a row at a time: a robe's skirt, a body on a slant.
-    fn quad(&mut self, p: [(f64, f64); 4], col: Rgba) {
+    /// The convex shape with corners `p` (any number, in order round it) filled, a row at a time: a robe's skirt, a body on a slant.
+    fn quad(&mut self, p: &[(f64, f64)], col: Rgba) {
         let lo = p.iter().fold(f64::INFINITY, |m, q| js_min(m, q.1));
         let hi = p.iter().fold(f64::NEG_INFINITY, |m, q| js_max(m, q.1));
         let mut y = floor(lo);
@@ -369,8 +390,7 @@ impl Pen<'_> {
             // where the row's middle crosses each edge
             let mid = y + 0.5;
             let (mut left, mut right) = (f64::INFINITY, f64::NEG_INFINITY);
-            for i in 0..4 {
-                let (a, b) = (p[i], p[(i + 1) % 4]);
+            for (&a, &b) in p.iter().zip(p.iter().cycle().skip(1)) {
                 let (y0, y1) = (js_min(a.1, b.1), js_max(a.1, b.1));
                 if mid < y0 || mid > y1 || y0 == y1 {
                     continue;
@@ -387,16 +407,6 @@ impl Pen<'_> {
         }
     }
 
-    /// A round patch of radius `r` about (cx, cy).
-    fn disc(&mut self, cx: f64, cy: f64, r: f64, col: Rgba) {
-        let mut dy = -r;
-        while dy <= r {
-            let half = js_round(sqrt(js_max(0.0, r * r - dy * dy)));
-            self.px(cx - half, cy + dy, 2.0 * half + 1.0, 1.0, col);
-            dy += 1.0;
-        }
-    }
-
     /// An arm in its sleeve from the shoulder at (x0, y0) to the hand at (x1, y1): the sleeve in robe shade
     /// `shade`, gold at the cuff, the hand bare.
     fn arm(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, shade: usize) {
@@ -405,13 +415,6 @@ impl Pen<'_> {
         self.bar((x0, y0), (cx, cy), 3.0, 3.0, c.robe[shade]);
         self.bar((cx, cy), (cx, cy), 3.0, 3.0, c.trim[0]);
         self.px(x1, y1, 2.0, 2.0, c.skin[0]);
-    }
-
-    /// A leg in its trouser from the hip at (x0, y0) to the boot at (x1, y1) to (x1 + 3, y1 + 3).
-    fn leg(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) {
-        let c = self.c;
-        self.bar((x0, y0), (x1, y1), 3.0, 3.0, c.robe[2]);
-        self.px(x1, y1, 4.0, 4.0, c.boot);
     }
 
     /// A head lying face up, its crown toward -dx, at (x, y) to (x + 6, y + 6). The hair streams back from the
@@ -606,8 +609,6 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
     } else {
         js_max(-3.0, js_min(3.0, -a.vx * a.face * 0.03)) - 1.0 + js_round(sin(t * 4.0))
     };
-    // limbs thrown about while it flies: they swing every few frames
-    let flail = if still { 0.0 } else { floor(t * 12.0) % 2.0 };
     let mut pen = Pen {
         sprite: Sprite::default(),
         c: look,
@@ -635,7 +636,7 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
             // the near knee bent up under the robe, its foot flat
             pen.px(13.0, 0.0, 5.0, 2.0, c.boot);
             pen.quad(
-                [(2.0, 0.0), (9.0, 15.0), (10.0, 15.0), (16.0, 1.0)],
+                &[(2.0, 0.0), (9.0, 15.0), (10.0, 15.0), (16.0, 1.0)],
                 c.robe[1],
             );
             pen.bar((10.0, 14.0), (16.0, 1.0), 1.0, 1.0, c.robe[2]);
@@ -668,103 +669,239 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
             return pen.sprite;
         }
         Pose::Launched => {
-            // just thrown up and back by a heavy blow, spread like an X: head back and chest up on a slant, the
-            // near arm flung up, the far one out behind, the near leg kicked up toward the foe, the far leg and
-            // the robe's skirt flung down, the sash tails flying
-            let f = flail;
-            pen.arm(-7.0, 26.0, -17.0, 19.0 + f, 2);
-            pen.leg(6.0, 17.0, 13.0, 4.0 + f);
-            // the skirt, flared from the hips, its hem gold
+            // just thrown up and back by a heavy blow, spread like an X: head back and chest up on a 45° slant, the near
+            // arm flung up, the far one out behind, the near leg kicked up toward the foe, the far leg and the robe's skirt
+            // flung down, the sash tails and the scabbard trailing
+            // the far arm out behind, in the shade, gold at the cuff
             pen.quad(
-                [(0.0, 21.0), (11.0, 28.0), (20.0, 12.0), (6.0, 6.0)],
+                &[(-4.0, 32.0), (-2.0, 28.0), (-13.0, 23.0), (-15.0, 27.0)],
+                c.robe[2],
+            );
+            pen.line4(-15.0, 27.0, -13.0, 23.0, c.trim[0]);
+            pen.px(-18.0, 23.0, 3.0, 3.0, c.skin[1]);
+            // the far leg and the skirt flung down: shadowed along its back, the inner robe down its middle, the hem gold
+            pen.bar((9.0, 17.0), (12.0, 12.0), 3.0, 3.0, c.robe[2]);
+            pen.px(11.0, 9.0, 4.0, 5.0, c.boot);
+            pen.quad(
+                &[(0.0, 27.0), (9.0, 29.0), (19.0, 18.0), (5.0, 11.0)],
                 c.robe[1],
             );
-            pen.bar((0.0, 21.0), (6.0, 7.0), 2.0, 1.0, c.robe[2]);
-            pen.bar((11.0, 27.0), (19.0, 13.0), 1.0, 1.0, c.robe[0]);
-            pen.bar((6.0, 6.0), (19.0, 11.0), 1.0, 2.0, c.trim[0]);
-            pen.line(5.0, 21.0, 12.0, 9.0, c.inner[0]);
-            // the sash tails, flung down from the waist
-            pen.bar((1.0, 21.0), (0.0, 12.0 - f), 1.0, 1.0, c.inner[0]);
-            pen.bar((3.0, 21.0), (3.0, 13.0 + f), 1.0, 1.0, c.inner[1]);
-            // the body, back to the floor and chest up to the sky
+            pen.line4(0.0, 27.0, 5.0, 11.0, c.robe[2]);
+            pen.line4(9.0, 29.0, 19.0, 18.0, c.robe[0]);
+            pen.line4(7.0, 25.0, 10.0, 14.0, c.inner[0]);
+            pen.line4(5.0, 11.0, 19.0, 18.0, c.trim[0]);
+            pen.dot(8.0, 13.0, c.trim[1]);
+            pen.dot(15.0, 16.0, c.trim[1]);
+            // the near leg kicked up toward the foe
+            pen.bar((9.0, 23.0), (18.0, 26.0), 3.0, 3.0, c.robe[1]);
+            pen.line4(9.0, 23.0, 17.0, 26.0, c.robe[2]);
+            pen.px(18.0, 28.0, 4.0, 5.0, c.boot);
+            // the sword in its scabbard, trailing from the hip
+            pen.line4(2.0, 24.0, -6.0, 13.0, c.blade[2]);
+            pen.px(2.0, 25.0, 2.0, 2.0, c.trim[0]);
+            pen.px(4.0, 23.0, 1.0, 2.0, c.ribbon[0]);
+            // the body, chest up: the crossed collar's gold edge over the red inner robe
             pen.quad(
-                [(-10.0, 30.0), (2.0, 20.0), (11.0, 28.0), (-5.0, 38.0)],
+                &[(-6.0, 34.0), (0.0, 37.0), (8.0, 29.0), (0.0, 25.0)],
                 c.robe[1],
             );
-            pen.bar((-10.0, 30.0), (2.0, 20.0), 2.0, 1.0, c.robe[2]);
-            pen.bar((-5.0, 37.0), (10.0, 28.0), 1.0, 1.0, c.robe[0]);
-            pen.line(-5.0, 35.0, 5.0, 26.0, c.inner[0]);
-            pen.line(-6.0, 35.0, 4.0, 26.0, c.trim[0]);
-            pen.bar((2.0, 21.0), (9.0, 28.0), 2.0, 1.0, c.inner[0]);
-            pen.face_up(-17.0, 30.0, Eye::Shut, 5.0);
-            pen.leg(9.0, 26.0, 19.0, 31.0 - f);
-            pen.arm(-3.0, 35.0, -1.0 + f, 46.0, 1);
-            return pen.sprite;
-        }
-        Pose::Fall => {
-            // dropping back-first, a little head-down: the body on a slant with the head low, the arms and legs
-            // trailing up, the robe's skirt flaring up off the legs, the hair hanging below the head
-            let f = flail;
-            pen.arm(-7.0, 12.0, -17.0, 20.0 + f, 2);
-            pen.leg(5.0, 17.0, 9.0, 32.0 + f);
-            // the skirt flaring up from the hips, its hem gold
-            pen.quad(
-                [(1.0, 15.0), (8.0, 11.0), (21.0, 24.0), (10.0, 32.0)],
-                c.robe[1],
-            );
-            pen.bar((8.0, 11.0), (21.0, 24.0), 1.0, 1.0, c.robe[2]);
-            pen.bar((1.0, 16.0), (9.0, 31.0), 1.0, 1.0, c.robe[0]);
-            pen.bar((10.0, 32.0), (21.0, 24.0), 1.0, 1.0, c.trim[0]);
-            pen.line(5.0, 16.0, 14.0, 26.0, c.inner[0]);
-            // the body, back to the floor
-            pen.quad(
-                [(-10.0, 6.0), (7.0, 10.0), (6.0, 19.0), (-9.0, 13.0)],
-                c.robe[1],
-            );
-            pen.bar((-10.0, 6.0), (7.0, 10.0), 1.0, 1.0, c.robe[2]);
-            pen.bar((-9.0, 13.0), (6.0, 19.0), 1.0, 1.0, c.robe[0]);
-            pen.line(-7.0, 12.0, 2.0, 15.0, c.inner[0]);
-            pen.line(-8.0, 12.0, 1.0, 16.0, c.trim[0]);
-            pen.bar((3.0, 9.0), (3.0, 17.0), 2.0, 1.0, c.inner[0]);
-            pen.face_up(-17.0, 5.0, Eye::Shut, -6.0);
-            pen.leg(8.0, 17.0, 22.0, 20.0 - f);
-            pen.arm(-3.0, 16.0, -5.0 - f, 28.0, 1);
-            return pen.sprite;
-        }
-        Pose::Tumble => {
-            // spinning helplessly, curled into a ball round its middle: the head tucked down, the knees hugged to
-            // the chest, the feet folded under, the far arm flung out, swishes of motion round it; draw turns it
-            // a quarter at a time
-            let f = flail;
-            pen.swish(1.0, 16.0, 14.0, 2.6, 3.7, c.blade[1]);
-            pen.swish(1.0, 16.0, 14.0, -0.4, 0.6, c.blade[1]);
-            pen.arm(-5.0, 22.0, -14.0, 25.0 + f, 2);
-            // the back curled round, shadowed underneath
-            pen.disc(0.0, 15.0, 10.0, c.robe[2]);
-            pen.disc(1.0, 16.0, 9.0, c.robe[1]);
-            pen.px(-3.0, 24.0, 7.0, 1.0, c.robe[0]);
-            // the feet folded under the seat
-            pen.px(-9.0, 3.0, 7.0, 4.0, c.boot);
-            pen.px(-7.0, 7.0, 4.0, 2.0, c.boot);
-            // the knees hugged up to the chest, the skirt's hem gold round them
-            pen.disc(6.0, 14.0, 5.0, c.robe[1]);
-            pen.px(3.0, 18.0, 7.0, 1.0, c.robe[0]);
-            pen.bar((1.0, 9.0), (10.0, 11.0), 1.0, 1.0, c.trim[0]);
-            pen.bar((-6.0, 9.0), (1.0, 9.0), 1.0, 1.0, c.trim[0]);
-            // the sash round the middle, its tail whipping out behind
-            pen.bar((-9.0, 15.0), (10.0, 12.0), 1.0, 2.0, c.inner[0]);
-            for i in 0..6 {
+            pen.line4(-6.0, 33.0, 0.0, 25.0, c.robe[2]);
+            pen.line4(0.0, 37.0, 7.0, 30.0, c.robe[0]);
+            pen.line4(-3.0, 34.0, 2.0, 29.0, c.trim[0]);
+            pen.line4(-1.0, 34.0, 3.0, 30.0, c.inner[0]);
+            // the sash across the waist, its buckle, the jade pendant hanging from it, the two tails flying
+            pen.bar((-1.0, 25.0), (5.0, 28.0), 2.0, 2.0, c.inner[0]);
+            pen.px(3.0, 27.0, 2.0, 2.0, c.trim[0]);
+            pen.px(5.0, 25.0, 1.0, 2.0, c.ribbon[1]);
+            pen.dot(5.0, 24.0, c.jade);
+            for i in 0..7 {
                 let fi = f64::from(i);
-                let sway = js_round(sin(t * 9.0 + fi) * fi / 3.0);
+                let flutter = if i > 3 {
+                    js_round(sin(t * 6.0 + fi))
+                } else {
+                    0.0
+                };
                 pen.dot(
-                    -10.0 - fi,
-                    14.0 - js_round(fi / 2.0) + sway,
+                    -2.0 - fi,
+                    24.0 - js_round(fi * 0.8) - flutter,
                     c.inner[usize::from(i >= 3)],
                 );
             }
-            pen.head(20.0, 2.0, Eye::Shut);
-            // the near arm wrapped round the knees
-            pen.arm(-1.0, 20.0, 9.0, 17.0, 1);
+            for i in 0..6 {
+                let fi = f64::from(i);
+                let flutter = if i > 4 {
+                    js_round(sin(t * 6.0 + fi + 2.0))
+                } else {
+                    0.0
+                };
+                pen.px(
+                    -3.0 - fi,
+                    22.0 - fi - flutter,
+                    1.0,
+                    2.0,
+                    c.inner[usize::from(i >= 3)],
+                );
+            }
+            pen.face_up(-12.0, 31.0, Eye::Shut, 3.0);
+            // the near arm flung up, gold at the cuff
+            pen.quad(
+                &[(-1.0, 33.0), (3.0, 34.0), (6.0, 40.0), (2.0, 41.0)],
+                c.robe[0],
+            );
+            pen.line4(-1.0, 33.0, 2.0, 41.0, c.robe[1]);
+            pen.px(2.0, 40.0, 5.0, 2.0, c.trim[0]);
+            pen.px(2.0, 40.0, 5.0, 1.0, c.trim[1]);
+            pen.px(3.0, 42.0, 3.0, 4.0, c.skin[0]);
+            pen.dot(3.0, 45.0, c.skin[1]);
+            return pen.sprite;
+        }
+        Pose::Fall => {
+            // dropping back-first, head-down: the body on a slant with the head low and the hair hanging below it, the
+            // legs trailing up, the robe's skirt flaring up off them, the near arm trailing up
+            // the legs trailing up
+            pen.bar((9.0, 18.0), (12.0, 24.0), 3.0, 3.0, c.robe[2]);
+            pen.px(13.0, 27.0, 4.0, 7.0, c.boot);
+            pen.bar((14.0, 15.0), (17.0, 18.0), 3.0, 3.0, c.robe[2]);
+            pen.px(18.0, 21.0, 4.0, 5.0, c.boot);
+            // the skirt flaring up off the legs: the inner robe down its middle, the hem gold
+            pen.quad(
+                &[
+                    (6.0, 11.0),
+                    (6.0, 24.0),
+                    (10.0, 30.0),
+                    (20.0, 19.0),
+                    (13.0, 11.0),
+                ],
+                c.robe[1],
+            );
+            pen.line4(12.0, 19.0, 15.0, 15.0, c.robe[2]);
+            pen.px(8.0, 13.0, 3.0, 11.0, c.robe[0]);
+            pen.line4(6.0, 24.0, 6.0, 11.0, c.robe[2]);
+            pen.px(7.0, 12.0, 2.0, 9.0, c.inner[0]);
+            pen.px(7.0, 17.0, 1.0, 4.0, c.inner[1]);
+            pen.line4(10.0, 30.0, 20.0, 20.0, c.trim[0]);
+            // the sword in its scabbard at the hip
+            pen.line4(9.0, 11.0, 14.0, 16.0, c.blade[2]);
+            pen.px(8.0, 10.0, 1.0, 2.0, c.trim[0]);
+            pen.px(10.0, 9.0, 2.0, 1.0, c.ribbon[0]);
+            // the body, head-down: the crossed collar's gold edge over the red inner robe
+            pen.quad(
+                &[(-6.0, 11.0), (5.0, 17.0), (7.0, 8.0), (-3.0, 4.0)],
+                c.robe[1],
+            );
+            pen.line4(-3.0, 4.0, 7.0, 8.0, c.robe[2]);
+            pen.line4(-6.0, 11.0, 4.0, 17.0, c.robe[0]);
+            pen.line4(-2.0, 8.0, 2.0, 12.0, c.trim[0]);
+            pen.line4(0.0, 8.0, 4.0, 12.0, c.inner[0]);
+            // the sash across the waist, its buckle, the jade pendant, the tail streaming
+            pen.px(4.0, 8.0, 2.0, 9.0, c.inner[0]);
+            pen.px(4.0, 16.0, 2.0, 1.0, c.inner[1]);
+            pen.px(4.0, 12.0, 2.0, 2.0, c.trim[0]);
+            pen.px(3.0, 8.0, 1.0, 2.0, c.ribbon[1]);
+            pen.dot(3.0, 7.0, c.jade);
+            for i in 0..7 {
+                let fi = f64::from(i);
+                let flutter = if i > 3 {
+                    js_round(sin(t * 6.0 + fi))
+                } else {
+                    0.0
+                };
+                pen.px(
+                    2.0 - fi,
+                    5.0 - js_round(fi / 3.0) - flutter,
+                    1.0,
+                    2.0,
+                    c.inner[usize::from(i >= 3)],
+                );
+            }
+            // the hair hanging below the head
+            pen.px(-16.0, 4.0, 5.0, 4.0, c.hair[1]);
+            pen.px(-15.0, 2.0, 2.0, 2.0, c.hair[1]);
+            pen.px(-12.0, 5.0, 1.0, 3.0, c.hair[0]);
+            pen.face_up(-11.0, 8.0, Eye::Shut, 4.0);
+            // the near arm trailing up, gold at the cuff
+            pen.quad(
+                &[(-5.0, 8.0), (-1.0, 7.0), (0.0, 16.0), (-5.0, 16.0)],
+                c.robe[0],
+            );
+            pen.line4(0.0, 16.0, -1.0, 7.0, c.robe[2]);
+            pen.px(-5.0, 17.0, 5.0, 2.0, c.trim[0]);
+            pen.px(-5.0, 17.0, 5.0, 1.0, c.trim[1]);
+            pen.px(-4.0, 19.0, 3.0, 4.0, c.skin[0]);
+            pen.dot(-4.0, 22.0, c.skin[1]);
+            return pen.sprite;
+        }
+        Pose::Tumble => {
+            // spinning helplessly, curled into a ball: the head tucked down, the knees hugged to the chest, the feet folded
+            // under, the far arm flung out, swishes of motion round it; draw turns it a quarter at a time
+            pen.swish(6.0, 14.0, 14.0, 2.6, 3.7, c.blade[1]);
+            pen.swish(6.0, 14.0, 14.0, -0.4, 0.6, c.blade[1]);
+            // the far arm flung out, gold at the cuff
+            pen.quad(
+                &[(1.0, 25.0), (2.0, 18.0), (-8.0, 20.0), (-9.0, 26.0)],
+                c.robe[0],
+            );
+            pen.line4(-7.0, 20.0, 1.0, 18.0, c.robe[2]);
+            pen.px(-9.0, 21.0, 2.0, 6.0, c.trim[0]);
+            pen.px(-9.0, 21.0, 1.0, 6.0, c.trim[1]);
+            pen.px(-13.0, 24.0, 3.0, 3.0, c.skin[0]);
+            // the feet folded under
+            pen.px(4.0, 4.0, 4.0, 4.0, c.boot);
+            pen.px(8.0, 6.0, 3.0, 3.0, c.boot);
+            // the back curled round and shadowed, the knees lit, the hem gold at the shins, the inner robe between them
+            pen.quad(
+                &[
+                    (-1.0, 21.0),
+                    (8.0, 22.0),
+                    (14.0, 15.0),
+                    (13.0, 8.0),
+                    (3.0, 4.0),
+                    (-2.0, 10.0),
+                ],
+                c.robe[1],
+            );
+            pen.line4(-1.0, 20.0, -2.0, 11.0, c.robe[2]);
+            pen.line4(-2.0, 10.0, 3.0, 4.0, c.robe[2]);
+            pen.px(7.0, 12.0, 5.0, 4.0, c.robe[0]);
+            pen.line4(12.0, 14.0, 12.0, 9.0, c.robe[2]);
+            pen.line4(3.0, 4.0, 12.0, 8.0, c.trim[0]);
+            pen.bar((5.0, 11.0), (7.0, 6.0), 2.0, 2.0, c.inner[0]);
+            // the crossed collar's gold edge over the red inner robe
+            pen.line4(4.0, 20.0, 1.0, 15.0, c.trim[0]);
+            pen.line4(6.0, 20.0, 3.0, 15.0, c.inner[0]);
+            // the sword in its scabbard across the back
+            pen.line4(2.0, 11.0, -5.0, 5.0, c.blade[2]);
+            pen.px(2.0, 12.0, 1.0, 2.0, c.trim[0]);
+            pen.px(-7.0, 5.0, 1.0, 2.0, c.ribbon[0]);
+            // the sash, its buckle, the jade pendant, the tail streaming
+            pen.bar((-2.0, 11.0), (3.0, 14.0), 2.0, 2.0, c.inner[0]);
+            pen.px(1.0, 14.0, 2.0, 2.0, c.trim[0]);
+            pen.px(0.0, 11.0, 1.0, 2.0, c.ribbon[1]);
+            pen.dot(0.0, 10.0, c.jade);
+            for i in 0..7 {
+                let fi = f64::from(i);
+                let flutter = if i > 3 {
+                    js_round(sin(t * 6.0 + fi))
+                } else {
+                    0.0
+                };
+                pen.px(
+                    -3.0 - fi,
+                    12.0 - js_round(fi / 3.0) - flutter,
+                    1.0,
+                    2.0,
+                    c.inner[usize::from(i >= 3)],
+                );
+            }
+            pen.head(18.0, 8.0, Eye::Shut);
+            // the near arm hugging the knees
+            pen.quad(
+                &[(5.0, 20.0), (9.0, 20.0), (13.0, 16.0), (10.0, 13.0)],
+                c.robe[0],
+            );
+            pen.line4(5.0, 19.0, 9.0, 14.0, c.robe[1]);
+            pen.line4(11.0, 16.0, 11.0, 13.0, c.trim[0]);
+            pen.px(12.0, 14.0, 2.0, 2.0, c.skin[0]);
             return pen.sprite;
         }
         Pose::Roll => {
@@ -799,25 +936,71 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
             return pen.sprite;
         }
         Pose::Duck => {
-            // dropped low under the blow, body bent level, an arm over the head. The site asks
-            // `c.school === "thunder"` of a palette that has no school, so both looks take hair[0] here.
-            pen.px(-5.0, 0.0, 4.0, 2.0, c.boot);
+            // ducking under a blow: dropped into a deep squat, the body bent level and the head low, the near arm raised
+            // over the head to shield it, the sash tail streaming back
+            let bob = if !still && sin(t * 3.0) > 0.6 {
+                1.0
+            } else {
+                0.0
+            };
+            // the far sleeve hanging behind, the boots wide apart
+            pen.sleeve(-8.0, 8.0, 3.0, 5.0, 2);
+            pen.px(-12.0, 0.0, 4.0, 2.0, c.boot);
             pen.px(3.0, 0.0, 4.0, 2.0, c.boot);
-            pen.px(-7.0, 2.0, 15.0, 5.0, c.robe[1]);
-            pen.px(-7.0, 2.0, 15.0, 1.0, c.trim[0]);
-            pen.px(-7.0, 2.0, 2.0, 5.0, c.robe[2]);
-            pen.px(-5.0, 7.0, 11.0, 5.0, c.robe[1]);
-            pen.px(-5.0, 11.0, 11.0, 1.0, c.robe[2]);
-            pen.px(2.0, 7.0, 3.0, 4.0, c.inner[0]);
-            pen.px(6.0, 6.0, 6.0, 6.0, c.skin[0]);
-            pen.px(6.0, 6.0, 2.0, 6.0, c.skin[1]);
-            pen.px(10.0, 8.0, 1.0, 1.0, c.outline);
-            pen.px(5.0, 11.0, 8.0, 3.0, c.hair[0]);
-            pen.px(4.0, 12.0, 2.0, 2.0, c.hair[0]);
-            pen.px(3.0, 13.0, 3.0, 1.0, c.trim[0]);
-            pen.px(6.0, 4.0, 5.0, 3.0, c.robe[1]);
-            pen.px(11.0, 4.0, 2.0, 2.0, c.skin[0]);
-            pen.line(-10.0, 6.0, -3.0, 3.0, c.blade[2]);
+            // the lower robe over the folded legs: shadowed behind, lit in front, the inner robe down its middle, a fold
+            // at the knee, the hem gold
+            let mut dy = 2.0;
+            while dy <= 8.0 {
+                let back = -9.0 - if dy < 4.0 { 1.0 } else { 0.0 };
+                let front = 6.0 - if dy > 6.0 { 1.0 } else { 0.0 };
+                pen.px(back, dy, front - back + 1.0, 1.0, c.robe[1]);
+                pen.px(back, dy, 2.0, 1.0, c.robe[2]);
+                pen.px(front - 1.0, dy, 1.0, 1.0, c.robe[0]);
+                pen.px(-2.0, dy, 2.0, 1.0, c.inner[usize::from(dy < 5.0)]);
+                pen.px(1.0, dy, 1.0, 1.0, c.robe[2]);
+                dy += 1.0;
+            }
+            pen.px(-10.0, 1.0, 12.0, 1.0, c.trim[0]);
+            pen.px(2.0, 2.0, 4.0, 1.0, c.trim[0]);
+            // the sword in its scabbard, swung back and down from the hip
+            pen.line4(-15.0, 3.0, -4.0, 8.0, c.blade[2]);
+            pen.px(-3.0, 8.0, 1.0, 2.0, c.trim[0]);
+            pen.px(-4.0, 5.0, 1.0, 2.0, c.ribbon[0]);
+            // the body bent level, the crossed collar's gold edge over the red inner robe
+            let ty = 9.0 - bob;
+            pen.quad(
+                &[(-6.0, ty), (7.0, ty), (5.0, ty + 5.0), (-3.0, ty + 5.0)],
+                c.robe[1],
+            );
+            pen.px(-6.0, ty, 2.0, 3.0, c.robe[2]);
+            pen.px(-4.0, ty + 3.0, 2.0, 2.0, c.robe[2]);
+            pen.px(5.0, ty + 1.0, 1.0, 3.0, c.robe[0]);
+            pen.line4(2.0, ty + 4.0, 1.0, ty + 1.0, c.trim[0]);
+            pen.px(3.0, ty + 2.0, 2.0, 3.0, c.inner[0]);
+            // the sash, its buckle, the jade pendant hanging from it, the tail streaming back
+            pen.px(-7.0, ty, 13.0, 2.0, c.inner[1]);
+            pen.px(-7.0, ty + 1.0, 13.0, 1.0, c.inner[0]);
+            pen.px(1.0, ty, 2.0, 2.0, c.trim[0]);
+            pen.px(2.0, ty - 3.0, 1.0, 3.0, c.ribbon[1]);
+            pen.dot(2.0, ty - 4.0, c.jade);
+            for i in 0..6 {
+                let fi = f64::from(i);
+                let flutter = if i > 3 {
+                    js_round(sin(t * 6.0 + fi))
+                } else {
+                    0.0
+                };
+                pen.px(
+                    -8.0 - fi + js_round(wind * fi * 0.3),
+                    ty + js_round(fi / 3.0) + flutter,
+                    1.0,
+                    2.0,
+                    c.inner[usize::from(i >= 3)],
+                );
+            }
+            pen.head(ty + 4.0, 7.0, Eye::Shut);
+            // the near arm raised over the head
+            pen.arm(6.0, ty + 5.0, 12.0, ty + 13.0, 0);
             return pen.sprite;
         }
         Pose::Meditate => {
