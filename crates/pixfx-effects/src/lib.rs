@@ -4,8 +4,10 @@
 
 use pixfx_core::effect::{Effect, find};
 
+pub mod appear;
 pub mod arcane;
 pub mod critters;
+pub mod disappear;
 pub mod explosions;
 pub mod feedback;
 pub mod fire;
