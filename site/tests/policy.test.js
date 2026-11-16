@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createDuel, freeDuel, step } from "../assets/duel.js";
-import { effects, pkg } from "./engine.js";
+import { effects, pkg, policyBytes } from "./engine.js";
 
 const all = new Set(effects());
 const golden = JSON.parse(readFileSync(new URL("../../crates/pixfx-duel/tests/goldens/policy_fight.json", import.meta.url), "utf8"));
@@ -57,8 +57,40 @@ describe("the trained policy", () => {
     expect(brain.view()).toEqual(brains.view());
     brain.free();
     brains.free();
-    expect(() => new pkg.Duel(config, ["policy", "brain"])).toThrow(/needs the trained policy/);
+    expect(() => new pkg.Duel(config, ["policy", "brain"])).toThrow(/needs a trained policy for its corner/);
     expect(() => new pkg.Policy(new Uint8Array(16))).toThrow();
+  });
+
+  test("each corner plays its own policy", () => {
+    // a second policy: the trained one with other output biases (`pi.b`, the file's last tensor), so it leans to other acts
+    const other = new Uint8Array(policyBytes);
+    const tail = new DataView(other.buffer, other.byteLength - 64);
+    for (let i = 0; i < 16; i++) tail.setFloat32(i * 4, i % 2 ? 3 : -3, true);
+    const config = { seed: 5, left: 0, right: 220, ground: 150, sky: 96, effects: [...all] };
+    const p = new pkg.Policy(policyBytes);
+    const q = new pkg.Policy(other);
+    const fight = (left, right) => {
+      const duel = pkg.Duel.withPolicies(config, undefined, left, right);
+      for (let i = 0; i < 20 * 60; i++) duel.step(1 / 60);
+      const view = duel.view().fighters.map((f) => [f.hp, f.qi, f.x]);
+      duel.free();
+      return view;
+    };
+    const pp = fight(p, p);
+    expect(fight(p, p)).toEqual(pp);
+    expect(fight(p, q)).not.toEqual(pp); // the right corner plays its own
+    expect(fight(q, q)).not.toEqual(fight(p, q)); // and so does the left
+    // a corner the brain sits in ignores its policy
+    const brainRight = (right) => {
+      const duel = pkg.Duel.withPolicies(config, ["policy", "brain"], p, right);
+      for (let i = 0; i < 20 * 60; i++) duel.step(1 / 60);
+      const view = duel.view().fighters.map((f) => [f.hp, f.qi, f.x]);
+      duel.free();
+      return view;
+    };
+    expect(brainRight(q)).toEqual(brainRight(p));
+    p.free();
+    q.free();
   });
 
   test("each fighter shows the style it fights in", () => {
