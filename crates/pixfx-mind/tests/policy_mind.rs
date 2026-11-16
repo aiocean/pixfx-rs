@@ -113,12 +113,19 @@ fn it_sees_a_windup_late_by_its_reaction() {
 }
 
 #[test]
-fn a_reset_forgets_what_it_saw_and_its_clock() {
-    let mut m = mind(8);
-    run(&mut m, 1.0);
-    m.hold(5.0);
-    m.reset();
-    // nothing it meant to do survives, and it decides at once: its act comes the tick after
-    assert_eq!(think(&mut m, &at(10.0), DT), None);
-    assert!(think(&mut m, &at(10.0 + DT), DT).is_some());
+fn a_reset_forgets_what_it_saw_and_waits_like_the_brain() {
+    // nothing it meant to do survives a reset, and a round opens with the brain's wait: 0.4-0.7 s before it acts
+    for seed in 1..=20 {
+        let mut m = mind(seed);
+        run(&mut m, 1.0);
+        m.hold(5.0);
+        m.reset();
+        let first = (0..60).find(|&i| think(&mut m, &at(10.0 + i as f64 * DT), DT).is_some());
+        assert!(first.is_some(), "seed {seed}: no act within a second");
+        let t = first.unwrap_or(0) as f64 * DT;
+        assert!(
+            (0.4..=0.7 + 2.0 * DT).contains(&t),
+            "seed {seed}: first act at {t} s"
+        );
+    }
 }

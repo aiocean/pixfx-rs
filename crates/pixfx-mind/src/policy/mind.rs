@@ -111,9 +111,10 @@ impl PolicyMind {
         self.queued = Some(act);
     }
 
-    /// A new round: it forgets what it saw, what it meant to do, and its clock.
+    /// A new round: it forgets what it saw and what it meant to do, and waits 0.4-0.7 s before it acts, as `Mind`
+    /// does.
     pub fn reset(&mut self) {
-        self.clock = 0.0;
+        self.clock = 0.4 + 0.3 * self.rng.next();
         self.hold = 0.0;
         self.view.clear();
         self.queued = None;

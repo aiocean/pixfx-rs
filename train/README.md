@@ -8,6 +8,8 @@ uv sync
 uv run maturin develop --release -m ../crates/pixfx-duel-py/Cargo.toml   # after any change to the Rust rules
 uv run pytest
 uv run python ppo.py --run v1                     # runs/v1/log.jsonl, runs/v1/last.pt
+uv run python ppo.py --run v2 --init runs/v1/last.pt --updates 600 --lr 1e-4 --ent 0.003 0.002 --shaping-until 0
+                                                  # a fine-tune: a new run from v1's network
 uv run python export.py runs/v1/last.pt           # crates/pixfx-duel/weights/policy.bin + its Rust check
 cargo run --release -p pixfx-duel --example ladder -- --seeds 150
 ```

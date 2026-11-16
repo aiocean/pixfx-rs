@@ -3,9 +3,12 @@
 //! it learns is what it does on the page.
 //!
 //! Reward, per decision: +1 for the round won and -1 for the round lost (a round cut at `limit` seconds is lost too,
-//! so stalling never pays); `shaping` x (a x dealt - b x taken) / 100, with (a, b) set by the learner's style; minus
+//! so stalling never pays); `shaping` x (dealt - taken) / 100, which the trainer anneals to 0; the style's lean, which
+//! stays (`LEAN` x the share of the foe's health dealt for an aggressive learner, minus `LEAN` x the share of its own
+//! taken for a defensive one, nothing for a balanced one); minus
 //! `STALL` a decision once `QUIET` seconds pass with no damage either way; minus `REPEAT` when one act (other than
-//! waiting) is chosen `RUN` times in a row.
+//! waiting) is chosen `RUN` times in a row; minus `HABIT` when the act chosen is already `SHARE` or more of the last
+//! `HABITS` decisions.
 
 use crate::duel::{Duel, DuelConfig, TICK};
 use crate::first_mind::FirstMind;
@@ -16,15 +19,22 @@ use crate::sense::sense_of;
 use crate::style::Style;
 use pixfx_mind::policy::{ACTIONS, Due, Net, OBS, PolicyMind};
 use pixfx_mind::{Choice, Outcome};
+use std::collections::VecDeque;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 /// The penalty a decision for a fight gone quiet, and how long it must be quiet.
 const STALL: f32 = 0.002;
+/// What a style's lean pays for a whole health bar dealt (aggressive) or taken (defensive), against 1 for a round.
+const LEAN: f64 = 0.3;
 const QUIET: f64 = 6.0;
 /// The penalty for choosing one act `RUN` times in a row.
 const REPEAT: f32 = 0.002;
 const RUN: u32 = 6;
+/// What choosing an act that already fills `SHARE` of the last `HABITS` decisions (about 5 s of play) costs.
+const HABIT: f32 = 0.004;
+const HABITS: usize = 40;
+const SHARE: f64 = 0.4;
 
 /// Who the learner fights.
 #[derive(Clone, Debug)]
@@ -112,6 +122,8 @@ pub struct Env {
     quiet: f64,
     last: Option<usize>,
     run: u32,
+    /// The last `HABITS` acts it chose.
+    recent: VecDeque<usize>,
     done: bool,
 }
 
@@ -132,7 +144,7 @@ impl Env {
         let seats = if me == 0 { [learner, foe] } else { [foe, learner] };
         let config = DuelConfig { seed: cfg.seed, left: 0.0, right: 220.0, ground: 150.0, sky: 96.0, effects: cfg.effects };
         let blank = Due { obs: [0.0; OBS], legal: [false; ACTIONS], u: 0.0 };
-        let mut env = Env { duel: Duel::new(config, seats), me, style, limit: cfg.limit, wire, due: blank, quiet: 0.0, last: None, run: 0, done: false };
+        let mut env = Env { duel: Duel::new(config, seats), me, style, limit: cfg.limit, wire, due: blank, quiet: 0.0, last: None, run: 0, recent: VecDeque::with_capacity(HABITS + 1), done: false };
         env.advance();
         env
     }
@@ -163,14 +175,18 @@ impl Env {
         if self.quiet >= QUIET {
             reward -= STALL;
         }
+        let same = self.recent.iter().filter(|&&a| a == act).count();
+        if self.recent.len() == HABITS && same as f64 >= SHARE * HABITS as f64 {
+            reward -= HABIT;
+        }
+        self.recent.push_back(act);
+        if self.recent.len() > HABITS {
+            self.recent.pop_front();
+        }
         self.wire.borrow_mut().answer = Some(act);
         let (dealt, taken, won) = self.advance();
-        let (a, b) = match self.style {
-            Style::Aggressive => (1.5, 0.5),
-            Style::Balanced => (1.0, 1.0),
-            Style::Defensive => (0.5, 1.5),
-        };
-        reward += shaping * ((a * dealt - b * taken) / 100.0) as f32;
+        reward += shaping * ((dealt - taken) / 100.0) as f32;
+        reward += self.lean(dealt, taken);
         let length = self.duel.state.time;
         let cut = won.is_none() && length >= self.limit;
         if won.is_some() || cut {
@@ -178,6 +194,16 @@ impl Env {
             reward += if won == Some(true) { 1.0 } else { -1.0 };
         }
         Step { reward, done: self.done, won, length }
+    }
+
+    /// The style's lean for one decision's damage.
+    fn lean(&self, dealt: f64, taken: f64) -> f32 {
+        let hp = |i: usize| self.duel.state.fighters.get(i).map_or(1.0, |f| f.stats.hp.max(1.0));
+        match self.style {
+            Style::Aggressive => (LEAN * dealt / hp(1 - self.me)) as f32,
+            Style::Balanced => 0.0,
+            Style::Defensive => (-LEAN * taken / hp(self.me)) as f32,
+        }
     }
 
     /// Run whole ticks until the learner's next decision, the round's end or the limit: the damage it dealt and

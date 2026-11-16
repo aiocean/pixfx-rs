@@ -5,7 +5,7 @@ mod common;
 use common::all_effects;
 use pixfx_duel::style::Style;
 use pixfx_duel::train::{Env, EnvConfig, Opponent, Step};
-use pixfx_mind::policy::ACTIONS;
+use pixfx_mind::policy::{ACTIONS, Act};
 use pixfx_mind::Rng;
 
 fn cfg(seed: u32, learner: usize, opponent: Opponent) -> EnvConfig {
@@ -52,7 +52,7 @@ fn an_episode_pays_plus_or_minus_one_at_its_end() {
 
 #[test]
 fn an_episode_cut_at_its_limit_is_a_loss() {
-    let mut env = Env::new(EnvConfig { limit: 2.0, ..cfg(4, 0, Opponent::Turtle) });
+    let mut env = Env::new(EnvConfig { limit: 3.0, ..cfg(4, 0, Opponent::Turtle) });
     let steps = play(&mut env, 0.0, |_| 0);
     let last = steps.last().copied();
     assert!(last.is_some_and(|s| s.done && s.won.is_none() && (s.reward + 1.0).abs() < 0.05), "{last:?}");
@@ -116,4 +116,57 @@ fn a_policy_opponent_plays_from_its_weights() {
     let mut env = Env::new(cfg(9, 1, Opponent::Policy(net)));
     let steps = play(&mut env, 0.0, |e| random_legal(e, &mut rng));
     assert!(steps.last().is_some_and(|s| s.done));
+}
+
+#[test]
+fn a_style_still_leans_once_shaping_is_gone() {
+    // the same fight paid with no shaping as each style: aggressive is paid for what it deals, defensive pays for
+    // what it takes, balanced plays for the outcome alone
+    let paid = |style| {
+        let mut rng = Rng::new(4);
+        let mut env = Env::new(EnvConfig {
+            style,
+            ..cfg(8, 0, Opponent::Brain)
+        });
+        play(&mut env, 0.0, |e| random_legal(e, &mut rng))
+            .iter()
+            .map(|s| s.reward)
+            .sum::<f32>()
+    };
+    let (a, b, d) = (
+        paid(Style::Aggressive),
+        paid(Style::Balanced),
+        paid(Style::Defensive),
+    );
+    assert!(
+        a > b && b > d,
+        "aggressive {a}, balanced {b}, defensive {d}"
+    );
+}
+
+#[test]
+fn an_act_that_fills_its_recent_decisions_pays_for_the_habit() {
+    // meditate and guard in turn never repeat one act six times running, yet meditate is half of what it does
+    let mut env = Env::new(cfg(9, 0, Opponent::Turtle));
+    let mut turn = 0;
+    let steps = play(&mut env, 0.0, |e| {
+        turn += 1;
+        let want = if turn % 2 == 0 {
+            Act::Meditate
+        } else {
+            Act::Guard
+        }
+        .index();
+        if e.observe().1[want] { want } else { 0 }
+    });
+    let worst = steps
+        .iter()
+        .filter(|s| !s.done)
+        .map(|s| s.reward)
+        .fold(0.0_f32, f32::min);
+    assert!(
+        worst <= -0.004,
+        "the worst of {} steps paid {worst}",
+        steps.len()
+    );
 }

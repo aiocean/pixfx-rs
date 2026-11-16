@@ -1,6 +1,10 @@
 """PPO for the duel's policy (CleanRL-style, one file): many envs, short rollouts, masked actions, an HL-Gauss critic.
 
     uv run python ppo.py --run v1 [--updates 3000] [--envs 512] [--device cpu|mps] [--resume runs/v1/last.pt]
+    uv run python ppo.py --run v2 --init runs/v1/last.pt --updates 600 --lr 1e-4 --ent 0.003 0.002 --shaping-until 0
+
+`--resume` continues a run where it stopped (its optimiser and its place in the schedule); `--init` starts a new run,
+with its own schedule, from another run's network (a `.pt` checkpoint, critic included, or a `.bin` weights file).
 
 Writes runs/<run>/log.jsonl (one line every 10 updates) and runs/<run>/last.pt (every 25 updates and at the end).
 """
@@ -17,7 +21,15 @@ from torch.distributions import Categorical
 
 import pixfx_duel as pd
 from league import League
-from net import Policy, hl_gauss
+from net import Policy, hl_gauss, load_bin
+
+
+def schedule(update, updates, lr, ent, shaping_until):
+    """Learning rate, entropy weight and shaping at `update` of `updates`: the first two fall linearly to 0 and to
+    `ent[1]`, shaping falls from 1 to 0 over the first `shaping_until` of the run (0: no shaping at all)."""
+    frac = update / updates
+    shaping = max(0.0, 1 - frac / shaping_until) if shaping_until > 0 else 0.0
+    return lr * (1 - frac), ent[0] + (ent[1] - ent[0]) * frac, shaping
 
 
 def main():
@@ -39,6 +51,7 @@ def main():
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--resume")
+    ap.add_argument("--init", help="start from this network (.pt or .bin) with a fresh schedule")
     args = ap.parse_args()
 
     out = pathlib.Path(__file__).parent / "runs" / args.run
@@ -53,6 +66,12 @@ def main():
     start = 0
     env = pd.VecEnv(n, args.threads)
     league = League(env, rng, seed=1_000_000 + args.seed * 10_000_000)
+    if args.init:
+        path = pathlib.Path(args.init)
+        if path.suffix == ".pt":
+            policy.load_state_dict(torch.load(path, map_location=dev, weights_only=False)["model"])
+        else:
+            load_bin(policy, path.read_bytes())
     if args.resume:
         ck = torch.load(args.resume, map_location=dev, weights_only=False)
         policy.load_state_dict(ck["model"])
@@ -77,11 +96,9 @@ def main():
     tick = time.time()
 
     for update in range(start, args.updates):
-        frac = update / args.updates
+        lr, ent_coef, shaping = schedule(update, args.updates, args.lr, args.ent, args.shaping_until)
         for g in opt.param_groups:
-            g["lr"] = args.lr * (1 - frac)
-        ent_coef = args.ent[0] + (args.ent[1] - args.ent[0]) * frac
-        shaping = max(0.0, 1 - frac / args.shaping_until)
+            g["lr"] = lr
 
         policy.eval()
         for t in range(T):
