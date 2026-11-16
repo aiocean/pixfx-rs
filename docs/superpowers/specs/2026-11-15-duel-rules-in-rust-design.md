@@ -210,20 +210,20 @@ Until the JS rules are deleted, `site/tests/replay.test.js` runs `duel.js` and t
   `Duel`s in a batch (training favours many parallel duels over long rollouts) and steps them all from arrays of actions, returning observations, masks, rewards and dones.
 - **Trainer:** a Python PPO trainer (CleanRL-style, PyTorch on MPS) in `train/` at the repo root, a `uv` project.
   It is scripts, not a CLI, the way each crate's `examples/` are.
-- **One policy for both schools and all styles** (user, 2026-11-15). The observation tells it its school and its
-  style (aggressive, balanced or defensive). It plays both sides, and one weights file ships.
+- **One policy for both schools** (user, 2026-11-15). The observation tells it its school and a style tag
+  (aggressive, balanced or defensive). It plays both sides, and one weights file ships.
 - **Styles on the page:** each fight draws a style per fighter from its seed. The style is shown before the fight,
   so bettors can study it. It is part of each fighter's view for the HUD; the betting project decides where it
-  shows.
+  shows. Styles are cosmetic for now (user, 2026-11-16): they do not change how a fighter plays. A reward that
+  makes them play differently was either ignored (small) or farmed by stalling (large); styles that play differently
+  return with the balance work.
 - **League:** opponents are drawn from the policy's latest self, its frozen past snapshots, the utility brain, the
   first mind, and scripted styles (aggressive, turtling).
 - **Reward:**
   - +1 for a round won, −1 for a round lost;
   - a small shaped term for damage dealt minus damage taken, decayed away during training;
-  - penalties for stalling (no damage either way for a long stretch) and for repeating one move.
-
-  The style input sets the reward's weights (an aggressive fighter is paid more for damage dealt, a defensive one
-  for damage avoided), so each style plays recognisably.
+  - penalties for stalling (no damage either way for a long stretch), for repeating one move, and for a move that
+    already fills 40% of its recent decisions.
 - **Export:** `train/` writes the weights file that `pixfx-mind` loads, after checking it in Rust against PyTorch's
   outputs on a fixed batch.
 
@@ -233,15 +233,13 @@ All measured over 150 seeds, each fought both ways (the method of the 55% run):
 
 | Check | Bar |
 |---|---|
-| New brain, balanced style, vs utility brain | ≥ 75% of rounds overall, ≥ 65% as each school |
-| New brain, aggressive and defensive styles, vs utility brain | ≥ 60% of rounds each |
-| New brain, balanced style, vs first mind | ≥ 80% of rounds |
+| New brain vs utility brain | ≥ 75% of rounds overall, ≥ 65% as each school |
+| New brain vs first mind | ≥ 80% of rounds |
 | Mirror match (new brain both sides, styles drawn) | Thunder wins 45-55%, after the balance pass if needed |
 | Mean round length | 15-45 s; no fight hits the time limit |
 | Most-used action | Under 40% of decisions |
-| Styles | A viewer told the style can see it in the fight: share of attack actions, distance kept |
 | Decision cost | Under 0.2 ms in wasm on the desktop; the phone checked once by hand |
-| On the page | The user watches rounds with `?mind` and agrees they look skilled |
+| On the page | The user watches rounds on the landing page and agrees they look skilled |
 
 `site/tests/mind-match.test.js` turns from `todo` into a passing test against the new brain. Its bar is the table
 above, and the file name it cites is this document.

@@ -97,14 +97,14 @@ fn without_shaping_only_the_outcome_and_small_penalties_pay() {
 }
 
 #[test]
-fn shaping_pays_for_damage_by_style() {
-    // the same fight, paid as aggressive and as defensive: the aggressive learner is paid more for what it deals
-    let paid = |style| {
+fn shaping_pays_for_damage() {
+    // the same fight paid with and without shaping: the damage either way is paid only when shaping is on
+    let paid = |shaping| {
         let mut rng = Rng::new(4);
-        let mut env = Env::new(EnvConfig { style, ..cfg(8, 0, Opponent::Turtle) });
-        play(&mut env, 1.0, |e| random_legal(e, &mut rng)).iter().map(|s| s.reward).sum::<f32>()
+        let mut env = Env::new(cfg(8, 0, Opponent::Turtle));
+        play(&mut env, shaping, |e| random_legal(e, &mut rng)).iter().map(|s| s.reward).sum::<f32>()
     };
-    assert_ne!(paid(Style::Aggressive), paid(Style::Defensive));
+    assert_ne!(paid(1.0), paid(0.0));
 }
 
 #[test]
@@ -116,32 +116,6 @@ fn a_policy_opponent_plays_from_its_weights() {
     let mut env = Env::new(cfg(9, 1, Opponent::Policy(net)));
     let steps = play(&mut env, 0.0, |e| random_legal(e, &mut rng));
     assert!(steps.last().is_some_and(|s| s.done));
-}
-
-#[test]
-fn a_style_still_leans_once_shaping_is_gone() {
-    // the same fight paid with no shaping as each style: aggressive is paid for what it deals, defensive pays for
-    // what it takes, balanced plays for the outcome alone
-    let paid = |style| {
-        let mut rng = Rng::new(4);
-        let mut env = Env::new(EnvConfig {
-            style,
-            ..cfg(8, 0, Opponent::Brain)
-        });
-        play(&mut env, 0.0, |e| random_legal(e, &mut rng))
-            .iter()
-            .map(|s| s.reward)
-            .sum::<f32>()
-    };
-    let (a, b, d) = (
-        paid(Style::Aggressive),
-        paid(Style::Balanced),
-        paid(Style::Defensive),
-    );
-    assert!(
-        a > b && b > d,
-        "aggressive {a}, balanced {b}, defensive {d}"
-    );
 }
 
 #[test]

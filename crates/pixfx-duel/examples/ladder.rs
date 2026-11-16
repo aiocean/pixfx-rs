@@ -60,16 +60,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Box::new(Brain::make),
         ),
         (
-            "aggressive vs brain (>=60%)",
-            Box::new(styled(Style::Aggressive)),
-            Box::new(Brain::make),
-        ),
-        (
-            "defensive vs brain (>=60%)",
-            Box::new(styled(Style::Defensive)),
-            Box::new(Brain::make),
-        ),
-        (
             "balanced vs first mind (>=80%)",
             Box::new(styled(Style::Balanced)),
             Box::new(FirstMind::make),
