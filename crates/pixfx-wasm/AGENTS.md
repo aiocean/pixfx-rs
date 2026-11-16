@@ -31,7 +31,7 @@ Behind `duel` (default): `src/duel.rs`, the landing duel's rules from `pixfx-due
 (`seats`: `["brain" | "first", ...]`, the brain when left out) or `Duel.withPolicies(config, seats?, left, right)`, a
 trained policy per corner (`seats`: `["policy" | "brain" | "first", ...]`, each corner's policy when left out),
 `step(dt)` (commands and events), `view()`, `hold(me, seconds)`; `new Policy(bytes)`, a trained policy read from a
-weights file (`crates/pixfx-duel/weights/*.bin`), which the page fetches beside the wasm (the wasm never carries the
+weights file (`games/arena/crates/pixfx-duel/weights/*.bin`), which the page fetches beside the wasm (the wasm never carries the
 weights); its tables as
 the page reads (`duelSpells()`, `duelTraits()`, `duelStats()`, `duelConstants()`), `damageOf` and `orbOffset`.
 A `hit` event says what kind of blow it was (`how`: `"plain"`, `"counter"` on a fighter gathering a cast, `"punish"`

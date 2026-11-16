@@ -8,7 +8,7 @@
 
 **Tech Stack:** JavaScript (bun test), Rust (pixfx-mind, pixfx-wasm), the site's static build.
 
-**Spec:** `docs/superpowers/specs/2026-11-15-duel-bar-polish-design.md` (builds on `2026-11-15-duel-rotating-skills-design.md`).
+**Spec:** `games/arena/docs/specs/2026-11-15-duel-bar-polish-design.md` (builds on `2026-11-15-duel-rotating-skills-design.md`).
 
 ## Global Constraints
 

@@ -1,7 +1,7 @@
 # Duel frames: design
 
 Status: shipped 2026-11-16 (main `629f9d1`, the page deployed with the policy retrained on these rules). Every number
-is in `pixfx_duel::data::FRAMES` and the spells' `recover`; the rules' tests are `crates/pixfx-duel/tests/frames.rs`.
+is in `pixfx_duel::data::FRAMES` and the spells' `recover`; the rules' tests are `games/arena/crates/pixfx-duel/tests/frames.rs`.
 
 Built differently from the text below:
 
@@ -22,7 +22,7 @@ difference, and the policy decides every 0.096-0.144 s and sees 0.16 s late. Eve
 
 ## What exists today
 
-- A cast runs Windup -> `release` -> Recover -> done (`crates/pixfx-duel/src/act.rs:240-264`), with fixed `windup`
+- A cast runs Windup -> `release` -> Recover -> done (`games/arena/crates/pixfx-duel/src/act.rs:240-264`), with fixed `windup`
   and `recover` per spell (`src/data.rs:545-546`). Pose shows `Doing::Windup` / `Doing::Recover` (`act.rs:106-114`),
   so the phases are already visible.
 - Everything is paid at `begin`: qi (`act.rs:133`), rage for an ultimate (`act.rs:136`), cooldown (`act.rs:145-146`),
@@ -213,7 +213,7 @@ counted from `Out::Hit.how`, plus blows that passed through an ultimate's start.
 5. **Goldens.** `event_hashes.json`, `first_mind.json` and `policy_fight.json` re-pin on purpose; `arenas.json` (pools
    and opening bars) must not change.
 6. **The shipped policy plays the old game until retrained.** The rules and the new `policy.bin` land in one change.
-7. **Doc drift.** `crates/pixfx-duel/CLAUDE.md` still names a `duel.js` parity gate and a dump tool that no longer
+7. **Doc drift.** `games/arena/crates/pixfx-duel/CLAUDE.md` still names a `duel.js` parity gate and a dump tool that no longer
    exist (`site/assets/duel.js` is a 74-line wrapper); fix it with this work.
 
 ## Decided (user, 2026-11-16)

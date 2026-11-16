@@ -1,5 +1,5 @@
 //! The ladder: the trained policy against the brain, the first mind, the scripted fighters and itself, printed as
-//! the "Done when" table of `docs/superpowers/specs/2026-11-15-duel-rules-in-rust-design.md`.
+//! the "Done when" table of `games/arena/docs/specs/2026-11-15-duel-rules-in-rust-design.md`.
 //!
 //! `cargo run --release -p pixfx-duel --example ladder -- [--seeds 150] [--rounds 3] [--limit 120] [--weights FILE]
 //! [--telemetry]`

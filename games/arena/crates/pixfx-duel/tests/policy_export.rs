@@ -1,4 +1,4 @@
-//! The shipped weights compute what PyTorch computed when `train/export.py` wrote them
+//! The shipped weights compute what PyTorch computed when `games/arena/train/export.py` wrote them
 //! (`tests/fixtures/policy_check.json`: observations from real fights, their masks, PyTorch's logits).
 
 use pixfx_duel::seat::shipped;
@@ -11,7 +11,7 @@ fn exported_weights_match_pytorch() {
         env!("CARGO_MANIFEST_DIR"),
         "/tests/fixtures/policy_check.json"
     ));
-    assert!(text.is_ok(), "run train/export.py to write the fixture");
+    assert!(text.is_ok(), "run games/arena/train/export.py to write the fixture");
     let Ok(text) = text else { return };
     let check: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
     let net = shipped();

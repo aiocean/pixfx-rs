@@ -9,7 +9,7 @@ watch, by letting an agent propose numbers and the trained policy play them, ins
 
 The shape is AlphaEvolve's (DeepMind, 2025): a model proposes candidates, a scoring function people wrote judges each
 one, the best candidates are kept and changed again. Here the candidate is a set of numbers in
-`crates/pixfx-duel/src/data.rs` and the scoring function is the ladder (`crates/pixfx-duel/src/ladder.rs`).
+`games/arena/crates/pixfx-duel/src/data.rs` and the scoring function is the ladder (`games/arena/crates/pixfx-duel/src/ladder.rs`).
 
 ## Why the policy, and why it must be fine-tuned every round
 
@@ -29,7 +29,7 @@ fine-tuned from the base model before it is measured.
    balance measured through the policy is wrong for exactly the statuses this loop will tune. The input size
    changes, so this needs one full retrain (2-4 h). That run is the **base model**.
 3. One or two balance rounds by hand, with the user, to learn what a good score looks like before a machine optimises it.
-4. The duel.js parity gate (`crates/pixfx-duel/CLAUDE.md`, Traps) is settled: either the Rust port is the only
+4. The duel.js parity gate (`games/arena/crates/pixfx-duel/CLAUDE.md`, Traps) is settled: either the Rust port is the only
    source of the rules, or every number the loop changes is also changed in `site/assets/duel.js` and the dump re-run.
 
 ## One round

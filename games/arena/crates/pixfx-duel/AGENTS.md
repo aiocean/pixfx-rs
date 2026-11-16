@@ -2,7 +2,7 @@
 
 Layer: **Game**. Read the root `AGENTS.md` ("The boundary" and "Layers and where code goes") before changing anything
 here; this file only says what this crate holds. The design is
-`docs/superpowers/specs/2026-11-15-duel-rules-in-rust-design.md`.
+`games/arena/docs/specs/2026-11-15-duel-rules-in-rust-design.md`.
 
 ## Job
 
@@ -12,14 +12,14 @@ and blows (`act`), shots (`shot`), the round loop (`duel`), the seats that decid
 `pixfx-mind`, the trained policy (`PolicySeat`, weights in `weights/policy.bin`), `first_mind`, the yardstick a brain is
 measured against, or the scripted fighters in `scripted`), each fighter's style (`style`), what a mind senses
 (`sense`), and the duel as the page reads it (`view`). For training and measuring the policy: the trainer's episodes
-and rewards (`train`, driven from Python through `crates/pixfx-duel-py`) and the ladder (`ladder`, printed by
+and rewards (`train`, driven from Python through `games/arena/crates/pixfx-duel-py`) and the ladder (`ladder`, printed by
 `examples/ladder.rs`). A seed replays the same fight on every target. The page (`site/assets/duel.js`, a
 wrapper over the wasm `Duel`) plays the effect commands and feels the events the duel returns; it decides nothing.
 
 ## Belongs here
 
 - The duel's rules: damage, defences, cooldowns, qi, rage, statuses, wards, barriers, the bar, rounds.
-- Frame data (`docs/superpowers/specs/2026-11-16-duel-frames-design.md`): a blow on a fighter gathering a cast is a
+- Frame data (`games/arena/docs/specs/2026-11-16-duel-frames-design.md`): a blow on a fighter gathering a cast is a
   COUNTER, on one recovering a PUNISH (`Out::Hit.how`); unsafe skills recover longer when guarded; an ultimate's
   opening cannot be hit. Every number is in `data::FRAMES`.
 - The duel's tables: spells, schools, stats, tiers, traits, luck.
@@ -47,7 +47,7 @@ wrapper over the wasm `Duel`) plays the effect commands and feels the events the
   the tests once to rewrite them.
 - `tests/fixtures/js_numbers.json` pins the tables, dice and formulas (`tests/data.rs`), one key per number: a
   deliberate change to a number edits its key there too.
-- `weights/policy.bin` is the trained policy (`train/export.py` writes it). A new one must pass
+- `weights/policy.bin` is the trained policy (`games/arena/train/export.py` writes it). A new one must pass
   `tests/policy_export.rs` (Rust's forward pass against PyTorch's, `tests/fixtures/policy_check.json`, written with it)
   and re-pins `goldens/policy_fight.json` (delete it and run the tests), which `site/tests/policy.test.js` checks
   the wasm build against.

@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 js-sys = "=0.3.107"
 pixfx-core = { path = "../pixfx-core", features = ["ts"] }
 pixfx-draw = { path = "../pixfx-draw" }
-pixfx-duel = { path = "../pixfx-duel", features = ["serde"], optional = true }
+pixfx-duel = { path = "../../games/arena/crates/pixfx-duel", features = ["serde"], optional = true }
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
 pixfx-export = { path = "../pixfx-export" }
 pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"], optional = true }

@@ -17,7 +17,7 @@ const LETTERBOX = 12;
 const WRAP = { ring: "feedback/outline", surge: "feedback/power-up" };
 /** Where a fighter's ring plays, above its feet: about the middle of its body, so the ring's box holds it in any pose. */
 const RING_MID = 24;
-/** Each corner's trained policy, `[left, right]`: a weights file in `crates/pixfx-duel/weights/`, which `site/build.sh`
+/** Each corner's trained policy, `[left, right]`: a weights file in `games/arena/crates/pixfx-duel/weights/`, which `site/build.sh`
  *  copies beside the wasm. A new policy is a new file there and its name here. */
 const POLICY_FILES = ["policy.bin", "policy.bin"];
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -31,7 +31,7 @@ export async function mount() {
   const [engine, icons] = await Promise.all([loadPixfx(), loadIcons([32, 24])]);
   useEngine(pixfx);
   // each corner's trained policy is a file of its own beside the wasm (`site/build.sh` copies every
-  // `crates/pixfx-duel/weights/*.bin`), about as heavy as the engine: fetched only once the engine is in, so it never
+  // `games/arena/crates/pixfx-duel/weights/*.bin`), about as heavy as the engine: fetched only once the engine is in, so it never
   // holds back the first frame, and seated from the next duel on. A file named twice is fetched once. Until both
   // arrive, or if one never does, the duel seats the brain.
   const files = [...new Set(POLICY_FILES)];

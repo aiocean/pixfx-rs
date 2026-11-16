@@ -14,8 +14,8 @@ crate-type = ["cdylib"]
 numpy = "0.30"
 pixfx-duel = { path = "../pixfx-duel" }
 # the effect registry the page has: some duel rules play only when their effect is there
-pixfx-effects = { path = "../pixfx-effects" }
-pixfx-mind = { path = "../pixfx-mind" }
+pixfx-effects = { path = "../../../../crates/pixfx-effects" }
+pixfx-mind = { path = "../../../../crates/pixfx-mind" }
 pyo3 = { version = "0.30", features = ["extension-module"] }
 
 # pyo3 stays out of the main workspace (like pixfx-gpui): it is built only by `maturin` for the trainer

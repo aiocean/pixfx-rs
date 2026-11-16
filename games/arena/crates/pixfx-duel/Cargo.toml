@@ -7,16 +7,16 @@ license.workspace = true
 
 [dependencies]
 libm.workspace = true
-pixfx-draw = { path = "../pixfx-draw" }
-pixfx-fighter = { path = "../pixfx-fighter" }
-pixfx-mind = { path = "../pixfx-mind" }
+pixfx-draw = { path = "../../../../crates/pixfx-draw" }
+pixfx-fighter = { path = "../../../../crates/pixfx-fighter" }
+pixfx-mind = { path = "../../../../crates/pixfx-mind" }
 serde = { workspace = true, optional = true }
 tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 [dev-dependencies]
 # the whole effect registry, as the page has it, and which effects loop
-pixfx-effects = { path = "../pixfx-effects" }
+pixfx-effects = { path = "../../../../crates/pixfx-effects" }
 # exact float parsing and the fixture's key order
 serde_json = { version = "=1.0.154", features = ["float_roundtrip", "preserve_order"] }
 

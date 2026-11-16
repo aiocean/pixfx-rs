@@ -2,11 +2,11 @@
 
 Layer: **Shell** (for the trainer). Read the root `AGENTS.md` ("The boundary" and "Layers and where code goes")
 before changing anything here; this file only says what this crate holds. The design is
-`docs/superpowers/specs/2026-11-15-duel-rules-in-rust-design.md` (Part 2, "Training").
+`games/arena/docs/specs/2026-11-15-duel-rules-in-rust-design.md` (Part 2, "Training").
 
 ## Job
 
-`import pixfx_duel` for the PPO trainer in `train/`: `VecEnv(n, threads)` runs `n` training episodes
+`import pixfx_duel` for the PPO trainer in `games/arena/train/`: `VecEnv(n, threads)` runs `n` training episodes
 (`pixfx_duel::train::Env`) on worker threads and hands numpy arrays back: `set_weights(id, bytes)` for `policy`
 opponents, `reset(i, seed, learner, style, foe_style, opponent, weights_id, limit)`, `observe()` →
 `(obs float32[n, OBS], mask bool[n, ACTIONS])`, `step(actions int64[n], shaping)` →
@@ -23,7 +23,7 @@ and seats); only plain arrays cross threads.
 |---|---|
 | decides a reward, an episode's end, an opponent's play | `pixfx-duel` (`train`, `seat`, `scripted`) |
 | encodes what the policy sees or may do | `pixfx-mind` (`policy`) |
-| is the trainer | `train/` |
+| is the trainer | `games/arena/train/` |
 
 ## Dependencies
 
@@ -39,6 +39,6 @@ and seats); only plain arrays cross threads.
 ## Before you finish
 
 ```
-cd train && uv run maturin develop --release -m ../crates/pixfx-duel-py/Cargo.toml && uv run pytest
-PYO3_PYTHON=$PWD/train/.venv/bin/python cargo clippy --manifest-path crates/pixfx-duel-py/Cargo.toml -- -D warnings
+cd games/arena/train && uv run maturin develop --release -m ../crates/pixfx-duel-py/Cargo.toml && uv run pytest
+PYO3_PYTHON=$PWD/games/arena/train/.venv/bin/python cargo clippy --manifest-path games/arena/crates/pixfx-duel-py/Cargo.toml -- -D warnings
 ```

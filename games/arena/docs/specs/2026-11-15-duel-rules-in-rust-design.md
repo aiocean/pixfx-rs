@@ -23,7 +23,7 @@ Why the fighters must be smart, for people who watch and bet:
 
 ## Goals
 
-1. The duel's rules live in one Rust crate, `crates/pixfx-duel`. The page, the HUD, the tooltips and the bout
+1. The duel's rules live in one Rust crate, `games/arena/crates/pixfx-duel`. The page, the HUD, the tooltips and the bout
    pages run on it through wasm. The only behaviour change is fixed ticks (below).
 2. A PPO-trained policy in `pixfx-mind` drives both fighters on the page. It is the same on every target: the same
    seed and the same inputs give the same fight natively and in wasm.
@@ -116,7 +116,7 @@ Evidence for the pick:
 
 ### The crate
 
-`crates/pixfx-duel` sits in a new **Game** layer above Engine. It depends on `pixfx-fighter` (`Body`),
+`games/arena/crates/pixfx-duel` sits in a new **Game** layer above Engine. It depends on `pixfx-fighter` (`Body`),
 `pixfx-mind` (`Mind`, `Sense`, `Choice`) and `libm`, and never on a shell. `CLAUDE.md`'s layer table gets the row,
 and `crates/pixfx-mind/AGENTS.md` points "the rules of a fight" at `pixfx-duel` in place of `duel.js`.
 
@@ -206,7 +206,7 @@ Until the JS rules are deleted, `site/tests/replay.test.js` runs `duel.js` and t
 
 ### Training
 
-- **Env binding:** `crates/pixfx-duel-py`, a thin pyo3/maturin binding, the only Python-facing code. It runs many
+- **Env binding:** `games/arena/crates/pixfx-duel-py`, a thin pyo3/maturin binding, the only Python-facing code. It runs many
   `Duel`s in a batch (training favours many parallel duels over long rollouts) and steps them all from arrays of actions, returning observations, masks, rewards and dones.
 - **Trainer:** a Python PPO trainer (CleanRL-style, PyTorch on MPS) in `train/` at the repo root, a `uv` project.
   It is scripts, not a CLI, the way each crate's `examples/` are.

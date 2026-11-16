@@ -1,7 +1,7 @@
 //! The landing duel's rules: two cultivators, Thunder and Frost, fight with skills drawn onto a rotating bar, with
 //! statuses, wards and barriers, round after round. Everything is decided here and deterministic from a seed; a shell
 //! plays the effect commands and feels the events `Duel::step` returns.
-//! See `AGENTS.md` and `docs/superpowers/specs/2026-11-15-duel-rules-in-rust-design.md`.
+//! See `AGENTS.md` and `games/arena/docs/specs/2026-11-15-duel-rules-in-rust-design.md`.
 
 #![forbid(unsafe_code)]
 

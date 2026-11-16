@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move the landing duel's rules from `site/assets/duel.js` into a Rust crate, `crates/pixfx-duel`, prove the
+**Goal:** Move the landing duel's rules from `site/assets/duel.js` into a Rust crate, `games/arena/crates/pixfx-duel`, prove the
 port equal to the JS rules by replay, and run the page on it through wasm, so Plan B can train a brain on it.
 
 **Architecture:**
@@ -18,7 +18,7 @@ port equal to the JS rules by replay, and run the page on it through wasm, so Pl
 **Tech Stack:** Rust 2021 (workspace crates, `libm`, `pixfx-draw::math`), `pixfx-fighter` (`Body`),
 `pixfx-mind` (`Mind`), `wasm-bindgen` via `pixfx-wasm`, bun tests in `site/tests`.
 
-**Spec:** `docs/superpowers/specs/2026-11-15-duel-rules-in-rust-design.md` (Part 1).
+**Spec:** `games/arena/docs/specs/2026-11-15-duel-rules-in-rust-design.md` (Part 1).
 
 ## Global Constraints
 
@@ -93,7 +93,7 @@ port equal to the JS rules by replay, and run the page on it through wasm, so Pl
 
 **Files:**
 - Create:
-  - `crates/pixfx-duel/{Cargo.toml,AGENTS.md,CLAUDE.md}`;
+  - `games/arena/crates/pixfx-duel/{Cargo.toml,AGENTS.md,CLAUDE.md}`;
   - `src/lib.rs`, `src/data.rs` (every table and constant of `duel.js` lines 10-367), `src/rng.rs`;
   - `tests/data.rs`, `tests/fixtures/js_numbers.json`.
 - Create: `site/tests/tools/dump-numbers.js` (writes the fixture from `duel.js`)
@@ -328,7 +328,7 @@ port equal to the JS rules by replay, and run the page on it through wasm, so Pl
   `site/tests/tools/dump-numbers.js`.
 - Modify: `site/tests/info.test.js` (feeds `skillInfo` plain `SlotView` objects), `site/tests/mind-match.test.js`
   (seats `["brain", "first"]` through the wasm `Duel`).
-- Create: `crates/pixfx-duel/tests/goldens.rs` and `tests/goldens/event_hashes.json`.
+- Create: `games/arena/crates/pixfx-duel/tests/goldens.rs` and `tests/goldens/event_hashes.json`.
 - Modify: `CLAUDE.md` (Game layer row in the layer table), `crates/pixfx-mind/AGENTS.md` (rules belong to
   `pixfx-duel`), `README.md` (crate list).
 

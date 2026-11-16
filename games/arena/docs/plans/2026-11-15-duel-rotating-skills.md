@@ -8,7 +8,7 @@
 
 **Tech Stack:** JavaScript (ES modules), bun test, the pixfx wasm engine (`site/tests/engine.js`), ImageMagick + the pixel snapper for icons, the codex-image skill for the icon sheet.
 
-**Spec:** `docs/superpowers/specs/2026-11-15-duel-rotating-skills-design.md` (research: `docs/superpowers/research/2026-11-15-survivors-combat-research.md`)
+**Spec:** `games/arena/docs/specs/2026-11-15-duel-rotating-skills-design.md` (research: `docs/superpowers/research/2026-11-15-survivors-combat-research.md`)
 
 ## Global Constraints
 

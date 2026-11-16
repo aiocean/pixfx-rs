@@ -1,4 +1,4 @@
-// The landing duel, whose rules are crates/pixfx-duel, run through the engine's wasm (`Duel`). This file only hands
+// The landing duel, whose rules are games/arena/crates/pixfx-duel, run through the engine's wasm (`Duel`). This file only hands
 // the page what the rules decided: a duel whose `fighters`, `time`, `round`, `wins`, `winner`, `left`, `right` and
 // `ground` are refreshed from the rules' view after each `step`, and the rules' tables, read from the engine once it
 // has loaded (`useEngine`). It decides nothing.
@@ -40,7 +40,7 @@ export function useEngine(pkg) {
 
 /**
  * Seat a trained policy in each corner of every duel created from now on: `[left, right]` are the bytes of weights files
- * (`crates/pixfx-duel/weights/*.bin`), which the page fetches beside the wasm. The same bytes in both corners are read
+ * (`games/arena/crates/pixfx-duel/weights/*.bin`), which the page fetches beside the wasm. The same bytes in both corners are read
  * once. Throws when they are not a policy of this duel's shape.
  */
 export function usePolicies([left, right]) {

@@ -1,4 +1,4 @@
-// The trained policy on the page: wasm plays the same fights as the native rules (crates/pixfx-duel's
+// The trained policy on the page: wasm plays the same fights as the native rules (games/arena/crates/pixfx-duel's
 // goldens/policy_fight.json), and a decision costs well under a frame.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -6,7 +6,7 @@ import { createDuel, freeDuel, step } from "../assets/duel.js";
 import { effects, pkg, policyBytes } from "./engine.js";
 
 const all = new Set(effects());
-const golden = JSON.parse(readFileSync(new URL("../../crates/pixfx-duel/tests/goldens/policy_fight.json", import.meta.url), "utf8"));
+const golden = JSON.parse(readFileSync(new URL("../../games/arena/crates/pixfx-duel/tests/goldens/policy_fight.json", import.meta.url), "utf8"));
 const make = (seed, seats) => createDuel({ seed, left: 0, right: 220, ground: 150, sky: 96, has: (id) => all.has(id), seats });
 
 describe("the trained policy", () => {

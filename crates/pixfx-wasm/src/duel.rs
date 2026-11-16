@@ -53,7 +53,7 @@ impl SeatKind {
     }
 }
 
-/// A trained policy, read from the bytes of a weights file (`crates/pixfx-duel/weights/*.bin`), which the page fetches
+/// A trained policy, read from the bytes of a weights file (`games/arena/crates/pixfx-duel/weights/*.bin`), which the page fetches
 /// beside the wasm instead of carrying it inside. Read once, shared by every duel and every corner it seats.
 #[wasm_bindgen]
 pub struct Policy {

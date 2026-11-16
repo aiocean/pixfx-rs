@@ -1,5 +1,5 @@
 // The duel driven the way the hero drives it, step after step, playing what comes back: every effect it plays takes
-// the options it is given. The rules themselves are crates/pixfx-duel's, tested there.
+// the options it is given. The rules themselves are games/arena/crates/pixfx-duel's, tested there.
 import { describe, expect, test } from "bun:test";
 import { createDuel, damageOf, freeDuel, step } from "../assets/duel.js";
 import { Fx, effects, pkg } from "./engine.js";

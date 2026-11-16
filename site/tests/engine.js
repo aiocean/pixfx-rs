@@ -9,7 +9,7 @@ pkg.initSync({ module: readFileSync(new URL("pixfx_wasm_bg.wasm", dir)) });
 
 useEngine(pkg);
 // the trained policy in both corners, as the landing page seats it once its file arrives
-export const policyBytes = readFileSync(new URL("../../crates/pixfx-duel/weights/policy.bin", import.meta.url));
+export const policyBytes = readFileSync(new URL("../../games/arena/crates/pixfx-duel/weights/policy.bin", import.meta.url));
 usePolicies([policyBytes, policyBytes]);
 export { pkg };
 export const { Body, Fx, Mind, effects } = pkg;

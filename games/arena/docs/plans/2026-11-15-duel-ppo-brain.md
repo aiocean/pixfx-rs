@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 2024 (`libm`, `rayon` only in the py binding), pyo3 + numpy + maturin, Python 3.12 with PyTorch 2.8 (MPS or CPU), `uv`.
 
-**Spec:** `docs/superpowers/specs/2026-11-15-duel-rules-in-rust-design.md` (Part 2, "Done when")
+**Spec:** `games/arena/docs/specs/2026-11-15-duel-rules-in-rust-design.md` (Part 2, "Done when")
 
 ## Global Constraints
 
@@ -37,7 +37,7 @@
 **Files:**
 - Modify: `crates/pixfx-mind/src/sense.rs` (`Sense.slots`), `crates/pixfx-mind/src/lib.rs`
 - Create: `crates/pixfx-mind/src/policy/mod.rs`, `crates/pixfx-mind/src/policy/observe.rs`, `crates/pixfx-mind/src/policy/action.rs`
-- Modify: `crates/pixfx-duel/src/sense.rs` (fill `slots`)
+- Modify: `games/arena/crates/pixfx-duel/src/sense.rs` (fill `slots`)
 - Test: `crates/pixfx-mind/tests/policy_observe.rs`, `crates/pixfx-mind/tests/policy_action.rs`
 
 **Interfaces:**
@@ -119,9 +119,9 @@ Masking rules: a `Cast` is legal only when `me.can_act`, its slot holds a skill 
 ### Task 4: Styles and seats (`pixfx-duel`)
 
 **Files:**
-- Create: `crates/pixfx-duel/src/style.rs`, `crates/pixfx-duel/src/scripted.rs`
-- Modify: `crates/pixfx-duel/src/seat.rs` (`PolicySeat`), `src/view.rs` (`style`), `src/fighter.rs` (`Fighter.style`), `src/duel.rs`, `src/lib.rs`
-- Test: `crates/pixfx-duel/tests/style.rs`, `tests/seats.rs`
+- Create: `games/arena/crates/pixfx-duel/src/style.rs`, `games/arena/crates/pixfx-duel/src/scripted.rs`
+- Modify: `games/arena/crates/pixfx-duel/src/seat.rs` (`PolicySeat`), `src/view.rs` (`style`), `src/fighter.rs` (`Fighter.style`), `src/duel.rs`, `src/lib.rs`
+- Test: `games/arena/crates/pixfx-duel/tests/style.rs`, `tests/seats.rs`
 
 **Interfaces:**
 - Produces:
@@ -139,8 +139,8 @@ Masking rules: a `Cast` is legal only when `me.can_act`, its slot holds a skill 
 ### Task 5: The training environment (`pixfx-duel`)
 
 **Files:**
-- Create: `crates/pixfx-duel/src/train.rs`
-- Test: `crates/pixfx-duel/tests/train.rs`
+- Create: `games/arena/crates/pixfx-duel/src/train.rs`
+- Test: `games/arena/crates/pixfx-duel/tests/train.rs`
 
 **Interfaces:**
 - Consumes: Task 3 `PolicyMind::decide_with`, Task 4 seats.
@@ -157,8 +157,8 @@ Masking rules: a `Cast` is legal only when `me.can_act`, its slot holds a skill 
 ### Task 6: The ladder (`pixfx-duel`)
 
 **Files:**
-- Create: `crates/pixfx-duel/src/ladder.rs`, `crates/pixfx-duel/examples/ladder.rs`
-- Test: `crates/pixfx-duel/tests/ladder.rs`
+- Create: `games/arena/crates/pixfx-duel/src/ladder.rs`, `games/arena/crates/pixfx-duel/examples/ladder.rs`
+- Test: `games/arena/crates/pixfx-duel/tests/ladder.rs`
 
 **Interfaces:**
 - Produces: `pub fn match_up(a: &dyn Fn() -> MakeSeat, b: &dyn Fn() -> MakeSeat, seeds: Range<u32>, limit: f64) -> Record`, each seed fought both ways for 3 rounds. `Record { rounds_won: [u32; 2] /* a as Thunder, a as Frost */, rounds_lost: [u32; 2], lengths: Vec<f64>, timeouts: u32, actions: [u32; ACTIONS] /* a's, policy seats only */, attack_share: f64, mean_distance: f64, think_ns: Option<f64> }` and `Record::win_rate()`, `Record::as_school(i)`.
@@ -167,10 +167,10 @@ Masking rules: a `Cast` is legal only when `me.can_act`, its slot holds a skill 
 - [ ] **Step 1: Failing tests:** `the_brain_against_itself_is_counted_both_ways` (wins + losses = rounds played, 2 × seeds × 3), `a_round_past_the_limit_counts_as_a_timeout`.
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** → PASS; `cargo run --release -p pixfx-duel --example ladder -- --seeds 20` prints the table (with the random network, near 0% against the brain); commit `pixfx-duel: the ladder`.
 
-### Task 7: The batch binding (`crates/pixfx-duel-py`)
+### Task 7: The batch binding (`games/arena/crates/pixfx-duel-py`)
 
 **Files:**
-- Create: `crates/pixfx-duel-py/{Cargo.toml, pyproject.toml, src/lib.rs, AGENTS.md, CLAUDE.md -> AGENTS.md}`; root `Cargo.toml` `exclude` gains it (pyo3 stays out of the workspace, like `pixfx-gpui`).
+- Create: `games/arena/crates/pixfx-duel-py/{Cargo.toml, pyproject.toml, src/lib.rs, AGENTS.md, CLAUDE.md -> AGENTS.md}`; root `Cargo.toml` `exclude` gains it (pyo3 stays out of the workspace, like `pixfx-gpui`).
 - Test: `train/tests/test_env.py`
 
 **Interfaces:**
@@ -183,14 +183,14 @@ Masking rules: a `Cast` is legal only when `me.can_act`, its slot holds a skill 
 
 - [ ] **Step 1: Failing test** (`uv run pytest train/tests/test_env.py`): `test_random_legal_play_finishes_episodes` (64 envs, random legal actions, every env reaches `done` within 2000 steps, rewards at done are ±1), `test_same_seeds_same_rewards`.
 - [ ] **Step 2: Run** → FAIL: `ModuleNotFoundError: pixfx_duel`.
-- [ ] **Step 3: Implement**; build with `uv run maturin develop --release -m crates/pixfx-duel-py/Cargo.toml`.
-- [ ] **Step 4: Run** → PASS; `cargo clippy --manifest-path crates/pixfx-duel-py/Cargo.toml -- -D warnings`; measure env steps per second with 512 envs (print it, ledger it); commit `pixfx-duel-py: batched environments for the trainer`.
+- [ ] **Step 3: Implement**; build with `uv run maturin develop --release -m games/arena/crates/pixfx-duel-py/Cargo.toml`.
+- [ ] **Step 4: Run** → PASS; `cargo clippy --manifest-path games/arena/crates/pixfx-duel-py/Cargo.toml -- -D warnings`; measure env steps per second with 512 envs (print it, ledger it); commit `pixfx-duel-py: batched environments for the trainer`.
 
 ### Task 8: The trainer and the export (`train/`)
 
 **Files:**
 - Create: `train/{pyproject.toml, .gitignore (runs/), README.md, net.py, ppo.py, league.py, export.py, tests/test_net.py}`
-- Create: `crates/pixfx-duel/tests/policy_export.rs`, fixture `crates/pixfx-duel/tests/fixtures/policy_check.json` (written by `export.py`)
+- Create: `games/arena/crates/pixfx-duel/tests/policy_export.rs`, fixture `games/arena/crates/pixfx-duel/tests/fixtures/policy_check.json` (written by `export.py`)
 
 **Interfaces:**
 - Consumes: Task 2's weights layout and names; Task 7's `VecEnv`.
@@ -198,7 +198,7 @@ Masking rules: a `Cast` is legal only when `me.can_act`, its slot holds a skill 
   - `net.py`: `Policy(obs, actions, width=128, hidden=256)` mirroring Task 2 exactly, plus a value head (`Linear(W, 101)`) trained by HL-Gauss over `[-1.5, 1.5]`, sigma `0.75 × bin width`; value clipping off.
   - `ppo.py`: CleanRL-style PPO. Starting values: 512 envs, 64 steps a rollout, γ 0.995, λ 0.95, clip 0.2, lr 3e-4 annealed to 0, 4 epochs, 8 minibatches, entropy 0.01 → 0.002, grad clip 0.5, shaping 1 → 0 linearly over the first 60% of updates. Device MPS if faster than CPU on a 10-update benchmark, else CPU (ledger which).
   - `league.py`: per reset, opponent = latest snapshot 35%, a past snapshot 25%, brain 15%, first mind 10%, scripted 15% (aggressive/turtle even); a snapshot every 20 updates; learner corner and both styles drawn uniformly.
-  - `export.py <checkpoint> --out crates/pixfx-duel/weights/policy.bin`: writes the file and `policy_check.json` (32 fixed observations, their masks, PyTorch's logits).
+  - `export.py <checkpoint> --out games/arena/crates/pixfx-duel/weights/policy.bin`: writes the file and `policy_check.json` (32 fixed observations, their masks, PyTorch's logits).
   - Rust test `exported_weights_match_pytorch`: loads `policy.bin`, logits within `1e-4` of PyTorch's, and the argmax of legal logits equal on all 32.
 - [ ] **Step 1: Failing tests:** `test_net.py::test_forward_shapes_and_mask`, `test_hl_gauss_targets_sum_to_one`, and the Rust `exported_weights_match_pytorch` → FAIL (no export yet).
 - [ ] **Step 2: Implement**; `uv run python train/ppo.py --updates 20 --run smoke` runs and writes a checkpoint; `uv run python train/export.py train/runs/smoke/last.pt`.
@@ -211,13 +211,13 @@ No new code beyond fixes; an experiment loop with a record.
 - [ ] **Step 1:** Train: `uv run python train/ppo.py --run v1` in the background (Monitor on its log), until the balanced-vs-brain win rate in its eval stops rising or 200M steps.
 - [ ] **Step 2:** Export and run `cargo run --release -p pixfx-duel --example ladder -- --seeds 150 --weights <file>`. Ledger the full table.
 - [ ] **Step 3:** For every bar missed, rule: train longer, change reward weights or league mix (ledger), or, if the brain exploits a rules bug or the mirror is outside 45-55%, fix or tune the rules (each change reported to the user, `event_hashes.json` re-pinned, training resumed from the last checkpoint).
-- [ ] **Step 4:** When the table meets "Done when" except the page check, export to `crates/pixfx-duel/weights/policy.bin`, re-run `exported_weights_match_pytorch`, commit `pixfx-duel: the trained policy` with the ladder table in the message.
+- [ ] **Step 4:** When the table meets "Done when" except the page check, export to `games/arena/crates/pixfx-duel/weights/policy.bin`, re-run `exported_weights_match_pytorch`, commit `pixfx-duel: the trained policy` with the ladder table in the message.
 
 ### Task 10: The page plays the policy
 
 **Files:**
 - Modify: `crates/pixfx-wasm/src/duel.rs` (seats `"policy"`, default), `site/assets/duel.js` (doc), `site/assets/duel-info.js` or HUD only if the style must show (view carries it), `site/tests/mind-match.test.js`
-- Create: `crates/pixfx-duel/tests/goldens/policy_fight.json` (Rust test writes the view of seeds 1-3 after 60 s with policy seats), `site/tests/policy.test.js`
+- Create: `games/arena/crates/pixfx-duel/tests/goldens/policy_fight.json` (Rust test writes the view of seeds 1-3 after 60 s with policy seats), `site/tests/policy.test.js`
 
 **Interfaces:**
 - Consumes: Task 4 `PolicySeat::make`, `shipped()`.

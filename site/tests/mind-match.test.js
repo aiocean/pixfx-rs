@@ -1,7 +1,7 @@
 // The proof that the page's fighters are smart: the trained policy, in the styles each fight draws, against the
 // utility brain and the duel's first mind. Each seed is fought twice, the policy as Thunder and then as Frost, so the
 // schools' own balance cancels out. The full bars, per style over 150 seeds, are the Rust ladder's
-// (`cargo run --release -p pixfx-duel --example ladder`); docs/superpowers/specs/2026-11-15-duel-rules-in-rust-design.md.
+// (`cargo run --release -p pixfx-duel --example ladder`); games/arena/docs/specs/2026-11-15-duel-rules-in-rust-design.md.
 import { describe, expect, test } from "bun:test";
 import { createDuel, freeDuel, step } from "../assets/duel.js";
 import { effects } from "./engine.js";
