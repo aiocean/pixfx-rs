@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createDuel, freeDuel, step } from "../assets/duel.js";
-import { effects } from "./engine.js";
+import { effects, pkg } from "./engine.js";
 
 const all = new Set(effects());
 const golden = JSON.parse(readFileSync(new URL("../../crates/pixfx-duel/tests/goldens/policy_fight.json", import.meta.url), "utf8"));
@@ -45,6 +45,21 @@ describe("the trained policy", () => {
     console.log(`policy decision in wasm: ${(extra / decisions).toFixed(3)} ms over ${decisions} decisions`);
     expect(extra / decisions).toBeLessThan(0.2);
   }, 30_000);
+
+  test("the wasm carries no policy: a duel without one seats the brain, and a policy seat asks for it", () => {
+    const config = { seed: 1, left: 0, right: 220, ground: 150, sky: 96, effects: [...all] };
+    const brain = new pkg.Duel(config, undefined);
+    const brains = new pkg.Duel(config, ["brain", "brain"]);
+    for (let i = 0; i < 20 * 60; i++) {
+      brain.step(1 / 60);
+      brains.step(1 / 60);
+    }
+    expect(brain.view()).toEqual(brains.view());
+    brain.free();
+    brains.free();
+    expect(() => new pkg.Duel(config, ["policy", "brain"])).toThrow(/needs the trained policy/);
+    expect(() => new pkg.Policy(new Uint8Array(16))).toThrow();
+  });
 
   test("each fighter shows the style it fights in", () => {
     const duel = make(3);

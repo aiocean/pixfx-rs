@@ -245,8 +245,10 @@ mod tests {
         let report = run(&config(&[fx.meta().id], 3))?;
         assert_eq!(report.frames, 60);
         let row = report.rows.first().ok_or("no row")?;
-        // frame 0, then one more for each authored frame the clock passes in 1 s
-        assert_eq!(row.draws, 3 * (u64::from(fps) + 1));
+        // frame 0, then one more for each authored frame the clock passes in 1 s; but it draws after each update, at
+        // most once a display frame, so an effect authored at the display rate (60 fps) is past frame 0 before its
+        // first draw and draws once on each of the 60
+        assert_eq!(row.draws, 3 * (u64::from(fps) + 1).min(report.frames));
         Ok(())
     }
 

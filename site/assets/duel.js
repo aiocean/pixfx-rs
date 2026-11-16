@@ -5,6 +5,8 @@
 
 /** The engine's duel bindings, set by `useEngine`. */
 let engine = null;
+/** The trained policy, set by `usePolicy` once its file has arrived; until then duels seat the brain. */
+let policy = null;
 
 /** The engine, or a clear error when the page forgot `useEngine`. */
 function loaded() {
@@ -36,14 +38,25 @@ export function useEngine(pkg) {
 }
 
 /**
+ * Seat the trained policy in every duel created from now on: `bytes` are `policy.bin` (`crates/pixfx-duel/weights/`),
+ * which the page fetches beside the wasm. Throws when they are not a policy of this duel's shape.
+ */
+export function usePolicy(bytes) {
+  const next = new (loaded().Policy)(bytes);
+  policy?.free();
+  policy = next;
+}
+
+/**
  * A new duel in the arena from `left` to `right` (game pixels), standing on `ground`, flying no higher than `sky`.
  * `has(id)` says whether an effect is in the registry. `seats`, for tests, seats another mind in a corner:
- * `["policy" | "brain" | "first", ...]` (the trained policy when left out).
+ * `["policy" | "brain" | "first", ...]` (the trained policy when `usePolicy` has run, else the brain, when left out).
  */
 export function createDuel({ seed = 1, left, right, ground, has, sky, seats }) {
   const pkg = loaded();
   const effects = pkg.effects().filter((id) => has(id));
-  const rs = new pkg.Duel({ seed, left, right, ground, sky, effects }, seats);
+  const config = { seed, left, right, ground, sky, effects };
+  const rs = policy ? pkg.Duel.withPolicy(config, seats, policy) : new pkg.Duel(config, seats);
   return { rs, seed, ...rs.view() };
 }
 

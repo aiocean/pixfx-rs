@@ -2,7 +2,7 @@
 // animation-frame loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
 import { FightFeel, Lighting, Sprites, createPixfx, loadPixfx, lookColors, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
 import * as pixfx from "../pkg/pixfx-canvas2d.js";
-import { DECOR, RAGE, createDuel, freeDuel, step, useEngine } from "./duel.js";
+import { DECOR, RAGE, createDuel, freeDuel, step, useEngine, usePolicy } from "./duel.js";
 import { BARS_TALL, actorOf, drawBars, drawNumbers, drawSkills, drawStreaks, hudAt, paintFighters } from "./duel-art.js";
 import { buffInfo, skillInfo } from "./duel-info.js";
 import { createScene, drawScene } from "./duel-scene.js";
@@ -27,6 +27,13 @@ export async function mount() {
   // the skill icon atlases (site/art/skill-icons.sh), by icon size; the hero waits for them, as for the engine
   const [engine, icons] = await Promise.all([loadPixfx(), loadIcons([32, 24])]);
   useEngine(pixfx);
+  // the trained policy is a file of its own beside the wasm (`site/build.sh`), about as heavy as the engine: fetched
+  // only once the engine is in, so it never holds back the first frame, and seated from the next duel on. Until it
+  // arrives, or if it never does, the duel seats the brain.
+  fetch(new URL("../pkg/policy.bin", import.meta.url))
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`policy.bin: HTTP ${r.status}`))))
+    .then((bytes) => usePolicy(new Uint8Array(bytes)))
+    .catch((e) => console.warn("landing: the duel seats the brain, the trained policy did not load:", e));
 
   const hero = createHero(document.getElementById("scene"), off.signal, icons, engine);
   let last = null;

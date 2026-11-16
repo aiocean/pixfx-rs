@@ -112,7 +112,8 @@ impl Seat for Brain {
     }
 }
 
-/// The trained policy the page ships (`weights/policy.bin`).
+/// The trained policy (`weights/policy.bin`), compiled in for native callers: the tests and the ladder. The page
+/// fetches the same file beside the wasm and hands its bytes to the wasm `Policy`.
 pub fn shipped() -> Result<Rc<Net>, NetError> {
     Net::load(include_bytes!("../weights/policy.bin")).map(Rc::new)
 }
