@@ -36,6 +36,11 @@
   damage, guarded, broken, punished, final blows) and each school's totals.
 - Train: long runs go on a training machine as a launchd job (`train/long-run.sh`, which resumes from the last checkpoint
   when the trainer dies); `train/README.md` "Training on a remote host".
+- Duel: the two schools win about even in the policy mirror (Thunder 49.1% over 150 seeds, from 40.2%) with no rule
+  changed. The rules were not what held Thunder back: the brain's mirror stays at 50.9%. The policy played Thunder
+  worse, so it is fine-tuned (600 updates) with the learner on Thunder in 90% of its fights. It beats the brain
+  95.9% (95.1% as Thunder, 96.7% as Frost) and the first mind 95.4%. `ppo.py --thunder` sets that share (0.5 by
+  default), and the training log gives each opponent's win rate per school (`win/latest/thunder`, ...).
 
 - Fighter: the duck, launched, tumble and fall poses are redrawn by hand from reference drawings
   (`pixfx-pixel` clean and read), each with the whole costume as the standing poses wear it: the crown and its
