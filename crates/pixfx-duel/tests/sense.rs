@@ -71,6 +71,7 @@ fn a_fighter_senses_its_own_act_and_the_foes_ultimate() {
         stacks: 1.0,
         pierce: false,
         circle: None,
+        blocked: false,
     });
     let me = sense_of(&duel.state, 1).me;
     let a = me.act.unwrap_or_else(|| unreachable!("it is acting"));

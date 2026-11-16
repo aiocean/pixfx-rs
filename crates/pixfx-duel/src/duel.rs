@@ -104,6 +104,7 @@ impl Duel {
     /// call.
     pub fn step(&mut self, dt: f64) -> Vec<Out> {
         self.state.out.clear();
+        self.state.notes.clear();
         let dt = if dt > 0.0 { js_min(dt, STEP_MAX) } else { 0.0 };
         self.state.carry += dt;
         // a hair under a whole tick counts as one, so 1/60 steps at 60 Hz never drift a tick behind

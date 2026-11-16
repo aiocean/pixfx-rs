@@ -8,7 +8,7 @@ use crate::data::{
     RING, Spell, Status, TRAITS, Trait, WARD, block_chance, payoff, school, spell, tint,
 };
 use crate::fighter::{Act, Burning, Phase, Slot, State, Told};
-use crate::out::{How, Out, PlayOpts};
+use crate::out::{How, Note, Out, PlayOpts, Stop};
 use crate::shot::{Shot, ShotKind};
 use crate::status::{
     ControlKind, add_chill, add_shock, cleanse, control, damage_of, gain_rage, take,
@@ -145,17 +145,11 @@ pub fn begin(state: &mut State, me: usize, name: &'static str, target: Option<f6
     let cooldown = sp.cooldown * swift + sp.windup;
     state.fighters[me].set_cool(name, cooldown, cooldown);
     // a bar skill's one cast empties its slot, and strikes with the power it was drawn with
-    let (power, evolved) = match &slot {
-        Some(Slot::Held { power, evolved, .. }) => (*power, *evolved),
-        _ => (1.0, false),
+    let power = match &slot {
+        Some(Slot::Held { power, .. }) => *power,
+        _ => 1.0,
     };
-    // an evolved or lingering skill inflicts one more stack of what it inflicts, each
-    let lingering = if has_trait(slot.as_ref(), Trait::Lingering) {
-        TRAITS.lingering_stacks
-    } else {
-        0.0
-    };
-    let stacks = 1.0 + if evolved { 1.0 } else { 0.0 } + lingering;
+    let stacks = stacks_in(slot.as_ref());
     let pierce = has_trait(slot.as_ref(), Trait::Piercing);
     if let Some(at) = at {
         spend(state, me, at);
@@ -266,6 +260,17 @@ pub fn advance(state: &mut State, me: usize, dt: f64) {
     pose(state, me);
 }
 
+/// How many stacks of what it inflicts a skill drawn into `slot` lands: one, one more evolved, more again lingering.
+pub fn stacks_in(slot: Option<&Slot>) -> f64 {
+    let evolved = matches!(slot, Some(Slot::Held { evolved: true, .. }));
+    let lingering = if has_trait(slot, Trait::Lingering) {
+        TRAITS.lingering_stacks
+    } else {
+        0.0
+    };
+    1.0 + if evolved { 1.0 } else { 0.0 } + lingering
+}
+
 /// How long `act` of `sp` recovers: an unsafe skill whose blow was guarded recovers longer.
 pub fn recover_of(act: &Act, sp: &Spell) -> f64 {
     if act.blocked && FRAMES.unsafe_on_block.contains(&act.spell) {
@@ -348,11 +353,21 @@ pub fn release(state: &mut State, me: usize, sp: &'static Spell) {
                 let crossing = state.fighters[foe].act.is_some_and(|a| {
                     a.spell == "slash" && a.phase == Phase::Windup && a.t > slash_windup * 0.6
                 });
-                if !act.pierce && blocks(state, foe, mx, hit, blow) {
+                if !act.pierce && blocks(state, foe, mx, hit, blow, act.spell) {
                     guarded(state, me);
                     clash(state, (mx + fx) / 2.0, g - mspec.chest - mair, &[me, foe]);
                 } else if crossing {
                     // both blades swing at once: they meet
+                    state.note(Note::Stopped {
+                        by: me,
+                        spell: act.spell,
+                        how: Stop::Clash,
+                        chip: 0.0,
+                    });
+                    state.note(Note::Broken {
+                        who: foe,
+                        spell: "slash",
+                    });
                     clash(state, (mx + fx) / 2.0, g - mspec.chest - mair, &[me, foe]);
                     state.fighters[foe].act = None;
                 } else {
@@ -467,7 +482,7 @@ pub fn release(state: &mut State, me: usize, sp: &'static Spell) {
                 && (fair - mair).abs() < fspec.body
                 && fhp > 0.0
             {
-                if !act.pierce && blocks(state, foe, mx, hit, blow) {
+                if !act.pierce && blocks(state, foe, mx, hit, blow, act.spell) {
                     guarded(state, me);
                     clash(state, fx - face * 4.0, g - fspec.chest - fair, &[foe]);
                 } else if hurt(state, foe, hit, face, act.spell, act.stacks) && sp.shock {
@@ -532,7 +547,7 @@ pub fn release(state: &mut State, me: usize, sp: &'static Spell) {
                 state.fighters[foe].hp,
             );
             if fx > lo && fx < hi && (fair - mair).abs() < fspec.body && fhp > 0.0 {
-                if !act.pierce && blocks(state, foe, from, hit, blow) {
+                if !act.pierce && blocks(state, foe, from, hit, blow, act.spell) {
                     guarded(state, me);
                     clash(state, fx, g - fspec.chest - fair, &[foe]);
                 } else {
@@ -546,6 +561,11 @@ pub fn release(state: &mut State, me: usize, sp: &'static Spell) {
             // a heal on the bar heals by its power, as its damage would
             let gained = js_min(100.0 - f.hp, sp.amount.unwrap_or(0.0) * act.power);
             f.hp += gained;
+            state.note(Note::Healed {
+                by: me,
+                share: gained,
+            });
+            let f = &state.fighters[me];
             let (amount, x, y) = (js_round((gained / 100.0) * f.stats.hp), f.body.x, f.chest());
             state.emit(Out::Heal {
                 by: me,
@@ -651,8 +671,15 @@ pub fn zone_height(sp: &Spell, foe: &BodySpec) -> f64 {
 }
 
 /// Does fighter `f` block a blow of `damage` from `from_x`? A block costs qi and still lets a little damage through
-/// (chip); with too little qi left the guard breaks and the blow lands.
-pub fn blocks(state: &mut State, f: usize, from_x: f64, damage: f64, blow: Blow) -> bool {
+/// (chip); with too little qi left the guard breaks and the blow lands. `name` is the blow's spell, for the notes.
+pub fn blocks(
+    state: &mut State,
+    f: usize,
+    from_x: f64,
+    damage: f64,
+    blow: Blow,
+    name: &'static str,
+) -> bool {
     let me = &mut state.fighters[f];
     if me.guard == 0.0 || me.body.reeling() || js_sign(from_x - me.body.x) != me.body.face {
         return false;
@@ -675,19 +702,31 @@ pub fn blocks(state: &mut State, f: usize, from_x: f64, damage: f64, blow: Blow)
         false,
         0.5,
     ) * CHIP;
-    take(state, f, chip);
+    let chip = take(state, f, chip);
+    state.note(Note::Stopped {
+        by: 1 - f,
+        spell: name,
+        how: Stop::Guard,
+        chip,
+    });
     true
 }
 
 /// Does fighter `f`'s barrier turn this blow aside? An ultimate breaks through it. A golden bell rings back at a
 /// blade, palm or dash that struck it from close by: the striker takes a blow of its own, is stunned and thrown off.
-pub fn turns_aside(state: &mut State, f: usize, dir: f64, name: &str) -> bool {
+pub fn turns_aside(state: &mut State, f: usize, dir: f64, name: &'static str) -> bool {
     let s = spell(name);
     let me = &state.fighters[f];
     if me.barrier == 0.0 || s.is_some_and(|s| s.ultimate) {
         return false;
     }
     let (x, air, spec) = (me.body.x, me.body.air, me.body.spec);
+    state.note(Note::Stopped {
+        by: 1 - f,
+        spell: name,
+        how: Stop::Barrier,
+        chip: 0.0,
+    });
     turn_aside(state, f, x - dir * 8.0, state.ground - spec.chest - air);
     let me = &state.fighters[f];
     let Some(barrier_spell) = me.barrier_spell else {
@@ -785,6 +824,12 @@ pub fn hurt(
     let by = 1 - f;
     // a ward's charge erases the whole blow
     if state.fighters[f].charges > 0.0 {
+        state.note(Note::Stopped {
+            by,
+            spell: name,
+            how: Stop::Ward,
+            chip: 0.0,
+        });
         state.fighters[f].charges -= 1.0;
         let me = &state.fighters[f];
         let y = state.ground - me.body.spec.chest - me.body.air;
@@ -801,6 +846,12 @@ pub fn hurt(
         me.body.vx -= dir * 40.0;
         let (x, y) = (me.body.x, me.chest());
         state.emit(Out::Dodge { x, y });
+        state.note(Note::Stopped {
+            by,
+            spell: name,
+            how: Stop::Dodge,
+            chip: 0.0,
+        });
         return false;
     }
     // a payoff spends the stacks of its status on f, a little more power for each
@@ -915,6 +966,14 @@ pub fn hurt(
         );
     }
     // a hit breaks a cast: what was gathering is lost
+    if let Some(a) = state.fighters[f].act
+        && a.phase == Phase::Windup
+    {
+        state.note(Note::Broken {
+            who: f,
+            spell: a.spell,
+        });
+    }
     break_act(state, f);
     state.fighters[f].guard = 0.0;
     set_meditating(state, f, false);

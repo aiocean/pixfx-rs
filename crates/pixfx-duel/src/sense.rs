@@ -1,11 +1,10 @@
 //! What a brain is told: each spell as pixfx-mind reads it (`skill_of`), and what a fighter could perceive this tick
 //! (`sense_of`).
 
-use crate::bar::{has_trait, ready, slot_of};
-use crate::data::{
-    BAR, BURN, CHILL, DEF_DOWN, Kind, RAGE, SHOCK, Spell, TRAITS, Trait, school, spell,
-};
-use crate::fighter::{Act, Fighter, Phase, Slot, State};
+use crate::act::{recover_of, stacks_in};
+use crate::bar::{ready, slot_of};
+use crate::data::{BAR, BURN, CHILL, DEF_DOWN, Kind, RAGE, SHOCK, Spell, school, spell};
+use crate::fighter::{Fighter, Phase, Slot, State};
 use crate::shot::{ShotKind, orb_at};
 use pixfx_mind::{
     ActPhase, Acting, Arena, Doing, Foe, Inflicts, Me, Sense, Skill, SkillKind, Threat, ThreatShape,
@@ -111,7 +110,7 @@ fn inflicts_of(s: &Spell) -> Inflicts {
 /// The skill fighter `f` is using, as pixfx-mind reads it.
 fn acting_of(f: &Fighter) -> Option<Acting> {
     let a = f.act?;
-    let (windup, recover) = spell(a.spell).map_or((0.0, 0.0), |s| (s.windup, recover_span(&a, s)));
+    let (windup, recover) = spell(a.spell).map_or((0.0, 0.0), |s| (s.windup, recover_of(&a, s)));
     let phase = if a.phase == Phase::Windup {
         ActPhase::Windup
     } else {
@@ -125,27 +124,10 @@ fn acting_of(f: &Fighter) -> Option<Acting> {
     })
 }
 
-/// Seconds act `a` of spell `sp` recovers for.
-fn recover_span(_a: &Act, sp: &Spell) -> f64 {
-    sp.recover
-}
-
 /// How many times each spell of fighter `f` lands its stacks now: once, once more evolved, more again lingering
 /// (as `act::begin` counts them).
 fn stacks_of(f: &Fighter) -> Vec<f64> {
-    f.spells
-        .iter()
-        .map(|n| {
-            let slot = slot_of(f, n);
-            let evolved = matches!(slot, Some(Slot::Held { evolved: true, .. }));
-            let lingering = if has_trait(slot, Trait::Lingering) {
-                TRAITS.lingering_stacks
-            } else {
-                0.0
-            };
-            1.0 + if evolved { 1.0 } else { 0.0 } + lingering
-        })
-        .collect()
+    f.spells.iter().map(|n| stacks_in(slot_of(f, n))).collect()
 }
 
 /// What fighter `f` is doing, as pixfx-mind reads it.
