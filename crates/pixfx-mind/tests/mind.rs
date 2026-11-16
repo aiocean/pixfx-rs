@@ -275,10 +275,16 @@ fn a_skill_with_more_power_on_the_bar_is_cast_more() {
     strong[bolt] = 3.0;
     let plain = casts_of("bolt", vec![1.0; n]);
     let more = casts_of("bolt", strong);
-    assert!(more > plain + plain / 4 + 2, "bolt cast {plain} times at power 1, {more} at power 3");
+    assert!(
+        more > plain + plain / 4 + 2,
+        "bolt cast {plain} times at power 1, {more} at power 3"
+    );
 }
 
 #[test]
 fn no_power_reads_as_one() {
-    assert_eq!(casts_of("bolt", vec![]), casts_of("bolt", vec![1.0; kit().len()]));
+    assert_eq!(
+        casts_of("bolt", vec![]),
+        casts_of("bolt", vec![1.0; kit().len()])
+    );
 }

@@ -25,7 +25,9 @@ impl Seat for Recorder {
     fn think(&mut self, state: &State, me: usize, dt: f64) -> Option<Choice> {
         let c = self.mind.think(state, me, dt);
         if let Some(c) = &c {
-            self.log.borrow_mut().push(json!([self.tick.get(), me, as_js(c)]));
+            self.log
+                .borrow_mut()
+                .push(json!([self.tick.get(), me, as_js(c)]));
         }
         c
     }
@@ -56,7 +58,13 @@ fn as_js(c: &Choice) -> Value {
 
 fn recorder(log: &Log, tick: &Rc<Cell<usize>>) -> MakeSeat {
     let (log, tick) = (log.clone(), tick.clone());
-    Box::new(move |state, me| Box::new(Recorder { mind: FirstMind::new(state.seed, me), log, tick }))
+    Box::new(move |state, me| {
+        Box::new(Recorder {
+            mind: FirstMind::new(state.seed, me),
+            log,
+            tick,
+        })
+    })
 }
 
 #[test]
@@ -65,7 +73,10 @@ fn first_mind_choices_are_pinned() {
     for seed in 1..=5_u32 {
         let log: Log = Rc::default();
         let tick = Rc::new(Cell::new(0));
-        let mut duel = Duel::new(config(seed, all_effects()), [recorder(&log, &tick), recorder(&log, &tick)]);
+        let mut duel = Duel::new(
+            config(seed, all_effects()),
+            [recorder(&log, &tick), recorder(&log, &tick)],
+        );
         while log.borrow().len() < 600 && tick.get() < 600 * 60 {
             duel.step(1.0 / 60.0);
             tick.set(tick.get() + 1);

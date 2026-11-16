@@ -23,7 +23,11 @@ impl Seat for Checked {
         let c = self.inner.think(state, me, dt);
         match &c {
             Some(Choice::Cast { skill, .. }) => {
-                assert!(ready(&state.fighters[me], skill), "{skill} cast while not ready at {}", state.time);
+                assert!(
+                    ready(&state.fighters[me], skill),
+                    "{skill} cast while not ready at {}",
+                    state.time
+                );
                 self.casts.set(self.casts.get() + 1);
             }
             Some(Choice::Move { dir }) => assert!(*dir == 1.0 || *dir == -1.0),
@@ -44,7 +48,12 @@ impl Seat for Checked {
 
 fn checked(make: MakeSeat, casts: &Rc<Cell<u32>>) -> MakeSeat {
     let casts = casts.clone();
-    Box::new(move |state, me| Box::new(Checked { inner: make(state, me), casts }))
+    Box::new(move |state, me| {
+        Box::new(Checked {
+            inner: make(state, me),
+            casts,
+        })
+    })
 }
 
 #[test]
@@ -54,7 +63,10 @@ fn a_policy_seat_only_ever_makes_possible_choices() {
     let Ok(net) = net else { return };
     let casts = Rc::new(Cell::new(0));
     for seed in 1..=4 {
-        let seats = [checked(PolicySeat::make(net.clone()), &casts), checked(PolicySeat::make(net.clone()), &casts)];
+        let seats = [
+            checked(PolicySeat::make(net.clone()), &casts),
+            checked(PolicySeat::make(net.clone()), &casts),
+        ];
         let mut duel = Duel::new(config(seed, all_effects()), seats);
         for _ in 0..(60 * 60) {
             duel.step(1.0 / 60.0);
@@ -67,14 +79,23 @@ fn a_policy_seat_only_ever_makes_possible_choices() {
 fn scripted_seats_finish_rounds_with_possible_choices() {
     let casts = Rc::new(Cell::new(0));
     for seed in 1..=5 {
-        let mut duel = Duel::new(config(seed, all_effects()), [checked(Scripted::aggressive(), &casts), checked(Scripted::turtle(), &casts)]);
+        let mut duel = Duel::new(
+            config(seed, all_effects()),
+            [
+                checked(Scripted::aggressive(), &casts),
+                checked(Scripted::turtle(), &casts),
+            ],
+        );
         for _ in 0..(120 * 60) {
             duel.step(1.0 / 60.0);
             if duel.state.round > 1 {
                 break;
             }
         }
-        assert!(duel.state.round > 1, "seed {seed}: a round ends within 120 s");
+        assert!(
+            duel.state.round > 1,
+            "seed {seed}: a round ends within 120 s"
+        );
     }
     assert!(casts.get() > 20, "they cast: {}", casts.get());
 }

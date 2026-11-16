@@ -2,8 +2,8 @@
 //! schools' own balance cancels out, with what a watcher would judge: who wins as each school, how long rounds last,
 //! whether fights stall, how varied and how aggressive the first seat plays, and the distance it keeps.
 
-use crate::duel::{Duel, DuelConfig, TICK};
 use crate::data::spell;
+use crate::duel::{Duel, DuelConfig, TICK};
 use crate::fighter::State;
 use crate::seat::{MakeSeat, Seat};
 use pixfx_mind::{Choice, Outcome};
@@ -44,18 +44,27 @@ pub struct Record {
 impl Record {
     /// The share of finished rounds the first seat won.
     pub fn win_rate(&self) -> f64 {
-        share(self.won[0] + self.won[1], self.won[0] + self.won[1] + self.lost[0] + self.lost[1])
+        share(
+            self.won[0] + self.won[1],
+            self.won[0] + self.won[1] + self.lost[0] + self.lost[1],
+        )
     }
 
     /// The share it won as school `i` (0 Thunder, 1 Frost).
     pub fn as_school(&self, i: usize) -> f64 {
-        let (w, l) = (self.won.get(i).copied().unwrap_or(0), self.lost.get(i).copied().unwrap_or(0));
+        let (w, l) = (
+            self.won.get(i).copied().unwrap_or(0),
+            self.lost.get(i).copied().unwrap_or(0),
+        );
         share(w, w + l)
     }
 
     /// The share of its decisions taken by its most frequent choice.
     pub fn most_used(&self) -> f64 {
-        share(self.choices.values().copied().max().unwrap_or(0), self.decisions)
+        share(
+            self.choices.values().copied().max().unwrap_or(0),
+            self.decisions,
+        )
     }
 
     /// The share of its decisions that cast a spell that hurts.
@@ -64,12 +73,20 @@ impl Record {
     }
 
     pub fn mean_length(&self) -> f64 {
-        if self.lengths.is_empty() { 0.0 } else { self.lengths.iter().sum::<f64>() / self.lengths.len() as f64 }
+        if self.lengths.is_empty() {
+            0.0
+        } else {
+            self.lengths.iter().sum::<f64>() / self.lengths.len() as f64
+        }
     }
 }
 
 fn share(a: u32, b: u32) -> f64 {
-    if b == 0 { 0.0 } else { f64::from(a) / f64::from(b) }
+    if b == 0 {
+        0.0
+    } else {
+        f64::from(a) / f64::from(b)
+    }
 }
 
 /// What a counting seat writes.
@@ -133,9 +150,25 @@ pub fn match_up(a: &dyn Fn() -> MakeSeat, b: &dyn Fn() -> MakeSeat, m: &Match) -
         for corner in 0..2 {
             let make = a();
             let t = Rc::clone(&tally);
-            let counted: MakeSeat = Box::new(move |state, me| Box::new(Counted { inner: make(state, me), tally: t }));
-            let seats = if corner == 0 { [counted, b()] } else { [b(), counted] };
-            let config = DuelConfig { seed, left: 0.0, right: 220.0, ground: 150.0, sky: 96.0, effects: m.effects.clone() };
+            let counted: MakeSeat = Box::new(move |state, me| {
+                Box::new(Counted {
+                    inner: make(state, me),
+                    tally: t,
+                })
+            });
+            let seats = if corner == 0 {
+                [counted, b()]
+            } else {
+                [b(), counted]
+            };
+            let config = DuelConfig {
+                seed,
+                left: 0.0,
+                right: 220.0,
+                ground: 150.0,
+                sky: 96.0,
+                effects: m.effects.clone(),
+            };
             let mut duel = Duel::new(config, seats);
             let mut started = duel.state.time;
             let mut round = duel.state.round;
@@ -171,6 +204,10 @@ pub fn match_up(a: &dyn Fn() -> MakeSeat, b: &dyn Fn() -> MakeSeat, m: &Match) -
     r.choices = t.choices.clone();
     r.decisions = t.decisions;
     r.attacks = t.attacks;
-    r.mean_distance = if ticks == 0 { 0.0 } else { distance / ticks as f64 };
+    r.mean_distance = if ticks == 0 {
+        0.0
+    } else {
+        distance / ticks as f64
+    };
     r
 }

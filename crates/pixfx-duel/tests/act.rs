@@ -5,13 +5,13 @@
 mod common;
 
 use common::arena;
+use pixfx_draw::math::{js_sign, or_one};
 use pixfx_duel::act::{advance, begin, clash, knock_out};
 use pixfx_duel::data::{KNOCKBACK, spell};
 use pixfx_duel::fighter::{Act, Phase, State};
 use pixfx_duel::out::Out;
 use pixfx_duel::shot::{ShotKind, shot};
 use pixfx_duel::status::{add_shock, shocking};
-use pixfx_draw::math::{js_sign, or_one};
 
 /// A duel where nobody dodges or crits, as the JS tests' `still` sets it, with every effect in the registry.
 fn still(seed: u32) -> State {
@@ -30,7 +30,16 @@ fn strike(s: &mut State, by: usize, name: &'static str) -> Vec<Out> {
     let windup = spell(name).map_or(0.0, |sp| sp.windup);
     let fx = s.fighters[f].body.x;
     let bx = s.fighters[by].body.x;
-    s.fighters[by].act = Some(Act { spell: name, phase: Phase::Windup, t: windup, target: Some(fx), power: 1.0, stacks: 1.0, pierce: false, circle: None });
+    s.fighters[by].act = Some(Act {
+        spell: name,
+        phase: Phase::Windup,
+        t: windup,
+        target: Some(fx),
+        power: 1.0,
+        stacks: 1.0,
+        pierce: false,
+        circle: None,
+    });
     s.fighters[by].body.x = fx - 20.0 * js_sign(or_one(fx - bx));
     s.fighters[by].body.face = js_sign(fx - s.fighters[by].body.x);
     s.out.clear();
@@ -39,7 +48,8 @@ fn strike(s: &mut State, by: usize, name: &'static str) -> Vec<Out> {
 }
 
 fn hits(out: &[Out], name: &str) -> bool {
-    out.iter().any(|o| matches!(o, Out::Hit { spell, .. } if *spell == name))
+    out.iter()
+        .any(|o| matches!(o, Out::Hit { spell, .. } if *spell == name))
 }
 
 #[test]
@@ -52,7 +62,11 @@ fn a_failed_block_lets_the_whole_blow_through_and_the_guards_qi_is_paid_anyway()
         let qi = s.fighters[1].qi;
         let out = strike(&mut s, 0, "palm");
         assert!(s.fighters[1].qi < qi, "seed {seed}");
-        if hits(&out, "palm") { through += 1 } else { held += 1 }
+        if hits(&out, "palm") {
+            through += 1
+        } else {
+            held += 1
+        }
     }
     // palm (power 20): about half get through
     assert!(through > 8 && held > 8, "{through} {held}");
@@ -110,7 +124,16 @@ fn a_ward_holds_1_to_3_charges() {
         let mut s = still(seed);
         let x = s.fighters[1].body.x;
         let windup = spell("ward").map_or(0.0, |sp| sp.windup);
-        s.fighters[1].act = Some(Act { spell: "ward", phase: Phase::Windup, t: windup, target: Some(x), power: 1.0, stacks: 1.0, pierce: false, circle: None });
+        s.fighters[1].act = Some(Act {
+            spell: "ward",
+            phase: Phase::Windup,
+            t: windup,
+            target: Some(x),
+            power: 1.0,
+            stacks: 1.0,
+            pierce: false,
+            circle: None,
+        });
         advance(&mut s, 1, 1.0 / 60.0);
         let c = s.fighters[1].charges;
         if !seen.contains(&c) {
@@ -157,11 +180,24 @@ fn a_bolt_flies_strikes_and_ends_its_effect() {
     s.fighters[1].body.x = s.fighters[0].body.x + 60.0;
     let windup = spell("bolt").map_or(0.0, |sp| sp.windup);
     s.fighters[0].body.face = 1.0;
-    s.fighters[0].act = Some(Act { spell: "bolt", phase: Phase::Windup, t: windup, target: None, power: 1.0, stacks: 1.0, pierce: false, circle: None });
+    s.fighters[0].act = Some(Act {
+        spell: "bolt",
+        phase: Phase::Windup,
+        t: windup,
+        target: None,
+        power: 1.0,
+        stacks: 1.0,
+        pierce: false,
+        circle: None,
+    });
     advance(&mut s, 0, 1.0 / 60.0);
     assert_eq!(s.shots.len(), 1);
     let key = s.out.iter().find_map(|o| match o {
-        Out::Play { key, fx: "projectiles/laser-bolt", .. } => Some(*key),
+        Out::Play {
+            key,
+            fx: "projectiles/laser-bolt",
+            ..
+        } => Some(*key),
         _ => None,
     });
     assert!(key.is_some(), "no bolt played");
@@ -192,7 +228,16 @@ fn two_bolts_meeting_head_on_are_both_spent() {
     s.fighters[1].body.face = -1.0;
     for (me, name) in [(0, "bolt"), (1, "shard")] {
         let windup = spell(name).map_or(0.0, |sp| sp.windup);
-        s.fighters[me].act = Some(Act { spell: name, phase: Phase::Windup, t: windup, target: None, power: 1.0, stacks: 1.0, pierce: false, circle: None });
+        s.fighters[me].act = Some(Act {
+            spell: name,
+            phase: Phase::Windup,
+            t: windup,
+            target: None,
+            power: 1.0,
+            stacks: 1.0,
+            pierce: false,
+            circle: None,
+        });
         advance(&mut s, me, 1.0 / 60.0);
     }
     assert_eq!(s.shots.len(), 2);
@@ -209,7 +254,13 @@ fn two_bolts_meeting_head_on_are_both_spent() {
     assert!(s.shots.is_empty());
     assert!(s.out.iter().any(|o| matches!(o, Out::Clash { .. })));
     assert!(!s.out.iter().any(|o| matches!(o, Out::Hit { .. })));
-    assert_eq!(s.out.iter().filter(|o| matches!(o, Out::Stop { .. })).count(), 2);
+    assert_eq!(
+        s.out
+            .iter()
+            .filter(|o| matches!(o, Out::Stop { .. }))
+            .count(),
+        2
+    );
 }
 
 #[test]
@@ -221,20 +272,41 @@ fn a_bolt_spent_in_a_clash_neither_lands_nor_takes_another_shot_with_it() {
     s.fighters[1].body.face = -1.0;
     for (me, name) in [(0, "bolt"), (1, "shard")] {
         let windup = spell(name).map_or(0.0, |sp| sp.windup);
-        s.fighters[me].act = Some(Act { spell: name, phase: Phase::Windup, t: windup, target: None, power: 1.0, stacks: 1.0, pierce: false, circle: None });
+        s.fighters[me].act = Some(Act {
+            spell: name,
+            phase: Phase::Windup,
+            t: windup,
+            target: None,
+            power: 1.0,
+            stacks: 1.0,
+            pierce: false,
+            circle: None,
+        });
         advance(&mut s, me, 1.0 / 60.0);
     }
     assert_eq!(s.shots.len(), 2);
     // the two bolts meet right at Thunder's body, and a third shot flies last in the list, far above it all
     let y = s.fighters[0].body.spec.chest;
-    s.shots[0].kind = ShotKind::Bolt { x: 100.0, y, vx: 60.0 };
-    s.shots[1].kind = ShotKind::Bolt { x: 104.0, y, vx: -60.0 };
+    s.shots[0].kind = ShotKind::Bolt {
+        x: 100.0,
+        y,
+        vx: 60.0,
+    };
+    s.shots[1].kind = ShotKind::Bolt {
+        x: 104.0,
+        y,
+        vx: -60.0,
+    };
     s.fighters[0].body.x = 103.0;
     s.fighters[1].body.x = 200.0;
     let mut third = s.shots[0];
     third.id = 99;
     third.key = Some(999);
-    third.kind = ShotKind::Bolt { x: 10.0, y: 500.0, vx: 0.0 };
+    third.kind = ShotKind::Bolt {
+        x: 10.0,
+        y: 500.0,
+        vx: 0.0,
+    };
     s.shots.push(third);
     s.out.clear();
     let ids: Vec<u32> = s.shots.iter().map(|x| x.id).collect();
@@ -243,6 +315,15 @@ fn a_bolt_spent_in_a_clash_neither_lands_nor_takes_another_shot_with_it() {
     }
     assert!(s.out.iter().any(|o| matches!(o, Out::Clash { .. })));
     // the spent bolt does not strike, and the third shot flies on
-    assert!(!s.out.iter().any(|o| matches!(o, Out::Hit { .. } | Out::Dodge { .. } | Out::Block { .. })), "{:?}", s.out);
-    assert!(s.shots.iter().any(|x| x.id == 99), "the third shot left the list with its effect playing");
+    assert!(
+        !s.out
+            .iter()
+            .any(|o| matches!(o, Out::Hit { .. } | Out::Dodge { .. } | Out::Block { .. })),
+        "{:?}",
+        s.out
+    );
+    assert!(
+        s.shots.iter().any(|x| x.id == 99),
+        "the third shot left the list with its effect playing"
+    );
 }

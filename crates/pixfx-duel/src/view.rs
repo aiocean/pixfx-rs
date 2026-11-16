@@ -1,9 +1,9 @@
 //! The duel as the page reads it: each fighter's body, life, statuses, cast, skill bar and buffs, and the round.
 
-use crate::style::Style;
 use crate::bar::{Buff, SlotView, buffs_of, skill_bar};
 use crate::data::{Luck, School, Stats};
 use crate::fighter::{Fighter, Phase, State};
+use crate::style::Style;
 use pixfx_fighter::pose::Pose;
 
 /// The duel this tick.
@@ -88,7 +88,10 @@ pub fn view(state: &State) -> DuelView {
         left: state.left,
         right: state.right,
         ground: state.ground,
-        fighters: [fighter_view(&state.fighters[0]), fighter_view(&state.fighters[1])],
+        fighters: [
+            fighter_view(&state.fighters[0]),
+            fighter_view(&state.fighters[1]),
+        ],
     }
 }
 
@@ -118,8 +121,17 @@ fn fighter_view(f: &Fighter) -> FighterView {
         charges: f.charges,
         barrier: f.barrier,
         burn: f.burn.is_some(),
-        lucky: f.lucky.map(|l| LuckView { kind: l.kind, spell: l.spell, slot: l.slot, at: l.at }),
-        act: f.act.map(|a| ActView { spell: a.spell, phase: a.phase, t: a.t }),
+        lucky: f.lucky.map(|l| LuckView {
+            kind: l.kind,
+            spell: l.spell,
+            slot: l.slot,
+            at: l.at,
+        }),
+        act: f.act.map(|a| ActView {
+            spell: a.spell,
+            phase: a.phase,
+            t: a.t,
+        }),
         stats: f.stats,
         untouchable: b.untouchable(),
         skill_bar: skill_bar(f),

@@ -24,8 +24,17 @@ fn stacks_show_as_numbers_and_good_ones_come_before_bad_ones() {
     t.fury = 3.0;
     t.charges = 2.0;
     t.chill = 2.0;
-    t.burn = Some(Burning { t: 1.0, tick: 0.5, per: 1.0, by: 1 });
-    t.shock = Some(Shocked { stacks: 4.0, tick: 0.5, by: 1 });
+    t.burn = Some(Burning {
+        t: 1.0,
+        tick: 0.5,
+        per: 1.0,
+        by: 1,
+    });
+    t.shock = Some(Shocked {
+        stacks: 4.0,
+        tick: 0.5,
+        by: 1,
+    });
     t.def_down = 1.0;
     t.silence = 1.0;
     t.sealed = 0.1;
@@ -57,7 +66,11 @@ fn stacks_show_as_numbers_and_good_ones_come_before_bad_ones() {
 fn an_unyielding_fighter_that_has_stood_up_shows_it_no_more_a_knocked_out_fighter_shows_nothing() {
     let mut s = arena(1);
     s.fighters[0].rose = true;
-    assert!(buffs_of(&s.fighters[0]).iter().all(|x| x.id != "unyielding"));
+    assert!(
+        buffs_of(&s.fighters[0])
+            .iter()
+            .all(|x| x.id != "unyielding")
+    );
     s.fighters[1].hp = 0.0;
     s.fighters[1].chill = 2.0;
     assert!(buffs_of(&s.fighters[1]).is_empty());

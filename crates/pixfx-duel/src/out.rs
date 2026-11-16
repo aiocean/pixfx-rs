@@ -31,38 +31,131 @@ pub struct PlayOpts {
 /// One command or event of a step, in the order the rules made it.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase"))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        tag = "type",
+        rename_all = "camelCase",
+        rename_all_fields = "camelCase"
+    )
+)]
 pub enum Out {
     /// Start effect `fx` at (`x`, `y`) under `key`.
-    Play { key: u32, fx: &'static str, x: f64, y: f64, opts: PlayOpts },
+    Play {
+        key: u32,
+        fx: &'static str,
+        x: f64,
+        y: f64,
+        opts: PlayOpts,
+    },
     /// Move the effect under `key`.
-    Move { key: u32, x: f64, y: f64 },
+    Move {
+        key: u32,
+        x: f64,
+        y: f64,
+    },
     /// Stop the effect under `key`.
-    Stop { key: u32 },
+    Stop {
+        key: u32,
+    },
     /// Fighter `by`'s `spell` struck.
-    Hit { by: usize, spell: &'static str, power: f64, launch: bool, ranged: bool, damage: f64, crit: bool, share: f64, x: f64, y: f64 },
+    Hit {
+        by: usize,
+        spell: &'static str,
+        power: f64,
+        launch: bool,
+        ranged: bool,
+        damage: f64,
+        crit: bool,
+        share: f64,
+        x: f64,
+        y: f64,
+    },
     /// A burn, shock or field ticked on its target.
-    Tick { by: usize, damage: f64, share: f64, x: f64, y: f64 },
+    Tick {
+        by: usize,
+        damage: f64,
+        share: f64,
+        x: f64,
+        y: f64,
+    },
     /// Fighter `by` turned a blow aside.
-    Block { by: usize, x: f64, y: f64 },
+    Block {
+        by: usize,
+        x: f64,
+        y: f64,
+    },
     /// Two blows met, or a ward's charge took one.
-    Clash { x: f64, y: f64 },
-    Dodge { x: f64, y: f64 },
-    Heal { by: usize, amount: f64, x: f64, y: f64 },
-    Ward { by: usize, amount: f64, x: f64, y: f64 },
-    Barrier { by: usize, x: f64, y: f64 },
-    Ko { x: f64, y: f64 },
+    Clash {
+        x: f64,
+        y: f64,
+    },
+    Dodge {
+        x: f64,
+        y: f64,
+    },
+    Heal {
+        by: usize,
+        amount: f64,
+        x: f64,
+        y: f64,
+    },
+    Ward {
+        by: usize,
+        amount: f64,
+        x: f64,
+        y: f64,
+    },
+    Barrier {
+        by: usize,
+        x: f64,
+        y: f64,
+    },
+    Ko {
+        x: f64,
+        y: f64,
+    },
     /// Feet or back met the floor.
-    Land { x: f64, strength: f64 },
+    Land {
+        x: f64,
+        strength: f64,
+    },
     /// Thrown into the arena's edge.
-    Bump { x: f64, y: f64, strength: f64 },
+    Bump {
+        x: f64,
+        y: f64,
+        strength: f64,
+    },
     /// A streak of qi from (`x0`, `y0`) to (`x1`, `y1`).
-    Streak { by: usize, x0: f64, y0: f64, x1: f64, y1: f64 },
-    Lucky { by: usize, kind: Luck, x: f64, y: f64 },
+    Streak {
+        by: usize,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+    },
+    Lucky {
+        by: usize,
+        kind: Luck,
+        x: f64,
+        y: f64,
+    },
     /// A bar skill rose a tier.
-    Tier { by: usize, slot: usize, rarity: Rarity },
-    Ultimate { by: usize, x: f64, y: f64 },
-    Unyielding { by: usize, x: f64, y: f64 },
+    Tier {
+        by: usize,
+        slot: usize,
+        rarity: Rarity,
+    },
+    Ultimate {
+        by: usize,
+        x: f64,
+        y: f64,
+    },
+    Unyielding {
+        by: usize,
+        x: f64,
+        y: f64,
+    },
 }
 
 impl From<pixfx_fighter::body::Event> for Out {

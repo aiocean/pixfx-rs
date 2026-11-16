@@ -24,18 +24,38 @@ fn still(seed: u32) -> Duel {
 /// A cast of `name` at the end of its windup (or `before` it).
 fn act(name: &'static str, target: f64, before: f64) -> Act {
     let windup = spell(name).map_or(0.0, |s| s.windup);
-    Act { spell: name, phase: Phase::Windup, t: windup - before, target: Some(target), power: 1.0, stacks: 1.0, pierce: false, circle: None }
+    Act {
+        spell: name,
+        phase: Phase::Windup,
+        t: windup - before,
+        target: Some(target),
+        power: 1.0,
+        stacks: 1.0,
+        pierce: false,
+        circle: None,
+    }
 }
 
 fn held(spell: &'static str, rarity: Rarity, traits: Vec<Trait>, evolved: bool) -> Slot {
     let power = slot_power(rarity, &traits, evolved);
-    Slot::Held { spell, power, evolved, rarity, traits, idle: 0.0 }
+    Slot::Held {
+        spell,
+        power,
+        evolved,
+        rarity,
+        traits,
+        idle: 0.0,
+    }
 }
 
 /// A duel where fighter `index` casts `name` once, from a bar slot set to `slot`, and the other stands still 30 px
 /// away; nobody dodges or crits.
 fn cast_once(seed: u32, index: usize, name: &'static str, slot: Slot) -> Duel {
-    let seats: [MakeSeat; 2] = if index == 0 { [caster(name), idle()] } else { [idle(), caster(name)] };
+    let seats: [MakeSeat; 2] = if index == 0 {
+        [caster(name), idle()]
+    } else {
+        [idle(), caster(name)]
+    };
     let mut duel = Duel::new(config(seed, all_effects()), seats);
     for f in &mut duel.state.fighters {
         f.stats.dodge = 0.0;
@@ -43,7 +63,17 @@ fn cast_once(seed: u32, index: usize, name: &'static str, slot: Slot) -> Duel {
     }
     let s = &mut duel.state;
     let me = &mut s.fighters[index];
-    me.bar = vec![slot, Slot::Empty { left: 9.0, full: 9.0 }, Slot::Empty { left: 9.0, full: 9.0 }];
+    me.bar = vec![
+        slot,
+        Slot::Empty {
+            left: 9.0,
+            full: 9.0,
+        },
+        Slot::Empty {
+            left: 9.0,
+            full: 9.0,
+        },
+    ];
     if !me.pool.contains(&name) {
         me.pool.push(name);
     }
@@ -95,7 +125,11 @@ fn grit_falls_0_4_a_second_and_is_gone_next_round() {
 /// The hit `name` lands from fighter `by` 20 px off, with `set` run on the duel first.
 fn payoff_blow(name: &'static str, set: impl Fn(&mut Duel)) -> (f64, Duel) {
     let mut duel = still(3);
-    let by = if matches!(name, "palm" | "burst") { 0 } else { 1 };
+    let by = if matches!(name, "palm" | "burst") {
+        0
+    } else {
+        1
+    };
     let f = 1 - by;
     for g in &mut duel.state.fighters {
         g.stats.dodge = 0.0;
@@ -110,7 +144,9 @@ fn payoff_blow(name: &'static str, set: impl Fn(&mut Duel)) -> (f64, Duel) {
     let mut power = f64::NAN;
     for _ in 0..90 {
         for o in duel.step(1.0 / 60.0) {
-            if let Out::Hit { spell, power: p, .. } = o
+            if let Out::Hit {
+                spell, power: p, ..
+            } = o
                 && spell == name
             {
                 power = p;
@@ -148,7 +184,12 @@ fn heal_hex_and_ward_clear_burn_silence_defence_down_chill_and_shock() {
         let mut duel = still(5);
         let foe = 1 - index;
         let s = &mut duel.state;
-        s.fighters[index].burn = Some(Burning { t: 3.0, tick: 0.5, per: 2.0, by: foe });
+        s.fighters[index].burn = Some(Burning {
+            t: 3.0,
+            tick: 0.5,
+            per: 2.0,
+            by: foe,
+        });
         s.fighters[index].def_down = 3.0;
         add_chill(s, index, 1.0);
         add_chill(s, index, 1.0);
@@ -184,7 +225,10 @@ fn an_orb_that_lands_leaves_a_shock_stack() {
     duel.state.fighters[0].act = Some(act("orb", fx, 0.0));
     duel.state.fighters[0].body.x = fx - 30.0;
     duel.state.fighters[0].body.face = 1.0;
-    let landed = steps_until(&mut duel, 60 * 7, |_, out| out.iter().any(|o| matches!(o, Out::Hit { spell: "orb", .. })));
+    let landed = steps_until(&mut duel, 60 * 7, |_, out| {
+        out.iter()
+            .any(|o| matches!(o, Out::Hit { spell: "orb", .. }))
+    });
     assert!(landed);
     assert!(duel.state.fighters[1].shock.map_or(0.0, |k| k.stacks) > 0.0);
 }
@@ -196,10 +240,19 @@ fn a_spent_skill_empties_its_slot_which_counts_down_and_draws_a_skill_not_on_the
     for seed in 1..=6 {
         let mut duel = still(seed);
         let f = (seed % 2) as usize;
-        let plain = if f == 0 { ["orb", "bell", "heal"] } else { ["mirror", "void", "frostfire"] };
-        duel.state.fighters[f].bar = plain.iter().map(|n| held(n, Rarity::Common, Vec::new(), false)).collect();
+        let plain = if f == 0 {
+            ["orb", "bell", "heal"]
+        } else {
+            ["mirror", "void", "frostfire"]
+        };
+        duel.state.fighters[f].bar = plain
+            .iter()
+            .map(|n| held(n, Rarity::Common, Vec::new(), false))
+            .collect();
         pixfx_duel::bar::spend(&mut duel.state, f, 0);
-        let Slot::Empty { left, .. } = duel.state.fighters[f].bar[0] else { return assert!(matches!(duel.state.fighters[f].bar[0], Slot::Empty { .. })) };
+        let Slot::Empty { left, .. } = duel.state.fighters[f].bar[0] else {
+            return assert!(matches!(duel.state.fighters[f].bar[0], Slot::Empty { .. }));
+        };
         assert!((1.5..=2.5).contains(&left));
         for _ in 0..libm::ceil(left * 60.0) as usize + 1 {
             duel.step(1.0 / 60.0);
@@ -219,7 +272,13 @@ fn the_same_seed_plays_the_same_bar() {
         for i in 0..60 * 60 {
             duel.step(1.0 / 60.0);
             if i % 30 == 0 {
-                seen.push(duel.state.fighters.iter().map(|f| f.bar.clone()).collect::<Vec<_>>());
+                seen.push(
+                    duel.state
+                        .fighters
+                        .iter()
+                        .map(|f| f.bar.clone())
+                        .collect::<Vec<_>>(),
+                );
             }
         }
         seen
@@ -249,7 +308,11 @@ fn the_screens_bar_holds_no_nan_after_a_knockout() {
     duel.step(1.0 / 60.0);
     for f in &duel.state.fighters {
         for s in skill_bar(f) {
-            assert!([s.left, s.full, s.charge, s.power, s.stale].iter().all(|v| !v.is_nan()));
+            assert!(
+                [s.left, s.full, s.charge, s.power, s.stale]
+                    .iter()
+                    .all(|v| !v.is_nan())
+            );
         }
     }
 }
@@ -263,7 +326,10 @@ fn stale_bar(spells: [&'static str; 3]) -> Duel {
             f.pool.push(n);
         }
     }
-    f.bar = spells.iter().map(|n| held(n, Rarity::Common, Vec::new(), false)).collect();
+    f.bar = spells
+        .iter()
+        .map(|n| held(n, Rarity::Common, Vec::new(), false))
+        .collect();
     duel
 }
 
@@ -277,7 +343,13 @@ fn a_skill_left_ready_and_uncast_for_stale_seconds_leaves_the_bar_for_another() 
     for (i, was) in ["orb", "bell", "heal"].into_iter().enumerate() {
         assert!(bar[i].spell().is_some_and(|n| n != was));
     }
-    assert_eq!(on_bar(&duel.state.fighters[0]).iter().collect::<HashSet<_>>().len(), 3);
+    assert_eq!(
+        on_bar(&duel.state.fighters[0])
+            .iter()
+            .collect::<HashSet<_>>()
+            .len(),
+        3
+    );
 }
 
 #[test]
@@ -319,7 +391,10 @@ fn every_pool_spell_is_cast_in_some_fight() {
             }
         }
     }
-    for s in [pixfx_duel::data::School::Thunder, pixfx_duel::data::School::Frost] {
+    for s in [
+        pixfx_duel::data::School::Thunder,
+        pixfx_duel::data::School::Frost,
+    ] {
         for name in school(s).pool {
             assert!(cast.contains(name), "{name}");
         }
@@ -359,7 +434,11 @@ fn an_evolved_skill_inflicts_one_more_stack_of_what_it_inflicts() {
         }
         let tx = duel.state.fighters[0].body.x;
         let f = &mut duel.state.fighters[1];
-        f.bar = vec![held("jet", Rarity::Common, Vec::new(), evolved), held("shard", Rarity::Common, Vec::new(), false), held("mirror", Rarity::Common, Vec::new(), false)];
+        f.bar = vec![
+            held("jet", Rarity::Common, Vec::new(), evolved),
+            held("shard", Rarity::Common, Vec::new(), false),
+            held("mirror", Rarity::Common, Vec::new(), false),
+        ];
         if let Slot::Held { power, .. } = &mut f.bar[0] {
             *power = 1.0;
         }
@@ -376,15 +455,28 @@ fn an_evolved_skill_inflicts_one_more_stack_of_what_it_inflicts() {
 
 #[test]
 fn swift_cuts_the_skills_cooldown_to_60_percent() {
-    let mut duel = cast_once(1, 0, "spark", held("spark", Rarity::Common, vec![Trait::Swift], false));
+    let mut duel = cast_once(
+        1,
+        0,
+        "spark",
+        held("spark", Rarity::Common, vec![Trait::Swift], false),
+    );
     duel.step(1.0 / 60.0);
     let sp = spell("spark").map_or((0.0, 0.0), |s| (s.cooldown, s.windup));
-    assert!((duel.state.fighters[0].cool_full("spark") - (sp.0 * TRAITS.swift_cooldown + sp.1)).abs() < 1e-9);
+    assert!(
+        (duel.state.fighters[0].cool_full("spark") - (sp.0 * TRAITS.swift_cooldown + sp.1)).abs()
+            < 1e-9
+    );
 }
 
 #[test]
 fn cheap_halves_the_qi_a_cast_costs() {
-    let mut duel = cast_once(1, 0, "burst", held("burst", Rarity::Common, vec![Trait::Cheap], false));
+    let mut duel = cast_once(
+        1,
+        0,
+        "burst",
+        held("burst", Rarity::Common, vec![Trait::Cheap], false),
+    );
     duel.state.fighters[0].qi = spell("burst").map_or(0.0, |s| s.cost) * 0.5 + 0.1;
     assert!(pixfx_duel::bar::ready(&duel.state.fighters[0], "burst"));
     duel.step(1.0 / 60.0);
@@ -397,13 +489,21 @@ fn piercing_goes_through_a_guard_every_time() {
     let landed = |traits: Vec<Trait>| {
         let mut n = 0;
         for seed in 1..=20 {
-            let mut duel = cast_once(seed, 0, "palm", held("palm", Rarity::Common, traits.clone(), false));
+            let mut duel = cast_once(
+                seed,
+                0,
+                "palm",
+                held("palm", Rarity::Common, traits.clone(), false),
+            );
             let (mx, fx) = (duel.state.fighters[0].body.x, duel.state.fighters[1].body.x);
             duel.state.fighters[1].body.face = pixfx_draw::math::js_sign(mx - fx);
             let mut hit = false;
             for _ in 0..60 {
                 duel.state.fighters[1].guard = 5.0;
-                hit = duel.step(1.0 / 60.0).iter().any(|o| matches!(o, Out::Hit { spell: "palm", .. }));
+                hit = duel
+                    .step(1.0 / 60.0)
+                    .iter()
+                    .any(|o| matches!(o, Out::Hit { spell: "palm", .. }));
                 if hit {
                     break;
                 }
@@ -418,10 +518,20 @@ fn piercing_goes_through_a_guard_every_time() {
 
 #[test]
 fn lingering_adds_a_stack_on_top_of_evolutions() {
-    let mut duel = cast_once(4, 1, "jet", held("jet", Rarity::Common, vec![Trait::Lingering], false));
+    let mut duel = cast_once(
+        4,
+        1,
+        "jet",
+        held("jet", Rarity::Common, vec![Trait::Lingering], false),
+    );
     steps_until(&mut duel, 60, |d, _| d.state.fighters[0].chill != 0.0);
     assert_eq!(duel.state.fighters[0].chill, 2.0);
-    let mut duel = cast_once(4, 0, "spark", held("spark", Rarity::Common, vec![Trait::Lingering], true));
+    let mut duel = cast_once(
+        4,
+        0,
+        "spark",
+        held("spark", Rarity::Common, vec![Trait::Lingering], true),
+    );
     steps_until(&mut duel, 60, |d, _| d.state.fighters[1].shock.is_some());
     assert_eq!(duel.state.fighters[1].shock.map(|k| k.stacks), Some(3.0));
 }
@@ -455,7 +565,17 @@ fn casts(name: &'static str, n: usize) -> Vec<Cast> {
         me.qi = 50.0;
         me.hp = 100.0;
         if on_bar {
-            me.bar = vec![held(name, Rarity::Common, Vec::new(), false), Slot::Empty { left: 9.0, full: 9.0 }, Slot::Empty { left: 9.0, full: 9.0 }];
+            me.bar = vec![
+                held(name, Rarity::Common, Vec::new(), false),
+                Slot::Empty {
+                    left: 9.0,
+                    full: 9.0,
+                },
+                Slot::Empty {
+                    left: 9.0,
+                    full: 9.0,
+                },
+            ];
         }
         let lucky = duel.step(1.0 / 600.0).into_iter().find_map(|o| match o {
             Out::Lucky { kind, .. } => Some(kind),
@@ -463,7 +583,13 @@ fn casts(name: &'static str, n: usize) -> Vec<Cast> {
         });
         let me = &duel.state.fighters[0];
         if let Some(a) = me.act.filter(|a| a.spell == name) {
-            out.push(Cast { kind: lucky, power: a.power, qi: me.qi, cool: me.cool(name), kept: me.bar.first().and_then(Slot::spell) == Some(name) });
+            out.push(Cast {
+                kind: lucky,
+                power: a.power,
+                qi: me.qi,
+                cool: me.cool(name),
+                kept: me.bar.first().and_then(Slot::spell) == Some(name),
+            });
         }
     }
     out
@@ -474,10 +600,17 @@ fn about_one_bar_cast_in_twelve_is_lucky_and_each_kind_does_what_it_says() {
     let seen = casts("spark", 3000);
     let lucky: Vec<&Cast> = seen.iter().filter(|c| c.kind.is_some()).collect();
     assert!((lucky.len() as f64 / seen.len() as f64 - LUCKY.chance).abs() < 0.02);
-    let kinds: HashSet<&str> = lucky.iter().filter_map(|c| c.kind.map(Luck::name)).collect();
+    let kinds: HashSet<&str> = lucky
+        .iter()
+        .filter_map(|c| c.kind.map(Luck::name))
+        .collect();
     assert_eq!(kinds, HashSet::from(["again", "double", "free"]));
     for c in &seen {
-        let want_power = if c.kind == Some(Luck::Double) { 2.0 } else { 1.0 };
+        let want_power = if c.kind == Some(Luck::Double) {
+            2.0
+        } else {
+            1.0
+        };
         assert!((c.power - want_power).abs() < 1e-9);
         if c.kind == Some(Luck::Free) {
             assert!(c.qi > 49.9);
@@ -520,7 +653,17 @@ fn a_lucky_cast_names_its_own_slot_and_again_puts_the_skill_back_on_it() {
         me.cool.clear();
         me.qi = 50.0;
         me.lucky = None;
-        me.bar = vec![Slot::Empty { left: 9.0, full: 9.0 }, held("spark", Rarity::Common, Vec::new(), false), Slot::Empty { left: 9.0, full: 9.0 }];
+        me.bar = vec![
+            Slot::Empty {
+                left: 9.0,
+                full: 9.0,
+            },
+            held("spark", Rarity::Common, Vec::new(), false),
+            Slot::Empty {
+                left: 9.0,
+                full: 9.0,
+            },
+        ];
         duel.step(1.0 / 600.0);
         let me = &duel.state.fighters[0];
         if let Some(l) = me.lucky {
@@ -534,7 +677,12 @@ fn a_lucky_cast_names_its_own_slot_and_again_puts_the_skill_back_on_it() {
 
 #[test]
 fn a_heal_on_the_bar_heals_by_its_power_as_the_ai_is_told() {
-    let mut duel = cast_once(2, 0, "heal", held("heal", Rarity::Common, Vec::new(), false));
+    let mut duel = cast_once(
+        2,
+        0,
+        "heal",
+        held("heal", Rarity::Common, Vec::new(), false),
+    );
     duel.state.fighters[0].hp = 40.0;
     duel.state.fighters[0].qi = 100.0;
     if let Slot::Held { power, .. } = &mut duel.state.fighters[0].bar[0] {
@@ -555,7 +703,11 @@ fn the_water_jet_sprays_for_a_moment_and_stops() {
     let stopped = steps_until(&mut duel, 3 * 60, |_, out| {
         for o in out {
             match o {
-                Out::Play { key: k, fx: "water/water-jet", .. } => key = Some(*k),
+                Out::Play {
+                    key: k,
+                    fx: "water/water-jet",
+                    ..
+                } => key = Some(*k),
                 Out::Stop { key: k } if Some(*k) == key => return true,
                 _ => {}
             }
@@ -585,7 +737,10 @@ fn knockout_stops_every_effect_it_started() {
                 }
             }
             for (fx, at) in live.values() {
-                assert!(duel.state.time - at < 12.0, "seed {seed}: {fx} left playing");
+                assert!(
+                    duel.state.time - at < 12.0,
+                    "seed {seed}: {fx} left playing"
+                );
             }
         }
     }
@@ -611,7 +766,10 @@ fn stopped_after_knockout(name: &'static str, fx: &str) -> bool {
         if duel.state.round != round {
             break;
         }
-        stopped |= duel.step(1.0 / 60.0).iter().any(|o| matches!(o, Out::Stop { key: k } if Some(*k) == key));
+        stopped |= duel
+            .step(1.0 / 60.0)
+            .iter()
+            .any(|o| matches!(o, Out::Stop { key: k } if Some(*k) == key));
     }
     assert_eq!(duel.state.round, round + 1);
     stopped
@@ -634,7 +792,11 @@ fn the_hex_shields_dome_stands_on_the_casters_feet() {
     let mut at = None;
     steps_until(&mut duel, 120, |d, out| {
         at = out.iter().find_map(|o| match o {
-            Out::Play { fx: "arcane/hex-shield", y, .. } => Some((*y, d.state.ground - d.state.fighters[0].body.air)),
+            Out::Play {
+                fx: "arcane/hex-shield",
+                y,
+                ..
+            } => Some((*y, d.state.ground - d.state.fighters[0].body.air)),
             _ => None,
         });
         at.is_some()

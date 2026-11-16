@@ -5,7 +5,9 @@ use crate::bar::{ready, slot_of};
 use crate::data::{BAR, Kind, RAGE, school, spell};
 use crate::fighter::{Fighter, Phase, Slot, State};
 use crate::shot::{ShotKind, orb_at};
-use pixfx_mind::{ActPhase, Arena, Doing, Foe, Inflicts, Me, Sense, Skill, SkillKind, Threat, ThreatShape};
+use pixfx_mind::{
+    ActPhase, Arena, Doing, Foe, Inflicts, Me, Sense, Skill, SkillKind, Threat, ThreatShape,
+};
 
 /// Spell `name` as pixfx-mind reads it: what it does, never what it is called (a heal's `damage` is what it heals).
 pub fn skill_of(name: &str) -> Skill {
@@ -24,7 +26,15 @@ pub fn skill_of(name: &str) -> Skill {
             strikes: 1,
             ultimate: false,
             grounded: false,
-            inflicts: Inflicts { freeze: 0.0, shock: false, silence: 0.0, def_down: 0.0, burn: false, chill: false, pull: 0.0 },
+            inflicts: Inflicts {
+                freeze: 0.0,
+                shock: false,
+                silence: 0.0,
+                def_down: 0.0,
+                burn: false,
+                chill: false,
+                pull: 0.0,
+            },
         };
     };
     let kind = if s.dive {
@@ -49,8 +59,16 @@ pub fn skill_of(name: &str) -> Skill {
         Kind::Melee | Kind::Blast => s.range.unwrap_or(f64::NAN),
         _ => s.reach.unwrap_or(0.0),
     };
-    let damage = if s.kind == Kind::Heal { s.amount } else { s.damage };
-    let lands = if s.kind == Kind::Void { s.life.unwrap_or(f64::NAN) } else { s.sigil.unwrap_or(0.0) + s.impact.unwrap_or(0.0) };
+    let damage = if s.kind == Kind::Heal {
+        s.amount
+    } else {
+        s.damage
+    };
+    let lands = if s.kind == Kind::Void {
+        s.life.unwrap_or(f64::NAN)
+    } else {
+        s.sigil.unwrap_or(0.0) + s.impact.unwrap_or(0.0)
+    };
     Skill {
         name: name.to_string(),
         kind,
@@ -82,8 +100,20 @@ pub fn doing_of(f: &Fighter) -> Doing {
     if let Some(a) = f.act {
         let skill = skill_of(a.spell);
         let (windup, recover) = spell(a.spell).map_or((0.0, 0.0), |s| (s.windup, s.recover));
-        let phase = if a.phase == Phase::Windup { ActPhase::Windup } else { ActPhase::Recover };
-        return Doing::Act { kind: skill.kind, phase, t: a.t, windup, recover, reach: skill.reach, damage: skill.damage };
+        let phase = if a.phase == Phase::Windup {
+            ActPhase::Windup
+        } else {
+            ActPhase::Recover
+        };
+        return Doing::Act {
+            kind: skill.kind,
+            phase,
+            t: a.t,
+            windup,
+            recover,
+            reach: skill.reach,
+            damage: skill.damage,
+        };
     }
     if f.guard > 0.0 {
         Doing::Guard
@@ -108,16 +138,38 @@ pub fn threats_of(state: &State, me: usize) -> Vec<Threat> {
         let sp = s.spell;
         let damage = sp.damage.unwrap_or(0.0);
         let threat = match s.kind {
-            ShotKind::Bolt { x, y, vx } => Some(Threat { age: s.t, damage, shape: ThreatShape::Projectile { x, y, vx } }),
+            ShotKind::Bolt { x, y, vx } => Some(Threat {
+                age: s.t,
+                damage,
+                shape: ThreatShape::Projectile { x, y, vx },
+            }),
             ShotKind::Orb { .. } => {
                 let (x, y) = orb_at(s);
-                Some(Threat { age: s.t, damage, shape: ThreatShape::Seeker { x, y: -y, radius: sp.radius.unwrap_or(f64::NAN) } })
+                Some(Threat {
+                    age: s.t,
+                    damage,
+                    shape: ThreatShape::Seeker {
+                        x,
+                        y: -y,
+                        radius: sp.radius.unwrap_or(f64::NAN),
+                    },
+                })
             }
-            ShotKind::Zone { fell: false, follow, x, lead, .. } => {
+            ShotKind::Zone {
+                fell: false,
+                follow,
+                x,
+                lead,
+                ..
+            } => {
                 if follow && s.t < 0.0 {
                     // a barrage still falling: its next strike aims where I stand
                     let age = s.t + sp.every.unwrap_or(f64::NAN) + sp.aim_ahead.unwrap_or(f64::NAN);
-                    Some(Threat { age, damage, shape: ThreatShape::Barrage { lands_in: -s.t } })
+                    Some(Threat {
+                        age,
+                        damage,
+                        shape: ThreatShape::Barrage { lands_in: -s.t },
+                    })
                 } else {
                     // a sealed spell is seen from the moment its seal shows, a falling one once it trembles
                     let shape = ThreatShape::Area {
@@ -127,12 +179,21 @@ pub fn threats_of(state: &State, me: usize) -> Vec<Threat> {
                         lands_in: sp.impact.unwrap_or(f64::NAN) - s.t,
                         grounded: sp.grounded,
                     };
-                    Some(Threat { age: s.t + lead - sp.notice.unwrap_or(f64::NAN), damage, shape })
+                    Some(Threat {
+                        age: s.t + lead - sp.notice.unwrap_or(f64::NAN),
+                        damage,
+                        shape,
+                    })
                 }
             }
-            ShotKind::Void { x, .. } => {
-                Some(Threat { age: s.t, damage, shape: ThreatShape::Field { x, reach: sp.reach.unwrap_or(f64::NAN) } })
-            }
+            ShotKind::Void { x, .. } => Some(Threat {
+                age: s.t,
+                damage,
+                shape: ThreatShape::Field {
+                    x,
+                    reach: sp.reach.unwrap_or(f64::NAN),
+                },
+            }),
             ShotKind::Zone { .. } | ShotKind::Spray => None,
         };
         out.extend(threat);
@@ -145,7 +206,13 @@ pub fn sense_of(state: &State, me: usize) -> Sense {
     let f = &state.fighters[me];
     let foe = &state.fighters[1 - me];
     let b = &f.body;
-    let free = !(f.act.is_some() || b.reeling() || b.squat > 0.0 || b.duck > 0.0 || b.frozen > 0.0 || b.shocked > 0.0 || f.hp <= 0.0);
+    let free = !(f.act.is_some()
+        || b.reeling()
+        || b.squat > 0.0
+        || b.duck > 0.0
+        || b.frozen > 0.0
+        || b.shocked > 0.0
+        || f.hp <= 0.0);
     Sense {
         time: state.time,
         me: Me {
@@ -164,7 +231,10 @@ pub fn sense_of(state: &State, me: usize) -> Sense {
             sealed: f.sealed > 0.0,
             barrier: f.barrier > 0.0,
             shield: f.charges > 0.0,
-            seeker_out: state.shots.iter().any(|s| matches!(s.kind, ShotKind::Orb { .. }) && s.owner == me),
+            seeker_out: state
+                .shots
+                .iter()
+                .any(|s| matches!(s.kind, ShotKind::Orb { .. }) && s.owner == me),
         },
         foe: Foe {
             x: foe.body.x,
@@ -180,7 +250,11 @@ pub fn sense_of(state: &State, me: usize) -> Sense {
             barrier: foe.barrier > 0.0,
             ready: foe.spells.iter().map(|n| ready(foe, n)).collect(),
         },
-        arena: Arena { left: state.left, right: state.right, top: state.top },
+        arena: Arena {
+            left: state.left,
+            right: state.right,
+            top: state.top,
+        },
         threats: threats_of(state, me),
         ready: f.spells.iter().map(|n| ready(f, n)).collect(),
         // a bar skill strikes at its power on the bar
@@ -202,5 +276,10 @@ pub fn slots_of(f: &Fighter) -> Vec<Option<usize>> {
     let d = school(f.school);
     let at = |name: &str| f.spells.iter().position(|n| *n == name);
     let bar = (0..BAR.slots).map(|i| f.bar.get(i).and_then(Slot::spell).and_then(at));
-    d.basics.iter().map(|n| at(n)).chain(bar).chain([at(d.ultimate)]).collect()
+    d.basics
+        .iter()
+        .map(|n| at(n))
+        .chain(bar)
+        .chain([at(d.ultimate)])
+        .collect()
 }

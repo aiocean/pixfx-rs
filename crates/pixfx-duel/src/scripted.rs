@@ -39,7 +39,12 @@ impl Scripted {
     }
 
     fn new(plan: Plan) -> Scripted {
-        Scripted { plan, view: Delayed::new(), clock: 0.0, hold: 0.0 }
+        Scripted {
+            plan,
+            view: Delayed::new(),
+            clock: 0.0,
+            hold: 0.0,
+        }
     }
 }
 
@@ -69,14 +74,23 @@ impl Seat for Scripted {
             .filter_map(|n| {
                 let s = skill_of(n);
                 let fits = match self.plan {
-                    Plan::Aggressive => s.damage > 0.0 && (s.reach.is_nan() || s.reach == 0.0 || dist <= s.reach.max(CLOSE)),
-                    Plan::Turtle => matches!(s.kind, SkillKind::Bolt | SkillKind::Area | SkillKind::Seeker),
+                    Plan::Aggressive => {
+                        s.damage > 0.0
+                            && (s.reach.is_nan() || s.reach == 0.0 || dist <= s.reach.max(CLOSE))
+                    }
+                    Plan::Turtle => matches!(
+                        s.kind,
+                        SkillKind::Bolt | SkillKind::Area | SkillKind::Seeker
+                    ),
                 };
                 fits.then_some((n, s.damage))
             })
             .collect();
         skills.sort_by(|a, b| b.1.total_cmp(&a.1));
-        let cast = skills.first().map(|(n, _)| Choice::Cast { skill: (*n).to_string(), target: Some(foe.x) });
+        let cast = skills.first().map(|(n, _)| Choice::Cast {
+            skill: (*n).to_string(),
+            target: Some(foe.x),
+        });
         match self.plan {
             Plan::Aggressive => {
                 if dist > CLOSE && cast.is_none() {
@@ -86,7 +100,13 @@ impl Seat for Scripted {
                 }
             }
             Plan::Turtle => {
-                let blow = matches!(foe.doing, Doing::Act { phase: ActPhase::Windup, .. });
+                let blow = matches!(
+                    foe.doing,
+                    Doing::Act {
+                        phase: ActPhase::Windup,
+                        ..
+                    }
+                );
                 if blow && dist < FAR + 40.0 {
                     Some(Choice::Guard { hold: 0.4 })
                 } else if dist < FAR {

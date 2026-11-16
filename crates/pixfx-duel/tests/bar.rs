@@ -12,7 +12,14 @@ use std::collections::HashSet;
 
 fn held(slot: &Slot) -> (&'static str, f64, bool, Rarity, Vec<Trait>) {
     match slot {
-        Slot::Held { spell, power, evolved, rarity, traits, .. } => (spell, *power, *evolved, *rarity, traits.clone()),
+        Slot::Held {
+            spell,
+            power,
+            evolved,
+            rarity,
+            traits,
+            ..
+        } => (spell, *power, *evolved, *rarity, traits.clone()),
         Slot::Empty { .. } => ("", 0.0, false, Rarity::Common, Vec::new()),
     }
 }
@@ -55,7 +62,11 @@ fn a_spent_skill_empties_its_slot_for_1_5_to_2_5_s() {
     for seed in 1..=6 {
         let mut s = arena(seed);
         let f = (seed % 2) as usize;
-        let plain = if f == 0 { ["orb", "bell", "heal"] } else { ["mirror", "void", "frostfire"] };
+        let plain = if f == 0 {
+            ["orb", "bell", "heal"]
+        } else {
+            ["mirror", "void", "frostfire"]
+        };
         s.fighters[f].bar = plain.iter().map(|n| common(n)).collect();
         spend(&mut s, f, 0);
         let w = wait(&s.fighters[f].bar[0]).unwrap_or(0.0);
@@ -69,7 +80,10 @@ fn a_draw_fills_an_empty_slot_with_a_skill_not_on_the_bar() {
     s.fighters[0].bar[1] = empty(1.0);
     draw(&mut s, 0, 1, false, None);
     assert!(s.fighters[0].bar[1].spell().is_some());
-    assert_eq!(on_bar(&s.fighters[0]).iter().collect::<HashSet<_>>().len(), 3);
+    assert_eq!(
+        on_bar(&s.fighters[0]).iter().collect::<HashSet<_>>().len(),
+        3
+    );
 }
 
 #[test]
@@ -126,7 +140,14 @@ fn drawing_a_skill_already_on_the_bar_raises_its_tier_and_the_slot_draws_another
 fn tiers_climb_one_step_a_duplicate_up_to_legendary_keeping_the_traits_they_had() {
     let mut s = arena(12);
     s.fighters[0].pool = vec!["palm"];
-    let swift = Slot::Held { spell: "palm", power: 1.0, evolved: false, rarity: Rarity::Common, traits: vec![Trait::Swift], idle: 0.0 };
+    let swift = Slot::Held {
+        spell: "palm",
+        power: 1.0,
+        evolved: false,
+        rarity: Rarity::Common,
+        traits: vec![Trait::Swift],
+        idle: 0.0,
+    };
     s.fighters[0].bar = vec![swift, empty(1.0), empty(1.0)];
     let mut seen = Vec::new();
     for _ in 0..4 {
@@ -138,14 +159,29 @@ fn tiers_climb_one_step_a_duplicate_up_to_legendary_keeping_the_traits_they_had(
         // nothing else to draw: the slot waits again
         assert!(wait(&s.fighters[0].bar[1]).is_some_and(|w| w > 0.0));
     }
-    assert_eq!(seen, [Rarity::Rare, Rarity::Epic, Rarity::Legendary, Rarity::Legendary]);
+    assert_eq!(
+        seen,
+        [
+            Rarity::Rare,
+            Rarity::Epic,
+            Rarity::Legendary,
+            Rarity::Legendary
+        ]
+    );
 }
 
 #[test]
 fn an_evolved_skill_keeps_its_evolution_when_a_duplicate_raises_its_tier() {
     let mut s = arena(13);
     s.fighters[0].pool = vec!["palm"];
-    let evolved = Slot::Held { spell: "palm", power: 1.5, evolved: true, rarity: Rarity::Common, traits: Vec::new(), idle: 0.0 };
+    let evolved = Slot::Held {
+        spell: "palm",
+        power: 1.5,
+        evolved: true,
+        rarity: Rarity::Common,
+        traits: Vec::new(),
+        idle: 0.0,
+    };
     s.fighters[0].bar = vec![evolved, empty(1.0), empty(1.0)];
     draw(&mut s, 0, 2, false, None);
     let (_, power, evolved, rarity, traits) = held(&s.fighters[0].bar[0]);
@@ -167,13 +203,17 @@ fn the_new_spells_are_in_their_schools_pools() {
     for d in [thunder, frost] {
         for name in d.pool.iter().chain([&d.ultimate]) {
             let cost = spell(name).map_or(-1.0, |s| s.cost);
-            assert!(cost > if *name == d.ultimate { -1.0 } else { 0.0 }, "{name}");
+            assert!(
+                cost > if *name == d.ultimate { -1.0 } else { 0.0 },
+                "{name}"
+            );
         }
     }
 }
 
 #[test]
-fn each_fight_plays_8_of_its_schools_skills_with_its_signature_kind_and_a_skill_that_pays_off_its_status() {
+fn each_fight_plays_8_of_its_schools_skills_with_its_signature_kind_and_a_skill_that_pays_off_its_status()
+ {
     assert_eq!(POOL_SIZE, 8);
     for seed in 1..=30 {
         for f in &arena(seed).fighters {
@@ -181,9 +221,18 @@ fn each_fight_plays_8_of_its_schools_skills_with_its_signature_kind_and_a_skill_
             assert_eq!(f.pool.len(), 8);
             assert_eq!(f.pool.iter().collect::<HashSet<_>>().len(), 8);
             assert!(f.pool.iter().all(|n| d.pool.contains(n)));
-            assert!(f.pool.iter().any(|n| spell(n).is_some_and(|s| s.kind == d.signature)));
+            assert!(
+                f.pool
+                    .iter()
+                    .any(|n| spell(n).is_some_and(|s| s.kind == d.signature))
+            );
             assert!(f.pool.iter().any(|n| payoff(n).is_some()));
-            let mut mine: Vec<_> = f.spells.iter().filter(|n| d.pool.contains(n)).copied().collect();
+            let mut mine: Vec<_> = f
+                .spells
+                .iter()
+                .filter(|n| d.pool.contains(n))
+                .copied()
+                .collect();
             let mut pool = f.pool.clone();
             mine.sort_unstable();
             pool.sort_unstable();
@@ -197,10 +246,18 @@ fn a_pools_payoff_skill_always_has_a_skill_in_the_pool_that_lays_its_status() {
     for seed in 1..=200 {
         for f in &arena(seed).fighters {
             for name in f.pool.iter().filter(|n| payoff(n).is_some()) {
-                let Some((status, _)) = payoff(name) else { continue };
+                let Some((status, _)) = payoff(name) else {
+                    continue;
+                };
                 let lays = f.pool.iter().any(|n| {
                     n != name
-                        && spell(n).is_some_and(|s| if status == pixfx_duel::data::Status::Shock { s.shock } else { s.chill })
+                        && spell(n).is_some_and(|s| {
+                            if status == pixfx_duel::data::Status::Shock {
+                                s.shock
+                            } else {
+                                s.chill
+                            }
+                        })
                 });
                 assert!(lays, "{seed} {name}");
             }
@@ -270,7 +327,10 @@ fn a_draw_never_repeats_a_skill_on_the_bar() {
         let i = k % 3;
         s.fighters[1].bar[i] = empty(1.0);
         draw(&mut s, 1, i, false, None);
-        assert_eq!(on_bar(&s.fighters[1]).iter().collect::<HashSet<_>>().len(), 3);
+        assert_eq!(
+            on_bar(&s.fighters[1]).iter().collect::<HashSet<_>>().len(),
+            3
+        );
     }
 }
 
@@ -294,7 +354,11 @@ fn a_spent_skill_whose_partner_is_on_the_bar_refills_at_once_evolved_and_half_ag
 
 #[test]
 fn each_school_has_its_own_pairs() {
-    assert!(!school(pixfx_duel::data::School::Frost).pool.contains(&"bolt"));
+    assert!(
+        !school(pixfx_duel::data::School::Frost)
+            .pool
+            .contains(&"bolt")
+    );
     let mut frost = bar_of(1, 1, ["shard", "icicle", "lotus"]);
     spend(&mut frost, 1, 0);
     assert!(held(&frost.fighters[1].bar[0]).2);

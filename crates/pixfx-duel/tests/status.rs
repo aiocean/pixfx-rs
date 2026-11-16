@@ -2,15 +2,18 @@
 //! `site/tests/guard.test.js`. The cases that need a whole step of the duel (stacks fading, grit falling, payoffs,
 //! cleanses, the orb) come with `Duel::step`.
 
+use pixfx_draw::math::js_round;
 use pixfx_duel::data::{Blow, School, shock_interval, stats};
 use pixfx_duel::fighter::{Fighter, State};
 use pixfx_duel::status::{ControlKind, add_chill, add_shock, control, damage_of, shocking, take};
-use pixfx_draw::math::js_round;
 use serde_json::Value;
 
 /// A duel's state with two fresh fighters and no effects: only the rules under test move.
 fn still() -> State {
-    let fighters = [Fighter::new(0, School::Thunder, Vec::new(), Vec::new()), Fighter::new(1, School::Frost, Vec::new(), Vec::new())];
+    let fighters = [
+        Fighter::new(0, School::Thunder, Vec::new(), Vec::new()),
+        Fighter::new(1, School::Frost, Vec::new(), Vec::new()),
+    ];
     State::new(1, 0.0, 220.0, 150.0, 96.0, Vec::new(), fighters)
 }
 
@@ -45,7 +48,10 @@ fn each_tick_spends_a_stack_costs_3_percent_of_the_casters_attack_and_holds_the_
     assert_eq!(s.fighters[1].shock.map(|k| k.stacks), Some(2.0));
     assert!(s.fighters[1].body.shocked > 0.0);
     let lost = (hp - s.fighters[1].hp) / 100.0 * stats(School::Frost).hp;
-    assert!((lost - js_round(stats(School::Thunder).atk * 0.03)).abs() < 0.5, "{lost}");
+    assert!(
+        (lost - js_round(stats(School::Thunder).atk * 0.03)).abs() < 0.5,
+        "{lost}"
+    );
     for _ in 0..180 {
         shocking(&mut s, 1, 1.0 / 60.0);
     }
@@ -100,29 +106,56 @@ fn an_unyielding_fighter_stands_up_once_a_round_from_a_killing_blow() {
     let full = stats(School::Thunder).hp;
     take(&mut s, 0, full * 2.0);
     assert!((s.fighters[0].hp - 100.0 / full).abs() < 1e-9);
-    assert!(s.out.iter().any(|o| matches!(o, pixfx_duel::out::Out::Unyielding { by: 0, .. })));
+    assert!(
+        s.out
+            .iter()
+            .any(|o| matches!(o, pixfx_duel::out::Out::Unyielding { by: 0, .. }))
+    );
     take(&mut s, 0, full * 2.0);
     assert_eq!(s.fighters[0].hp, 0.0);
 }
 
 fn school(name: &str) -> School {
-    if name == "frost" { School::Frost } else { School::Thunder }
+    if name == "frost" {
+        School::Frost
+    } else {
+        School::Thunder
+    }
 }
 
 #[test]
 fn damage_matches_js_table() {
-    let f: Value = serde_json::from_str(include_str!("fixtures/js_numbers.json")).unwrap_or(Value::Null);
+    let f: Value =
+        serde_json::from_str(include_str!("fixtures/js_numbers.json")).unwrap_or(Value::Null);
     let rows = f["damage"].as_array().cloned().unwrap_or_default();
     assert_eq!(rows.len(), 12);
     for row in rows {
         let num = |i: usize| row[i].as_f64().unwrap_or(f64::NAN);
-        let mut by = Fighter::new(0, school(row[0].as_str().unwrap_or("")), Vec::new(), Vec::new());
+        let mut by = Fighter::new(
+            0,
+            school(row[0].as_str().unwrap_or("")),
+            Vec::new(),
+            Vec::new(),
+        );
         by.fury = num(1);
-        let mut target = Fighter::new(1, school(row[2].as_str().unwrap_or("")), Vec::new(), Vec::new());
+        let mut target = Fighter::new(
+            1,
+            school(row[2].as_str().unwrap_or("")),
+            Vec::new(),
+            Vec::new(),
+        );
         target.def_down = num(3);
-        let blow = if row[5] == "physical" { Blow::Physical } else { Blow::Magic };
+        let blow = if row[5] == "physical" {
+            Blow::Physical
+        } else {
+            Blow::Magic
+        };
         let crit = row[6].as_bool().unwrap_or(false);
-        assert_eq!(damage_of(&by, &target, num(4), blow, crit, num(7)), num(8), "{row}");
+        assert_eq!(
+            damage_of(&by, &target, num(4), blow, crit, num(7)),
+            num(8),
+            "{row}"
+        );
     }
 }
 
@@ -135,5 +168,8 @@ fn damage_stays_within_1_5_percent_of_its_middle() {
         let roll = f64::from(i) / 20.0;
         assert!((damage_of(&by, &f, 20.0, Blow::Magic, false, roll) - mid).abs() / mid <= 0.016);
     }
-    assert!(damage_of(&by, &f, 20.0, Blow::Magic, false, 0.0) < damage_of(&by, &f, 20.0, Blow::Magic, false, 0.999));
+    assert!(
+        damage_of(&by, &f, 20.0, Blow::Magic, false, 0.0)
+            < damage_of(&by, &f, 20.0, Blow::Magic, false, 0.999)
+    );
 }

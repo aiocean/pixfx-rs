@@ -54,11 +54,31 @@ impl Brain {
             posture_scale: d.postures,
         };
         let spec = &f.body.spec;
-        let body = BodySize { half_width: spec.half_width, chest: spec.chest, body: spec.body, duck: spec.duck, walk: spec.walk };
+        let body = BodySize {
+            half_width: spec.half_width,
+            chest: spec.chest,
+            body: spec.body,
+            duck: spec.duck,
+            walk: spec.walk,
+        };
         let skills = f.spells.iter().map(|n| skill_of(n)).collect();
-        let mut mind = Mind::new(profile, body, skills, state.seed.wrapping_mul(2).wrapping_add(me as u32));
-        mind.meet(state.fighters[1 - me].spells.iter().map(|n| skill_of(n)).collect());
-        Brain { mind, thought: None }
+        let mut mind = Mind::new(
+            profile,
+            body,
+            skills,
+            state.seed.wrapping_mul(2).wrapping_add(me as u32),
+        );
+        mind.meet(
+            state.fighters[1 - me]
+                .spells
+                .iter()
+                .map(|n| skill_of(n))
+                .collect(),
+        );
+        Brain {
+            mind,
+            thought: None,
+        }
     }
 
     /// A maker for `Duel::new`.
@@ -115,7 +135,10 @@ pub struct PolicySeat {
 impl PolicySeat {
     /// Fighter `me`'s policy seat, playing `style`.
     pub fn new(net: Rc<Net>, state: &State, me: usize, style: Style) -> PolicySeat {
-        PolicySeat { net, mind: policy_mind(state, me, style) }
+        PolicySeat {
+            net,
+            mind: policy_mind(state, me, style),
+        }
     }
 
     /// A maker for `Duel::new`: the policy in the style the fight drew for the fighter.

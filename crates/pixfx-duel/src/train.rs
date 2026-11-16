@@ -9,16 +9,16 @@
 //! `HABITS` decisions.
 
 use crate::duel::{Duel, DuelConfig, TICK};
-use crate::first_mind::FirstMind;
 use crate::fighter::State;
+use crate::first_mind::FirstMind;
 use crate::scripted::Scripted;
 use crate::seat::{Brain, MakeSeat, PolicySeat, Seat, policy_mind};
 use crate::sense::sense_of;
 use crate::style::Style;
 use pixfx_mind::policy::{ACTIONS, Due, Net, OBS, PolicyMind};
 use pixfx_mind::{Choice, Outcome};
-use std::collections::VecDeque;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
 
 /// The penalty a decision for a fight gone quiet, and how long it must be quiet.
@@ -127,7 +127,12 @@ impl Env {
     pub fn new(cfg: EnvConfig) -> Env {
         let wire = Rc::new(RefCell::new(Wire::default()));
         let (style, w) = (cfg.style, Rc::clone(&wire));
-        let learner: MakeSeat = Box::new(move |state, me| Box::new(Learner { mind: policy_mind(state, me, style), wire: w }));
+        let learner: MakeSeat = Box::new(move |state, me| {
+            Box::new(Learner {
+                mind: policy_mind(state, me, style),
+                wire: w,
+            })
+        });
         let foe: MakeSeat = match cfg.opponent {
             Opponent::Brain => Brain::make(),
             Opponent::First => FirstMind::make(),
@@ -136,10 +141,36 @@ impl Env {
             Opponent::Policy(net) => PolicySeat::with_style(net, cfg.foe_style),
         };
         let me = cfg.learner.min(1);
-        let seats = if me == 0 { [learner, foe] } else { [foe, learner] };
-        let config = DuelConfig { seed: cfg.seed, left: 0.0, right: 220.0, ground: 150.0, sky: 96.0, effects: cfg.effects };
-        let blank = Due { obs: [0.0; OBS], legal: [false; ACTIONS], u: 0.0 };
-        let mut env = Env { duel: Duel::new(config, seats), me, limit: cfg.limit, wire, due: blank, quiet: 0.0, last: None, run: 0, recent: VecDeque::with_capacity(HABITS + 1), done: false };
+        let seats = if me == 0 {
+            [learner, foe]
+        } else {
+            [foe, learner]
+        };
+        let config = DuelConfig {
+            seed: cfg.seed,
+            left: 0.0,
+            right: 220.0,
+            ground: 150.0,
+            sky: 96.0,
+            effects: cfg.effects,
+        };
+        let blank = Due {
+            obs: [0.0; OBS],
+            legal: [false; ACTIONS],
+            u: 0.0,
+        };
+        let mut env = Env {
+            duel: Duel::new(config, seats),
+            me,
+            limit: cfg.limit,
+            wire,
+            due: blank,
+            quiet: 0.0,
+            last: None,
+            run: 0,
+            recent: VecDeque::with_capacity(HABITS + 1),
+            done: false,
+        };
         env.advance();
         env
     }
@@ -154,9 +185,18 @@ impl Env {
     pub fn step(&mut self, action: usize, shaping: f32) -> Step {
         let length = self.duel.state.time;
         if self.done {
-            return Step { reward: 0.0, done: true, won: None, length };
+            return Step {
+                reward: 0.0,
+                done: true,
+                won: None,
+                length,
+            };
         }
-        let act = if self.due.legal.get(action).copied().unwrap_or(false) { action } else { 0 };
+        let act = if self.due.legal.get(action).copied().unwrap_or(false) {
+            action
+        } else {
+            0
+        };
         let mut reward = 0.0;
         if act != 0 && self.last == Some(act) {
             self.run += 1;
@@ -187,7 +227,12 @@ impl Env {
             self.done = true;
             reward += if won == Some(true) { 1.0 } else { -1.0 };
         }
-        Step { reward, done: self.done, won, length }
+        Step {
+            reward,
+            done: self.done,
+            won,
+            length,
+        }
     }
 
     /// Run whole ticks until the learner's next decision, the round's end or the limit: the damage it dealt and
@@ -196,13 +241,23 @@ impl Env {
         let (me, foe) = (self.me, 1 - self.me);
         let (mut dealt, mut taken) = (0.0, 0.0);
         loop {
-            let before = [self.duel.state.fighters[0].hp, self.duel.state.fighters[1].hp];
+            let before = [
+                self.duel.state.fighters[0].hp,
+                self.duel.state.fighters[1].hp,
+            ];
             self.duel.step(TICK);
             let f = &self.duel.state.fighters;
-            let (d, t) = ((before[foe] - f[foe].hp).max(0.0), (before[me] - f[me].hp).max(0.0));
+            let (d, t) = (
+                (before[foe] - f[foe].hp).max(0.0),
+                (before[me] - f[me].hp).max(0.0),
+            );
             dealt += d;
             taken += t;
-            self.quiet = if d > 0.0 || t > 0.0 { 0.0 } else { self.quiet + TICK };
+            self.quiet = if d > 0.0 || t > 0.0 {
+                0.0
+            } else {
+                self.quiet + TICK
+            };
             if let Some(w) = self.duel.state.winner {
                 return (dealt, taken, Some(w == me));
             }

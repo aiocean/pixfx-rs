@@ -34,8 +34,18 @@ pub struct Act {
 /// A slot of the rotating bar: counting down to a draw, or holding a skill drawn with its tier and traits.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Slot {
-    Empty { left: f64, full: f64 },
-    Held { spell: &'static str, power: f64, evolved: bool, rarity: Rarity, traits: Vec<Trait>, idle: f64 },
+    Empty {
+        left: f64,
+        full: f64,
+    },
+    Held {
+        spell: &'static str,
+        power: f64,
+        evolved: bool,
+        rarity: Rarity,
+        traits: Vec<Trait>,
+        idle: f64,
+    },
 }
 
 impl Slot {
@@ -129,7 +139,12 @@ pub struct Fighter {
 
 impl Fighter {
     /// Fighter `index` of `school`, with the spells it may cast and the pool its bar draws from, fresh.
-    pub fn new(index: usize, school: School, spells: Vec<&'static str>, pool: Vec<&'static str>) -> Fighter {
+    pub fn new(
+        index: usize,
+        school: School,
+        spells: Vec<&'static str>,
+        pool: Vec<&'static str>,
+    ) -> Fighter {
         Fighter {
             index,
             school,
@@ -197,12 +212,18 @@ impl Fighter {
 
     /// Cooldown left on `name` (JS `cool[name] ?? 0`).
     pub fn cool(&self, name: &str) -> f64 {
-        self.cool.iter().find(|(n, _)| *n == name).map_or(0.0, |&(_, v)| v)
+        self.cool
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map_or(0.0, |&(_, v)| v)
     }
 
     /// The full cooldown `name` was last set to.
     pub fn cool_full(&self, name: &str) -> f64 {
-        self.cool_full.iter().find(|(n, _)| *n == name).map_or(0.0, |&(_, v)| v)
+        self.cool_full
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map_or(0.0, |&(_, v)| v)
     }
 
     /// Set `name`'s cooldown and its full length; a new name joins at the end, as a JS object's key does.
@@ -265,7 +286,15 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(seed: u32, left: f64, right: f64, ground: f64, top: f64, effects: Vec<String>, fighters: [Fighter; 2]) -> State {
+    pub fn new(
+        seed: u32,
+        left: f64,
+        right: f64,
+        ground: f64,
+        top: f64,
+        effects: Vec<String>,
+        fighters: [Fighter; 2],
+    ) -> State {
         State {
             seed,
             rng: Rng::new(seed),
@@ -297,7 +326,11 @@ impl State {
 
     /// The arena the bodies move in.
     pub fn arena(&self) -> Arena {
-        Arena { left: self.left, right: self.right, top: self.top }
+        Arena {
+            left: self.left,
+            right: self.right,
+            top: self.top,
+        }
     }
 
     pub fn emit(&mut self, out: Out) {

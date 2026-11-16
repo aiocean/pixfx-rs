@@ -8,7 +8,12 @@ use pixfx_duel::seat::Brain;
 
 #[test]
 fn every_seed_is_fought_both_ways_and_counted() {
-    let m = Match { seeds: 1..3, rounds: 1, limit: 300.0, effects: all_effects() };
+    let m = Match {
+        seeds: 1..3,
+        rounds: 1,
+        limit: 300.0,
+        effects: all_effects(),
+    };
     let r = match_up(&Brain::make, &Brain::make, &m);
     assert_eq!(r.won[0] + r.lost[0], 2, "as Thunder: {r:?}");
     assert_eq!(r.won[1] + r.lost[1], 2, "as Frost: {r:?}");
@@ -22,7 +27,12 @@ fn every_seed_is_fought_both_ways_and_counted() {
 
 #[test]
 fn a_round_past_the_limit_counts_as_a_timeout() {
-    let m = Match { seeds: 1..4, rounds: 3, limit: 5.0, effects: all_effects() };
+    let m = Match {
+        seeds: 1..4,
+        rounds: 3,
+        limit: 5.0,
+        effects: all_effects(),
+    };
     let r = match_up(&idle, &idle, &m);
     assert_eq!(r.timeouts, 6, "{r:?}");
     assert!(r.lengths.is_empty());

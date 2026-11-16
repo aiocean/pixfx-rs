@@ -5,18 +5,28 @@ mod common;
 use common::all_effects;
 use pixfx_duel::style::Style;
 use pixfx_duel::train::{Env, EnvConfig, Opponent, Step};
-use pixfx_mind::policy::{ACTIONS, Act};
 use pixfx_mind::Rng;
+use pixfx_mind::policy::{ACTIONS, Act};
 
 fn cfg(seed: u32, learner: usize, opponent: Opponent) -> EnvConfig {
-    EnvConfig { seed, learner, style: Style::Balanced, foe_style: Style::Balanced, opponent, limit: 90.0, effects: all_effects() }
+    EnvConfig {
+        seed,
+        learner,
+        style: Style::Balanced,
+        foe_style: Style::Balanced,
+        opponent,
+        limit: 90.0,
+        effects: all_effects(),
+    }
 }
 
 /// A random legal action from the env's mask.
 fn random_legal(env: &Env, rng: &mut Rng) -> usize {
     let (_, legal) = env.observe();
     let ok: Vec<usize> = (0..ACTIONS).filter(|&i| legal[i]).collect();
-    ok.get((rng.next() * ok.len() as f64) as usize).copied().unwrap_or(0)
+    ok.get((rng.next() * ok.len() as f64) as usize)
+        .copied()
+        .unwrap_or(0)
 }
 
 /// Play `env` to its end with `pick`; every step's result.
@@ -36,7 +46,11 @@ fn play(env: &mut Env, shaping: f32, mut pick: impl FnMut(&Env) -> usize) -> Vec
 #[test]
 fn an_episode_pays_plus_or_minus_one_at_its_end() {
     let mut rng = Rng::new(1);
-    for (seed, learner, opp) in [(1, 0, Opponent::Brain), (2, 1, Opponent::First), (3, 0, Opponent::Aggressive)] {
+    for (seed, learner, opp) in [
+        (1, 0, Opponent::Brain),
+        (2, 1, Opponent::First),
+        (3, 0, Opponent::Aggressive),
+    ] {
         let mut env = Env::new(cfg(seed, learner, opp));
         let steps = play(&mut env, 0.0, |e| random_legal(e, &mut rng));
         let last = steps.last().copied().filter(|s| s.done);
@@ -45,17 +59,27 @@ fn an_episode_pays_plus_or_minus_one_at_its_end() {
         let won = last.won.unwrap_or(false);
         let want = if won { 1.0 } else { -1.0 };
         assert!(last.won.is_some(), "seed {seed}: a knockout, not a cut");
-        assert!((last.reward - want).abs() < 0.05, "seed {seed}: {} for won {won}", last.reward);
+        assert!(
+            (last.reward - want).abs() < 0.05,
+            "seed {seed}: {} for won {won}",
+            last.reward
+        );
         assert!(last.length > 0.0 && last.length < 90.0);
     }
 }
 
 #[test]
 fn an_episode_cut_at_its_limit_is_a_loss() {
-    let mut env = Env::new(EnvConfig { limit: 3.0, ..cfg(4, 0, Opponent::Turtle) });
+    let mut env = Env::new(EnvConfig {
+        limit: 3.0,
+        ..cfg(4, 0, Opponent::Turtle)
+    });
     let steps = play(&mut env, 0.0, |_| 0);
     let last = steps.last().copied();
-    assert!(last.is_some_and(|s| s.done && s.won.is_none() && (s.reward + 1.0).abs() < 0.05), "{last:?}");
+    assert!(
+        last.is_some_and(|s| s.done && s.won.is_none() && (s.reward + 1.0).abs() < 0.05),
+        "{last:?}"
+    );
     assert!(steps.len() > 8, "it decided along the way: {}", steps.len());
 }
 
@@ -80,7 +104,11 @@ fn an_action_outside_the_mask_is_a_wait() {
         let mut env = Env::new(cfg(6, 0, Opponent::Aggressive));
         play(&mut env, 1.0, |e| {
             let (_, legal) = e.observe();
-            if illegal { (0..ACTIONS).rev().find(|&i| !legal[i]).unwrap_or(0) } else { 0 }
+            if illegal {
+                (0..ACTIONS).rev().find(|&i| !legal[i]).unwrap_or(0)
+            } else {
+                0
+            }
         })
     };
     assert_eq!(run(true), run(false));
@@ -102,7 +130,10 @@ fn shaping_pays_for_damage() {
     let paid = |shaping| {
         let mut rng = Rng::new(4);
         let mut env = Env::new(cfg(8, 0, Opponent::Turtle));
-        play(&mut env, shaping, |e| random_legal(e, &mut rng)).iter().map(|s| s.reward).sum::<f32>()
+        play(&mut env, shaping, |e| random_legal(e, &mut rng))
+            .iter()
+            .map(|s| s.reward)
+            .sum::<f32>()
     };
     assert_ne!(paid(1.0), paid(0.0));
 }

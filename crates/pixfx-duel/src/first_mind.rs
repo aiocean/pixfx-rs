@@ -57,7 +57,14 @@ pub struct FirstMind {
 impl FirstMind {
     /// Fighter `me`'s first mind in a duel of seed `seed`.
     pub fn new(seed: u32, me: usize) -> FirstMind {
-        FirstMind { rng: Rng::new(seed.wrapping_mul(2).wrapping_add(me as u32)), think: 0.0, calm: 0.0, hold: 0.0, tried: Vec::new(), landed: Vec::new() }
+        FirstMind {
+            rng: Rng::new(seed.wrapping_mul(2).wrapping_add(me as u32)),
+            think: 0.0,
+            calm: 0.0,
+            hold: 0.0,
+            tried: Vec::new(),
+            landed: Vec::new(),
+        }
     }
 
     /// A maker for `Duel::new`.
@@ -66,11 +73,17 @@ impl FirstMind {
     }
 
     fn tried(&self, name: &str) -> f64 {
-        self.tried.iter().find(|(n, _)| *n == name).map_or(0.0, |&(_, v)| v)
+        self.tried
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map_or(0.0, |&(_, v)| v)
     }
 
     fn landed(&self, name: &str) -> f64 {
-        self.landed.iter().find(|(n, _)| n == name).map_or(0.0, |(_, v)| *v)
+        self.landed
+            .iter()
+            .find(|(n, _)| n == name)
+            .map_or(0.0, |(_, v)| *v)
     }
 
     fn mind(&mut self, state: &State, me: usize, dt: f64) -> Option<Choice> {
@@ -78,7 +91,15 @@ impl FirstMind {
         let foe = &state.fighters[1 - me];
         self.think -= dt;
         let b = &f.body;
-        if self.think > 0.0 || f.act.is_some() || b.reeling() || b.squat > 0.0 || b.duck > 0.0 || b.frozen > 0.0 || b.shocked > 0.0 || f.hp <= 0.0 {
+        if self.think > 0.0
+            || f.act.is_some()
+            || b.reeling()
+            || b.squat > 0.0
+            || b.duck > 0.0
+            || b.frozen > 0.0
+            || b.shocked > 0.0
+            || f.hp <= 0.0
+        {
             return None;
         }
         self.think = THINK * (0.8 + self.rng.next() * 0.4);
@@ -88,7 +109,11 @@ impl FirstMind {
         options.extend(self.attacks(state, f, foe));
         options.extend(self.positions(state, f, foe));
         // something is about to land: raise the barrier, which answers any of it
-        let barrier = f.spells.iter().copied().find(|n| spell(n).is_some_and(|s| s.kind == Kind::Barrier));
+        let barrier = f
+            .spells
+            .iter()
+            .copied()
+            .find(|n| spell(n).is_some_and(|s| s.kind == Kind::Barrier));
         let threat = threats.iter().fold(0.0, |m, o| js_max(m, o.score));
         if let Some(barrier) = barrier
             && f.barrier == 0.0
@@ -119,13 +144,17 @@ impl FirstMind {
             What::Wait => Choice::Wait,
             What::Cast(name, target) => {
                 if spell(name).and_then(|s| s.damage).is_some_and(|d| d != 0.0) {
-                    self.calm = school(f.school).tempo * (1.0 - SPREAD / 2.0 + SPREAD * self.rng.next());
+                    self.calm =
+                        school(f.school).tempo * (1.0 - SPREAD / 2.0 + SPREAD * self.rng.next());
                     match self.tried.iter_mut().find(|(n, _)| *n == name) {
                         Some(e) => e.1 += 1.0,
                         None => self.tried.push((name, 1.0)),
                     }
                 }
-                Choice::Cast { skill: name.to_string(), target }
+                Choice::Cast {
+                    skill: name.to_string(),
+                    target,
+                }
             }
         }
     }
@@ -138,13 +167,26 @@ impl FirstMind {
         // how long the foe cannot answer: it is gathering a spell, recovering from one, or staggered
         let busy = foe.body.out_for()
             + fact.map_or(0.0, |(a, s)| {
-                let phase = if a.phase == Phase::Windup { s.windup } else { s.recover };
-                phase - a.t + if a.phase == Phase::Windup { s.recover } else { 0.0 }
+                let phase = if a.phase == Phase::Windup {
+                    s.windup
+                } else {
+                    s.recover
+                };
+                phase - a.t
+                    + if a.phase == Phase::Windup {
+                        s.recover
+                    } else {
+                        0.0
+                    }
             });
         // a foe on the floor cannot be touched: a blow is only worth starting if it lands once the foe is up
         let open = foe.body.open_in();
-        let free = !foe.body.reeling() && foe.act.is_none() && foe.body.frozen == 0.0 && foe.body.shocked == 0.0;
-        let striking = fact.is_some_and(|(_, s)| matches!(s.kind, Kind::Melee | Kind::Blast | Kind::Dash));
+        let free = !foe.body.reeling()
+            && foe.act.is_none()
+            && foe.body.frozen == 0.0
+            && foe.body.shocked == 0.0;
+        let striking =
+            fact.is_some_and(|(_, s)| matches!(s.kind, Kind::Melee | Kind::Blast | Kind::Dash));
         let opening = foe.body.out_for()
             + foe.body.frozen
             + foe.body.shocked
@@ -174,20 +216,40 @@ impl FirstMind {
             // what it has seen this attack do against this foe
             chance = (chance * PRIOR + self.landed(name)) / (PRIOR + self.tried(name));
             let gain = s.damage.unwrap_or(0.0) * chance * sch.aggression;
-            let risk = if free { RISK * punisher(foe, me, s.recover) * (1.0 - chance) * (1.0 + LEAD * lead) } else { 0.0 };
+            let risk = if free {
+                RISK * punisher(foe, me, s.recover) * (1.0 - chance) * (1.0 + LEAD * lead)
+            } else {
+                0.0
+            };
             js_max(gain * FLOOR, gain - risk) / (0.5 + s.windup + s.cost / 40.0)
         };
         let sp = |n: &str| spell(n);
         let mut out = Vec::new();
         let dive_windup = sp("dive").map_or(0.0, |s| s.windup);
         if ready(me, "dive") && me.body.air - foe.body.air > 14.0 && d < 44.0 {
-            let c = if busy > dive_windup { 0.9 } else if foe.guard > 0.0 { 0.25 } else { 0.6 };
+            let c = if busy > dive_windup {
+                0.9
+            } else if foe.guard > 0.0 {
+                0.25
+            } else {
+                0.6
+            };
             out.push(opt(What::Cast("dive", None), value("dive", c, None)));
         }
         let slash = sp("slash").copied();
-        let (slash_windup, slash_range) = slash.map_or((0.0, 0.0), |s| (s.windup, s.range.unwrap_or(0.0)));
-        if ready(me, "slash") && d < slash_range + 8.0 && (foe.body.air - me.body.air).abs() < me.body.spec.chest {
-            let c = if busy > slash_windup { 0.95 } else if foe.guard > 0.0 { 0.15 } else { 0.55 };
+        let (slash_windup, slash_range) =
+            slash.map_or((0.0, 0.0), |s| (s.windup, s.range.unwrap_or(0.0)));
+        if ready(me, "slash")
+            && d < slash_range + 8.0
+            && (foe.body.air - me.body.air).abs() < me.body.spec.chest
+        {
+            let c = if busy > slash_windup {
+                0.95
+            } else if foe.guard > 0.0 {
+                0.15
+            } else {
+                0.55
+            };
             out.push(opt(What::Cast("slash", None), value("slash", c, None)));
         }
         // a bolt flies level from my chest: it must cross the foe's body
@@ -195,9 +257,12 @@ impl FirstMind {
         let level = chest > foe.body.air - 2.0 && chest < foe.body.air + foe.body.spec.body;
         if ready(me, "bolt") && d > 24.0 && level {
             let bolt = sp("bolt").copied();
-            let travel = d / bolt.and_then(|s| s.speed).unwrap_or(f64::NAN) + bolt.map_or(0.0, |s| s.windup);
+            let travel =
+                d / bolt.and_then(|s| s.speed).unwrap_or(f64::NAN) + bolt.map_or(0.0, |s| s.windup);
             // a bolt into a bolt the foe is gathering only cancels it
-            let trade = foe.act.is_some_and(|a| a.spell == "bolt" && a.phase == Phase::Windup);
+            let trade = foe
+                .act
+                .is_some_and(|a| a.spell == "bolt" && a.phase == Phase::Windup);
             let c = if trade {
                 0.1
             } else if busy > travel {
@@ -207,13 +272,29 @@ impl FirstMind {
             } else {
                 0.45
             };
-            out.push(opt(What::Cast("bolt", None), value("bolt", c, Some(travel))));
+            out.push(opt(
+                What::Cast("bolt", None),
+                value("bolt", c, Some(travel)),
+            ));
         }
-        if ready(me, "orb") && d > 40.0 && !state.shots.iter().any(|s| matches!(s.kind, ShotKind::Orb { .. }) && s.owner == me.index) {
+        if ready(me, "orb")
+            && d > 40.0
+            && !state
+                .shots
+                .iter()
+                .any(|s| matches!(s.kind, ShotKind::Orb { .. }) && s.owner == me.index)
+        {
             // a slow ball that hunts the foe down: from far off it holds the space between and seldom misses
-            out.push(opt(What::Cast("orb", None), value("orb", if d > 80.0 { 0.8 } else { 0.5 }, None)));
+            out.push(opt(
+                What::Cast("orb", None),
+                value("orb", if d > 80.0 { 0.8 } else { 0.5 }, None),
+            ));
         }
-        let pace = if foe.act.is_some() || foe.body.reeling() || foe.medit { 0.0 } else { foe.intent * foe.body.spec.walk };
+        let pace = if foe.act.is_some() || foe.body.reeling() || foe.medit {
+            0.0
+        } else {
+            foe.intent * foe.body.spec.walk
+        };
         for name in ["tribulation", "prison"] {
             if !ready(me, name) {
                 continue;
@@ -224,7 +305,10 @@ impl FirstMind {
                 continue;
             }
             let score = value(name, 0.8, Some(lead)) * s.strikes.unwrap_or(1.0) + 3.0;
-            out.push(opt(What::Cast(s.name, Some(foe.body.x + pace * lead * 0.8)), score));
+            out.push(opt(
+                What::Cast(s.name, Some(foe.body.x + pace * lead * 0.8)),
+                score,
+            ));
         }
         for &name in &me.spells {
             let Some(s) = sp(name) else { continue };
@@ -236,7 +320,11 @@ impl FirstMind {
             let target = foe.body.x + pace * lead * 0.8;
             // an icicle only finds a foe standing on the floor
             let grounded = if s.grounded {
-                if foe.body.air < 10.0 && !foe.fly { 1.0 } else { 0.1 }
+                if foe.body.air < 10.0 && !foe.fly {
+                    1.0
+                } else {
+                    0.1
+                }
             } else {
                 1.0
             };
@@ -248,18 +336,33 @@ impl FirstMind {
             } else {
                 0.4
             };
-            out.push(opt(What::Cast(name, Some(target)), value(name, c * grounded, Some(lead))));
+            out.push(opt(
+                What::Cast(name, Some(target)),
+                value(name, c * grounded, Some(lead)),
+            ));
         }
         for &name in &me.spells {
             let Some(s) = sp(name) else { continue };
             if s.kind == Kind::Blast && ready(me, name) && d < s.range.unwrap_or(f64::NAN) + 4.0 {
-                let c = if busy > s.windup { 0.9 } else if foe.guard > 0.0 { 0.2 } else { 0.55 };
+                let c = if busy > s.windup {
+                    0.9
+                } else if foe.guard > 0.0 {
+                    0.2
+                } else {
+                    0.55
+                };
                 out.push(opt(What::Cast(name, None), value(name, c, None)));
             }
             // a fire or a vortex under the foe: worth it on a foe that cannot leave it soon
-            if s.kind == Kind::Void && ready(me, name) && (busy > 0.4 || foe.body.frozen > 0.0 || foe.hp < 75.0) {
+            if s.kind == Kind::Void
+                && ready(me, name)
+                && (busy > 0.4 || foe.body.frozen > 0.0 || foe.hp < 75.0)
+            {
                 // it lands its blow when it ends, burning on the way
-                out.push(opt(What::Cast(name, None), value(name, 0.7, Some(s.windup + s.life.unwrap_or(f64::NAN))) + 4.0));
+                out.push(opt(
+                    What::Cast(name, None),
+                    value(name, 0.7, Some(s.windup + s.life.unwrap_or(f64::NAN))) + 4.0,
+                ));
             }
             // a lightning step: the foe within a stride, on my level
             if s.kind == Kind::Dash
@@ -268,7 +371,13 @@ impl FirstMind {
                 && d < s.distance.unwrap_or(f64::NAN) - 10.0
                 && (foe.body.air - me.body.air).abs() < me.body.spec.chest
             {
-                let c = if busy > s.windup { 0.9 } else if foe.guard > 0.0 { 0.2 } else { 0.6 };
+                let c = if busy > s.windup {
+                    0.9
+                } else if foe.guard > 0.0 {
+                    0.2
+                } else {
+                    0.6
+                };
                 out.push(opt(What::Cast(name, None), value(name, c, None)));
             }
         }
@@ -282,7 +391,10 @@ impl FirstMind {
                 0.2
             };
             let amount = sp("heal").and_then(|s| s.amount).unwrap_or(0.0);
-            out.push(opt(What::Cast("heal", None), amount * safe * (1.0 - me.hp / 100.0)));
+            out.push(opt(
+                What::Cast("heal", None),
+                amount * safe * (1.0 - me.hp / 100.0),
+            ));
         }
         out
     }
@@ -290,7 +402,11 @@ impl FirstMind {
     /// Moving to the distance it fights best at, meditating when it is quiet, or waiting.
     fn positions(&mut self, state: &State, me: &Fighter, foe: &Fighter) -> Vec<Opt> {
         let d = foe.body.x - me.body.x;
-        let has = |kinds: &[Kind]| me.spells.iter().any(|n| spell(n).is_some_and(|s| kinds.contains(&s.kind)));
+        let has = |kinds: &[Kind]| {
+            me.spells
+                .iter()
+                .any(|n| spell(n).is_some_and(|s| kinds.contains(&s.kind)))
+        };
         let sch = school(me.school);
         let casting = me.qi >= 25.0;
         let slash_range = spell("slash").and_then(|s| s.range).unwrap_or(0.0);
@@ -308,17 +424,32 @@ impl FirstMind {
         let spec = &me.body.spec;
         // after an exchange, or with the foe behind a barrier, back off to spacing and let it come
         let reach = js_max(slash_range + spec.half_width + 6.0, range * 0.8);
-        if (self.calm > 0.0 || foe.barrier > 0.0) && d.abs() < reach && (foe.body.air - me.body.air).abs() < spec.chest && !foe.body.reeling() {
+        if (self.calm > 0.0 || foe.barrier > 0.0)
+            && d.abs() < reach
+            && (foe.body.air - me.body.air).abs() < spec.chest
+            && !foe.body.reeling()
+        {
             let back = or_one(-js_sign(d));
-            let room = if back < 0.0 { me.body.x - state.left } else { state.right - me.body.x };
+            let room = if back < 0.0 {
+                me.body.x - state.left
+            } else {
+                state.right - me.body.x
+            };
             if room > 14.0 {
                 out.push(opt(What::Move(back), 2.4));
             }
         }
         // inside the foe's sword reach with no blade of my own ready: get out of it
-        if d.abs() < slash_range + 4.0 && me.body.air - foe.body.air < spec.chest && !ready(me, "slash") {
+        if d.abs() < slash_range + 4.0
+            && me.body.air - foe.body.air < spec.chest
+            && !ready(me, "slash")
+        {
             let back = or_one(-js_sign(d));
-            let room = if back < 0.0 { me.body.x - state.left } else { state.right - me.body.x };
+            let room = if back < 0.0 {
+                me.body.x - state.left
+            } else {
+                state.right - me.body.x
+            };
             if room > 14.0 {
                 out.push(opt(What::Move(back), 2.2));
             }
@@ -326,7 +457,9 @@ impl FirstMind {
         if off.abs() > 8.0 {
             let mut dir = js_sign(d) * js_sign(off);
             // backed against a wall: step out sideways past the foe's reach instead
-            if (dir < 0.0 && me.body.x - state.left < 12.0) || (dir > 0.0 && state.right - me.body.x < 12.0) {
+            if (dir < 0.0 && me.body.x - state.left < 12.0)
+                || (dir > 0.0 && state.right - me.body.x < 12.0)
+            {
                 dir = 0.0;
             }
             if dir != 0.0 {
@@ -342,9 +475,17 @@ impl FirstMind {
             }
         }
         // the height it wants: its school's while it has the qi, the foe's when it must close in with a blade
-        let mut want = if me.qi > 40.0 && has(&[Kind::Bolt, Kind::Orb, Kind::Zone, Kind::Void]) { sch.sky } else { 0.0 };
+        let mut want = if me.qi > 40.0 && has(&[Kind::Bolt, Kind::Orb, Kind::Zone, Kind::Void]) {
+            sch.sky
+        } else {
+            0.0
+        };
         if !casting || d.abs() < 40.0 {
-            want = if foe.body.air > 16.0 && me.qi > 20.0 { js_min(state.top, foe.body.air) } else { want };
+            want = if foe.body.air > 16.0 && me.qi > 20.0 {
+                js_min(state.top, foe.body.air)
+            } else {
+                want
+            };
         }
         let flying = if me.fly { me.hover } else { 0.0 };
         if (flying - want).abs() > 8.0 {
@@ -355,7 +496,13 @@ impl FirstMind {
             out.push(opt(What::Jump, 1.3));
         }
         let threatened = state.shots.iter().any(|s| s.owner != me.index);
-        if me.qi < 45.0 && d.abs() > 70.0 && !threatened && foe.act.is_none() && me.body.air == 0.0 && !me.fly {
+        if me.qi < 45.0
+            && d.abs() > 70.0
+            && !threatened
+            && foe.act.is_none()
+            && me.body.air == 0.0
+            && !me.fly
+        {
             out.push(opt(What::Meditate, 2.2 - me.qi / 40.0));
         }
         out
@@ -429,9 +576,20 @@ fn dangers(state: &State, me: &Fighter) -> Vec<Opt> {
         let damage = sp.damage.unwrap_or(f64::NAN);
         // a barrage still falling: its next strike aims where I stand, so keep on the move, toward the open side
         let follow = matches!(s.kind, ShotKind::Zone { follow: true, .. });
-        if follow && s.t < 0.0 && s.t > -sp.every.unwrap_or(f64::NAN) - sp.aim_ahead.unwrap_or(f64::NAN) + REACTION {
-            let way = if x - state.left > state.right - x { -1.0 } else { 1.0 };
-            let dir = if me.body.vx != 0.0 { js_sign(me.body.vx) * if at_wall(state, me) { -1.0 } else { 1.0 } } else { way };
+        if follow
+            && s.t < 0.0
+            && s.t > -sp.every.unwrap_or(f64::NAN) - sp.aim_ahead.unwrap_or(f64::NAN) + REACTION
+        {
+            let way = if x - state.left > state.right - x {
+                -1.0
+            } else {
+                1.0
+            };
+            let dir = if me.body.vx != 0.0 {
+                js_sign(me.body.vx) * if at_wall(state, me) { -1.0 } else { 1.0 }
+            } else {
+                way
+            };
             out.push(opt(What::Move(dir), damage * 1.4));
             continue;
         }
@@ -447,7 +605,11 @@ fn dangers(state: &State, me: &Fighter) -> Vec<Opt> {
             ShotKind::Bolt { x: sx, y: sy, vx } => {
                 let toward = js_sign(x - sx) == js_sign(vx);
                 let tti = (x - sx).abs() / vx.abs();
-                if !toward || tti > 0.6 || sy < me.body.air - 3.0 || sy > me.body.air + spec.body + 3.0 {
+                if !toward
+                    || tti > 0.6
+                    || sy < me.body.air - 3.0
+                    || sy > me.body.air + spec.body + 3.0
+                {
                     continue;
                 }
                 let urgency = damage * (1.2 - tti);
@@ -489,15 +651,29 @@ fn dangers(state: &State, me: &Fighter) -> Vec<Opt> {
                 }
                 blink(&mut out, bx, urgency * 0.9);
             }
-            ShotKind::Zone { x: zx, fell: false, lead, .. } if s.t + lead >= sp.notice.unwrap_or(f64::NAN) => {
+            ShotKind::Zone {
+                x: zx,
+                fell: false,
+                lead,
+                ..
+            } if s.t + lead >= sp.notice.unwrap_or(f64::NAN) => {
                 let dx = x - zx;
-                if dx.abs() > sp.reach.unwrap_or(0.0) + sp.radius.unwrap_or(f64::NAN) + spec.half_width + 4.0 {
+                if dx.abs()
+                    > sp.reach.unwrap_or(0.0)
+                        + sp.radius.unwrap_or(f64::NAN)
+                        + spec.half_width
+                        + 4.0
+                {
                     continue;
                 }
                 let left = sp.impact.unwrap_or(f64::NAN) - s.t;
                 let urgency = damage * (1.5 - left);
                 let way = if dx.abs() < 1.0 {
-                    if zx - state.left > state.right - zx { -1.0 } else { 1.0 }
+                    if zx - state.left > state.right - zx {
+                        -1.0
+                    } else {
+                        1.0
+                    }
                 } else {
                     js_sign(dx)
                 };
@@ -530,7 +706,9 @@ fn blows(state: &State, me: &Fighter, foe: &Fighter) -> Vec<Opt> {
     if a.phase != Phase::Windup || a.t < REACTION {
         return Vec::new();
     }
-    let Some(s) = spell(a.spell) else { return Vec::new() };
+    let Some(s) = spell(a.spell) else {
+        return Vec::new();
+    };
     if s.kind != Kind::Melee && s.kind != Kind::Blast {
         return Vec::new();
     }
@@ -546,7 +724,10 @@ fn blows(state: &State, me: &Fighter, foe: &Fighter) -> Vec<Opt> {
     // backing off works if I can walk out of reach before it lands
     let out_by = range + spec.half_width + 2.0 - d;
     if out_by / spec.walk < left + 0.05 {
-        out.push(opt(What::Move(or_one(js_sign(me.body.x - foe.body.x))), urgency * 1.2));
+        out.push(opt(
+            What::Move(or_one(js_sign(me.body.x - foe.body.x))),
+            urgency * 1.2,
+        ));
     }
     if js_sign(foe.body.x - me.body.x) == me.body.face {
         out.push(opt(What::Guard(left + 0.2), urgency * 0.9));
@@ -557,7 +738,9 @@ fn blows(state: &State, me: &Fighter, foe: &Fighter) -> Vec<Opt> {
         out.push(opt(What::Cast("slash", None), urgency * 1.1));
     }
     if ready(me, "blink") {
-        let to = me.body.x + js_sign(or_one(me.body.x - foe.body.x)) * spell("blink").and_then(|s| s.distance).unwrap_or(f64::NAN);
+        let to = me.body.x
+            + js_sign(or_one(me.body.x - foe.body.x))
+                * spell("blink").and_then(|s| s.distance).unwrap_or(f64::NAN);
         if to > state.left + 10.0 && to < state.right - 10.0 {
             out.push(opt(What::Cast("blink", Some(to)), urgency * 0.8));
         }
@@ -579,7 +762,10 @@ fn punisher(foe: &Fighter, me: &Fighter, time: f64) -> f64 {
             continue;
         }
         let range = s.range.unwrap_or(f64::NAN);
-        let close = (s.kind == Kind::Melee && !s.dive && d < range + spec.half_width && level < spec.chest)
+        let close = (s.kind == Kind::Melee
+            && !s.dive
+            && d < range + spec.half_width
+            && level < spec.chest)
             || (s.kind == Kind::Blast && d < range + spec.half_width && level < spec.body)
             || (s.kind == Kind::Dash && d < s.distance.unwrap_or(f64::NAN) && level < spec.chest);
         let lands = if close {

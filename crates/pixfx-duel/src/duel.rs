@@ -2,7 +2,9 @@
 
 use crate::act::{advance, begin, break_act, drop_barrier, knock_out, set_meditating, settle};
 use crate::bar::{draw, fight_pool};
-use crate::data::{BAR, CHILL, DECOR, FLY, GRIT, MEDITATE_REGEN, QI_REGEN, ROUND_PAUSE, STALE, powi, school, spell};
+use crate::data::{
+    BAR, CHILL, DECOR, FLY, GRIT, MEDITATE_REGEN, QI_REGEN, ROUND_PAUSE, STALE, powi, school, spell,
+};
 use crate::fighter::{Fighter, Phase, Slot, State, Told};
 use crate::out::Out;
 use crate::seat::{Brain, MakeSeat, Seat};
@@ -41,16 +43,37 @@ impl Duel {
         let top = js_min(FLY.top, config.sky);
         let blank = |i, s| Fighter::new(i, s, Vec::new(), Vec::new());
         let schools = [crate::data::School::Thunder, crate::data::School::Frost];
-        let mut state = State::new(config.seed, config.left, config.right, config.ground, top, config.effects, schools.map(|s| blank(s as usize, s)));
+        let mut state = State::new(
+            config.seed,
+            config.left,
+            config.right,
+            config.ground,
+            top,
+            config.effects,
+            schools.map(|s| blank(s as usize, s)),
+        );
         let effects = state.effects.clone();
-        let usable = |name: &str| spell(name).is_some_and(|sp| sp.fx.is_none_or(|fx| effects.iter().any(|e| e == fx)));
+        let usable = |name: &str| {
+            spell(name).is_some_and(|sp| sp.fx.is_none_or(|fx| effects.iter().any(|e| e == fx)))
+        };
         for (i, s) in schools.into_iter().enumerate() {
             let pool = fight_pool(&mut state, s, &|n| usable(n));
             let d = school(s);
-            let spells = d.basics.iter().copied().chain(pool.iter().copied()).chain([d.ultimate]).filter(|n| usable(n)).collect();
+            let spells = d
+                .basics
+                .iter()
+                .copied()
+                .chain(pool.iter().copied())
+                .chain([d.ultimate])
+                .filter(|n| usable(n))
+                .collect();
             state.fighters[i] = Fighter::new(i, s, spells, pool);
         }
-        for (f, style) in state.fighters.iter_mut().zip(crate::style::draw(config.seed)) {
+        for (f, style) in state
+            .fighters
+            .iter_mut()
+            .zip(crate::style::draw(config.seed))
+        {
             f.style = style;
         }
         let [make0, make1] = seats;
@@ -153,7 +176,11 @@ impl Duel {
         }
         let [a, b] = &mut self.state.fighters;
         if a.hp > 0.0 && b.hp > 0.0 {
-            let arena = pixfx_fighter::body::Arena { left: self.state.left, right: self.state.right, top: self.state.top };
+            let arena = pixfx_fighter::body::Arena {
+                left: self.state.left,
+                right: self.state.right,
+                top: self.state.top,
+            };
             pixfx_fighter::body::separate(&mut a.body, &mut b.body, &arena);
         }
         // the shots in flight at the start of the tick run, but not one another shot ended this tick
@@ -243,12 +270,17 @@ fn body(state: &mut State, me: usize, dt: f64) {
         f.fly = false;
     }
     // a dive drops straight at the foe's height
-    let diving = f.act.is_some_and(|a| a.phase == Phase::Windup && spell(a.spell).is_some_and(|s| s.dive));
+    let diving = f
+        .act
+        .is_some_and(|a| a.phase == Phase::Windup && spell(a.spell).is_some_and(|s| s.dive));
     let foe_air = state.fighters[foe].body.air;
     let foe_x = state.fighters[foe].body.x;
     let f = &state.fighters[me];
     let motion = if diving {
-        Motion::Dive { speed: spell("dive").and_then(|s| s.speed).unwrap_or(0.0), floor: foe_air }
+        Motion::Dive {
+            speed: spell("dive").and_then(|s| s.speed).unwrap_or(0.0),
+            floor: foe_air,
+        }
     } else if f.fly {
         Motion::Fly { hover: f.hover }
     } else {
@@ -266,7 +298,9 @@ fn body(state: &mut State, me: usize, dt: f64) {
     };
     let arena = state.arena();
     let State { rng, fighters, .. } = state;
-    let events = fighters[me].body.step(dt, &drive, &arena, &mut || rng.next());
+    let events = fighters[me]
+        .body
+        .step(dt, &drive, &arena, &mut || rng.next());
     for e in events {
         state.emit(e.into());
     }

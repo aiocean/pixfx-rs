@@ -2,8 +2,8 @@
 //! fighter can cast now, and what the HUD shows of the bar and of a fighter's buffs.
 
 use crate::data::{
-    BAR, Kind, PAY_DRAW, POOL_SIZE, RAGE, RARITY, Rarity, STALE, School, Status, TRAITS, Trait, evolves, fits, payoff,
-    school, slot_power, spell,
+    BAR, Kind, PAY_DRAW, POOL_SIZE, RAGE, RARITY, Rarity, STALE, School, Status, TRAITS, Trait,
+    evolves, fits, payoff, school, slot_power, spell,
 };
 use crate::fighter::{Fighter, Slot, State};
 use crate::out::Out;
@@ -11,14 +11,21 @@ use pixfx_draw::math::js_min;
 
 /// `POOL_SIZE` skills of `school` a fighter plays this fight, by the duel's dice: always one of the school's
 /// signature kind and one that pays off its status, where it has them, then the rest at random.
-pub fn fight_pool(state: &mut State, s: School, usable: &dyn Fn(&str) -> bool) -> Vec<&'static str> {
+pub fn fight_pool(
+    state: &mut State,
+    s: School,
+    usable: &dyn Fn(&str) -> bool,
+) -> Vec<&'static str> {
     let d = school(s);
     let mut left: Vec<&'static str> = d.pool.iter().copied().filter(|name| usable(name)).collect();
     for i in (1..left.len()).rev() {
         let j = pick(state, i + 1);
         left.swap(i, j);
     }
-    let signature = left.iter().copied().find(|name| spell(name).is_some_and(|sp| sp.kind == d.signature));
+    let signature = left
+        .iter()
+        .copied()
+        .find(|name| spell(name).is_some_and(|sp| sp.kind == d.signature));
     let pays = left.iter().copied().find(|name| payoff(name).is_some());
     let mut kept: Vec<&'static str> = Vec::new();
     for name in [signature, pays].into_iter().flatten() {
@@ -53,7 +60,11 @@ pub fn has_trait(slot: Option<&Slot>, t: Trait) -> bool {
 /// What casting `name` costs `f` in qi: a cheap skill half.
 pub fn cost_of(f: &Fighter, name: &str) -> f64 {
     let cost = spell(name).map_or(0.0, |s| s.cost);
-    cost * if has_trait(slot_of(f, name), Trait::Cheap) { TRAITS.cheap_cost } else { 1.0 }
+    cost * if has_trait(slot_of(f, name), Trait::Cheap) {
+        TRAITS.cheap_cost
+    } else {
+        1.0
+    }
 }
 
 /// Can `f` cast `name` now: in its kit, on its bar if it is a bar skill, off cooldown, paid for.
@@ -83,9 +94,19 @@ fn put(f: &mut Fighter, i: usize, slot: Slot) {
 /// slot draws again from the skills not on the bar; with none left it waits.
 pub fn draw(state: &mut State, f: usize, i: usize, first: bool, gone: Option<&str>) {
     let me = &state.fighters[f];
-    let held: Vec<&'static str> =
-        me.bar.iter().enumerate().filter(|&(j, _)| j != i).filter_map(|(_, slot)| slot.spell()).collect();
-    let mut choice: Vec<&'static str> = me.pool.iter().copied().filter(|&name| Some(name) != gone).collect();
+    let held: Vec<&'static str> = me
+        .bar
+        .iter()
+        .enumerate()
+        .filter(|&(j, _)| j != i)
+        .filter_map(|(_, slot)| slot.spell())
+        .collect();
+    let mut choice: Vec<&'static str> = me
+        .pool
+        .iter()
+        .copied()
+        .filter(|&name| Some(name) != gone)
+        .collect();
     let foe = &state.fighters[1 - f];
     let carried = |status: Status| match status {
         Status::Shock => foe.shock.map_or(0.0, |s| s.stacks),
@@ -93,21 +114,40 @@ pub fn draw(state: &mut State, f: usize, i: usize, first: bool, gone: Option<&st
     } > 0.0;
     let signature = school(me.school).signature;
     let want: Vec<&'static str> = if first {
-        choice.iter().copied().filter(|name| spell(name).is_some_and(|s| s.kind == signature)).collect()
+        choice
+            .iter()
+            .copied()
+            .filter(|name| spell(name).is_some_and(|s| s.kind == signature))
+            .collect()
     } else {
-        let pays: Vec<&'static str> =
-            choice.iter().copied().filter(|name| payoff(name).is_some_and(|(status, _)| carried(status))).collect();
-        if state.rng.next() < PAY_DRAW { pays } else { Vec::new() }
+        let pays: Vec<&'static str> = choice
+            .iter()
+            .copied()
+            .filter(|name| payoff(name).is_some_and(|(status, _)| carried(status)))
+            .collect();
+        if state.rng.next() < PAY_DRAW {
+            pays
+        } else {
+            Vec::new()
+        }
     };
     if !want.is_empty() {
         choice = want;
     }
-    let mut drawn = if choice.is_empty() { None } else { Some(choice[pick(state, choice.len())]) };
+    let mut drawn = if choice.is_empty() {
+        None
+    } else {
+        Some(choice[pick(state, choice.len())])
+    };
     if let Some(name) = drawn
         && held.contains(&name)
     {
         let me = &state.fighters[f];
-        let twin = me.bar.iter().enumerate().position(|(j, slot)| j != i && slot.spell() == Some(name));
+        let twin = me
+            .bar
+            .iter()
+            .enumerate()
+            .position(|(j, slot)| j != i && slot.spell() == Some(name));
         if let Some(twin) = twin {
             let raised = raise(state, &state.fighters[f].bar[twin].clone());
             let rarity = match &raised {
@@ -115,15 +155,34 @@ pub fn draw(state: &mut State, f: usize, i: usize, first: bool, gone: Option<&st
                 Slot::Empty { .. } => Rarity::Common,
             };
             state.fighters[f].bar[twin] = raised;
-            state.emit(Out::Tier { by: f, slot: twin, rarity });
+            state.emit(Out::Tier {
+                by: f,
+                slot: twin,
+                rarity,
+            });
         }
-        let free: Vec<&'static str> =
-            state.fighters[f].pool.iter().copied().filter(|&n| !held.contains(&n) && Some(n) != gone).collect();
-        drawn = if free.is_empty() { None } else { Some(free[pick(state, free.len())]) };
+        let free: Vec<&'static str> = state.fighters[f]
+            .pool
+            .iter()
+            .copied()
+            .filter(|&n| !held.contains(&n) && Some(n) != gone)
+            .collect();
+        drawn = if free.is_empty() {
+            None
+        } else {
+            Some(free[pick(state, free.len())])
+        };
     }
     let Some(name) = drawn else {
         // nothing left to draw: wait and look again
-        put(&mut state.fighters[f], i, Slot::Empty { left: BAR.wait, full: BAR.wait });
+        put(
+            &mut state.fighters[f],
+            i,
+            Slot::Empty {
+                left: BAR.wait,
+                full: BAR.wait,
+            },
+        );
         return;
     };
     let r = state.rng.next();
@@ -141,12 +200,26 @@ pub fn draw(state: &mut State, f: usize, i: usize, first: bool, gone: Option<&st
     };
     let traits = add_traits(state, name, &[], count);
     let power = slot_power(rarity, &traits, false);
-    put(&mut state.fighters[f], i, Slot::Held { spell: name, power, evolved: false, rarity, traits, idle: 0.0 });
+    put(
+        &mut state.fighters[f],
+        i,
+        Slot::Held {
+            spell: name,
+            power,
+            evolved: false,
+            rarity,
+            traits,
+            idle: 0.0,
+        },
+    );
 }
 
 /// `traits` and more that fit `name`, rolled, up to `count` (or as many as fit).
 pub fn add_traits(state: &mut State, name: &str, traits: &[Trait], count: usize) -> Vec<Trait> {
-    let mut fitting: Vec<Trait> = Trait::ALL.into_iter().filter(|&t| fits(t, name) && !traits.contains(&t)).collect();
+    let mut fitting: Vec<Trait> = Trait::ALL
+        .into_iter()
+        .filter(|&t| fits(t, name) && !traits.contains(&t))
+        .collect();
     let mut out = traits.to_vec();
     while out.len() < count && !fitting.is_empty() {
         let k = pick(state, fitting.len());
@@ -157,23 +230,54 @@ pub fn add_traits(state: &mut State, name: &str, traits: &[Trait], count: usize)
 
 /// A bar slot one tier up (a legendary stays legendary): more power, and the traits its new tier brings.
 pub fn raise(state: &mut State, slot: &Slot) -> Slot {
-    let Slot::Held { spell, evolved, rarity, traits, idle, .. } = slot else { return slot.clone() };
+    let Slot::Held {
+        spell,
+        evolved,
+        rarity,
+        traits,
+        idle,
+        ..
+    } = slot
+    else {
+        return slot.clone();
+    };
     let rarity = rarity.up();
     let traits = add_traits(state, spell, traits, RARITY[rarity as usize].traits);
     let power = slot_power(rarity, &traits, *evolved);
-    Slot::Held { spell, power, evolved: *evolved, rarity, traits, idle: *idle }
+    Slot::Held {
+        spell,
+        power,
+        evolved: *evolved,
+        rarity,
+        traits,
+        idle: *idle,
+    }
 }
 
 /// The cast of slot `i`'s skill empties the slot, which counts down before it draws again, unless the skill's partner
 /// is on the bar: then it refills at once, evolved, for one more cast.
 pub fn spend(state: &mut State, f: usize, i: usize) {
     let me = &state.fighters[f];
-    let Some(Slot::Held { spell: name, evolved, rarity, traits, .. }) = me.bar.get(i) else { return };
+    let Some(Slot::Held {
+        spell: name,
+        evolved,
+        rarity,
+        traits,
+        ..
+    }) = me.bar.get(i)
+    else {
+        return;
+    };
     let partner = evolves(me.school)
         .iter()
         .find(|pair| pair.contains(name))
         .and_then(|pair| pair.iter().copied().find(|n| n != name));
-    let paired = partner.is_some_and(|p| me.bar.iter().enumerate().any(|(j, other)| j != i && other.spell() == Some(p)));
+    let paired = partner.is_some_and(|p| {
+        me.bar
+            .iter()
+            .enumerate()
+            .any(|(j, other)| j != i && other.spell() == Some(p))
+    });
     if !evolved && paired {
         let slot = Slot::Held {
             spell: name,
@@ -187,7 +291,10 @@ pub fn spend(state: &mut State, f: usize, i: usize) {
         return;
     }
     let wait = BAR.wait + BAR.spread * state.rng.next();
-    state.fighters[f].bar[i] = Slot::Empty { left: wait, full: wait };
+    state.fighters[f].bar[i] = Slot::Empty {
+        left: wait,
+        full: wait,
+    };
 }
 
 /// A slot of the bar as the screen shows it.
@@ -233,8 +340,19 @@ pub fn skill_bar(f: &Fighter) -> Vec<SlotView> {
         .bar
         .iter()
         .map(|slot| match slot {
-            Slot::Empty { left, full } => SlotView { left: *left, full: *full, ..NO_SLOT },
-            Slot::Held { spell, power, evolved, rarity, traits, idle } => SlotView {
+            Slot::Empty { left, full } => SlotView {
+                left: *left,
+                full: *full,
+                ..NO_SLOT
+            },
+            Slot::Held {
+                spell,
+                power,
+                evolved,
+                rarity,
+                traits,
+                idle,
+            } => SlotView {
                 spell: Some(spell),
                 empty: false,
                 ready: f.hp > 0.0 && ready(f, spell),
@@ -298,5 +416,8 @@ pub fn buffs_of(f: &Fighter) -> Vec<Buff> {
         ("silence", false, f.silence > 0.0, 0.0),
         ("sealed", false, f.sealed > 0.0, 0.0),
     ];
-    all.into_iter().filter(|&(_, _, on, _)| on).map(|(id, good, _, stacks)| Buff { id, good, stacks }).collect()
+    all.into_iter()
+        .filter(|&(_, _, on, _)| on)
+        .map(|(id, good, _, stacks)| Buff { id, good, stacks })
+        .collect()
 }

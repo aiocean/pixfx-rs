@@ -19,7 +19,15 @@ pub enum ShotKind {
     Orb { x: f64 },
     /// A zone at `x`, `air` up, falling at `t = impact`; a seal shows `lead` seconds before; a barrage strike after
     /// the first `follow`s the foe and is `aimed` once.
-    Zone { x: f64, air: f64, lead: f64, follow: bool, aimed: bool, shown: bool, fell: bool },
+    Zone {
+        x: f64,
+        air: f64,
+        lead: f64,
+        follow: bool,
+        aimed: bool,
+        shown: bool,
+        fell: bool,
+    },
     /// A jet that sprays for the spell's `spray` seconds.
     Spray,
     /// A vortex at `x`, ticking every half second.
@@ -43,7 +51,9 @@ pub struct Shot {
 
 /// Move shot `id` on by `dt`; a shot no longer in flight (ended earlier this tick) does nothing.
 pub fn shot(state: &mut State, id: u32, dt: f64) {
-    let Some(mut s) = state.shots.iter().find(|s| s.id == id).copied() else { return };
+    let Some(mut s) = state.shots.iter().find(|s| s.id == id).copied() else {
+        return;
+    };
     if run(state, &mut s, dt)
         && let Some(slot) = state.shots.iter_mut().find(|x| x.id == id)
     {
@@ -71,7 +81,11 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
                     return None;
                 }
                 match o.kind {
-                    ShotKind::Bolt { x: ox, y: oy, .. } if (ox - x).abs() < 6.0 && (oy - y).abs() < 8.0 => Some((*o, None)),
+                    ShotKind::Bolt { x: ox, y: oy, .. }
+                        if (ox - x).abs() < 6.0 && (oy - y).abs() < 8.0 =>
+                    {
+                        Some((*o, None))
+                    }
                     ShotKind::Orb { .. } => {
                         let (bx, by) = orb_at(o);
                         (libm::hypot(bx - x, by + y) < 10.0).then_some((*o, Some((bx, by))))
@@ -91,7 +105,8 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
             }
             // an ice mirror sends the bolt back the way it came, now its own
             let f = &state.fighters[foe];
-            let reflects = f.barrier > 0.0 && f.barrier_spell.and_then(spell).is_some_and(|b| b.reflect);
+            let reflects =
+                f.barrier > 0.0 && f.barrier_spell.and_then(spell).is_some_and(|b| b.reflect);
             if reflects && overlaps(state, foe, x, y, 9.0) {
                 s.owner = foe;
                 vx = -vx;
@@ -152,13 +167,29 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
             }
             true
         }
-        ShotKind::Zone { mut x, mut air, lead, follow, mut aimed, mut shown, mut fell } => {
+        ShotKind::Zone {
+            mut x,
+            mut air,
+            lead,
+            follow,
+            mut aimed,
+            mut shown,
+            mut fell,
+        } => {
             let fspec = state.fighters[foe].body.spec;
             // a strike of a barrage aims where the foe was a moment before it falls
             if follow && !aimed && s.t >= -sp.aim_ahead.unwrap_or(0.0) {
                 aimed = true;
-                x = crate::act::clamp(state.fighters[foe].body.x, state.left + 6.0, state.right - 6.0);
-                air = if sp.grounded { 0.0 } else { state.fighters[foe].body.air };
+                x = crate::act::clamp(
+                    state.fighters[foe].body.x,
+                    state.left + 6.0,
+                    state.right - 6.0,
+                );
+                air = if sp.grounded {
+                    0.0
+                } else {
+                    state.fighters[foe].body.air
+                };
             }
             if !shown && s.t >= 0.0 {
                 shown = true;
@@ -167,9 +198,24 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
                 }
                 s.key = None;
                 let y = g - zone_height(sp, &fspec) - air;
-                cast(state, s.owner, sp.fx.unwrap_or(""), x, y, PlayOpts::default());
+                cast(
+                    state,
+                    s.owner,
+                    sp.fx.unwrap_or(""),
+                    x,
+                    y,
+                    PlayOpts::default(),
+                );
             }
-            s.kind = ShotKind::Zone { x, air, lead, follow, aimed, shown, fell };
+            s.kind = ShotKind::Zone {
+                x,
+                air,
+                lead,
+                follow,
+                aimed,
+                shown,
+                fell,
+            };
             if s.t < 0.0 {
                 return true;
             }
@@ -177,7 +223,11 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
             let reach = sp.reach.unwrap_or(0.0);
             let pull = sp.pull.unwrap_or(0.0);
             let f = &mut state.fighters[foe];
-            if pull != 0.0 && s.t < sp.pull_until.unwrap_or(0.0) && (x - f.body.x).abs() < reach && f.hp > 0.0 {
+            if pull != 0.0
+                && s.t < sp.pull_until.unwrap_or(0.0)
+                && (x - f.body.x).abs() < reach
+                && f.hp > 0.0
+            {
                 let dx = x - f.body.x;
                 f.body.x += js_sign(dx) * js_min(dx.abs(), pull * dt);
             }
@@ -187,10 +237,22 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
             }
             if !fell && s.t >= sp.impact.unwrap_or(0.0) {
                 fell = true;
-                s.kind = ShotKind::Zone { x, air, lead, follow, aimed, shown, fell };
+                s.kind = ShotKind::Zone {
+                    x,
+                    air,
+                    lead,
+                    follow,
+                    aimed,
+                    shown,
+                    fell,
+                };
                 let f = &state.fighters[foe];
                 let near = (f.body.x - x).abs() < sp.radius.unwrap_or(0.0) + fspec.half_width;
-                let level = if sp.grounded { f.body.air < 10.0 } else { (f.body.air - air).abs() < 22.0 };
+                let level = if sp.grounded {
+                    f.body.air < 10.0
+                } else {
+                    (f.body.air - air).abs() < 22.0
+                };
                 let dir = or_one(js_sign(f.body.x - x));
                 if near && level && hurt(state, foe, s.power, dir, s.name, s.stacks) {
                     if let Some(freeze) = sp.freeze.filter(|v| *v != 0.0) {
@@ -230,10 +292,23 @@ fn run(state: &mut State, s: &mut Shot, dt: f64) -> bool {
                 if dx.abs() < under && state.fighters[foe].hp > 0.0 {
                     let by = s.owner;
                     let roll = state.rng.next();
-                    let amount = damage_of(&state.fighters[by], &state.fighters[foe], sp.tick.unwrap_or(0.0), blow, false, roll);
+                    let amount = damage_of(
+                        &state.fighters[by],
+                        &state.fighters[foe],
+                        sp.tick.unwrap_or(0.0),
+                        blow,
+                        false,
+                        roll,
+                    );
                     let share = take(state, foe, amount);
                     let (fx, fy) = (state.fighters[foe].body.x, state.fighters[foe].chest());
-                    state.emit(Out::Tick { by, damage: amount, share, x: fx, y: fy });
+                    state.emit(Out::Tick {
+                        by,
+                        damage: amount,
+                        share,
+                        x: fx,
+                        y: fy,
+                    });
                     // a cold fire chills whoever stands in it, a stack a tick
                     if sp.chill {
                         add_chill(state, foe, s.stacks);
@@ -270,7 +345,11 @@ pub fn overlaps(state: &State, f: usize, x: f64, y: f64, r: f64) -> bool {
     if b.untouchable() {
         return false;
     }
-    let top = if b.duck > 0.0 { b.spec.duck } else { b.spec.body };
+    let top = if b.duck > 0.0 {
+        b.spec.duck
+    } else {
+        b.spec.body
+    };
     (x - b.x).abs() < b.spec.half_width + r && y > b.air - r && y < b.air + top + r
 }
 

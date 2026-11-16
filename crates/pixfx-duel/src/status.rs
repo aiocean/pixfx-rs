@@ -1,7 +1,10 @@
 //! Statuses that stack, hard controls cut by grit, burns, life lost and damage dealt. Each
 //! takes the state and the index of the fighter it touches, and emits what it did in a fixed order.
 
-use crate::data::{BURN, Blow, CHILL, DEF_DOWN, DEFENCE, FREEZE, FURY, GRIT, RAGE, SHOCK, SPREAD, Stats, shock_interval};
+use crate::data::{
+    BURN, Blow, CHILL, DEF_DOWN, DEFENCE, FREEZE, FURY, GRIT, RAGE, SHOCK, SPREAD, Stats,
+    shock_interval,
+};
 use crate::fighter::{Fighter, Shocked, State};
 use crate::out::Out;
 use pixfx_draw::math::{js_max, js_min, js_round};
@@ -60,7 +63,11 @@ pub fn add_shock(state: &mut State, f: usize, by: usize, n: f64) {
     if me.hp <= 0.0 {
         return;
     }
-    let mut shock = me.shock.unwrap_or(Shocked { stacks: 0.0, tick: 0.0, by });
+    let mut shock = me.shock.unwrap_or(Shocked {
+        stacks: 0.0,
+        tick: 0.0,
+        by,
+    });
     shock.stacks = js_min(SHOCK.max, shock.stacks + n);
     if shock.tick <= 0.0 {
         shock.tick = shock_interval(shock.stacks);
@@ -71,7 +78,9 @@ pub fn add_shock(state: &mut State, f: usize, by: usize, n: f64) {
 
 /// Fighter `f`'s shock stacks twitch, one a tick, faster the more there are.
 pub fn shocking(state: &mut State, f: usize, dt: f64) {
-    let Some(mut shock) = state.fighters[f].shock else { return };
+    let Some(mut shock) = state.fighters[f].shock else {
+        return;
+    };
     shock.tick -= dt;
     state.fighters[f].shock = Some(shock);
     if shock.tick > 0.0 || state.fighters[f].hp <= 0.0 {
@@ -81,7 +90,13 @@ pub fn shocking(state: &mut State, f: usize, dt: f64) {
     let amount = js_round(state.fighters[by].stats.atk * SHOCK.share);
     let share = take(state, f, amount);
     let (x, y) = (state.fighters[f].body.x, state.fighters[f].chest());
-    state.emit(Out::Tick { by, damage: amount, share, x, y });
+    state.emit(Out::Tick {
+        by,
+        damage: amount,
+        share,
+        x,
+        y,
+    });
     control(state, f, ControlKind::Hold, SHOCK.hold);
     let me = &mut state.fighters[f];
     let Some(mut shock) = me.shock else { return };
@@ -96,7 +111,9 @@ pub fn shocking(state: &mut State, f: usize, dt: f64) {
 
 /// A burn on fighter `f` ticks: a share of its caster's attack, past defence, until it runs out.
 pub fn burning(state: &mut State, f: usize, dt: f64) {
-    let Some(mut burn) = state.fighters[f].burn else { return };
+    let Some(mut burn) = state.fighters[f].burn else {
+        return;
+    };
     burn.t -= dt;
     burn.tick -= dt;
     state.fighters[f].burn = Some(burn);
@@ -105,7 +122,13 @@ pub fn burning(state: &mut State, f: usize, dt: f64) {
         state.fighters[f].burn = Some(burn);
         let share = take(state, f, burn.per);
         let (x, y) = (state.fighters[f].body.x, state.fighters[f].chest());
-        state.emit(Out::Tick { by: burn.by, damage: burn.per, share, x, y });
+        state.emit(Out::Tick {
+            by: burn.by,
+            damage: burn.per,
+            share,
+            x,
+            y,
+        });
     }
     if burn.t <= 0.0 {
         state.fighters[f].burn = None;
@@ -135,16 +158,39 @@ pub fn gain_rage(f: &mut Fighter, n: f64) {
 
 /// The damage `by` does to `f` with a blow of `power` and `blow`; `roll` in [0, 1) spreads it.
 pub fn damage_of(by: &Fighter, f: &Fighter, power: f64, blow: Blow, crit: bool, roll: f64) -> f64 {
-    damage(&by.stats, by.fury, &f.stats, f.def_down, power, blow, crit, roll)
+    damage(
+        &by.stats, by.fury, &f.stats, f.def_down, power, blow, crit, roll,
+    )
 }
 
 /// [`damage_of`] from only what it reads: the striker's stats and fury, the target's stats and defence-down.
 #[allow(clippy::too_many_arguments)]
-pub fn damage(by: &Stats, fury: f64, f: &Stats, def_down: f64, power: f64, blow: Blow, crit: bool, roll: f64) -> f64 {
+pub fn damage(
+    by: &Stats,
+    fury: f64,
+    f: &Stats,
+    def_down: f64,
+    power: f64,
+    blow: Blow,
+    crit: bool,
+    roll: f64,
+) -> f64 {
     let atk = by.atk * (1.0 + FURY.per * fury);
-    let def = (if blow == Blow::Physical { f.pdef } else { f.mdef }) * (if def_down > 0.0 { 1.0 - DEF_DOWN } else { 1.0 });
+    let def = (if blow == Blow::Physical {
+        f.pdef
+    } else {
+        f.mdef
+    }) * (if def_down > 0.0 { 1.0 - DEF_DOWN } else { 1.0 });
     let spread = 1.0 - SPREAD / 2.0 + SPREAD * roll;
-    js_max(1.0, js_round(atk * (power / 10.0) * (DEFENCE / (DEFENCE + def)) * (if crit { by.crit_damage } else { 1.0 }) * spread))
+    js_max(
+        1.0,
+        js_round(
+            atk * (power / 10.0)
+                * (DEFENCE / (DEFENCE + def))
+                * (if crit { by.crit_damage } else { 1.0 })
+                * spread,
+        ),
+    )
 }
 
 /// A heal or a ward washes off what clings to fighter `f`: burn, silence, defence-down, chill and shock.

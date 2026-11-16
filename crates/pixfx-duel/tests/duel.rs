@@ -11,9 +11,22 @@ use pixfx_duel::fighter::Slot;
 use pixfx_duel::out::Out;
 
 const PLAN2: [&str; 16] = [
-    "fire/candle", "fire/campfire", "fire/brazier", "impacts/parry", "explosions/plasma-explosion", "explosions/implosion",
-    "explosions/small-explosion", "arcane/rune-circle", "lightning/ball-lightning", "projectiles/laser-bolt",
-    "ice/icicle-fall", "shadow/void-orb", "holy/feather-burst", "spawn/poof", "fire/spirit-flame", "weather/fireflies",
+    "fire/candle",
+    "fire/campfire",
+    "fire/brazier",
+    "impacts/parry",
+    "explosions/plasma-explosion",
+    "explosions/implosion",
+    "explosions/small-explosion",
+    "arcane/rune-circle",
+    "lightning/ball-lightning",
+    "projectiles/laser-bolt",
+    "ice/icicle-fall",
+    "shadow/void-orb",
+    "holy/feather-burst",
+    "spawn/poof",
+    "fire/spirit-flame",
+    "weather/fireflies",
 ];
 
 fn plan2(seed: u32) -> Duel {
@@ -80,7 +93,11 @@ fn a_heavy_blow_throws_its_target_which_lands_lies_and_gets_up() {
     let mut lands = 0;
     let mut up = false;
     for _ in 0..240 {
-        lands += duel.step(1.0 / 60.0).iter().filter(|o| matches!(o, Out::Land { .. })).count();
+        lands += duel
+            .step(1.0 / 60.0)
+            .iter()
+            .filter(|o| matches!(o, Out::Land { .. }))
+            .count();
         if duel.state.fighters[1].body.down.is_none() {
             up = true;
             break;
@@ -113,13 +130,18 @@ fn a_cast_puts_its_spell_on_its_own_cooldown_and_a_bar_skills_one_cast_empties_i
         let mut duel = plan2(seed);
         let mut was: [Option<&str>; 2] = [None, None];
         for _ in 0..90 * 60 {
-            let before: Vec<Vec<Slot>> = duel.state.fighters.iter().map(|f| f.bar.clone()).collect();
+            let before: Vec<Vec<Slot>> =
+                duel.state.fighters.iter().map(|f| f.bar.clone()).collect();
             duel.step(1.0 / 60.0);
             for f in &duel.state.fighters {
                 let name = f.act.map(|a| a.spell);
-                let fresh = name.is_some() && name != was[f.index] && f.act.is_some_and(|a| a.t < 1.0 / 30.0);
+                let fresh = name.is_some()
+                    && name != was[f.index]
+                    && f.act.is_some_and(|a| a.t < 1.0 / 30.0);
                 was[f.index] = name;
-                let Some(name) = name.filter(|_| fresh) else { continue };
+                let Some(name) = name.filter(|_| fresh) else {
+                    continue;
+                };
                 let j = before[f.index].iter().position(|s| s.spell() == Some(name));
                 let swift = j.is_some_and(|j| matches!(&before[f.index][j], Slot::Held { traits, .. } if traits.contains(&pixfx_duel::data::Trait::Swift)));
                 let sp = spell(name).map_or((0.0, 0.0), |s| (s.cooldown, s.windup));
@@ -129,7 +151,10 @@ fn a_cast_puts_its_spell_on_its_own_cooldown_and_a_bar_skills_one_cast_empties_i
                 let (after, prior) = (&f.bar[j], &before[f.index][j]);
                 let evolved = |s: &Slot| matches!(s, Slot::Held { evolved: true, .. });
                 let refilled = evolved(after) && !evolved(prior);
-                let again = f.lucky.is_some_and(|l| l.kind == pixfx_duel::data::Luck::Again && l.spell == name) && after.spell() == Some(name);
+                let again = f
+                    .lucky
+                    .is_some_and(|l| l.kind == pixfx_duel::data::Luck::Again && l.spell == name)
+                    && after.spell() == Some(name);
                 assert!(matches!(after, Slot::Empty { .. }) || refilled || again);
                 checked += 1;
             }
@@ -157,7 +182,15 @@ fn the_skill_bar_shows_four_slots_the_last_one_the_ultimate_charged_by_rage() {
 fn a_dive_that_lands_cracks_the_ground_with_every_effect_in_the_engine() {
     let mut played = false;
     for seed in 1..=8 {
-        played |= run(&mut fight(seed), 90.0).iter().any(|o| matches!(o, Out::Play { fx: "explosions/dirt-explosion", .. }));
+        played |= run(&mut fight(seed), 90.0).iter().any(|o| {
+            matches!(
+                o,
+                Out::Play {
+                    fx: "explosions/dirt-explosion",
+                    ..
+                }
+            )
+        });
     }
     assert!(played);
 }
@@ -168,7 +201,15 @@ fn fought(hz: f64, seconds: f64) -> ([u32; 2], u32, Vec<(f64, f64)>) {
     for _ in 0..(seconds * hz) as usize {
         duel.step(1.0 / hz);
     }
-    (duel.state.wins, duel.state.round, duel.state.fighters.iter().map(|f| (f.hp, f.body.x)).collect())
+    (
+        duel.state.wins,
+        duel.state.round,
+        duel.state
+            .fighters
+            .iter()
+            .map(|f| (f.hp, f.body.x))
+            .collect(),
+    )
 }
 
 #[test]
@@ -206,7 +247,10 @@ fn zero_dt_holds_and_big_dt_is_capped() {
 
 #[test]
 fn missing_effects_leave_their_spells_out() {
-    let effects: Vec<String> = all_effects().into_iter().filter(|e| e != "ice/icicle-fall" && e != "lightning/ball-lightning").collect();
+    let effects: Vec<String> = all_effects()
+        .into_iter()
+        .filter(|e| e != "ice/icicle-fall" && e != "lightning/ball-lightning")
+        .collect();
     for seed in 1..=10 {
         let mut duel = Duel::with_brains(config(seed, effects.clone()));
         for f in &duel.state.fighters {
@@ -221,9 +265,17 @@ fn missing_effects_leave_their_spells_out() {
     }
     // the blade and the dive need no effect: an empty registry still fights with them
     let mut bare = Duel::with_brains(config(1, Vec::new()));
-    assert!(run(&mut bare, 20.0).iter().all(|o| !matches!(o, Out::Play { .. })));
+    assert!(
+        run(&mut bare, 20.0)
+            .iter()
+            .all(|o| !matches!(o, Out::Play { .. }))
+    );
     for f in &bare.state.fighters {
-        assert!(f.spells.contains(&"slash") && f.spells.contains(&"dive"), "{:?}", f.spells);
+        assert!(
+            f.spells.contains(&"slash") && f.spells.contains(&"dive"),
+            "{:?}",
+            f.spells
+        );
         assert!(!f.spells.contains(&school(f.school).ultimate));
     }
 }
