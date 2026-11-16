@@ -3,16 +3,72 @@
   "name": "Blood",
   "look": "Blood shield from dark cultivation fantasy. A thin dark crimson film shaped like a tall dome surrounds the character, veins of bright red flowing through it.",
   "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the whole crimson dome alone, its film and veins, no glow and no droplets",
+      "pivot": "the centre of its base",
+      "forms": [
+        "whole, standing still",
+        "bulging inward at the right where a blow lands",
+        "sagging and melting down, half drained"
+      ]
+    },
+    {
+      "name": "VEIN",
+      "text": "one stretch of bright red vein alone, branching",
+      "forms": [
+        "a thin stream of blood rising from the ground",
+        "a thick stream rising and curling over",
+        "a stream dripping down into the ground"
+      ]
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: blood droplets, a splash, red mist puffs"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the dome, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "blood rises from the ground in streams and spreads into the dome"
+      "text": "blood rises from the ground in streams and spreads into the dome",
+      "notes": [
+        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
+        "",
+        "",
+        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+      ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "the film holds, red veins flowing slowly across it and droplets sliding down; it loops"
+      "text": "the film holds, red veins flowing slowly across it and droplets sliding down; it loops",
+      "frames": 3
     },
     {
       "name": "HIT",
@@ -22,7 +78,13 @@
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the film loses its shape and drains down into the ground as dripping streams"
+      "text": "the film loses its shape and drains down into the ground as dripping streams",
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left",
+        "a few last faint specks, under 20 pixels"
+      ]
     }
   ]
 }

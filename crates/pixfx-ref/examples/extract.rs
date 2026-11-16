@@ -1,6 +1,8 @@
 //! Step 3: cut a drawn sheet into the effect's frames, as colour and light layers, with a review page.
 //!
-//!   cargo run -p pixfx-ref --example extract -- <spec.json> <sheet.png> [--out DIR] [--back HREF] [--between N]
+//!   cargo run -p pixfx-ref --example extract -- <spec.json> <sheet.png> [--parts-sheet | --moment NAME] [--out DIR] [--back HREF] [--between N]
+//!
+//! `--parts-sheet` and `--moment` read the sheets `template` made with them, into `<their folder>/review`.
 //!
 //! `<sheet.png>` is what the model drew on a transparent background (`generate` writes it as
 //! `draw-<n>/image-01.png`). Writes into `--out` (default `target/ref/<slug>/review`): per frame
@@ -14,7 +16,7 @@ mod common;
 
 use std::path::PathBuf;
 
-use common::{Args, exit, home, key, read_png, read_spec, write_png, write_text};
+use common::{Args, exit, key, read_png, read_spec, sheet_of, write_png, write_text};
 use pixfx_pixel::frames::{busiest, grid_view};
 use pixfx_ref::RgbaImage;
 use pixfx_ref::extract::extract;
@@ -31,8 +33,7 @@ const CUT: [u8; 4] = [0, 255, 255, 255];
 /// In-betweens per two drawn frames, by default: 7 lets the player show 1, 3 or 7.
 const BETWEEN: usize = 7;
 
-const USAGE: &str =
-    "usage: extract <spec.json> <sheet.png> [--out DIR] [--back HREF] [--between N]";
+const USAGE: &str = "usage: extract <spec.json> <sheet.png> [--parts-sheet | --moment NAME] [--out DIR] [--back HREF] [--between N]";
 
 fn main() -> std::process::ExitCode {
     exit("extract", run())
@@ -65,6 +66,8 @@ fn run() -> Result<(), String> {
     let mut args = Args::new(USAGE);
     let out = args.value("--out")?.map(PathBuf::from);
     let back = args.value("--back")?;
+    let moment = args.value("--moment")?;
+    let parts_sheet = args.flag("--parts-sheet");
     let n = match args.value("--between")? {
         Some(v) => v
             .parse::<usize>()
@@ -72,9 +75,13 @@ fn run() -> Result<(), String> {
         None => BETWEEN,
     };
     let rest = args.rest(2..=2)?;
-    let spec = read_spec(&PathBuf::from(&rest[0]))?;
+    let (spec, dir) = sheet_of(
+        read_spec(&PathBuf::from(&rest[0]))?,
+        parts_sheet,
+        moment.as_deref(),
+    )?;
     let sheet = read_png(&PathBuf::from(&rest[1]))?;
-    let out = out.unwrap_or_else(|| home(&spec).join("review"));
+    let out = out.unwrap_or_else(|| dir.join("review"));
     let k = key(&spec);
     let ex = extract(&sheet, &spec).map_err(|e| format!("{}: {e}", rest[1]))?;
     let black = over_black(&sheet);

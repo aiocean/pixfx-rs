@@ -3,16 +3,68 @@
   "name": "Turtle shell",
   "look": "Black tortoise shell barrier from cultivation fantasy. A dome of dark jade-green hexagonal shell plates with glowing seams covers the character like a tortoise shell.",
   "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the shell dome alone, every hexagonal plate in place, no glow"
+    },
+    {
+      "name": "PLATE",
+      "text": "one hexagonal shell plate alone, its glowing seam round it",
+      "pivot": "its centre",
+      "forms": [
+        "lying flat, facing front",
+        "tilted, falling",
+        "cracked",
+        "broken into pieces"
+      ]
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: jade chips, a crack line, dust"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the seams, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "the plates slam down from above one after another and lock into the dome with a puff of dust"
+      "text": "the plates slam down from above one after another and lock into the dome with a puff of dust",
+      "notes": [
+        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
+        "",
+        "",
+        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+      ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "the shell holds, a dim green light running along the seams between the plates; it loops"
+      "text": "the shell holds, a dim green light running along the seams between the plates; it loops",
+      "frames": 3
     },
     {
       "name": "HIT",
@@ -22,7 +74,13 @@
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the plates crack and crumble into falling stones and dust"
+      "text": "the plates crack and crumble into falling stones and dust",
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left",
+        "a few last faint specks, under 20 pixels"
+      ]
     }
   ]
 }

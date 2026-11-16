@@ -176,6 +176,7 @@ fn in_betweens_stay_inside_a_row() {
     let f = |name: &str, x: usize| Frame {
         name: name.into(),
         px: block(x, 8, 10, 10, GOLD, DARK),
+        pivots: Vec::new(),
     };
     let m = Matrix {
         w: W as u32,

@@ -52,10 +52,30 @@ fn frames_drawn_off_come_back_and_changing_ones_stay() -> Result<(), String> {
     ];
     let s = register(&frames, 6)?;
     let got: Vec<(i32, i32)> = s.iter().map(|s| (s.dx, s.dy)).collect();
-    assert_eq!(got, [(0, 0), (0, 0), (0, 0), (0, 5), (-3, 0), (0, 0), (0, 0), (0, 0)], "{s:?}");
-    assert!(s[3].score > s[3].unshifted, "a taken shift correlates better than none");
+    assert_eq!(
+        got,
+        [
+            (0, 0),
+            (0, 0),
+            (0, 0),
+            (0, 5),
+            (-3, 0),
+            (0, 0),
+            (0, 0),
+            (0, 0)
+        ],
+        "{s:?}"
+    );
+    assert!(
+        s[3].score > s[3].unshifted,
+        "a taken shift correlates better than none"
+    );
     let back = apply(&frames[3], s[3]);
-    assert_eq!(back.get(14 + 18, 12 + 4), Some(LINE), "the band is back on its row");
+    assert_eq!(
+        back.get(14 + 18, 12 + 4),
+        Some(LINE),
+        "the band is back on its row"
+    );
     Ok(())
 }
 
@@ -68,7 +88,12 @@ fn frames_of_different_sizes_are_refused() {
 fn apply_moves_right_and_down() {
     let mut img = RgbaImage::new(4, 4);
     img.set(1, 1, SPARK);
-    let s = pixfx_pixel::register::Shift { dx: 2, dy: -1, score: 1.0, unshifted: 0.0 };
+    let s = pixfx_pixel::register::Shift {
+        dx: 2,
+        dy: -1,
+        score: 1.0,
+        unshifted: 0.0,
+    };
     let out = apply(&img, s);
     assert_eq!(out.get(3, 0), Some(SPARK));
     assert_eq!(out.get(1, 1), Some([0; 4]));
@@ -77,10 +102,19 @@ fn apply_moves_right_and_down() {
 #[test]
 fn a_best_match_on_the_window_edge_is_not_taken() -> Result<(), String> {
     // drawn 4 down, searched within 4: the match lands on the window's edge, so it is not trusted
-    let frames = [subject(14, 12, 40), subject(14, 12, 40), subject(14, 12, 40), subject(14, 16, 40)];
+    let frames = [
+        subject(14, 12, 40),
+        subject(14, 12, 40),
+        subject(14, 12, 40),
+        subject(14, 16, 40),
+    ];
     let s = register(&frames, 4)?;
     assert_eq!((s[3].dx, s[3].dy), (0, 0), "{s:?}");
     let s = register(&frames, 5)?;
-    assert_eq!((s[3].dx, s[3].dy), (0, -4), "inside a wider window it is found: {s:?}");
+    assert_eq!(
+        (s[3].dx, s[3].dy),
+        (0, -4),
+        "inside a wider window it is found: {s:?}"
+    );
     Ok(())
 }

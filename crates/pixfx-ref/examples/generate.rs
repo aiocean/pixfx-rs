@@ -2,8 +2,8 @@
 //!
 //!   cargo run -p pixfx-ref --example generate -- <dir> [--tier draft|standard|hero] [--aspect W:H] [--dry-run]
 //!
-//! `<dir>` is what `template` wrote (`prompt.txt`, `template.png`, `style.png`). Sends the prompt with the two
-//! images, in that order, asking for a transparent background, and writes the answer into the next free
+//! `<dir>` is what `template` wrote (`prompt.txt`, `template.png`, `style.png`, and `parts.png` for a moment's
+//! sheet). Sends the prompt with those images, in that order, asking for a transparent background, and writes the answer into the next free
 //! `<dir>/draw-<n>/`: `image-01.png` and `job.json` (model, request settings, cost). Every call is appended to
 //! `target/ref/spend.jsonl`. Nothing is overwritten: a rerun draws again and costs again. The aspect ratio is the
 //! one of [`ASPECTS`] nearest the template's shape, unless `--aspect` says otherwise.
@@ -34,7 +34,11 @@ fn nearest_aspect(w: u32, h: u32) -> String {
         let t = f64::from(a) / f64::from(b);
         (r / t).max(t / r)
     };
-    let (a, b) = ASPECTS.iter().copied().min_by(|x, y| off(x).total_cmp(&off(y))).unwrap_or((1, 1));
+    let (a, b) = ASPECTS
+        .iter()
+        .copied()
+        .min_by(|x, y| off(x).total_cmp(&off(y)))
+        .unwrap_or((1, 1));
     format!("{a}:{b}")
 }
 
@@ -45,7 +49,8 @@ fn main() -> std::process::ExitCode {
 fn run() -> Result<(), String> {
     let mut args = Args::new(USAGE);
     let tier_name = args.value("--tier")?.unwrap_or_else(|| "draft".into());
-    let tier = Tier::by_name(&tier_name).ok_or_else(|| format!("--tier {tier_name}: draft, standard or hero"))?;
+    let tier = Tier::by_name(&tier_name)
+        .ok_or_else(|| format!("--tier {tier_name}: draft, standard or hero"))?;
     let aspect = args.value("--aspect")?;
     let dry = args.flag("--dry-run");
     let dir = PathBuf::from(&args.rest(1..=1)?[0]);
@@ -58,7 +63,12 @@ fn run() -> Result<(), String> {
     };
     let image = |name: &str| -> Result<String, String> {
         let p = dir.join(name);
-        let bytes = std::fs::read(&p).map_err(|e| format!("reading {}: {e} (run the template script first)", p.display()))?;
+        let bytes = std::fs::read(&p).map_err(|e| {
+            format!(
+                "reading {}: {e} (run the template script first)",
+                p.display()
+            )
+        })?;
         Ok(data_url("image/png", &bytes))
     };
     let mut req = Request {
@@ -69,12 +79,19 @@ fn run() -> Result<(), String> {
         quality: tier.quality().map(String::from),
         references: vec![image("template.png")?, image("style.png")?],
     };
+    // a moment's sheet is drawn from the parts sheet (`template --moment ... --parts`), the third image its prompt names
+    if dir.join("parts.png").exists() {
+        req.references.push(image("parts.png")?);
+    }
     if dry {
         let n = req.references.len();
         req.references.clear();
         let mut b = body(&req);
         b["input_references"] = json!(format!("{n} reference image(s)"));
-        println!("{}", serde_json::to_string_pretty(&b).map_err(|e| e.to_string())?);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&b).map_err(|e| e.to_string())?
+        );
         return Ok(());
     }
     let key = std::env::var(KEY_VAR).map_err(|_| format!("{KEY_VAR} is not set"))?;
@@ -83,7 +100,8 @@ fn run() -> Result<(), String> {
     let body_file = out.join("request.json");
     write_text(&body_file, &body(&req).to_string())?;
     let sent = send(&key, &body_file);
-    std::fs::remove_file(&body_file).map_err(|e| format!("removing {}: {e}", body_file.display()))?;
+    std::fs::remove_file(&body_file)
+        .map_err(|e| format!("removing {}: {e}", body_file.display()))?;
     let (status, text) = sent?;
     let answer = parse_answer(status, &text)?;
     let mut files = Vec::new();
@@ -92,7 +110,9 @@ fn run() -> Result<(), String> {
         std::fs::write(&f, &img.bytes).map_err(|e| format!("writing {}: {e}", f.display()))?;
         files.push(f.display().to_string());
     }
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
     let job = json!({
         "created_unix": now, "route": "openrouter", "model": req.model, "tier": tier_name,
         "aspect_ratio": req.aspect_ratio, "background": req.background, "quality": req.quality,
@@ -123,7 +143,18 @@ fn next_free(dir: &Path) -> Result<PathBuf, String> {
 /// and the body of the answer.
 fn send(key: &str, body_file: &Path) -> Result<(u16, String), String> {
     let mut child = Command::new("curl")
-        .args(["-sS", "--max-time", "300", "-X", "POST", ENDPOINT, "-H", "Content-Type: application/json", "-K", "-"])
+        .args([
+            "-sS",
+            "--max-time",
+            "300",
+            "-X",
+            "POST",
+            ENDPOINT,
+            "-H",
+            "Content-Type: application/json",
+            "-K",
+            "-",
+        ])
         .arg("--data-binary")
         .arg(format!("@{}", body_file.display()))
         .args(["-w", "\n%{http_code}"])
@@ -133,14 +164,21 @@ fn send(key: &str, body_file: &Path) -> Result<(u16, String), String> {
         .spawn()
         .map_err(|e| format!("running curl: {e}"))?;
     let mut stdin = child.stdin.take().ok_or("curl: no stdin")?;
-    writeln!(stdin, "header = \"Authorization: Bearer {key}\"").map_err(|e| format!("curl stdin: {e}"))?;
+    writeln!(stdin, "header = \"Authorization: Bearer {key}\"")
+        .map_err(|e| format!("curl stdin: {e}"))?;
     drop(stdin);
     let out = child.wait_with_output().map_err(|e| format!("curl: {e}"))?;
     if !out.status.success() {
-        return Err(format!("curl failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
+        return Err(format!(
+            "curl failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
     }
     let text = String::from_utf8_lossy(&out.stdout);
     let (body, code) = text.rsplit_once('\n').ok_or("curl: no status line")?;
-    let status = code.trim().parse().map_err(|_| format!("curl: bad status {code}"))?;
+    let status = code
+        .trim()
+        .parse()
+        .map_err(|_| format!("curl: bad status {code}"))?;
     Ok((status, body.to_string()))
 }

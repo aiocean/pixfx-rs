@@ -3,16 +3,68 @@
   "name": "Bagua mirror",
   "look": "Bagua mirror, a protective treasure from cultivation fantasy. A large octagonal bronze mirror ringed with the eight trigram bars floats in front of the character, its polished face glowing pale jade, turning slowly.",
   "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the octagonal bronze mirror alone, facing front, its trigram bars and glowing jade face, no glow round it",
+      "pivot": "its centre",
+      "forms": [
+        "facing front, whole",
+        "turned a quarter away, narrower, its face foreshortened",
+        "seen edge-on, a thin bronze bar",
+        "shrunk to a small bright point of jade light"
+      ]
+    },
+    {
+      "name": "TRIGRAM",
+      "text": "one trigram bar alone, large and upright, its three lines clear"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: jade sparks, a ripple ring seen flat, a crack line"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the mirror's jade face, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "the mirror spins up out of a point of light in front of the character and grows to full size"
+      "text": "the mirror spins up out of a point of light in front of the character and grows to full size",
+      "notes": [
+        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
+        "",
+        "",
+        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+      ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "the mirror floats and turns slowly, the trigram bars lighting one after another; it loops"
+      "text": "the mirror floats and turns slowly, the trigram bars lighting one after another; it loops",
+      "frames": 3
     },
     {
       "name": "HIT",
@@ -22,7 +74,13 @@
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the mirror spins faster, shrinks to a point and winks out"
+      "text": "the mirror spins faster, shrinks to a point and winks out",
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left",
+        "a few last faint specks, under 20 pixels"
+      ]
     }
   ]
 }

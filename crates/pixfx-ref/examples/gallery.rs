@@ -28,13 +28,27 @@ fn relative(p: &Path, base: &Path) -> String {
 
 fn run() -> Result<(), String> {
     let mut args = Args::new(USAGE);
-    let out = PathBuf::from(args.value("--out")?.unwrap_or_else(|| "target/ref/index.html".into()));
-    let title = args.value("--title")?.unwrap_or_else(|| "Effect references".into());
-    let mut dirs: Vec<PathBuf> = args.rest(0..=usize::MAX)?.into_iter().map(PathBuf::from).collect();
+    let out = PathBuf::from(
+        args.value("--out")?
+            .unwrap_or_else(|| "target/ref/index.html".into()),
+    );
+    let title = args
+        .value("--title")?
+        .unwrap_or_else(|| "Effect references".into());
+    let mut dirs: Vec<PathBuf> = args
+        .rest(0..=usize::MAX)?
+        .into_iter()
+        .map(PathBuf::from)
+        .collect();
     if dirs.is_empty() {
         let root = Path::new("target/ref");
-        let list = std::fs::read_dir(root).map_err(|e| format!("reading {}: {e}", root.display()))?;
-        dirs = list.flatten().map(|e| e.path().join("review")).filter(|p| p.join("entry.json").exists()).collect();
+        let list =
+            std::fs::read_dir(root).map_err(|e| format!("reading {}: {e}", root.display()))?;
+        dirs = list
+            .flatten()
+            .map(|e| e.path().join("review"))
+            .filter(|p| p.join("entry.json").exists())
+            .collect();
         dirs.sort();
     }
     let base = out.parent().unwrap_or(Path::new("."));

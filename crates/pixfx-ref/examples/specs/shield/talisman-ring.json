@@ -3,16 +3,69 @@
   "name": "Talismans",
   "look": "Talisman barrier from cultivation fantasy. Six yellow paper talismans painted with red glyphs orbit the character, joined to each other by thin lines of golden light forming a hexagon.",
   "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the six talismans in their hexagon alone, the golden lines between them, no glow"
+    },
+    {
+      "name": "TALISMAN",
+      "text": "one paper talisman alone, upright, its red glyph clear",
+      "pivot": "its top",
+      "forms": [
+        "upright and flat",
+        "fluttering, bent in the middle",
+        "turning, seen edge-on",
+        "burning, its lower half in flames",
+        "burnt to a curl of ash"
+      ]
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: burning paper flecks, golden sparks, a small flame"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the golden lines and talismans, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "the talismans flick out one by one from the character's hand and take their places in the ring, the light lines joining them"
+      "text": "the talismans flick out one by one from the character's hand and take their places in the ring, the light lines joining them",
+      "notes": [
+        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
+        "",
+        "",
+        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+      ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "the talismans orbit slowly and flutter, the light lines between them glowing; it loops"
+      "text": "the talismans orbit slowly and flutter, the light lines between them glowing; it loops",
+      "frames": 3
     },
     {
       "name": "HIT",
@@ -22,7 +75,13 @@
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the remaining talismans catch fire one after another and burn to drifting ash"
+      "text": "the remaining talismans catch fire one after another and burn to drifting ash",
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left",
+        "a few last faint specks, under 20 pixels"
+      ]
     }
   ]
 }

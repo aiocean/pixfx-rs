@@ -3,20 +3,59 @@
   "name": "My effect",
   "look": "My effect, a <what it is> from <genre>. <One or two sentences: shape, material, colour, glow, where it sits round the character.>",
   "subject": "shield",
-  "rules": [
-    "The effect grows from almost nothing: never jump from an empty cell to a half-formed shape.",
-    "Keep the colours of the second image's palette: no outline in black, no gradients wider than a few pixels."
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "<the main object alone, whole, as it stands when fully formed, with no glow and no small effects>"
+    },
+    {
+      "name": "<PIECE>",
+      "text": "<one piece the main object is built from, alone and upright: one petal, one plate, one sword>",
+      "pivot": "<where it turns: its base>",
+      "forms": [
+        "<each shape it takes in the effect, one per cell: upright>",
+        "<leaning out, tip curled in>",
+        "<seen edge-on as it flies>"
+      ]
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: <sparks, specks, debris, puffs>"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of <the main object>, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow, with no solid shape drawn",
+      "light": true
+    }
   ],
   "rows": [
     {
       "name": "INIT",
       "caption": "forms",
       "text": "<how it appears>",
-      "frames": 5,
+      "frames": 4,
       "notes": [
         "only 3 to 6 faint specks of light, under 20 pixels in all: the shape is not visible yet",
         "a thin faint outline of the lowest part, under 60 pixels",
-        "",
         "",
         "fully formed, the same as the IDLE frames"
       ]
@@ -24,7 +63,8 @@
     {
       "name": "IDLE",
       "caption": "holds",
-      "text": "<what moves while it holds>. It loops"
+      "text": "<what moves while it holds>. It loops",
+      "frames": 3
     },
     {
       "name": "HIT RIGHT",
@@ -48,5 +88,9 @@
         "a few last faint specks, under 20 pixels"
       ]
     }
+  ],
+  "rules": [
+    "The effect grows from almost nothing: never jump from an empty cell to a half-formed shape.",
+    "Keep the colours of the second image's palette: no outline in black, no gradients wider than a few pixels."
   ]
 }

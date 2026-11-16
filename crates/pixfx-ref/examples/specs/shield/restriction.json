@@ -3,16 +3,78 @@
   "name": "Restriction",
   "look": "Restriction barrier, a seal of layered runes from cultivation fantasy. Three stacked horizontal rings of glowing violet-white rune characters circle the character at knee, waist and head height, turning in alternating directions, joined by faint vertical light.",
   "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the three rune rings stacked as they stand, no glow, no light between them"
+    },
+    {
+      "name": "RING",
+      "text": "one rune ring alone, seen a little from above",
+      "pivot": "its centre",
+      "forms": [
+        "whole, seen a little from above",
+        "only half drawn, an arc being written",
+        "jolted, tilted to one side",
+        "unravelling, runes peeling off one end"
+      ]
+    },
+    {
+      "name": "GLYPH",
+      "text": "three single rune characters alone, large, side by side",
+      "forms": [
+        "whole",
+        "flaring white",
+        "cracked",
+        "peeling away and fading"
+      ]
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: violet sparks, a broken glyph, a vertical light streak"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the rings and the light joining them, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "the rings draw themselves one by one from the ground up, each rune lighting as it is written"
+      "text": "the rings draw themselves one by one from the ground up, each rune lighting as it is written",
+      "notes": [
+        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
+        "",
+        "",
+        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+      ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "the three rings turn against each other and their runes pulse in sequence; it loops"
+      "text": "the three rings turn against each other and their runes pulse in sequence; it loops",
+      "frames": 3
     },
     {
       "name": "HIT",
@@ -22,7 +84,16 @@
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the rings unravel layer by layer from the top, their runes peeling away and fading"
+      "text": "the rings unravel layer by layer from the top, their runes peeling away and fading",
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left",
+        "a few last faint specks, under 20 pixels"
+      ]
     }
+  ],
+  "rules": [
+    "Exactly three rings in every frame once they are drawn, never four: one at knee height, one at waist height, one at head height, with an empty gap between each pair as tall as a ring, as in MAIN."
   ]
 }

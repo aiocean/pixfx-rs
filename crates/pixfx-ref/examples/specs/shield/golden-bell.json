@@ -3,16 +3,67 @@
   "name": "Golden Bell",
   "look": "Golden Bell, a protective barrier from cultivation fantasy. A translucent golden-bronze temple bell made of qi covers the character from head to ground, with engraved rune bands round its waist and rim and a warm glow.",
   "subject": "bell",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the bell alone, whole, its rune bands and rim, no glow, no dust",
+      "pivot": "the centre of its rim",
+      "forms": [
+        "whole",
+        "struck on the right, the struck side flashing white",
+        "faded from the rim up to its waist"
+      ]
+    },
+    {
+      "name": "BAND",
+      "text": "one rune band unrolled flat, its glyphs clear"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: a dust puff, golden motes, a ring of light seen flat"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the bell, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "the bell descends from above and settles over the character, landing with a small ring of dust at its rim"
+      "text": "the bell descends from above and settles over the character, landing with a small ring of dust at its rim",
+      "notes": [
+        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
+        "",
+        "",
+        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+      ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "the bell holds steady; light shimmers down its surface and the rune bands pulse softly. It loops"
+      "text": "the bell holds steady; light shimmers down its surface and the rune bands pulse softly. It loops",
+      "frames": 3
     },
     {
       "name": "HIT",
@@ -22,7 +73,13 @@
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the bell fades from the rim upward and dissolves into rising golden motes"
+      "text": "the bell fades from the rim upward and dissolves into rising golden motes",
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left",
+        "a few last faint specks, under 20 pixels"
+      ]
     }
   ]
 }

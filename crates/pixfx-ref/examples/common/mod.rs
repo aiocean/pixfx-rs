@@ -12,6 +12,21 @@ pub fn home(spec: &Spec) -> PathBuf {
     PathBuf::from("target/ref").join(spec.slug())
 }
 
+/// The sheet a script works on and its folder: the parts sheet (`target/ref/<slug>/parts`), one moment's sheet
+/// (`target/ref/<slug>/<moment>`), or the whole spec on one sheet (`target/ref/<slug>`). A spec with layers is drawn
+/// as a parts sheet, then a sheet per moment built from it.
+pub fn sheet_of(spec: Spec, parts: bool, moment: Option<&str>) -> Result<(Spec, PathBuf), String> {
+    match (parts, moment) {
+        (true, Some(_)) => Err("give --parts-sheet or --moment, not both".into()),
+        (true, None) => Ok((spec.parts_sheet(), home(&spec).join("parts"))),
+        (false, Some(m)) => Ok((spec.moment(m)?, home(&spec).join(m.to_lowercase()))),
+        (false, None) => {
+            let dir = home(&spec);
+            Ok((spec, dir))
+        }
+    }
+}
+
 /// The id's last part, a page anchor: `shield/golden-bell` is `golden-bell`.
 pub fn key(spec: &Spec) -> String {
     spec.id.rsplit('/').next().unwrap_or(&spec.id).to_string()

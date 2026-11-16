@@ -106,7 +106,11 @@ fn median(frames: &[Vec<f64>]) -> Vec<f64> {
             col.extend(frames.iter().map(|f| f[i]));
             col.sort_by(f64::total_cmp);
             let n = col.len();
-            if n % 2 == 1 { col[n / 2] } else { (col[n / 2 - 1] + col[n / 2]) / 2.0 }
+            if n % 2 == 1 {
+                col[n / 2]
+            } else {
+                (col[n / 2 - 1] + col[n / 2]) / 2.0
+            }
         })
         .collect()
 }
@@ -118,18 +122,39 @@ pub fn register(frames: &[RgbaImage], radius: u32) -> Result<Vec<Shift>, String>
         return Ok(Vec::new());
     };
     let (w, h) = (first.w as usize, first.h as usize);
-    if let Some(f) = frames.iter().find(|f| (f.w as usize, f.h as usize) != (w, h)) {
-        return Err(format!("frames differ in size: {w}x{h} and {}x{}", f.w, f.h));
+    if let Some(f) = frames
+        .iter()
+        .find(|f| (f.w as usize, f.h as usize) != (w, h))
+    {
+        return Err(format!(
+            "frames differ in size: {w}x{h} and {}x{}",
+            f.w, f.h
+        ));
     }
     let e: Vec<Vec<f64>> = frames.iter().map(edges).collect();
     let r = radius as i32;
     // the frame's own place first, so a tie keeps it
     let mut tries = vec![(0, 0)];
-    tries.extend((-r..=r).flat_map(|dy| (-r..=r).map(move |dx| (dx, dy))).filter(|&t| t != (0, 0)));
-    let mut out: Vec<Shift> =
-        e.iter().map(|_| Shift { dx: 0, dy: 0, score: 0.0, unshifted: 0.0 }).collect();
+    tries.extend(
+        (-r..=r)
+            .flat_map(|dy| (-r..=r).map(move |dx| (dx, dy)))
+            .filter(|&t| t != (0, 0)),
+    );
+    let mut out: Vec<Shift> = e
+        .iter()
+        .map(|_| Shift {
+            dx: 0,
+            dy: 0,
+            score: 0.0,
+            unshifted: 0.0,
+        })
+        .collect();
     for _ in 0..ROUNDS {
-        let placed: Vec<Vec<f64>> = e.iter().zip(&out).map(|(f, s)| shifted(f, w, h, s.dx, s.dy)).collect();
+        let placed: Vec<Vec<f64>> = e
+            .iter()
+            .zip(&out)
+            .map(|(f, s)| shifted(f, w, h, s.dx, s.dy))
+            .collect();
         let reference = median(&placed);
         for (f, s) in e.iter().zip(out.iter_mut()) {
             let unshifted = ncc(f, &reference);
@@ -144,9 +169,19 @@ pub fn register(frames: &[RgbaImage], radius: u32) -> Result<Vec<Shift>, String>
             let inside = best.0.abs() < r && best.1.abs() < r;
             let clear = inside && best.2 >= MIN_SCORE && best.2 - unshifted > MIN_GAIN;
             *s = if clear {
-                Shift { dx: best.0, dy: best.1, score: best.2, unshifted }
+                Shift {
+                    dx: best.0,
+                    dy: best.1,
+                    score: best.2,
+                    unshifted,
+                }
             } else {
-                Shift { dx: 0, dy: 0, score: unshifted, unshifted }
+                Shift {
+                    dx: 0,
+                    dy: 0,
+                    score: unshifted,
+                    unshifted,
+                }
             };
         }
     }
@@ -158,7 +193,10 @@ pub fn apply(img: &RgbaImage, shift: Shift) -> RgbaImage {
     let mut out = RgbaImage::new(img.w, img.h);
     for y in 0..img.h {
         for x in 0..img.w {
-            let (sx, sy) = (i64::from(x) - i64::from(shift.dx), i64::from(y) - i64::from(shift.dy));
+            let (sx, sy) = (
+                i64::from(x) - i64::from(shift.dx),
+                i64::from(y) - i64::from(shift.dy),
+            );
             if sx >= 0
                 && sy >= 0
                 && let Some(p) = img.get(sx as u32, sy as u32)

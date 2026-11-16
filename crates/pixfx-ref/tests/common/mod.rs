@@ -24,8 +24,18 @@ pub fn sheet(spec: &Spec) -> Result<RgbaImage, String> {
     let s = l.scale;
     for sy in 40..56 {
         for sx in 40..70 {
-            let checker = if (sx + sy) % 2 == 0 { BLOCK } else { BLOCK_DARK };
-            let p = if sx < 56 { checker } else if sx >= 60 { GLOW } else { [0; 4] };
+            let checker = if (sx + sy) % 2 == 0 {
+                BLOCK
+            } else {
+                BLOCK_DARK
+            };
+            let p = if sx < 56 {
+                checker
+            } else if sx >= 60 {
+                GLOW
+            } else {
+                [0; 4]
+            };
             for dy in 0..s {
                 for dx in 0..s {
                     img.set(x0 + sx * s + dx, y0 + sy * s + dy, p);

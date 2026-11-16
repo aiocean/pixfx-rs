@@ -1,0 +1,117 @@
+{
+  "id": "arcane/sword-formation",
+  "name": "Sword formation",
+  "look": "Flying-sword formation strike from cultivation fantasy. Eight slim spirit swords, pale steel blades edged in cyan light with small gold guards, gather one by one behind the caster (the left figure), fan out into a ring behind the caster's back, points outward, then dive one after another at the enemy (the right figure), each trailing a thin cyan streak.",
+  "subject": "swords",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 6,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the ring of exactly eight swords alone as it is held behind the caster, points outward, evenly spaced, with no trails, no glow and no specks",
+      "pivot": "the centre of the ring"
+    },
+    {
+      "name": "SWORD",
+      "text": "one spirit sword alone, upright, blade, guard and hilt clear",
+      "pivot": "its hilt",
+      "forms": [
+        "pointing up, still",
+        "pointing up and to the right, diagonal, a sword of the ring",
+        "pointing right, flat",
+        "pointing down and to the right, steep, as it dives",
+        "flying fast as a short bright streak, the blade barely seen",
+        "tumbling as it scatters, seen edge-on, dim"
+      ]
+    },
+    {
+      "name": "TRAIL",
+      "text": "one diving sword's thin cyan light trail alone, fading toward its tail"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: the flash where a sword strikes, cyan sparks, metal glints, a gathering speck of light"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the ring of swords, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes: the swords, opaque, with no glow, no trails, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: trails, sparks, flashes, glints and specks, with no sword and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the swords and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
+  "rows": [
+    {
+      "name": "GATHER",
+      "caption": "swords gather",
+      "text": "eight swords appear one after another behind the caster's back, each from a speck of light, and stack upright behind the caster",
+      "frames": 5,
+      "notes": [
+        "only a speck of light behind the caster and the first sword forming",
+        "two or three swords behind the caster, upright",
+        "five swords",
+        "seven swords",
+        "all eight swords upright behind the caster, side by side"
+      ]
+    },
+    {
+      "name": "RING",
+      "caption": "ring holds",
+      "text": "the eight swords fan out together into the ring behind the caster's back, exactly as MAIN, and hold it, the points glinting; it loops",
+      "frames": 4,
+      "notes": [
+        "the eight upright swords starting to fan out together",
+        "the ring exactly as MAIN on the parts sheet",
+        "the ring held, glints on a few points",
+        "the ring held, the same as the second frame"
+      ]
+    },
+    {
+      "name": "DIVE",
+      "caption": "swords dive",
+      "text": "the swords leave the ring one after another and dive at the enemy along a curve, each trailing a cyan streak, and strike it with a flash",
+      "frames": 6,
+      "notes": [
+        "the first sword turning toward the enemy, seven still in the ring",
+        "the first sword in flight, a second turning",
+        "the first sword striking the enemy with a flash, more in flight",
+        "half the ring empty, swords in flight and striking",
+        "the last sword in flight, flashes at the enemy",
+        "the ring empty, swords in the enemy, flashes fading"
+      ]
+    },
+    {
+      "name": "SCATTER",
+      "caption": "swords scatter",
+      "text": "the swords that struck spring back off the enemy, tumble, and fade into cyan specks",
+      "frames": 4,
+      "notes": [
+        "",
+        "",
+        "only dim tumbling swords and specks",
+        "a few last faint specks, under 20 pixels"
+      ]
+    }
+  ],
+  "rules": [
+    "There are always exactly eight swords; never more, never fewer.",
+    "The left figure is the caster and the right figure is the enemy: the swords gather behind the caster and strike the enemy. Draw neither figure.",
+    "Keep the colours of the second image's palette: no outline in black, no gradients wider than a few pixels."
+  ],
+  "figure": "28,48 32,48\n32,48 32,54\n32,54 28,54\n28,54 28,48\n30,54 30,72\n30,58 24,68\n30,58 36,68\n30,72 26,88\n30,72 34,88\n76,48 80,48\n80,48 80,54\n80,54 76,54\n76,54 76,48\n78,54 78,72\n78,58 72,68\n78,58 84,68\n78,72 74,88\n78,72 82,88\n"
+}

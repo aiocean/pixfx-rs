@@ -86,11 +86,21 @@ struct Lines<'a> {
 impl<'a> Lines<'a> {
     fn new(v: &'a [f64], w: usize, h: usize, across: bool) -> Self {
         let (lines, len) = if across { (h, w) } else { (w, h) };
-        Lines { v, w, across, lines, len }
+        Lines {
+            v,
+            w,
+            across,
+            lines,
+            len,
+        }
     }
 
     fn at(&self, line: usize, i: usize) -> f64 {
-        if self.across { self.v[line * self.w + i] } else { self.v[i * self.w + line] }
+        if self.across {
+            self.v[line * self.w + i]
+        } else {
+            self.v[i * self.w + line]
+        }
     }
 
     /// The step between value `i - 1` and `i` of a line, for `i` in `1..len`.
@@ -116,12 +126,21 @@ impl<'a> Lines<'a> {
             let mut last: Option<f64> = None;
             // a step at position i (between i - 1 and i) is an edge when it peaks over its neighbours
             for i in 2..self.len.saturating_sub(1) {
-                let (a, b, c) = (self.step(line, i - 1), self.step(line, i), self.step(line, i + 1));
+                let (a, b, c) = (
+                    self.step(line, i - 1),
+                    self.step(line, i),
+                    self.step(line, i + 1),
+                );
                 if b <= STEP || b < a || b <= c {
                     continue;
                 }
                 let den = a - 2.0 * b + c;
-                let at = i as f64 + if den == 0.0 { 0.0 } else { (a - c) / (2.0 * den) };
+                let at = i as f64
+                    + if den == 0.0 {
+                        0.0
+                    } else {
+                        (a - c) / (2.0 * den)
+                    };
                 if let Some(prev) = last {
                     let g = at - prev;
                     if g < LONGEST_GAP {
@@ -144,7 +163,10 @@ fn pitch_of(gaps: &[f64]) -> Option<(f64, f64)> {
     let score: Vec<(f64, f64)> = (0..=steps)
         .map(|k| {
             let p = PITCH_LO + k as f64 * PITCH_STEP;
-            let s: f64 = gaps.iter().map(|g| libm::cos(2.0 * core::f64::consts::PI * g / p)).sum();
+            let s: f64 = gaps
+                .iter()
+                .map(|g| libm::cos(2.0 * core::f64::consts::PI * g / p))
+                .sum();
             (p, s / n)
         })
         .collect();
@@ -191,7 +213,11 @@ fn cuts(profile: &[f64], n: usize, p: f64) -> Option<(Vec<u32>, f64)> {
         return None;
     }
     let inner = &profile[1..len];
-    let mean = if inner.is_empty() { 0.0 } else { inner.iter().sum::<f64>() / inner.len() as f64 };
+    let mean = if inner.is_empty() {
+        0.0
+    } else {
+        inner.iter().sum::<f64>() / inner.len() as f64
+    };
     let mut sorted = inner.to_vec();
     sorted.sort_by(f64::total_cmp);
     let floor = sorted.get(sorted.len() / 2).copied().unwrap_or(0.0);
@@ -200,7 +226,11 @@ fn cuts(profile: &[f64], n: usize, p: f64) -> Option<(Vec<u32>, f64)> {
     let edge_lo = (libm::ceil(p * 0.5) as usize).max(1);
     let cost = |w: usize, edge: bool| {
         let dev = (w as f64 - p) / p;
-        if edge && dev <= 0.0 { 0.0 } else { SMOOTH * mean * dev * dev }
+        if edge && dev <= 0.0 {
+            0.0
+        } else {
+            SMOOTH * mean * dev * dev
+        }
     };
     let stride = len + 1;
     let mut best = vec![f64::NEG_INFINITY; (n + 1) * stride];
@@ -259,7 +289,13 @@ fn axis_cuts(profiles: &[Vec<f64>], p: f64) -> (usize, Vec<Vec<u32>>) {
     match chosen {
         Some((_, n, c)) => (n, c),
         // no count fits the width bounds: even cells
-        None => (r, profiles.iter().map(|_| (0..=r).map(|k| ((k * len) / r) as u32).collect()).collect()),
+        None => (
+            r,
+            profiles
+                .iter()
+                .map(|_| (0..=r).map(|k| ((k * len) / r) as u32).collect())
+                .collect(),
+        ),
     }
 }
 
@@ -282,7 +318,11 @@ fn strength(profile: &[f64], cuts: &[u32]) -> f64 {
         }
     }
     let (on, off) = (on / on_n.max(1) as f64, off / off_n.max(1) as f64);
-    if on + off == 0.0 { 0.0 } else { (on - off) / (on + off) }
+    if on + off == 0.0 {
+        0.0
+    } else {
+        (on - off) / (on + off)
+    }
 }
 
 /// The shared pixel grid of `frames`, cells of one sheet, all the same size. Fails when they differ in size, or
@@ -293,8 +333,14 @@ pub fn recover_frames(frames: &[RgbaImage]) -> Result<SheetGrid, String> {
         return Err("no frames".to_string());
     };
     let (w, h) = (first.w as usize, first.h as usize);
-    if let Some(f) = frames.iter().find(|f| (f.w as usize, f.h as usize) != (w, h)) {
-        return Err(format!("frames differ in size: {w}x{h} and {}x{}", f.w, f.h));
+    if let Some(f) = frames
+        .iter()
+        .find(|f| (f.w as usize, f.h as usize) != (w, h))
+    {
+        return Err(format!(
+            "frames differ in size: {w}x{h} and {}x{}",
+            f.w, f.h
+        ));
     }
     let lum: Vec<Vec<f64>> = frames.iter().map(brightness).collect();
     let (mut gx, mut gy) = (Vec::new(), Vec::new());
@@ -308,8 +354,14 @@ pub fn recover_frames(frames: &[RgbaImage]) -> Result<SheetGrid, String> {
         (None, Some(y)) => ((y.0, 0.0), y),
         (None, None) => return Err("no edges show a pixel grid".to_string()),
     };
-    let ex: Vec<Vec<f64>> = lum.iter().map(|v| Lines::new(v, w, h, true).profile()).collect();
-    let ey: Vec<Vec<f64>> = lum.iter().map(|v| Lines::new(v, w, h, false).profile()).collect();
+    let ex: Vec<Vec<f64>> = lum
+        .iter()
+        .map(|v| Lines::new(v, w, h, true).profile())
+        .collect();
+    let ey: Vec<Vec<f64>> = lum
+        .iter()
+        .map(|v| Lines::new(v, w, h, false).profile())
+        .collect();
     let (nx, cols) = axis_cuts(&ex, px);
     let (ny, rows) = axis_cuts(&ey, py);
     let grids = cols
@@ -321,12 +373,23 @@ pub fn recover_frames(frames: &[RgbaImage]) -> Result<SheetGrid, String> {
             grid: Grid { cols, rows },
         })
         .collect();
-    Ok(SheetGrid { pitch: (px, py), fit: (fx, fy), size: (nx as u32, ny as u32), frames: grids })
+    Ok(SheetGrid {
+        pitch: (px, py),
+        fit: (fx, fy),
+        size: (nx as u32, ny as u32),
+        frames: grids,
+    })
 }
 
 /// `img` blown up `scale` times inside `[x0, y0, x1, y1]` (source pixels), with `grid`'s cuts drawn in `colour` on
 /// the left (top) edge of each cell, for checking cuts by eye.
-pub fn grid_view(img: &RgbaImage, grid: &Grid, [x0, y0, x1, y1]: [u32; 4], scale: u32, colour: [u8; 4]) -> RgbaImage {
+pub fn grid_view(
+    img: &RgbaImage,
+    grid: &Grid,
+    [x0, y0, x1, y1]: [u32; 4],
+    scale: u32,
+    colour: [u8; 4],
+) -> RgbaImage {
     let (x1, y1) = (x1.min(img.w), y1.min(img.h));
     let (w, h) = (x1.saturating_sub(x0), y1.saturating_sub(y0));
     let s = scale.max(1);
@@ -371,7 +434,9 @@ pub fn busiest(img: &RgbaImage, side: u32) -> [u32; 4] {
     let mut best = (f64::NEG_INFINITY, 0usize, 0usize);
     for y0 in (0..=h - s).step_by(step) {
         for x0 in (0..=w - s).step_by(step) {
-            let e: f64 = (y0..y0 + s).map(|y| energy[y * w + x0..y * w + x0 + s].iter().sum::<f64>()).sum();
+            let e: f64 = (y0..y0 + s)
+                .map(|y| energy[y * w + x0..y * w + x0 + s].iter().sum::<f64>())
+                .sum();
             if e > best.0 {
                 best = (e, x0, y0);
             }

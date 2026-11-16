@@ -496,14 +496,14 @@ pub fn between(a: &[Px], b: &[Px], m: &Motion, t: f64) -> Vec<Px> {
         .collect()
 }
 
-/// `n` in-betweens between each two frames next to each other in a row of the matrix (none across rows), named by
-/// [`name`], in order.
+/// `n` in-betweens between each two frames next to each other in a row of the matrix (none across rows, none
+/// between parts), named by [`name`], in order.
 pub fn tweens(m: &Matrix, n: usize) -> Vec<Frame> {
     let (w, h) = (m.w as usize, m.h as usize);
     let mut out = Vec::new();
     for pair in m.frames.windows(2) {
         let [a, b] = pair else { continue };
-        if row(&a.name) != row(&b.name) || n == 0 {
+        if row(&a.name) != row(&b.name) || n == 0 || crate::spec::is_part(&a.name) {
             continue;
         }
         let mo = motion(w, h, &a.px, &b.px);
@@ -512,6 +512,7 @@ pub fn tweens(m: &Matrix, n: usize) -> Vec<Frame> {
             out.push(Frame {
                 name: name(&a.name, &b.name, k),
                 px: between(&a.px, &b.px, &mo, t),
+                pivots: Vec::new(),
             });
         }
     }

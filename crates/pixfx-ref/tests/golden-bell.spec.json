@@ -1,0 +1,28 @@
+{
+  "id": "shield/golden-bell",
+  "name": "Golden Bell",
+  "look": "Golden Bell, a protective barrier from cultivation fantasy. A translucent golden-bronze temple bell made of qi covers the character from head to ground, with engraved rune bands round its waist and rim and a warm glow.",
+  "subject": "bell",
+  "rows": [
+    {
+      "name": "INIT",
+      "caption": "shield forms",
+      "text": "the bell descends from above and settles over the character, landing with a small ring of dust at its rim"
+    },
+    {
+      "name": "IDLE",
+      "caption": "shield holds",
+      "text": "the bell holds steady; light shimmers down its surface and the rune bands pulse softly. It loops"
+    },
+    {
+      "name": "HIT",
+      "caption": "blow lands from the right",
+      "text": "a blow strikes the bell's right side. The bell rings: a bright flash at the impact point, a ripple running round the bell, and a ring of light bursting outward, then settling"
+    },
+    {
+      "name": "BREAK",
+      "caption": "shield ends",
+      "text": "the bell fades from the rim upward and dissolves into rising golden motes"
+    }
+  ]
+}

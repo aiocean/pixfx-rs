@@ -30,9 +30,15 @@ const JOIN: f64 = 0.03;
 pub enum Px {
     Empty,
     /// Drawn opaque: its colour as drawn, and its colour palette entry.
-    Colour { rgb: [u8; 3], ink: u8 },
+    Colour {
+        rgb: [u8; 3],
+        ink: u8,
+    },
     /// See-through glow: what it adds over black, and its light palette entry.
-    Light { rgb: [u8; 3], ink: u8 },
+    Light {
+        rgb: [u8; 3],
+        ink: u8,
+    },
 }
 
 /// One frame's pixels, row by row.
@@ -40,6 +46,8 @@ pub enum Px {
 pub struct Frame {
     pub name: String,
     pub px: Vec<Px>,
+    /// A part's pivots, in pixels from the corner ([`crate::extract::Cell::pivots`]).
+    pub pivots: Vec<(f64, f64)>,
 }
 
 /// Every frame of a sheet as a pixel matrix, `w` by `h`, with the shared palettes and how far they miss the exact
@@ -57,7 +65,10 @@ pub struct Matrix {
 
 /// The pixels of one kind from every frame, stacked top to bottom into one picture: `pick` gives a pixel's value, or
 /// `None` where it is not of that kind.
-fn stack(ex: &Extracted, pick: impl Fn(&crate::extract::Cell, u32, u32) -> Option<[u8; 3]>) -> RgbaImage {
+fn stack(
+    ex: &Extracted,
+    pick: impl Fn(&crate::extract::Cell, u32, u32) -> Option<[u8; 3]>,
+) -> RgbaImage {
     let (w, h) = ex.size;
     let mut out = RgbaImage::new(w, h * ex.cells.len() as u32);
     for (i, c) in ex.cells.iter().enumerate() {
@@ -85,10 +96,13 @@ fn palette(stacked: &RgbaImage, n: usize) -> (Vec<[u8; 3]>, Vec<Option<u8>>) {
             if a == 0 {
                 return None;
             }
-            let at = entries.iter().position(|e| *e == [r, g, b]).unwrap_or_else(|| {
-                entries.push([r, g, b]);
-                entries.len() - 1
-            });
+            let at = entries
+                .iter()
+                .position(|e| *e == [r, g, b])
+                .unwrap_or_else(|| {
+                    entries.push([r, g, b]);
+                    entries.len() - 1
+                });
             Some(at as u8)
         })
         .collect();
@@ -110,9 +124,17 @@ fn miss(values: &RgbaImage, index: &[Option<u8>], entries: &[[u8; 3]]) -> f64 {
 /// The frames of `ex` as pixel matrices with shared palettes of at most [`COLOURS`] and [`LIGHTS`] entries.
 pub fn matrix(ex: &Extracted) -> Matrix {
     let (w, h) = ex.size;
-    let colour = stack(ex, |c, x, y| c.colour.get(x, y).filter(|p| p[3] > 0).map(|p| [p[0], p[1], p[2]]));
+    let colour = stack(ex, |c, x, y| {
+        c.colour
+            .get(x, y)
+            .filter(|p| p[3] > 0)
+            .map(|p| [p[0], p[1], p[2]])
+    });
     let light = stack(ex, |c, x, y| {
-        c.light.get(x, y).filter(|p| p[0] > 0 || p[1] > 0 || p[2] > 0).map(|p| [p[0], p[1], p[2]])
+        c.light
+            .get(x, y)
+            .filter(|p| p[0] > 0 || p[1] > 0 || p[2] > 0)
+            .map(|p| [p[0], p[1], p[2]])
     });
     let (colours, ci) = palette(&colour, COLOURS);
     let (lights, li) = palette(&light, LIGHTS);
@@ -126,17 +148,29 @@ pub fn matrix(ex: &Extracted) -> Matrix {
                 .map(|i| {
                     let at = f * per + i;
                     let value = |img: &RgbaImage| {
-                        let [r, g, b, _] = img.get((i % w as usize) as u32, (i / w as usize) as u32).unwrap_or([0; 4]);
+                        let [r, g, b, _] = img
+                            .get((i % w as usize) as u32, (i / w as usize) as u32)
+                            .unwrap_or([0; 4]);
                         [r, g, b]
                     };
                     match (ci[at], li[at]) {
-                        (Some(ink), _) => Px::Colour { rgb: value(&c.colour), ink },
-                        (None, Some(ink)) => Px::Light { rgb: value(&c.light), ink },
+                        (Some(ink), _) => Px::Colour {
+                            rgb: value(&c.colour),
+                            ink,
+                        },
+                        (None, Some(ink)) => Px::Light {
+                            rgb: value(&c.light),
+                            ink,
+                        },
                         (None, None) => Px::Empty,
                     }
                 })
                 .collect();
-            Frame { name: c.name.clone(), px }
+            Frame {
+                name: c.name.clone(),
+                px,
+                pivots: c.pivots.clone(),
+            }
         })
         .collect();
     Matrix {
@@ -160,7 +194,11 @@ pub fn paletted(m: &Matrix, frame: &Frame) -> RgbaImage {
             Px::Colour { ink, .. } => m.colours.get(usize::from(ink)).copied().unwrap_or([0; 3]),
             Px::Light { ink, .. } => m.lights.get(usize::from(ink)).copied().unwrap_or([0; 3]),
         };
-        out.set(i as u32 % m.w, i as u32 / m.w, [rgb[0], rgb[1], rgb[2], 255]);
+        out.set(
+            i as u32 % m.w,
+            i as u32 / m.w,
+            [rgb[0], rgb[1], rgb[2], 255],
+        );
     }
     out
 }
@@ -217,6 +255,7 @@ pub fn to_json(m: &Matrix) -> Value {
             };
             json!({
                 "name": f.name,
+                "pivots": f.pivots.iter().map(|p| [p.0, p.1]).collect::<Vec<_>>(),
                 "colour": rows(m, f, true),
                 "light": rows(m, f, false),
                 "exact": {"colour": exact(true), "light": exact(false)},

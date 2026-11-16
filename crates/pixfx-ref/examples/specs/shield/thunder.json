@@ -3,16 +3,72 @@
   "name": "Thunder",
   "look": "Thunder shield from cultivation fantasy. A sphere of crackling purple-white lightning surrounds the character, jagged arcs crawling over its surface.",
   "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the lightning sphere alone, its surface and arcs, no glow",
+      "pivot": "its centre",
+      "forms": [
+        "whole",
+        "collapsed to half its size, bright"
+      ]
+    },
+    {
+      "name": "ARC",
+      "text": "one jagged lightning arc alone, branching",
+      "forms": [
+        "short and jagged",
+        "long and branching",
+        "a thick bolt",
+        "thin and fading"
+      ]
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: electric sparks, a flash star, a small forked bolt"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the sphere and its arcs, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "sparks gather round the character and snap together into the crackling sphere"
+      "text": "sparks gather round the character and snap together into the crackling sphere",
+      "notes": [
+        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
+        "",
+        "",
+        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+      ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "arcs crawl and flicker over the sphere's surface in different places each frame; it loops"
+      "text": "arcs crawl and flicker over the sphere's surface in different places each frame; it loops",
+      "frames": 3
     },
     {
       "name": "HIT",
@@ -22,7 +78,13 @@
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the sphere collapses inward into a last bright flash and a few fading sparks"
+      "text": "the sphere collapses inward into a last bright flash and a few fading sparks",
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left",
+        "a few last faint specks, under 20 pixels"
+      ]
     }
   ]
 }

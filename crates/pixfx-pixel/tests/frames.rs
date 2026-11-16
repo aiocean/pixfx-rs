@@ -72,14 +72,25 @@ fn frames_share_one_grid_at_the_picture_size() -> Result<(), String> {
     let frames: Vec<RgbaImage> = sources.iter().map(|p| upscale(p, kx, ky)).collect();
     let g = recover_frames(&frames)?;
     assert_eq!(g.size, (W, H), "pitch {:?}", g.pitch);
-    assert!((g.pitch.0 - kx).abs() < 0.05 && (g.pitch.1 - ky).abs() < 0.05, "pitch {:?}", g.pitch);
+    assert!(
+        (g.pitch.0 - kx).abs() < 0.05 && (g.pitch.1 - ky).abs() < 0.05,
+        "pitch {:?}",
+        g.pitch
+    );
     for (i, (f, src)) in g.frames.iter().zip(&sources).enumerate() {
         assert_eq!(f.grid.cols.len() as u32, W + 1, "frame {i}");
         assert_eq!(f.grid.rows.len() as u32, H + 1, "frame {i}");
         let (back, _) = collapse(&frames[i], &f.grid);
         let wrong = differ(&back, src);
-        assert!(wrong * 100 <= (W * H) as usize, "frame {i}: {wrong} pixels wrong");
-        assert!(f.strength.0 > 0.5 && f.strength.1 > 0.5, "frame {i}: strength {:?}", f.strength);
+        assert!(
+            wrong * 100 <= (W * H) as usize,
+            "frame {i}: {wrong} pixels wrong"
+        );
+        assert!(
+            f.strength.0 > 0.5 && f.strength.1 > 0.5,
+            "frame {i}: strength {:?}",
+            f.strength
+        );
     }
     Ok(())
 }
@@ -95,8 +106,17 @@ fn noise_shows_no_grid() -> Result<(), String> {
     }
     let g = recover_frames(&[dense, noise])?;
     let (good, bad) = (&g.frames[0], &g.frames[1]);
-    assert!(bad.strength.0 < 0.2 && bad.strength.1 < 0.2, "noise strength {:?}", bad.strength);
-    assert!(good.strength.0 > bad.strength.0 + 0.3, "{:?} vs {:?}", good.strength, bad.strength);
+    assert!(
+        bad.strength.0 < 0.2 && bad.strength.1 < 0.2,
+        "noise strength {:?}",
+        bad.strength
+    );
+    assert!(
+        good.strength.0 > bad.strength.0 + 0.3,
+        "{:?} vs {:?}",
+        good.strength,
+        bad.strength
+    );
     Ok(())
 }
 
@@ -115,7 +135,12 @@ fn grid_view_draws_the_cuts() -> Result<(), String> {
     let v = grid_view(&img, &g.frames[0].grid, [0, 0, 30, 30], 4, line);
     assert_eq!((v.w, v.h), (120, 120));
     // a cut at a multiple of 3 shows as a line down the view
-    let col = g.frames[0].grid.cols.iter().copied().find(|&c| c > 0 && c < 30);
+    let col = g.frames[0]
+        .grid
+        .cols
+        .iter()
+        .copied()
+        .find(|&c| c > 0 && c < 30);
     let c = col.ok_or("no cut inside the view")?;
     assert!((0..120).all(|y| v.get(c * 4, y) == Some(line)));
     Ok(())
@@ -137,8 +162,10 @@ fn a_cell_cut_mid_pixel_keeps_the_count() -> Result<(), String> {
     // the first model pixel is cut short; whether a sliver of it counts is a matter of a pixel in the empty border,
     // so the count is right within one
     for (dx, dy) in [(1, 1), (2, 0), (0, 2)] {
-        let frames: Vec<RgbaImage> =
-            [picture(1, 90), picture(2, 90)].iter().map(|p| shifted(&upscale(p, 2.7, 2.45), dx, dy)).collect();
+        let frames: Vec<RgbaImage> = [picture(1, 90), picture(2, 90)]
+            .iter()
+            .map(|p| shifted(&upscale(p, 2.7, 2.45), dx, dy))
+            .collect();
         let g = recover_frames(&frames)?;
         assert!(
             g.size.0.abs_diff(W) <= 1 && g.size.1.abs_diff(H) <= 1,
@@ -161,5 +188,8 @@ fn busiest_finds_the_drawn_part() {
     }
     let [x0, y0, x1, y1] = pixfx_pixel::frames::busiest(&img, 32);
     assert_eq!((x1 - x0, y1 - y0), (32, 32));
-    assert!(x0 >= 72 && y0 >= 72, "the square lands on the checker: {x0},{y0}");
+    assert!(
+        x0 >= 72 && y0 >= 72,
+        "the square lands on the checker: {x0},{y0}"
+    );
 }

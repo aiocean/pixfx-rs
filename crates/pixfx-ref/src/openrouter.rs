@@ -174,14 +174,16 @@ fn sniff(bytes: &[u8]) -> Option<&'static str> {
 /// The answer to a request from its HTTP status and body. A status outside 200..300 fails with the API's own
 /// message; so does an answer with no image or an image in a format other than png, jpeg or webp.
 pub fn parse_answer(status: u16, text: &str) -> Result<Answer, String> {
-    let json: Value = serde_json::from_str(text).map_err(|_| format!("OpenRouter {status}: non-JSON response"))?;
+    let json: Value = serde_json::from_str(text)
+        .map_err(|_| format!("OpenRouter {status}: non-JSON response"))?;
     if !(200..300).contains(&status) {
         let msg = serde_json::from_value::<ErrorBody>(json)
             .map(|e| e.error.message)
             .unwrap_or_else(|_| "no error message".into());
         return Err(format!("OpenRouter {status}: {msg}"));
     }
-    let r: Response = serde_json::from_value(json).map_err(|e| format!("OpenRouter answer: {e}"))?;
+    let r: Response =
+        serde_json::from_value(json).map_err(|e| format!("OpenRouter answer: {e}"))?;
     if r.data.is_empty() {
         return Err("OpenRouter answer: no image".into());
     }
@@ -195,9 +197,17 @@ pub fn parse_answer(status: u16, text: &str) -> Result<Answer, String> {
                 .clone()
                 .or_else(|| sniff(&bytes).map(String::from))
                 .ok_or("unrecognized image format (media_type absent)")?;
-            let ext = extension(&media).ok_or_else(|| format!("unrecognized image format ({media})"))?;
-            Ok(Image { bytes, media_type: media, extension: ext })
+            let ext =
+                extension(&media).ok_or_else(|| format!("unrecognized image format ({media})"))?;
+            Ok(Image {
+                bytes,
+                media_type: media,
+                extension: ext,
+            })
         })
         .collect::<Result<Vec<_>, String>>()?;
-    Ok(Answer { images, cost_usd: r.usage.and_then(|u| u.cost) })
+    Ok(Answer {
+        images,
+        cost_usd: r.usage.and_then(|u| u.cost),
+    })
 }

@@ -134,7 +134,7 @@ size(); draw(); requestAnimationFrame(tick);
 /// The rows of an extraction for the player, in order: `[{"row": "init", "cells": ["init-1", ...]}, ...]`.
 fn player_rows(ex: &Extracted) -> Value {
     let mut rows: Vec<(String, Vec<String>)> = Vec::new();
-    for c in &ex.cells {
+    for c in ex.cells.iter().filter(|c| !crate::spec::is_part(&c.name)) {
         let row = tween::row(&c.name).to_string();
         match rows.last_mut() {
             Some((r, cells)) if *r == row => cells.push(c.name.clone()),
@@ -391,7 +391,7 @@ pub fn report(ex: &Extracted) -> Value {
     json!({
         "grid": {"found": ex.found, "size": [ex.size.0, ex.size.1], "pitch": [ex.pitch.0, ex.pitch.1], "fit": [ex.fit.0, ex.fit.1]},
         "cells": ex.cells.iter().map(|c| json!({
-            "cell": c.name, "rect": c.rect, "pitch": [c.pitch.0, c.pitch.1], "strength": [c.strength.0, c.strength.1], "shift": [c.shift.0, c.shift.1],
+            "cell": c.name, "rect": c.rect, "pitch": [c.pitch.0, c.pitch.1], "strength": [c.strength.0, c.strength.1], "shift": [c.shift.0, c.shift.1], "pivots": c.pivots.iter().map(|p| [p.0, p.1]).collect::<Vec<_>>(),
             "cuts": {"cols": c.grid.cols, "rows": c.grid.rows},
             "solid": c.solid, "light": c.lit, "mean_err": c.mean_err,
         })).collect::<Vec<_>>(),

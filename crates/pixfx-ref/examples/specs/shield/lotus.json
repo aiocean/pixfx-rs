@@ -2,27 +2,89 @@
   "id": "shield/lotus",
   "name": "Lotus",
   "look": "Lotus throne barrier from cultivation fantasy. Large translucent pink-white lotus petals of light rise round the character and close into a tall bud, a soft glow inside.",
-  "subject": "shield",
+  "subject": "bud",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 5,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the closed bud alone, every petal in place, with no glow, no specks and no pad",
+      "pivot": "the centre of its base"
+    },
+    {
+      "name": "PETAL",
+      "text": "one single petal alone, upright, its outline and shading clear",
+      "pivot": "its base",
+      "forms": [
+        "upright and closed, tall and narrow, the middle petal of the bud",
+        "leaning out to the left with its tip curled in to the right, an outer petal of the closed bud",
+        "broad and cupped, its tip curling in toward the middle, a front petal of the closed bud",
+        "wide open, leaning far out to the left and flattened, a petal of the opened flower",
+        "tumbling as it drifts away, seen edge-on, thin and bent",
+        "turned over, seen from behind, a little paler"
+      ]
+    },
+    {
+      "name": "PAD",
+      "text": "the lotus pad alone, flat, as it lies under the character's feet",
+      "pivot": "its centre"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: a puff of glowing pollen, rising specks of light, a sparkle"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the closed bud, the soft light inside and around it, with no petals drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes: the petals and the pad, opaque, with no glow, no specks and no pollen"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: specks, pollen, sparkles and flecks, with no petals, no pad and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light inside and around the petals and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "petals rise from a lotus pad under the character's feet and fold up into the closed bud"
-    },
-    {
-      "name": "IDLE",
-      "caption": "shield holds",
-      "text": "the bud holds, its petals breathing slightly and specks of light rising inside; it loops"
+      "text": "petals rise from a lotus pad under the character's feet and fold up into the closed bud",
+      "notes": [
+        "only the pad and a few faint specks",
+        "",
+        "",
+        "",
+        "the closed bud exactly as MAIN on the parts sheet, as wide and as tall as in every other moment"
+      ]
     },
     {
       "name": "HIT",
-      "caption": "blow lands from the right",
+      "caption": "blow from the right",
       "text": "a blow strikes from the right; the petals on that side shiver and flash, a puff of glowing pollen bursts out to the right"
     },
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the bud opens wide and its petals detach and drift away, fading"
+      "text": "the bud opens wide and its petals detach and drift away, fading",
+      "notes": [
+        "",
+        "",
+        "",
+        "",
+        "only a few faint specks left"
+      ]
     }
   ]
 }

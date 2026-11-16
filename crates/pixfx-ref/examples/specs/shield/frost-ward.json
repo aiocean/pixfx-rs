@@ -3,16 +3,78 @@
   "name": "Frost ward",
   "look": "Frost ward, an ice barrier from cultivation fantasy. A faceted shell of pale blue ice crystals encloses the character in a tall dome, sharp facets catching cold light, frost mist at its foot.",
   "subject": "shield",
+  "grid": true,
+  "cell": 64,
+  "scale": 6,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    {
+      "name": "MAIN",
+      "text": "the faceted ice dome alone, every facet in place, no mist and no glow",
+      "pivot": "the centre of its base",
+      "forms": [
+        "whole",
+        "cracked across its right side"
+      ]
+    },
+    {
+      "name": "SHARD",
+      "text": "one ice crystal shard alone, upright, its facets and highlight clear",
+      "pivot": "its base",
+      "forms": [
+        "a small crystal just growing from the ground",
+        "full size, upright",
+        "cracked through",
+        "broken off and falling, tilted",
+        "lying flat on the ground"
+      ]
+    },
+    {
+      "name": "MIST",
+      "text": "the frost mist that lies at the dome's foot, alone"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects alone, spread out so none overlap: ice sparkles, small ice chips, a frost crack"
+    },
+    {
+      "name": "LIGHT",
+      "text": "only the glow of the ice, the light it gives off, with no solid shape drawn"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOLID",
+      "text": "the solid shapes, opaque, with no glow, no sparks and no specks"
+    },
+    {
+      "name": "FX",
+      "text": "the small effects: sparks, specks, chips, flecks and puffs, with no solid shape and no glow"
+    },
+    {
+      "name": "LIGHT",
+      "text": "the glow: the soft light round the shapes and the effects, with no solid shape drawn",
+      "light": true
+    }
+  ],
   "rows": [
     {
       "name": "INIT",
       "caption": "shield forms",
-      "text": "ice crystals grow up from the ground and close over the character into the shell"
+      "text": "ice crystals grow up from the ground and close over the character into the shell",
+      "notes": [
+        "only a few faint specks of light, under 20 pixels: the shape is not visible yet",
+        "",
+        "",
+        "the whole effect fully formed, exactly as MAIN on the parts sheet, as big as in every other moment"
+      ]
     },
     {
       "name": "IDLE",
       "caption": "shield holds",
-      "text": "the shell holds; cold light glints across the facets and a little frost mist drifts at its foot; it loops"
+      "text": "the shell holds; cold light glints across the facets and a little frost mist drifts at its foot; it loops",
+      "frames": 3
     },
     {
       "name": "HIT",
@@ -22,7 +84,13 @@
     {
       "name": "BREAK",
       "caption": "shield ends",
-      "text": "the cracked shell shatters into ice shards that fall and scatter on the ground"
+      "text": "the cracked shell shatters into ice shards that fall and scatter on the ground",
+      "notes": [
+        "",
+        "",
+        "only scattered fragments left",
+        "a few last faint specks, under 20 pixels"
+      ]
     }
   ]
 }
