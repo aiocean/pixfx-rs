@@ -157,8 +157,11 @@ pub struct LimbPoints {
     pub root: Point,
     /// Elbow or knee.
     pub mid: Point,
-    /// Hand or foot.
+    /// Hand or foot: the wrist, or the sole under the ankle.
     pub end: Point,
+    /// Fingertips or toes.
+    #[serde(default)]
+    pub tip: Point,
 }
 
 impl LimbPoints {
@@ -167,6 +170,7 @@ impl LimbPoints {
             root: self.root.shifted(dx, dy),
             mid: self.mid.shifted(dx, dy),
             end: self.end.shifted(dx, dy),
+            tip: self.tip.shifted(dx, dy),
         }
     }
 }
@@ -213,6 +217,10 @@ pub enum Bone {
     RightShin,
     LeftThigh,
     LeftShin,
+    RightHand,
+    LeftHand,
+    RightFoot,
+    LeftFoot,
     Sword,
 }
 
@@ -238,6 +246,10 @@ impl Skeleton {
             (Bone::RightShin, s.right_leg.mid, s.right_leg.end),
             (Bone::LeftThigh, s.left_leg.root, s.left_leg.mid),
             (Bone::LeftShin, s.left_leg.mid, s.left_leg.end),
+            (Bone::RightHand, s.right_arm.end, s.right_arm.tip),
+            (Bone::LeftHand, s.left_arm.end, s.left_arm.tip),
+            (Bone::RightFoot, s.right_leg.end, s.right_leg.tip),
+            (Bone::LeftFoot, s.left_leg.end, s.left_leg.tip),
         ];
         // The neck line stops at the bottom of the head circle.
         if let Some(first) = out.first_mut() {
@@ -353,7 +365,7 @@ pub fn skeleton_seen(body: &Body, pose: &Pose, camera: Camera) -> Skeleton {
         r: view(V3(-sy, 0.0, cy)),
     };
     let up = world.u;
-    let pelvis_frame = world.pitched(-fin(pose.lie));
+    let pelvis_frame = world.pitched(-fin(pose.lie)).rolled(fin(pose.roll));
     let torso = pelvis_frame
         .pitched(fin(pose.lean))
         .rolled(fin(pose.tilt))
@@ -375,7 +387,13 @@ pub fn skeleton_seen(body: &Body, pose: &Pose, camera: Camera) -> Skeleton {
         };
         let (d, e) = limb_dirs(torso, k, l, 1.0);
         let mid = root.add(d.mul(body.upper_arm));
-        (root, mid, mid.add(e.mul(body.forearm)), e)
+        let end = mid.add(e.mul(body.forearm));
+        let wrist = match side {
+            Side::Right => pose.right_hand,
+            Side::Left => pose.left_hand,
+        };
+        let tip = end.add(bend(torso, e, fin(wrist)).mul(body.hand));
+        (root, mid, end, e, tip)
     };
     let leg3 = |side: Side| {
         let k = side_sign(side);
@@ -386,21 +404,30 @@ pub fn skeleton_seen(body: &Body, pose: &Pose, camera: Camera) -> Skeleton {
         };
         let (d, e) = limb_dirs(pelvis_frame, k, l, -1.0);
         let mid = root.add(d.mul(body.thigh));
-        [root, mid, mid.add(e.mul(body.shin))]
+        let end = mid.add(e.mul(body.shin));
+        let ankle = match side {
+            Side::Right => pose.right_foot,
+            Side::Left => pose.left_foot,
+        };
+        // Square to the shin, toward her front: flat on the ground when she stands; toes up folds it further.
+        let tip = end.add(bend(pelvis_frame, e, 90.0 + fin(ankle)).mul(body.foot));
+        [root, mid, end, tip]
     };
     let leg = |side: Side| {
-        let [root, mid, end] = leg3(side);
+        let [root, mid, end, tip] = leg3(side);
         LimbPoints {
             root: Point::of(root),
             mid: Point::of(mid),
             end: Point::of(end),
+            tip: Point::of(tip),
         }
     };
     let (ra, la) = (arm(Side::Right), arm(Side::Left));
-    let pts = |a: (V3, V3, V3, V3)| LimbPoints {
+    let pts = |a: (V3, V3, V3, V3, V3)| LimbPoints {
         root: Point::of(a.0),
         mid: Point::of(a.1),
         end: Point::of(a.2),
+        tip: Point::of(a.4),
     };
     let sword = pose.sword.map(|s| {
         let (hand, fore) = match s.hand {
@@ -416,9 +443,11 @@ pub fn skeleton_seen(body: &Body, pose: &Pose, camera: Camera) -> Skeleton {
         ra.0,
         ra.1,
         ra.2,
+        ra.4,
         la.0,
         la.1,
         la.2,
+        la.4,
         neck,
         head.add(up.mul(-body.head)),
     ]

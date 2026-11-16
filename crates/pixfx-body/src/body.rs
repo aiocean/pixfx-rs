@@ -25,6 +25,21 @@ pub struct Body {
     pub shin: f64,
     /// Hand to the tip of a held sword.
     pub sword: f64,
+    /// Wrist to fingertips.
+    #[serde(default = "ruler_hand")]
+    pub hand: f64,
+    /// Sole under the ankle to the toes, forward along the ground.
+    #[serde(default = "ruler_foot")]
+    pub foot: f64,
+}
+
+fn ruler_hand() -> f64 {
+    f64::from(pixfx_draw::RULER.hand)
+}
+
+/// A foot one and a half limbs long (the ruler's limb is 3 pixels thick).
+fn ruler_foot() -> f64 {
+    1.5 * f64::from(pixfx_draw::RULER.limb)
 }
 
 impl Body {
@@ -55,6 +70,8 @@ impl Body {
             thigh: rest * 0.3,
             shin: rest * 0.3,
             sword: height * 0.4,
+            hand: unit * 0.3,
+            foot: unit * 0.65,
         }
     }
 
@@ -63,6 +80,8 @@ impl Body {
     pub fn from_ruler(r: &Ruler) -> Body {
         Body {
             sword: f64::from(r.blade),
+            hand: f64::from(r.hand),
+            foot: 1.5 * f64::from(r.limb),
             ..Body::new(f64::from(r.figure()), r.heads())
         }
     }

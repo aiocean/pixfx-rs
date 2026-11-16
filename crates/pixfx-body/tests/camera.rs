@@ -82,6 +82,7 @@ fn a_symmetric_pose_from_west_mirrors_east() {
         root: flip(l.root),
         mid: flip(l.mid),
         end: flip(l.end),
+        tip: flip(l.tip),
     };
     let close = |a: LimbPoints, b: LimbPoints| {
         [(a.root, b.root), (a.mid, b.mid), (a.end, b.end)]

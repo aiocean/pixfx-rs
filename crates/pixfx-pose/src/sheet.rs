@@ -21,13 +21,13 @@ pub const fn colour(bone: Bone) -> Rgba {
     match bone {
         Bone::Neck | Bone::Spine | Bone::Shoulders | Bone::Hips => Rgba(220, 0, 0, 255),
         Bone::RightUpperArm => Rgba(255, 140, 0, 255),
-        Bone::RightForearm => Rgba(230, 200, 0, 255),
+        Bone::RightForearm | Bone::RightHand => Rgba(230, 200, 0, 255),
         Bone::LeftUpperArm => Rgba(120, 220, 0, 255),
-        Bone::LeftForearm => Rgba(0, 150, 0, 255),
+        Bone::LeftForearm | Bone::LeftHand => Rgba(0, 150, 0, 255),
         Bone::RightThigh => Rgba(0, 170, 120, 255),
-        Bone::RightShin => Rgba(0, 105, 85, 255),
+        Bone::RightShin | Bone::RightFoot => Rgba(0, 105, 85, 255),
         Bone::LeftThigh => Rgba(0, 110, 255, 255),
-        Bone::LeftShin => Rgba(0, 0, 190, 255),
+        Bone::LeftShin | Bone::LeftFoot => Rgba(0, 0, 190, 255),
         Bone::Sword => Rgba(80, 80, 80, 255),
     }
 }

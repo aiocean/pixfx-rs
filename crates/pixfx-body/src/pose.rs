@@ -83,6 +83,14 @@ pub struct Pose {
     pub lie: f64,
     /// The lowest point above the ground, in pixels (a jump).
     pub lift: f64,
+    /// The whole body turned about her forward axis toward her right (a cartwheel): 180 stands her on her head.
+    pub roll: f64,
+    /// Ankle: toes up (positive) or pointed down (negative) from flat.
+    pub right_foot: f64,
+    pub left_foot: f64,
+    /// Wrist: the hand folds the way the elbow folds (positive) or back.
+    pub right_hand: f64,
+    pub left_hand: f64,
     pub sword: Option<Sword>,
 }
 
@@ -101,6 +109,11 @@ impl Pose {
             left_arm: self.right_arm,
             right_leg: self.left_leg,
             left_leg: self.right_leg,
+            roll: -self.roll,
+            right_foot: self.left_foot,
+            left_foot: self.right_foot,
+            right_hand: self.left_hand,
+            left_hand: self.right_hand,
             sword: self.sword.map(|s| Sword {
                 hand: match s.hand {
                     Side::Right => Side::Left,
