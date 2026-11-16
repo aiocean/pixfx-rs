@@ -29,13 +29,16 @@ A full run trains on a training machine, not a laptop: the training machine runs
 
 - Reach it as `ssh <train-host>`.
 - The code must already be on that machine (clone or sync it); `.venv` is not copied, so `long-run.sh` builds it there.
-- Start a run detached, so it outlives the ssh session and the training machine does not sleep:
+- Start a run as a launchd job, so it belongs to no ssh login and the training machine does not sleep (a `nohup ... &` started
+  over ssh died silently after 30 minutes):
   ```
   ssh <train-host> 'cd pixfx-rs/train &&
-    nohup caffeinate -is ./long-run.sh frames > ~/train-frames.log 2>&1 < /dev/null &'
+    launchctl submit -l pixfx.train.frames -o $HOME/train-frames.log -e $HOME/train-frames.log \
+      -- /usr/bin/caffeinate -is $PWD/long-run.sh frames'
   ```
   `long-run.sh` builds the rules, runs pytest, trains, and resumes from `runs/<run>/last.pt` (saved every 25
-  updates) if the trainer dies. Its log ends in `TRAIN-DONE` or `FAIL`.
+  updates) if the trainer dies. Its log ends in `TRAIN-DONE` or `FAIL`. launchd starts a submitted job again
+  whenever it exits, so once the log says `TRAIN-DONE`, run `launchctl remove pixfx.train.frames`.
 - Progress is `runs/<run>/log.jsonl`, which syncs back to a laptop with the rest of `runs/`; export and the ladder run
   on a laptop.
 - One run at a time: check `pgrep -fl "ppo.py"` on the training machine before starting, since another session may be training.
