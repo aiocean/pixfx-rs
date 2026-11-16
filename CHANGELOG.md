@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Arena: the duel is a game of its own in `games/arena`. The rules (`pixfx-duel`), their Python module
+  (`pixfx-duel-py`), the trainer (`train/`) and the duel's specs and plans moved there; the engine keeps
+  `pixfx-mind`, and the landing page plays the duel as before. `games/arena/docs` is written for players who train
+  bots of their own: the rules, what a bot sees and does and the weights file it is (`bot.md`), training, the
+  tournament (seasons, weights-file submissions, matches played both ways, replays anyone can check) and the roadmap.
 - Words: **bake** now means only data a script computes once into a file an effect reads; images are **rendered**.
   The frame clips are renamed to match: `pixfx_export::render_clip` and `write_clip` (were `bake`, `write_bake`),
   module `pixfx_export::clip` with `ClipIndex`, `ClipPage`, `ClipSprite`, `ClipFiles`, `ClipLayer`, `CLIP_VERSION`;
