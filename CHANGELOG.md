@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Body: `pixfx-body`, one rig for every pose, direction and animation. A figure on the ruler is posed by joint
+  angles with hands, feet, roll and spin, and seen by any camera: side (4 directions), iso and top-down (8), each
+  turned in 3D, never flipped. Clips key poses with easing, loop or play once, carry root motion and plant a foot or
+  hand by IK while it is in contact. The catalog has the ground clips (idle, walk, run, run start and stop, sprint,
+  skid, turn, crouch, crouch walk) and every preset as a still. The mannequin is painted on the ruler from a hull of
+  shapes per body part with the bones inside it, plus a part map. `clip_sheet` lays a clip out a row per direction
+  and a column per frame with the frames' joints and root motion as JSON; `examples/clip_sheet.rs` and
+  `examples/catalog.rs` write the PNGs, a GIF and the JSON. `pixfx-pose` builds on the same rig.
 - Effects: `shadow/blood-shield`, a dome of blood with veins (dark cultivation fantasy), made from `pixfx-ref` sheets.
   A pool spreads under the feet, veins grow out of it up round the character with glowing tips, and a see-through
   film fills in behind them. The dome is lit from the upper left, has a Fresnel rim and a highlight crescent, and holds

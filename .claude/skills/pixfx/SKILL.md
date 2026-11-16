@@ -23,6 +23,7 @@ yourself, and run or edit scripts.
 | Measure or improve speed | `pixfx-perf` |
 | Read a picture as pixels, redraw a sprite | `pixfx-pixel` |
 | Pose skeleton sheets for an image model | `pixfx-pose` |
+| A character's poses, clips and directions as a mannequin sheet (hull, bones, part map, joints) | `pixfx-body` |
 
 ## Where code goes
 
@@ -34,7 +35,7 @@ Rust decides, a shell draws. Dependencies point down this table only.
 | JS runtime | `packages/pixfx-web` | wasm loading, painting workers, shared frames, a stage per host scene |
 | JS binding | `crates/pixfx-wasm` | wasm-bindgen translation only |
 | Scene | `crates/pixfx-scene` | what plays where, layers, which frame shows, shared frames |
-| Engine | `pixfx-core`, `pixfx-effects`, `pixfx-light`, `pixfx-fighter` | effects, particles, cues, `Feel`, bodies. Pure: no clock, no I/O |
+| Engine | `pixfx-core`, `pixfx-effects`, `pixfx-light`, `pixfx-fighter`, `pixfx-body` | effects, particles, cues, `Feel`, bodies. Pure: no clock, no I/O |
 | Drawing | `crates/pixfx-draw` | frames (colour + additive light), painter, palette |
 | Agent tools | `pixfx-pixel`, `pixfx-pose` | read pictures for an agent; never painted from |
 

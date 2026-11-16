@@ -113,7 +113,7 @@ Dependencies point one way, top to bottom. A lower layer never depends on a high
 | JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it, by way of `pixfx-web`. |
 | Game | `pixfx-duel` | The landing duel's rules: fighters, skills, the rotating bar, statuses, shots, rounds, the seats that decide for each corner (the brain from `pixfx-mind`, or the first mind), and the view the page reads | Deterministic from a seed: no clock, no I/O, no host types. Every decision of the duel is here; the page plays the commands and events it returns. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
-| Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies | Pure and deterministic: no clock, no I/O, no host types. |
+| Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter`, `pixfx-body` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies; the rig every pose, direction and clip is made with, and its mannequin | Pure and deterministic: no clock, no I/O, no host types. |
 | Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `halo`, `blend`, `color`, `palette`, `math`) | Frames with colour and light, painting, painted glow, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
 
 Where a new piece of code goes:
@@ -122,6 +122,7 @@ Where a new piece of code goes:
   feature (`fire`) and in `all` in `crates/pixfx-effects/Cargo.toml`, with `#[cfg(feature = "...")]` on its `mod`,
   `pub use` and `EFFECTS` entry; `crates/pixfx-effects/tests/features.rs` fails otherwise. A new feel rule or body
   behaviour: `pixfx-core` or `pixfx-fighter`.
+- A pose, a camera, an animation clip or the mannequin painted from them (hull, bones, part map): `pixfx-body`.
 - A new way to paint pixels (sprite, text, nine-slice, UI box): the drawing layer, driven by the first game that
   needs it; that game decides its API.
 - A tool an agent uses to read a picture as pixels (an image model's drawing, a customer's sprite): `pixfx-pixel`,

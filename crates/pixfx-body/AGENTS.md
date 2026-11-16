@@ -12,7 +12,14 @@ by default the game's ruler) is posed by joint angles (`Pose`), placed in 3D and
 |---|---|
 | `body` | `Body`: bone lengths; `Body::new(height, heads)`, `Body::from_ruler`; the default is `pixfx_draw::RULER` |
 | `pose` | `Pose`, `Limb` (raise, spread, bend), `Head`, `Sword`, `Side`; `Pose::mirrored` |
-| `rig` | 3D forward kinematics and the view: `skeleton(body, pose, facing)`, `Skeleton` (named joints, depth), `Bone`, `facing` |
+| `camera` | `Camera` (yaw, pitch), `Dir4`, `Dir8`, the side, iso and top-down presets |
+| `rig` | 3D forward kinematics and the view: `skeleton_seen(body, pose, camera)`, `skeleton(body, pose, facing)`, `Skeleton` (named joints, depth, ground), `Bone`, `facing`; two-bone IK (`reach`) |
+| `clip` | `Clip`: keys, easing, loop or once, root motion, planted contacts; `pose_at` |
+| `catalog` | the ready clips by name (`ground`: idle, walk, run...; every preset as `pose/<name>`) |
+| `presets` | the named still poses `pixfx-pose` re-exports |
+| `part`, `hull` | `Part` (17 body parts, guide colours); `hull`: the body as shapes per part, back to front |
+| `paint`, `sprite` | the mannequin on the ruler: `rasterize` to a `PartMap`, `paint` with a `Look` and `Layers`; `sprite` places a clip frame in a `Cell` |
+| `sheet` | `clip_sheet`: a row per direction of a `View`, a column per frame, composite, hull, bones and part images and `SheetMeta` |
 
 ## Belongs here
 
@@ -24,7 +31,7 @@ How a figure is posed, seen, animated and painted as a mannequin: joints, camera
 |---|---|
 | draws a captioned sheet for an image model | `pixfx-pose` |
 | paints the duel's hand-drawn fighter | `pixfx-fighter` |
-| reads or writes files | `examples/` |
+| reads or writes files | `examples/` (`clip_sheet.rs`, `catalog.rs`; shared code in `examples/common/mod.rs`) |
 
 ## Traps
 

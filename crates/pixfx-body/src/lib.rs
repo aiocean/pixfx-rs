@@ -15,6 +15,7 @@ mod part;
 mod pose;
 pub mod presets;
 mod rig;
+mod sheet;
 mod sprite;
 
 pub use body::Body;
@@ -25,4 +26,5 @@ pub use paint::{Layers, Look, PartMap, paint, rasterize};
 pub use part::Part;
 pub use pose::{Head, Limb, Pose, Side, Sword};
 pub use rig::{Bone, Limb4, LimbPoints, Point, Skeleton, facing, skeleton, skeleton_seen};
+pub use sheet::{ClipSheet, SheetFrame, SheetMeta, Tag, View, clip_sheet};
 pub use sprite::{Cell, Sprite, clip_cell, sprite};
