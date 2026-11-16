@@ -48,6 +48,8 @@ const TABLE = {
   "explosions/dirt-explosion": { role: "strike", at: "ground", impact: 0, power: 18, spell: "seal" },
   // implosion sucks in and pops at 1.02 s (explosions/implosion.rs STILL); it drags the foe in while it sucks
   "explosions/implosion": { role: "strike", at: "chest", impact: 1.02, power: 25, spell: "collapse", pull: 40, pullUntil: 0.8 },
+  // the sky falls on the foe: the keystone with the eye lands on its head at 1.78 s (shadow/winter_ordeal.rs BLOW)
+  "shadow/winter-ordeal": { role: "strike", at: "ground", impact: 1.78, power: 30, spell: "collapse" },
   // the icicle drops at 0.944 s (duel.js SPELLS.icicle) and freezes where it strikes
   "ice/icicle-fall": { role: "strike", at: "ground", impact: 0.944, power: 28, spell: "icicle", freeze: 0.9 },
   // a lotus of feathers bursts from the palm at arm's length (duel.js SPELLS.lotus), its cue at 0

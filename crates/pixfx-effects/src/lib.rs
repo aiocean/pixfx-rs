@@ -113,6 +113,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &shadow::BLOOD_SHIELD,
     #[cfg(feature = "shadow-void-orb")]
     &shadow::VOID_ORB,
+    #[cfg(feature = "shadow-winter-ordeal")]
+    &shadow::WINTER_ORDEAL,
     #[cfg(feature = "water-water-jet")]
     &water::WATER_JET,
     #[cfg(feature = "weather-snow")]

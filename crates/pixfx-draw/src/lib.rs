@@ -12,7 +12,9 @@ pub mod image;
 pub mod math;
 pub mod painter;
 pub mod palette;
+pub mod ruler;
 pub mod shapes;
+pub mod shatter;
 pub mod sweep;
 
 pub use color::{ColorError, Rgba, hex};
@@ -20,3 +22,4 @@ pub use frame::{Frame, composite, composite_px, frame_hash};
 pub use image::RgbaImage;
 pub use math::{Rng, rand};
 pub use painter::Painter;
+pub use ruler::{RULER, Ruler};

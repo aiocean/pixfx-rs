@@ -486,6 +486,10 @@ pub fn dbm(
     const TARGET: u8 = 3;
     const WALL: u8 = 4;
     const OMEGA: f64 = 1.8;
+    /// A neighbour the sweep leaves out (a wall when walls insulate, or off an insulated grid).
+    const SKIP: usize = usize::MAX;
+    /// A neighbour off a grounded grid: it counts as the edge's potential.
+    const EDGE: usize = usize::MAX - 1;
     const STEPS4: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
     const STEPS8: [(i32, i32); 8] = [
         (1, 0),
@@ -512,23 +516,26 @@ pub fn dbm(
     let edge = opts.edge.unwrap_or(0.0);
     let mut kind = vec![FREE; w * h];
     let mut phi = vec![edge.max(0.5); w * h];
+    let set = |kind: &mut [u8], phi: &mut [f64], k: usize, c: u8, p: f64| {
+        if let Some(slot) = kind.get_mut(k) {
+            *slot = c;
+        }
+        if let Some(slot) = phi.get_mut(k) {
+            *slot = p;
+        }
+    };
     for y in y0..=y1 {
         for x in x0..=x1 {
             if !inside(x, y)
                 && let Some(k) = at(x, y)
-                && let (Some(c), Some(p)) = (kind.get_mut(k), phi.get_mut(k))
             {
-                *c = WALL;
-                *p = edge;
+                set(&mut kind, &mut phi, k, WALL, edge);
             }
         }
     }
     for &(x, y) in targets {
-        if let Some(k) = at(x, y)
-            && let (Some(c), Some(p)) = (kind.get_mut(k), phi.get_mut(k))
-        {
-            *c = TARGET;
-            *p = 1.0;
+        if let Some(k) = at(x, y) {
+            set(&mut kind, &mut phi, k, TARGET, 1.0);
         }
     }
     let mut tree = Tree::roots(
@@ -538,66 +545,84 @@ pub fn dbm(
             .collect::<Vec<_>>(),
     );
     for &(x, y) in roots {
-        if let Some(k) = at(x, y)
-            && let (Some(c), Some(p)) = (kind.get_mut(k), phi.get_mut(k))
-        {
-            *c = GROWN;
-            *p = 0.0;
+        if let Some(k) = at(x, y) {
+            set(&mut kind, &mut phi, k, GROWN, 0.0);
         }
     }
-    // one sweep over the free cells; a neighbour off the grid is a wall
-    let sweep = |kind: &[u8], phi: &mut [f64]| {
-        for y in y0..=y1 {
-            for x in x0..=x1 {
-                let Some(k) = at(x, y) else {
-                    continue;
+    // each cell's four neighbours for the sweep, in STEPS4 order; walls never change after this, so it holds
+    let mut nb = vec![[SKIP; 4]; w * h];
+    for y in y0..=y1 {
+        for x in x0..=x1 {
+            let Some(slots) = at(x, y).and_then(|k| nb.get_mut(k)) else {
+                continue;
+            };
+            for (slot, (dx, dy)) in slots.iter_mut().zip(STEPS4) {
+                *slot = match at(x + dx, y + dy) {
+                    Some(j) if kind.get(j) != Some(&WALL) || opts.edge.is_some() => j,
+                    None if opts.edge.is_some() => EDGE,
+                    _ => SKIP,
                 };
-                if !matches!(kind.get(k), Some(&FREE) | Some(&CAND)) {
+            }
+        }
+    }
+    // one sweep over the free cells, in rows: each moves toward the mean of the neighbours it counts
+    let sweep = |kind: &[u8], phi: &mut [f64]| {
+        for (k, slots) in nb.iter().enumerate() {
+            if !matches!(kind.get(k), Some(&FREE) | Some(&CAND)) {
+                continue;
+            }
+            let (mut sum, mut n) = (0.0, 0.0);
+            for &j in slots {
+                if j == SKIP {
                     continue;
                 }
-                let (mut sum, mut n) = (0.0, 0.0);
-                for (dx, dy) in STEPS4 {
-                    match at(x + dx, y + dy) {
-                        Some(j) if kind.get(j) != Some(&WALL) || opts.edge.is_some() => {
-                            sum += phi.get(j).copied().unwrap_or(edge);
-                            n += 1.0;
-                        }
-                        None if opts.edge.is_some() => {
-                            sum += edge;
-                            n += 1.0;
-                        }
-                        _ => {}
-                    }
-                }
-                if n > 0.0
-                    && let Some(p) = phi.get_mut(k)
-                {
-                    *p += OMEGA * (sum / n - *p);
-                }
+                sum += if j == EDGE {
+                    edge
+                } else {
+                    phi.get(j).copied().unwrap_or(edge)
+                };
+                n += 1.0;
+            }
+            if n > 0.0
+                && let Some(p) = phi.get_mut(k)
+            {
+                *p += OMEGA * (sum / n - *p);
             }
         }
     };
     for _ in 0..(w.max(h) as u32 * 2) {
         sweep(&kind, &mut phi);
     }
-    // the cells next to the tree that may grow, each with the node it would grow from
-    let mut cands: Vec<(i32, i32, usize)> = Vec::new();
-    let open =
-        |tree: &Tree, cands: &mut Vec<(i32, i32, usize)>, kind: &mut Vec<u8>, from: usize| {
-            let Some(n) = tree.nodes.get(from) else {
-                return;
-            };
-            let (cx, cy) = (libm::floor(n.x) as i32, libm::floor(n.y) as i32);
-            for &(dx, dy) in around {
-                let (x, y) = (cx + dx, cy + dy);
-                if let Some(c) = at(x, y).and_then(|k| kind.get_mut(k))
-                    && *c == FREE
-                {
-                    *c = CAND;
-                    cands.push((x, y, from));
-                }
-            }
+    // the cells next to the tree that may grow: where, the node it would grow from, and its fixed noise
+    struct Cand {
+        x: i32,
+        y: i32,
+        from: usize,
+        noise: f64,
+    }
+    let mut cands: Vec<Cand> = Vec::new();
+    let open = |tree: &Tree, cands: &mut Vec<Cand>, kind: &mut Vec<u8>, from: usize| {
+        let Some(n) = tree.nodes.get(from) else {
+            return;
         };
+        let (cx, cy) = (libm::floor(n.x) as i32, libm::floor(n.y) as i32);
+        for &(dx, dy) in around {
+            let (x, y) = (cx + dx, cy + dy);
+            if let Some(c) = at(x, y).and_then(|k| kind.get_mut(k))
+                && *c == FREE
+            {
+                *c = CAND;
+                cands.push(Cand {
+                    x,
+                    y,
+                    from,
+                    noise: 1.0
+                        + opts.noise
+                            * (2.0 * rand(&[opts.seed, 9.0, f64::from(x), f64::from(y)]) - 1.0),
+                });
+            }
+        }
+    };
     for i in 0..tree.nodes.len() {
         open(&tree, &mut cands, &mut kind, i);
     }
@@ -610,23 +635,26 @@ pub fn dbm(
             })
             .fold(f64::INFINITY, f64::min)
     };
+    let mut weights: Vec<f64> = Vec::new();
     for step in 1..=opts.cells as u32 {
         if cands.is_empty() {
             break;
         }
-        let chance = |&(x, y, _): &(i32, i32, usize)| -> f64 {
-            let p = at(x, y).and_then(|k| phi.get(k)).copied().unwrap_or(0.0);
-            let v = (p + opts.drift.0 * f64::from(x) + opts.drift.1 * f64::from(y)).max(0.0);
-            let n = 1.0
-                + opts.noise * (2.0 * rand(&[opts.seed, 9.0, f64::from(x), f64::from(y)]) - 1.0);
-            libm::pow(v, opts.eta) * n
-        };
-        let total: f64 = cands.iter().map(chance).sum();
+        weights.clear();
+        weights.extend(cands.iter().map(|c| {
+            let p = at(c.x, c.y)
+                .and_then(|k| phi.get(k))
+                .copied()
+                .unwrap_or(0.0);
+            let v = (p + opts.drift.0 * f64::from(c.x) + opts.drift.1 * f64::from(c.y)).max(0.0);
+            libm::pow(v, opts.eta) * c.noise
+        }));
+        let total: f64 = weights.iter().sum();
         let chosen = if total > 0.0 {
             let mut pick = rand(&[opts.seed, f64::from(step)]) * total;
             let mut chosen = cands.len() - 1;
-            for (i, c) in cands.iter().enumerate() {
-                pick -= chance(c);
+            for (i, wt) in weights.iter().enumerate() {
+                pick -= wt;
                 if pick <= 0.0 {
                     chosen = i;
                     break;
@@ -636,12 +664,9 @@ pub fn dbm(
         } else {
             (rand(&[opts.seed, f64::from(step)]) * cands.len() as f64) as usize % cands.len()
         };
-        let (x, y, from) = cands.swap_remove(chosen);
-        if let Some(k) = at(x, y)
-            && let (Some(c), Some(p)) = (kind.get_mut(k), phi.get_mut(k))
-        {
-            *c = GROWN;
-            *p = 0.0;
+        let Cand { x, y, from, .. } = cands.swap_remove(chosen);
+        if let Some(k) = at(x, y) {
+            set(&mut kind, &mut phi, k, GROWN, 0.0);
         }
         let (fx, fy) = (f64::from(x), f64::from(y));
         tree.grow(fx, fy, from, step);

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Effects: `shadow/winter-ordeal`, the winter shadow of heaven, made here. Over the foe the
+  night sky darkens in and cracks like glass: jagged cracks run out from a keystone where an eye opens, and rings of
+  cracks cut the sky into slabs. Then the sky falls: ring by ring the slabs tremble, drop and turn, showing a lit top
+  edge and a dark underside, and smash on the ground into shards that crumble to dust; heavy ones shake the screen a
+  little. Last, the keystone carries the open eye down onto the foe's head at 1.78 s (the blow cue). The crack pattern
+  (37 slabs, their shards, and each crack cell with the time it appears) is baked once by
+  `examples/bake_winter_ordeal.rs` into `shadow/winter_ordeal_sky.rs`, so nothing about the cracks is worked out in a
+  game. On the site it plays as a strike landing at 1.78 s.
+- Drawing: `pixfx_draw::shatter` breaks a shape like glass. Bolts of cracks (`growth::dbm`) strike one after another,
+  and every region the cracks wall in becomes a piece. `Hold` decides which pieces fall: `Hold::Rim` lets only pieces
+  walled in by cracks fall, and `Hold::At` lets every piece fall except the one holding that point. `Cracks` sets the
+  strikes, `eta`, `noise`, `reach` and the smallest piece. Each piece knows the strike that freed it, and the part
+  still standing is `rest`. `examples/shatter.rs` draws it frame by frame.
+- Drawing: `growth::dbm` runs about 10x faster (a 152-node bolt: 625 ms to about 60 ms) with the same output, bit for
+  bit. Neighbours are looked up from a precomputed table, and each candidate keeps its noise.
 - Body: `pixfx-body`, one rig for every pose, direction and animation. A figure on the ruler is posed by joint
   angles with hands, feet, roll and spin, and seen by any camera: side (4 directions), iso and top-down (8), each
   turned in 3D, never flipped. Clips key poses with easing, loop or play once, carry root motion and plant a foot or
