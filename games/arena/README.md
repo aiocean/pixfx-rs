@@ -16,9 +16,10 @@ holds the rules, the training environment and the trainer.
 | `crates/pixfx-duel-py` | The rules as a Python module (`import pixfx_duel`): many duels stepped in parallel for a trainer. |
 | `train/` | The PPO trainer that made the shipped AI: the network, the opponents it trains against, export. |
 | `docs/` | The docs below, and the design history (`docs/specs`, `docs/plans`). |
+| `site/` | The arena's site, arena.aiocean.io: the duel full-screen, a page to watch two bots from their weights files and a seed, and the docs below as pages. `site/build.sh` builds it into `site/dist`. |
 
-The page that shows the duel is the pixfx site (`site/assets/duel.js`, `site/assets/landing.js`), through the
-engine's wasm (`crates/pixfx-wasm`, feature `duel`).
+The duel on both sites is drawn by the pixfx site's page code (`site/assets/duel.js`, `site/assets/duel-hero.js` at
+the repo root), through the engine's wasm (`crates/pixfx-wasm`, feature `duel`).
 
 ## Docs
 

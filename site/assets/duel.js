@@ -46,7 +46,16 @@ export function useEngine(pkg) {
 export function usePolicies([left, right]) {
   const { Policy } = loaded();
   const l = new Policy(left);
-  const next = [l, right === left ? l : new Policy(right)];
+  let r = l;
+  if (right !== left) {
+    try {
+      r = new Policy(right);
+    } catch (e) {
+      l.free();
+      throw e;
+    }
+  }
+  const next = [l, r];
   if (policies) for (const p of new Set(policies)) p.free();
   policies = next;
 }

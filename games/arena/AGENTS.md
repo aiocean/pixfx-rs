@@ -15,7 +15,8 @@ engine never depends on them.
 | trains, exports or loads weights in Python | `train/` |
 | is how any trained policy sees, acts or runs its network | the engine's `crates/pixfx-mind` (`policy`): it serves every game |
 | is the duel for JS | the engine's `crates/pixfx-wasm` (feature `duel`) |
-| draws or plays the duel on the page | `site/assets/duel.js`, `site/assets/landing.js` (a shell: it decides nothing) |
+| draws or plays the duel on the page | `site/assets/duel.js`, `site/assets/duel-hero.js` (a shell: it decides nothing), shared by the pixfx landing and the arena site |
+| is a page of the arena site (arena.aiocean.io): home, watch, the docs pages | this folder's `site/` (`build.sh`; the docs pages are rendered from `docs/*.md`, never edited by hand) |
 | explains the game to a player | `docs/` |
 
 ## Traps

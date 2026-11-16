@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
+  <title>Watch two bots · Arena</title>
+  <meta name="description" content="Load two bots' weights files and a seed, and watch them fight. The same files and seed give the same fight on every machine.">
+  <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/arena.css">
+</head>
+<body class="landing arena" data-page="watch">
+  <header class="topbar">
+    <a class="brand" href="./">arena</a>
+    <nav aria-label="Site">
+      <a href="watch.html" aria-current="page">Watch</a>
+      <a href="docs/rules.html">Rules</a>
+      <a href="docs/training.html">Train a bot</a>
+      <a href="docs/tournament.html">Tournament</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="watch-title">
+      <h1 id="watch-title" class="sr-only">Watch two bots</h1>
+      <canvas id="scene" aria-label="The duel between the two bots chosen below."></canvas>
+    </section>
+
+    <section class="section watch">
+      <form id="match" class="match">
+        <label>Thunder (left) <input type="file" name="left" accept=".bin"></label>
+        <label>Frost (right) <input type="file" name="right" accept=".bin"></label>
+        <label>Seed <span class="seed"><input type="number" name="seed" min="1" step="1" required><button type="button" data-random>Random</button></span></label>
+        <button class="button" type="submit">Fight</button>
+      </form>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p class="muted">A corner with no file plays the house bot. A bot is the <code>.bin</code> weights file <code>train/export.py</code> writes (<a href="docs/bot.html#the-weights-file">the weights file</a>). Nothing leaves your browser: the fight runs here. The same two files and the same seed play the same fight on every machine, so a seed is a replay.</p>
+    </section>
+  </main>
+  <script type="module" src="assets/arena.js"></script>
+</body>
+</html>
