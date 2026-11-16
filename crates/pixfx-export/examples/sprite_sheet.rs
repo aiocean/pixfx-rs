@@ -1,7 +1,7 @@
 //! Render an effect as sprite sheets plus beanfx's Aseprite-style JSON: `<name>.png`, `<name>_color.png`,
 //! `<name>_light.png` and `<name>.json`, `<name>` being the id with `/` as `_`.
 //!
-//!   cargo run -p pixfx-export --example sprite_sheet -- <id> [--seed N] [--palette WORD] [--out DIR]
+//!   cargo run -p pixfx-export --example sprite_sheet -- <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]
 //!
 //! `--out` defaults to `target/out`. For anything the flags do not cover (an effect's own option, a glow margin),
 //! change the `Options` below or copy this file.
@@ -12,7 +12,8 @@ use common::{Args, effect, exit, file_name};
 use pixfx_core::render_frames;
 use pixfx_export::write_sheet;
 
-const USAGE: &str = "usage: sprite_sheet <id> [--seed N] [--palette WORD] [--out DIR]";
+const USAGE: &str =
+    "usage: sprite_sheet <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]";
 
 fn main() -> std::process::ExitCode {
     exit(run())

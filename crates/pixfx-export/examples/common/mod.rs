@@ -44,6 +44,15 @@ impl Args {
         }
     }
 
+    /// Whether `--name` was given (a flag with no value).
+    pub fn flag(&mut self, name: &str) -> bool {
+        let Some(i) = self.words.iter().position(|w| w == name) else {
+            return false;
+        };
+        self.words.remove(i);
+        true
+    }
+
     /// The whole number after `--name`, at least 1, else `default`.
     pub fn count(&mut self, name: &str, default: u32) -> Result<u32, String> {
         match self.value(name)? {
@@ -62,9 +71,10 @@ impl Args {
         Ok(out)
     }
 
-    /// The options of a sheet, gif or bake: `--seed N` (a whole number; left out, the effect's own seed) and
-    /// `--palette` (a preset: fire, ice, poison, holy, shadow, arcane, blood, electric, nature, gold). Left out, the
-    /// effect looks as designed.
+    /// The options of a sheet, gif or bake: `--seed N` (a whole number; left out, the effect's own seed),
+    /// `--palette` (a preset: fire, ice, poison, holy, shadow, arcane, blood, electric, nature, gold) and `--num NAME=V`
+    /// for each of the effect's own number options to set (`--num hitX=-20 --num hitY=-48`). Left out, the effect
+    /// looks as designed.
     pub fn look(&mut self) -> Result<Options, String> {
         let seed = match self.value("--seed")? {
             Some(v) => Some(
@@ -77,9 +87,20 @@ impl Args {
             .value("--palette")?
             .map(|w| pixfx_draw::palette::parse(&w).map_err(|e| e.to_string()))
             .transpose()?;
+        let mut extra = std::collections::BTreeMap::new();
+        for pair in self.values("--num")? {
+            let Some((name, v)) = pair.split_once('=') else {
+                return Err(format!("--num expects NAME=V: {pair}\n{}", self.usage));
+            };
+            let v = v
+                .parse::<f64>()
+                .map_err(|_| format!("--num {name} expects a number: {v}\n{}", self.usage))?;
+            extra.insert(name.to_string(), pixfx_core::OptValue::Num(v));
+        }
         Ok(Options {
             seed,
             palette,
+            extra,
             ..Options::default()
         })
     }

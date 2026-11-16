@@ -17,5 +17,7 @@ serde_json = { version = "=1.0.154", features = ["preserve_order"] }
 workspace = true
 
 [dev-dependencies]
+libm.workspace = true
 pixfx-effects = { path = "../pixfx-effects" }
+pixfx-scene = { path = "../pixfx-scene" }
 serde_json = "=1.0.154"

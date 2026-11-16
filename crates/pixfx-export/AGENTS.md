@@ -10,7 +10,11 @@ An effect written out as files: sprite sheets (composite, colour and light PNG) 
 `decode`), and the parity check of a port against its source (`parity`: `compare`, `read_reference`,
 `write_side_gif`, `ParityOpts`, `Actors`; `gif --actor` reads its sprite frames through `Actors` too).
 
-`examples/` holds the scripts that write them: `sprite_sheet`, `gif`, `mp4`, `bake` and `parity` (`cargo run -p
+`examples/` holds the scripts that write them: `sprite_sheet`, `gif`, `mp4`, `bake`, `parity`, `stage` (an effect
+on a stage between two characters, played through `pixfx-scene`: ordered at the target, cues answered with a `Feel`),
+`blood_spray` (drops thrown in arcs, each a `projectiles/trail` in blood colours that the script moves, as a game
+moves any mover) and `carry` (an effect carried back and forth with `carried` 1, written as `<id>.carry.gif`)
+(`cargo run -p
 pixfx-export --example <name> -- ...`), sharing `examples/common/mod.rs`. A script reads its arguments, calls the
 library and writes files; anything worth testing moves into the library.
 
@@ -29,7 +33,7 @@ library and writes files; anything worth testing moves into the library.
 
 ## Dependencies
 
-`pixfx-core`, `pixfx-draw`, `png`, `gif`, `serde`, `serde_json`; `pixfx-effects` for tests and scripts only. A
+`pixfx-core`, `pixfx-draw`, `png`, `gif`, `serde`, `serde_json`; `pixfx-effects`, `pixfx-scene` and `libm` for tests and scripts only. A
 shell: no crate below the shell layer may depend on it (see "Known drift" in `crates/pixfx-wasm/AGENTS.md` about `decode`).
 
 ## Traps
