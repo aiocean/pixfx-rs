@@ -12,8 +12,8 @@ What the player kit and the tournament still need, most important first. Each it
    prebuilt wheels (macOS arm64 and x86_64, Linux x86_64), so `pip install pixfx-duel` is enough.
 3. **Check a bot before submitting.** Today the ladder is a Rust example that measures one file. Add, callable from
    Python: the ladder for any file against any opponent (`pixfx_duel.ladder(file, opponent, seeds)`), the entry bar
-   as a pass/fail, and the submission checks of `docs/tournament.md`. `export.py` gets `--out`, so a player's file
-   does not have to replace the shipped one.
+   as a pass/fail, and the submission checks of `docs/tournament.md`. The Rust ladder takes one file today
+   (`--weights`), seated in every policy corner; it needs a second, so two files can fight natively.
 4. **Watch two files fight.** Today a player edits `POLICY_FILES` and builds the site. A page where two `.bin` files
    are dropped in and fight, with the seed shown and replayable.
 5. **A standard environment.** A Gymnasium / PettingZoo wrapper over `VecEnv`, so Stable-Baselines3, CleanRL and RLlib

@@ -7,9 +7,10 @@ does is `docs/bot.md`.
 ## What you need
 
 - Rust (the toolchain in `rust-toolchain.toml`), `uv`, Python 3.12.
-- A fast machine for long runs. The env is the cost: about 40K env steps a second on an M4 Mac mini (CPU; CPU beats
-  MPS for this network), 6K-12K on a laptop. A fine-tune of 600 updates is about 20M steps, roughly 8 minutes on
-  the mini; a run from scratch (3000 updates) about 45 minutes.
+- A fast machine for long runs. The env is the cost, and the trainer runs on CPU (CPU beats MPS for this network).
+  Measured: about 42K env steps a second on the Mac mini the shipped AI trained on (30K each with two runs side by
+  side), 6K-12K on a laptop. A fine-tune of 600 updates is about 20M steps, roughly 8 minutes at 42K; a run from
+  scratch (3000 updates, about 98M steps) about 40-45 minutes.
 
 ## Setup
 
@@ -39,7 +40,8 @@ reward, done, won, length = env.step(actions, shaping)   # actions int64[n]
 - One step runs the duel to the learner's next decision. `done` marks the round's end; `won` is 1, -1, or 0 for a cut
   round; `length` is the round's seconds.
 - A done env ignores its action until it is reset.
-- The training seeds start at 1,000,000. The ladder plays seeds 1-150; never train on them.
+- The trainer's fight seeds start at 1,000,000 + 10,000,000 x `--seed` (11,000,000 by default). The ladder plays
+  seeds 1-150; never train on them.
 
 ## The reward
 
@@ -48,7 +50,7 @@ Today the reward is computed in Rust (`crates/pixfx-duel/src/train.rs`), per dec
 | Term | Value |
 |---|---|
 | Round won / lost (a cut round is lost) | +1 / -1 |
-| Damage | `shaping` x (dealt - taken) / 100, with `shaping` handed to `step` (the trainer anneals it to 0) |
+| Damage | `shaping` x (dealt - taken) / 100, dealt and taken in % of a life (so 1.0 is a whole life), with `shaping` handed to `step` (the trainer anneals it to 0) |
 | A fight gone quiet (no damage either way for 6 s) | -0.002 a decision |
 | The same act (not wait) 6 times in a row | -0.002 |
 | An act already 40% of the last 40 decisions | -0.004 |
@@ -75,8 +77,11 @@ uv run python ppo.py --run v2 --resume runs/v2/last.pt           # continue a ru
 | `--shaping-until` | 0.6 | share of the run over which the damage term falls to 0 (0: none at all) |
 | `--thunder` | 0.5 | share of fights in which the learner plays Thunder |
 | `--snapshot-every` | 20 | how often the latest self joins the league |
+| `--gamma`, `--lam` | 0.995, 0.95 | discount and GAE lambda |
+| `--clip`, `--epochs`, `--minibatches` | 0.2, 4, 8 | PPO clip, passes over each rollout, minibatches per pass |
+| `--device`, `--seed` | cpu, 1 | torch device; the seed for torch, numpy and the fight seeds |
 | `--init` | | start from a `.pt` checkpoint or a `.bin` weights file, with a fresh schedule |
-| `--resume` | | continue a run, optimiser and schedule included |
+| `--resume` | | continue a run, optimiser and schedule included; the league restarts with only the current policy (past selves are not saved) |
 
 It writes `runs/<run>/log.jsonl` every 10 updates (speed, losses, entropy, round length, and the win rate against
 each opponent, overall and per school: `win/brain`, `win/latest/thunder`, ...) and `runs/<run>/last.pt` every 25.
@@ -114,14 +119,19 @@ them. Then check that Rust computes the same:
 cargo test -p pixfx-duel --test policy_export
 ```
 
+`--out FILE` writes the weights elsewhere and `--check FILE` the check beside it. The Rust test checks the file built
+into the crate (`weights/policy.bin`), so pass both when you keep the shipped file: an `--out` alone leaves a check
+that no longer matches it, and the test fails.
+
 ## Measure it
 
 ```sh
 cargo run --release -p pixfx-duel --example ladder -- --seeds 150 --telemetry [--weights FILE]
 ```
 
-The ladder plays seeds 1-150, each both ways (as Thunder, then as Frost) for 3 rounds, rounds cut at 120 s, and
-prints:
+The ladder plays seeds 1-150, each both ways (as Thunder, then as Frost) for 3 rounds, rounds cut at 120 s. The
+policy plays the balanced style against the brain, the first mind and the scripts; only the mirror draws styles. A cut
+ends that fight and shows in the `cut` column; win rates count finished rounds. It prints:
 
 | Match | The shipped AI | Bar |
 |---|---|---|

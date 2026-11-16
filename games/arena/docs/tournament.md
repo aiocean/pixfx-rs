@@ -20,8 +20,9 @@ One weights file (`docs/bot.md`, "The weights file"), plus a name. Nothing else 
 own copy of the rules, on its own machines. A player never submits code.
 
 Why a weights file: it cannot do anything but compute logits, it runs the same bits on every machine, every bot costs
-the same to run, and the engine already seats a different file in each corner
-(`Duel.withPolicies(config, seats, left, right)` in the wasm, `--weights` in the ladder).
+the same to run, and the engine already seats a different file in each corner (`Duel.withPolicies(config, seats,
+left, right)` in the wasm). The ladder measures one file against fixed opponents (`--weights`); playing two files
+against each other natively is part of the runner (`docs/roadmap.md`).
 
 ## Checks on submission
 

@@ -1,5 +1,5 @@
 //! How a fighter fights: aggressive, balanced or defensive. Drawn per fighter from the seed on dice of its own, so the
-//! rules' dice are untouched; the trained policy reads it in its tag and was paid by it in training.
+//! rules' dice are untouched; the trained policy reads it in its tag; it changes no rule and no reward.
 
 use crate::data::School;
 use pixfx_mind::{Rng, policy::TAG};
