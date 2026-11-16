@@ -28,7 +28,10 @@ CPU. Behind the `fighter`, `light` and `mind` features (all default): `src/fight
 `lookColors`), `src/light.rs` (`stepLights`, `putOutLight`, `Lighting`; the game owns its list of lights) and
 `src/mind.rs` (`Mind`, a fighter's brain: `meet(foeSkills)`, `think(sense, dt)`, `tell`, `reset`, `hold`, `explain`, `posture`).
 Behind `duel` (default): `src/duel.rs`, the landing duel's rules from `pixfx-duel`: `new Duel(config, seats?)`
-(`seats`: `["policy" | "brain" | "first", ...]`, the trained policy when left out), `step(dt)` (commands and events), `view()`, `hold(me, seconds)`; its tables as
+(`seats`: `["brain" | "first", ...]`, the brain when left out) or `Duel.withPolicy(config, seats?, policy)` (`seats`:
+`["policy" | "brain" | "first", ...]`, the policy when left out), `step(dt)` (commands and events), `view()`,
+`hold(me, seconds)`; `new Policy(bytes)`, the trained policy read from `policy.bin`, which the page fetches beside the
+wasm (the wasm never carries the weights); its tables as
 the page reads (`duelSpells()`, `duelTraits()`, `duelStats()`, `duelConstants()`), `damageOf` and `orbOffset`.
 `Sprites.picture()` and `Lighting.paint()` return a `Picture` (`src/picture.rs`: the lit box's colour and light
 RGBA) that a shell draws. `Squash.step(dt, x, y, vx?, vy?)` works out velocity from movement.

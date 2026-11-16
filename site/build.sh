@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the static site into site/dist: the pages as they are, plus the engine in dist/pkg: the pixfx-canvas2d bundle,
-# its painting worker and the pixfx-web wasm.
+# its painting worker, the pixfx-web wasm, and the duel's trained policy (policy.bin), which the landing page fetches
+# on its own once the engine is in.
 # Usage: site/build.sh            (from anywhere in the repo)
 #        site/build.sh --serve    (build, then serve dist on http://127.0.0.1:8770/)
 set -euo pipefail
@@ -16,6 +17,7 @@ rm -rf "$out"
 mkdir -p "$out"
 rsync -a --exclude dist --exclude build.sh --exclude preload.js --exclude tests "$site/" "$out/"
 cp -R "$root/packages/pixfx-canvas2d/dist" "$out/pkg"
+cp "$root/crates/pixfx-duel/weights/policy.bin" "$out/pkg/policy.bin"
 bun "$site/preload.js" "$out"
 echo "site: $out"
 

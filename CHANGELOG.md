@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- The duel's trained policy is a file of its own: the wasm no longer carries `policy.bin` (1.35 MB to 660 KB gzip),
+  and the painting workers no longer hold a copy of it. `pixfx-wasm`: `new Policy(bytes)` reads the weights once;
+  `Duel.withPolicy(config, seats?, policy)` seats it (both corners when `seats` is left out), and `new Duel(config,
+  seats?)` seats the brain (`"brain" | "first"`). The site's `duel.js` takes it with `usePolicy(bytes)`; the landing
+  page fetches `pkg/policy.bin` once the engine is in, so the first frame never waits for it, and seats the brain
+  until it arrives.
+
 - `arcane/sword-slash` (new): a spirit sword appears beside the foe, winds back and cuts down through it in one fast
   arc. The blade sweeps a crescent of its own pixels (each blade row's edge colour, `pixfx_draw::sweep` with the brush
   turned with the blade), white at the blade and cooling to steel behind it; the impact cue fires as the blade points
