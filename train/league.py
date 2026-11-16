@@ -11,8 +11,9 @@ STYLES = 3
 
 
 class League:
-    def __init__(self, env, rng, limit=90.0, seed=1_000_000):
-        self.env, self.rng, self.limit = env, rng, limit
+    def __init__(self, env, rng, limit=90.0, seed=1_000_000, thunder=0.5):
+        """`thunder`: the share of fights in which the learner plays Thunder (corner 0); Frost the rest."""
+        self.env, self.rng, self.limit, self.thunder = env, rng, limit, thunder
         self.snapshots = []  # weights ids, oldest first
         self.next_seed = seed  # training fights never use the ladder's seeds (1-150)
         self.kinds = list(MIX)
@@ -25,7 +26,8 @@ class League:
         self.snapshots.append(wid)
 
     def reset(self, i):
-        """Start env i on a fresh fight against an opponent drawn from the mix; returns the opponent's name."""
+        """Start env i on a fresh fight against an opponent drawn from the mix; returns the opponent's name, the
+        learner's style and its school (0 Thunder, 1 Frost)."""
         kind = self.kinds[self.rng.choice(len(self.kinds), p=self.p)]
         wid = -1
         if kind == "latest" or (kind == "past" and len(self.snapshots) < 2):
@@ -40,7 +42,7 @@ class League:
             name = kind
         seed = self.next_seed
         self.next_seed += 1
-        learner = int(self.rng.integers(0, 2))
+        learner = 0 if self.rng.random() < self.thunder else 1
         style, foe_style = (int(x) for x in self.rng.integers(0, STYLES, 2))
         self.env.reset(i, seed, learner, style, foe_style, name, wid, self.limit)
-        return kind, style
+        return kind, style, learner
