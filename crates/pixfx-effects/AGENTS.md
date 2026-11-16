@@ -51,6 +51,9 @@ An effect never knows which shell shows it.
   unseeded randomness.
 - A `frame_hash` change to an existing effect needs a reason in the commit message; "the golden was updated" is not
   a reason.
+- Work that depends on nothing the game sets (a grown tree, cracks, a layout) is baked once by a script in
+  `examples/bake_<name>.rs` into a data file the effect reads, never redone per instance or per frame
+  (`.claude/skills/pixfx-effect/SKILL.md`, "Bake what nothing changes").
 
 ## Before you finish
 

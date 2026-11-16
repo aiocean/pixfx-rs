@@ -117,6 +117,18 @@ impl EffectState for State {
   sparks and the `impact` cue. Render a few with `gif ... --num hitX=-20 --num hitY=-48`.
 - **Cost.** Work only over the box the strokes cover, and only for the layer being drawn: restriction's halo went
   from 11.75 to 4.06 ms for 50 by both, pixels unchanged. Bench before and after.
+- **Bake what nothing changes; draw live what the game sets.** Choose by what the work depends on:
+
+  | The work depends on | Do it | Example |
+  |---|---|---|
+  | nothing the game sets: a grown tree, cracks, a layout, a map | once, in a script `examples/bake_<name>.rs` that writes it as data into `src/<category>/<name>_<what>.rs` ("Baked by ...; do not edit, run the script again"); the effect reads it, built into a map once for every instance (`std::sync::OnceLock`) | `shadow/winter-ordeal` (its sky), `shadow/blood-shield` (its veins: starting a shield went from 10.6 ms to 0) |
+  | only where a pixel is, the same on every frame (a shape's reach, a highlight's angle) | a table built once (`OnceLock`), read per pixel; a point off it (moved by a dent, a turned painter) is worked out as before, so the pixels stay the same bit for bit | `blood_shield.rs` `Px`: 3 `pow` and an `atan2` a pixel gone |
+  | the time, an option (`hitX`), the seed | live, every frame | the blow, the heartbeat |
+
+  A whole effect with no options and a costly draw can also ship as a baked clip of frames (skill `pixfx-render`,
+  `loadBaked`); a clip is fixed to one set of options and costs download and memory, so bake data first. A bake made
+  from one seed gives every seed that layout: bless the goldens again and say so in the commit. Profile before you
+  bake (`sample <pid>` on the bench): bake what the profile shows, not what looks heavy.
 
 ### Hit at any distance: an effect that takes orders
 

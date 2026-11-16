@@ -31,6 +31,12 @@
   with a heartbeat that pulses out along the veins. A blow (`hitX`, `hitY`) flashes, dents, ripples and splatters.
   At the end the bubble pops: the rim breaks into shards and drops, then the veins draw back into the pool and the pool
   shrinks away. On the site it plays as a ward with its blow at 1.6 s, with hit sliders.
+- `shadow/blood-shield`: its veins are baked. `examples/bake_blood_shield.rs` grows them once (seed 1) into
+  `src/shadow/blood_shield_veins.rs`, so starting a shield grows nothing (10.6 ms to 0). Every seed now shows the seed 1
+  veins, so the goldens of seeds 2 and 7 changed; seed 1's frames are unchanged. Drawing reads the dome's reach and the
+  film's highlight from a table made once, and skips rim pixels the dent cannot reach: 50 shields went from 29 to
+  8.7 ms of drawing per frame (best of 7 runs each), the same pixels. The rule (bake what nothing changes, draw live what the game sets) is
+  in the `pixfx-effect` skill.
 - Drawing: `pixfx_draw::growth`, branching growth for veins, lightning, cracks and roots. Every setting is a field.
   `dbm` is the dielectric breakdown model (a Laplace field relaxed on a grid: `eta`, grounded or insulating walls,
   `drift`, `noise`, an optional target). `colonize` and `colonize_from` are space colonization (`attractors`,

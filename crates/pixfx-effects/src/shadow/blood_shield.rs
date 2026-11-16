@@ -4,9 +4,10 @@
 //! the dome's rim, its branching veins, the see-through film, the pool, droplets, splash and ripples, in the sheet's
 //! exact colours. Its golden hashes pin it.
 //!
-//! The veins are a tree from `pixfx_draw::growth`: six main veins laid on set paths, side branches grown off them by
-//! space colonization with Murray's-law fork angles, stroked as tubes that taper from root to tip and are lit from the
-//! upper left. A pool spreads under the feet and the veins rise from it, the growing tips glowing; the film fills in
+//! The veins are a tree from `pixfx_draw::growth`, grown once by `examples/bake_blood_shield.rs` and baked as data into
+//! [`super::blood_shield_veins`]: six main veins laid on set paths, side branches grown off them by space colonization
+//! with Murray's-law fork angles, stroked as tubes that taper from root to tip and are lit from the upper left. Nothing
+//! the game sets changes them, so a shield grows nothing when it starts. A pool spreads under the feet and the veins rise from it, the growing tips glowing; the film fills in
 //! behind them. It holds with a heartbeat (the rim swells, a pulse runs out along the veins) while droplets slide down
 //! its sides. A blow lands anywhere (`hitX`, `hitY`, by default the right side at chest height): the dome flashes and
 //! dents in there, ripples run across it, ten droplets splatter away from it and land, and the dent springs back past
@@ -22,8 +23,9 @@ use pixfx_core::cue::{FEEL, TimedCue, impact};
 use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options};
 use pixfx_draw::Painter;
 use pixfx_draw::color::Rgba;
-use pixfx_draw::growth::{Colonize, Tree, colonize_from, jag};
 use pixfx_draw::math::{clamp, rand, smooth};
+
+use super::blood_shield_veins::{MAP_ROWS, MAP_W, VEINS};
 
 pub struct BloodShield;
 
@@ -87,8 +89,6 @@ const BRIGHT: usize = 8;
 const RIM: usize = 9;
 const PALE: usize = 10;
 const HIGH: usize = 11;
-/// A twig's lit edge.
-const BRANCH_LIT: usize = 5;
 /// Toward the light, upper left (y grows down): veins, film and rim are shaded by it.
 const LIGHT: (f64, f64) = (-0.6, -0.8);
 /// The red the dome and the pool light with.
@@ -133,7 +133,6 @@ impl Effect for BloodShield {
             ramp: opts.palette_or(&BLOOD),
             seed,
             blow: Blow::new(opts.num(&HIT_X), opts.num(&HIT_Y)),
-            veins: grow_veins(seed),
         })
     }
 }
@@ -142,7 +141,6 @@ struct State {
     ramp: Vec<Rgba>,
     seed: f64,
     blow: Blow,
-    veins: Vec<(u8, f32, f32)>,
 }
 
 /// Where the blow lands: the point of the dome's outline nearest the one the game gave, and which way is out.
@@ -166,122 +164,22 @@ impl Blow {
     }
 }
 
-/// The vein map's size: the whole dome in engine pixels, x from `-RX`, y from `-H` (the crown) to 0 (the base).
-const MAP_W: usize = 2 * RX as usize + 1;
-const MAP_ROWS: usize = H as usize + 1;
 /// No vein at this pixel.
 const NO_VEIN: u8 = u8::MAX;
 
-/// The main veins as MAIN draws them, as fractions of the dome (u across from -1 to 1, v up from 0 to 1): two up the
-/// walls, one up the middle and one right of it that forks; a path that starts on another is a fork off it.
-const MAIN_VEINS: [&[(f64, f64)]; 6] = [
-    &[
-        (-0.8, 0.0),
-        (-0.8, 0.3),
-        (-0.72, 0.56),
-        (-0.56, 0.76),
-        (-0.34, 0.9),
-        (-0.12, 0.95),
-    ],
-    &[
-        (-0.46, 0.0),
-        (-0.4, 0.24),
-        (-0.5, 0.44),
-        (-0.56, 0.62),
-        (-0.46, 0.8),
-    ],
-    &[
-        (-0.06, 0.0),
-        (0.0, 0.2),
-        (-0.12, 0.42),
-        (-0.06, 0.62),
-        (0.06, 0.8),
-        (0.0, 0.95),
-    ],
-    &[
-        (0.42, 0.0),
-        (0.46, 0.28),
-        (0.4, 0.5),
-        (0.24, 0.72),
-        (0.12, 0.9),
-    ],
-    &[(0.4, 0.5), (0.52, 0.66), (0.5, 0.84), (0.36, 0.93)],
-    &[
-        (0.8, 0.0),
-        (0.8, 0.3),
-        (0.72, 0.56),
-        (0.58, 0.76),
-        (0.66, 0.84),
-    ],
-];
+/// The baked veins ([`VEINS`]) as a map, a pixel each (tone, when it grew), made once for every shield.
+static VEIN_MAP: std::sync::OnceLock<Vec<(u8, f32)>> = std::sync::OnceLock::new();
 
-/// The veins as MAIN draws them, grown rather than copied: the main veins laid along [`MAIN_VEINS`] (made to wander
-/// by `jag`), then side branches grown off them by space colonization (`colonize_from`), walled inside the rim,
-/// then painted as strokes tapering from trunk to twig. Each pixel holds its tone (an index into [`BLOOD`]: a dark core, a lighter edge) and when it grew
-/// (0 the trunks' feet, 1 the last twig), so INIT grows them and the heartbeat runs out along them.
-fn grow_veins(seed: f64) -> Vec<(u8, f32, f32)> {
-    let whole = whole_dome();
-    let mut tree = Tree::default();
-    for (i, path) in MAIN_VEINS.iter().enumerate() {
-        let points: Vec<(f64, f64)> = path.iter().map(|&(u, v)| (u * RX, -v * H)).collect();
-        tree.path(&jag(&points, 3, 0.12, seed * 31.0 + i as f64), 1.5);
-    }
-    let laid = tree.nodes.len();
-    let mut tree = colonize_from(
-        tree,
-        Colonize {
-            attractors: 200,
-            step: 2.0,
-            influence: 16.0,
-            kill: 2.5,
-            steps: 44,
-            bias: (0.0, -1.0),
-            jitter: 0.3,
-            branch_chance: 0.08,
-            max_turn: 0.3,
-            fork_angle: (0.35, 0.75),
-            bounds: (-RX, -H, RX, 0.0),
-            seed,
-        },
-        |x, y| y < -1.0 && reach(&whole, x, y) < 0.9,
-    );
-    tree.murray(1.0, 0.6, laid, |x, y| y < -1.0 && reach(&whole, x, y) < 0.9);
-    tree.prune(5);
-    let radii = tree.radii(0.6, 3.2, 0.06);
-    let last = f64::from(tree.steps.max(1));
-    let mut map = vec![(NO_VEIN, 1.0f32, 1.0f32); MAP_W * MAP_ROWS];
-    tree.stroke(&radii, |dab| {
-        let (col, row) = (dab.x + RX as i32, dab.y + H as i32);
-        if col < 0 || row < 0 || col as usize >= MAP_W || row as usize >= MAP_ROWS {
-            return;
-        }
-        // a tube lit from the upper left: its lit side bright, a dark core, its far side in shadow; a fat trunk gets a
-        // glint on its lit side, a twig only a dark line with a lit edge
-        let facing = LIGHT.0 * dab.normal.0 + LIGHT.1 * dab.normal.1;
-        let s = facing * dab.depth;
-        let tone = if dab.radius >= 1.2 {
-            if s > 0.5 && dab.radius >= 2.2 {
-                BRIGHT
-            } else {
-                libm::round(2.0 + 4.0 * s).clamp(0.0, 7.0) as usize
+fn vein_map() -> &'static [(u8, f32)] {
+    VEIN_MAP.get_or_init(|| {
+        let mut map = vec![(NO_VEIN, 1.0f32); MAP_W * MAP_ROWS];
+        for &(col, row, tone, born) in &VEINS {
+            if let Some(px) = map.get_mut(usize::from(row) * MAP_W + usize::from(col)) {
+                *px = (tone, born);
             }
-        } else if s > 0.2 {
-            BRANCH_LIT
-        } else {
-            DEEP
-        } as u8;
-        let born = tree
-            .nodes
-            .get(dab.node)
-            .map_or(1.0, |n| f64::from(n.born) / last) as f32;
-        let depth = dab.depth as f32;
-        if let Some(px) = map.get_mut(row as usize * MAP_W + col as usize) {
-            // the stroke whose centre is nearer wins the tone; the earlier growth wins the time
-            let tone = if depth < px.2 { tone } else { px.0 };
-            *px = (tone, px.1.min(born), px.2.min(depth));
         }
-    });
-    map
+        map
+    })
 }
 
 /// The dome's shape at `t`: its half width, height, how high it has filled (0..1) and how much is left (1 whole, 0
@@ -336,14 +234,20 @@ fn pw(v: f64) -> f64 {
     libm::pow(v.max(0.0), 2.0 / N)
 }
 
-/// [`reach`] for every pixel centre of the whole dome's box, worked out once for every shield: the dome keeps its
-/// size, so a frame reads its pixels' reach here instead of paying three `pow`s a pixel. The same numbers as
-/// [`reach`], bit for bit; a point off the table (the dent moved it, or it is outside the box) is worked out.
-struct ReachTable {
-    x0: f64,
-    y0: f64,
-    w: usize,
-    v: Vec<f64>,
+/// What a pixel centre of the whole, undented dome always is, worked out once for every shield: the dome keeps its
+/// size, so a frame reads these instead of paying three `pow`s, an `atan2` and a few divisions a pixel. The same
+/// numbers as the expressions they come from, bit for bit; a point off the table (the dent moved it, or it is outside
+/// the box, or the painter is turned) is worked out as before.
+struct Px {
+    /// [`reach`].
+    r: f64,
+    /// The film's light before the beat and the flash: Fresnel toward the rim, deeper at the base.
+    film: f64,
+    /// The highlight crescent on the upper left, and the glint low on the right (0..1).
+    arc: f64,
+    glint: f64,
+    /// Where the vein map is read here, or `usize::MAX` off it.
+    vein: usize,
 }
 
 /// The box the table covers, in whole pixels: the rim reaches 4 past the outline.
@@ -352,46 +256,90 @@ const TABLE_Y0: f64 = -H - 6.0;
 const TABLE_W: usize = (2.0 * RX + 12.0) as usize;
 const TABLE_H: usize = (H + 8.0) as usize;
 
-static REACH: std::sync::OnceLock<ReachTable> = std::sync::OnceLock::new();
+static TABLE: std::sync::OnceLock<Vec<Px>> = std::sync::OnceLock::new();
 
-fn reach_table() -> &'static ReachTable {
-    REACH.get_or_init(|| {
-        let whole = whole_dome();
+fn table() -> &'static [Px] {
+    TABLE.get_or_init(|| {
+        let d = whole_dome();
         let mut v = Vec::with_capacity(TABLE_W * TABLE_H);
         for j in 0..TABLE_H {
             for i in 0..TABLE_W {
-                v.push(reach(
-                    &whole,
-                    TABLE_X0 + i as f64 + 0.5,
-                    TABLE_Y0 + j as f64 + 0.5,
-                ));
+                let (x, y) = (TABLE_X0 + i as f64 + 0.5, TABLE_Y0 + j as f64 + 0.5);
+                let (r, film, arc, glint) = film_at(&d, x, y);
+                v.push(Px {
+                    r,
+                    film,
+                    arc,
+                    glint,
+                    vein: vein_index(&d, x, y).unwrap_or(usize::MAX),
+                });
             }
         }
-        ReachTable {
-            x0: TABLE_X0,
-            y0: TABLE_Y0,
-            w: TABLE_W,
-            v,
-        }
+        v
     })
 }
 
-/// [`reach`] at a pixel, from the table when the point is one of its pixel centres on the whole dome.
-fn reach_px(d: &Dome, x: f64, y: f64) -> f64 {
-    if d.rx == RX && d.h == H {
-        let tb = reach_table();
-        let (fi, fj) = (x - 0.5 - tb.x0, y - 0.5 - tb.y0);
-        if fi >= 0.0
-            && fj >= 0.0
-            && fi == libm::floor(fi)
-            && fj == libm::floor(fj)
-            && (fi as usize) < tb.w
-            && let Some(&r) = tb.v.get(fj as usize * tb.w + fi as usize)
-        {
-            return r;
-        }
+/// The table's entry for this point, when it is one of its pixel centres on the whole dome.
+fn px(d: &Dome, x: f64, y: f64) -> Option<&'static Px> {
+    if d.rx != RX || d.h != H {
+        return None;
     }
-    reach(d, x, y)
+    let (fi, fj) = (x - 0.5 - TABLE_X0, y - 0.5 - TABLE_Y0);
+    if fi >= 0.0
+        && fj >= 0.0
+        && fi == libm::floor(fi)
+        && fj == libm::floor(fj)
+        && (fi as usize) < TABLE_W
+    {
+        table().get(fj as usize * TABLE_W + fi as usize)
+    } else {
+        None
+    }
+}
+
+/// The film at a point of the dome: its reach, its light before the beat and the flash (glass: clear in the middle so
+/// the character shows through, thicker toward the rim where the eye looks through more of the film, a Fresnel
+/// falloff, and a little deeper at the base where the blood pools), the highlight crescent on the upper left where the
+/// light falls, and the glint low on the right where it leaves.
+fn film_at(d: &Dome, x: f64, y: f64) -> (f64, f64, f64, f64) {
+    let e = reach(d, x, y);
+    let edge = e * e * e * e;
+    let low = 1.0 + y / d.h.max(1.0);
+    let ang = libm::atan2(-y / d.h.max(1.0), x / d.rx.max(1.0));
+    (
+        e,
+        0.07 + 0.42 * edge + 0.08 * low * low,
+        smooth(0.62 * PI, 0.72 * PI, ang) * (1.0 - smooth(0.86 * PI, 0.95 * PI, ang)),
+        smooth(0.12 * PI, 0.18 * PI, ang) * (1.0 - smooth(0.24 * PI, 0.3 * PI, ang)),
+    )
+}
+
+/// Whether every point within the dent's reach of a pixel lies outside the rim's band (3 pixels out to 9 in): its
+/// reach is within `slack` of `r` and its distance from the dome's foot at least `dist`.
+fn out_of_band(r: f64, slack: f64, dist: f64) -> bool {
+    if dist <= 0.0 {
+        return false;
+    }
+    let (lo, hi) = (r - slack, r + slack);
+    // deep inside: at least 9.5 in wherever it moves
+    (hi < 1.0 && (1.0 / hi - 1.0) * dist >= 9.5)
+        // far outside: at least 3.5 out wherever it moves
+        || (lo > 1.0 && (1.0 - 1.0 / lo) * dist >= 3.5)
+}
+
+/// [`reach`] at a point, from the table when it can be.
+fn reach_px(d: &Dome, x: f64, y: f64) -> f64 {
+    px(d, x, y).map_or_else(|| reach(d, x, y), |p| p.r)
+}
+
+/// Where the vein map is read for the point `(sx, sy)` of the dome as it stands, if on the map.
+fn vein_index(d: &Dome, sx: f64, sy: f64) -> Option<usize> {
+    let col = libm::floor(RX + sx * RX / d.rx.max(1.0));
+    let row = libm::floor(H + sy * H / d.h.max(1.0));
+    if col < 0.0 || row < 0.0 || col as usize >= MAP_W {
+        return None;
+    }
+    Some(row as usize * MAP_W + col as usize)
 }
 
 /// How far out a point is, 1 on the outline: the dome is the superellipse |x/rx|^N + |y/h|^N = 1 above the base.
@@ -469,8 +417,7 @@ impl State {
     }
 
     /// A point of the dome moved by the dent: toward the dome's middle, most at the blow.
-    fn warp(&self, d: &Dome, x: f64, y: f64, t: f64) -> (f64, f64) {
-        let k = self.dent(t);
+    fn warp(&self, d: &Dome, x: f64, y: f64, k: f64) -> (f64, f64) {
         if k == 0.0 {
             return (x, y);
         }
@@ -528,7 +475,7 @@ impl State {
             if (near < 0.0) != back {
                 continue;
             }
-            let (x, y) = self.warp(d, d.rx * libm::cos(az), RY * near, t);
+            let (x, y) = self.warp(d, d.rx * libm::cos(az), RY * near, self.dent(t));
             p.dot(x, y, self.c(if back { BRIGHT } else { RIM }), d.left);
         }
     }
@@ -539,6 +486,7 @@ impl State {
     fn veins(&self, p: &mut Painter, d: &Dome, t: f64, back: bool) {
         let ph = libm::fmod((t - WHOLE).max(0.0), BEAT) / BEAT;
         let pulse_on = smooth(WHOLE, WHOLE + 0.1, t) * (1.0 - smooth(POP, POP + 0.2, t));
+        let dent = self.dent(t);
         let (x0, x1) = if back {
             (-d.rx * 0.4, d.rx * 0.4)
         } else {
@@ -548,7 +496,7 @@ impl State {
             if !back && libm::fabs(x) < d.rx * 0.4 {
                 return;
             }
-            let Some((tone, born)) = self.vein_at(d, x, y, t) else {
+            let Some((tone, born)) = self.vein_at(d, x, y, dent) else {
                 return;
             };
             if born > d.grow {
@@ -582,15 +530,16 @@ impl State {
 
     /// The vein at this pixel of the dome as it is now, if any (its tone and when it grew): the map read where the
     /// dent and the sag moved the pixel from.
-    fn vein_at(&self, d: &Dome, x: f64, y: f64, t: f64) -> Option<(usize, f64)> {
-        let (wx, wy) = self.warp(d, x, y, t);
-        let (sx, sy) = (2.0 * x - wx, 2.0 * y - wy);
-        let col = libm::floor(RX + sx * RX / d.rx.max(1.0));
-        let row = libm::floor(H + sy * H / d.h.max(1.0));
-        if col < 0.0 || row < 0.0 || col as usize >= MAP_W {
-            return None;
-        }
-        let &(tone, born, _) = self.veins.get(row as usize * MAP_W + col as usize)?;
+    fn vein_at(&self, d: &Dome, x: f64, y: f64, dent: f64) -> Option<(usize, f64)> {
+        let at = if dent == 0.0
+            && let Some(p) = px(d, x, y)
+        {
+            (p.vein != usize::MAX).then_some(p.vein)
+        } else {
+            let (wx, wy) = self.warp(d, x, y, dent);
+            vein_index(d, 2.0 * x - wx, 2.0 * y - wy)
+        };
+        let &(tone, born) = vein_map().get(at?)?;
         (tone != NO_VEIN).then_some((usize::from(tone), f64::from(born)))
     }
 
@@ -599,24 +548,19 @@ impl State {
         let b = beat(t);
         let flash = clamp(1.0 - (t - HIT) / 0.2, 0.0, 1.0) * if t >= HIT { 1.0 } else { 0.0 };
         let top = d.h * d.fill;
+        let dent = self.dent(t);
         p.each(-d.rx, -d.h, d.rx, 0.0, |p, x, y, _, _| {
             if -y > top {
                 return;
             }
-            let e = reach_px(d, x, y);
-            if e >= 1.0 || self.vein_at(d, x, y, t).is_some() {
+            let (e, film, arc, glint) = match px(d, x, y) {
+                Some(px) => (px.r, px.film, px.arc, px.glint),
+                None => film_at(d, x, y),
+            };
+            if e >= 1.0 || self.vein_at(d, x, y, dent).is_some() {
                 return;
             }
-            // glass: clear in the middle so the character shows through, thicker toward the rim where the eye looks
-            // through more of the film (a Fresnel falloff), a little deeper at the base where the blood pools
-            let edge = e * e * e * e;
-            let low = 1.0 + y / d.h.max(1.0);
-            let k =
-                (0.07 + 0.42 * edge + 0.08 * low * low) * (1.0 + 0.4 * b + 0.5 * flash) * d.left;
-            p.light(x, y, GLOW, k);
-            // a highlight on the upper left, where the light falls: a crescent just inside the rim, dithered at its ends
-            let ang = libm::atan2(-y / d.h.max(1.0), x / d.rx.max(1.0));
-            let arc = smooth(0.62 * PI, 0.72 * PI, ang) * (1.0 - smooth(0.86 * PI, 0.95 * PI, ang));
+            p.light(x, y, GLOW, film * (1.0 + 0.4 * b + 0.5 * flash) * d.left);
             let odd = libm::fmod(libm::floor(x) + libm::floor(y), 2.0) != 0.0;
             if arc > 0.0 && (0.7..0.88).contains(&e) && (arc > 0.5 || !odd) {
                 p.light(x, y, self.c(PALE), 0.55 * arc * d.left);
@@ -627,8 +571,6 @@ impl State {
                 p.dot(x, y, self.c(c), (0.6 + 0.4 * arc) * d.left);
             }
             // a small glint low on the right, where the light leaves
-            let glint =
-                smooth(0.12 * PI, 0.18 * PI, ang) * (1.0 - smooth(0.24 * PI, 0.3 * PI, ang));
             if glint > 0.5 && (0.78..0.82).contains(&e) {
                 p.dot(x, y, self.c(PALE), 0.8 * d.left);
             }
@@ -645,9 +587,19 @@ impl State {
         let thick = 1.0 + 0.3 * b;
         let glow = d.left * (1.0 + 0.5 * b);
         let top = d.h * d.fill;
+        let dent = self.dent(t);
+        // the dent moves a point at most |k| pixels, and reach changes at most 1/43 per pixel (it is a norm of x / RX
+        // and y / H), so a pixel whose undented reach is this far from the band cannot be brought into it
+        let slack = libm::fabs(dent) / RX.min(H) * 1.05 + 1e-6;
         p.each(-d.rx - 4.0, -d.h - 4.0, d.rx + 4.0, 0.0, |p, x, y, _, _| {
+            if dent != 0.0
+                && let Some(px) = px(d, x, y)
+                && out_of_band(px.r, slack, libm::sqrt(x * x + y * y) - libm::fabs(dent))
+            {
+                return;
+            }
             // read the shape where the dent moved this pixel from
-            let (wx, wy) = self.warp(d, x, y, t);
+            let (wx, wy) = self.warp(d, x, y, dent);
             let (sx, sy) = (2.0 * x - wx, 2.0 * y - wy);
             if -sy > top + 1.0 {
                 return;
@@ -669,7 +621,7 @@ impl State {
             };
             if let Some(&k) = light
                 && ((-2.0..2.0).contains(&inside) || !odd)
-                && (inside < 2.0 || self.vein_at(d, x, y, t).is_none())
+                && (inside < 2.0 || self.vein_at(d, x, y, dent).is_none())
             {
                 p.light(x, y, GLOW, k * glow);
             }
@@ -719,7 +671,7 @@ impl State {
             let ph = libm::fmod(t - WHOLE - 0.1 + i as f64 * 0.4, period) / period;
             let v = 0.85 * (1.0 - ph * ph);
             let (x, y, _) = surface(d, az, v);
-            let (x, y) = self.warp(d, x, y, t);
+            let (x, y) = self.warp(d, x, y, self.dent(t));
             self.droplet(p, (x, y), 2, (0.0, -1.0), 1.0);
         }
     }
@@ -917,5 +869,28 @@ impl State {
                 self.droplet(p, (x, y), 2, (0.0, -1.0), 1.0);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_baked_veins_were_grown_for_this_dome() {
+        // the map is the whole dome, so a dome of another size needs the veins grown again
+        assert_eq!(
+            (MAP_W, MAP_ROWS),
+            (2 * RX as usize + 1, H as usize + 1),
+            "run examples/bake_blood_shield.rs again"
+        );
+        assert!(
+            VEINS
+                .iter()
+                .all(|&(c, r, tone, born)| usize::from(c) < MAP_W
+                    && usize::from(r) < MAP_ROWS
+                    && usize::from(tone) < BLOOD.len()
+                    && (0.0..=1.0).contains(&born))
+        );
     }
 }

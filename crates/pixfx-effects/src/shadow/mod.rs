@@ -4,6 +4,8 @@ pub mod lib;
 
 #[cfg(feature = "shadow-blood-shield")]
 mod blood_shield;
+#[cfg(feature = "shadow-blood-shield")]
+mod blood_shield_veins;
 #[cfg(feature = "shadow-void-orb")]
 mod void_orb;
 #[cfg(feature = "shadow-winter-ordeal")]
