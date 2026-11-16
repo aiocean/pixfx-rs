@@ -58,7 +58,25 @@ pub enum Doing {
         recover: f64,
         reach: f64,
         damage: f64,
+        /// The skill is an ultimate.
+        #[cfg_attr(feature = "serde", serde(default))]
+        ultimate: bool,
     },
+}
+
+/// A skill of the fighter's own under way: `t` seconds into its `phase`, of `windup` and `recover` seconds.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(rename_all = "camelCase", deny_unknown_fields)
+)]
+#[cfg_attr(feature = "ts", derive(tsify::Tsify))]
+pub struct Acting {
+    pub phase: ActPhase,
+    pub t: f64,
+    pub windup: f64,
+    pub recover: f64,
 }
 
 /// The fighter itself.
@@ -94,6 +112,9 @@ pub struct Me {
     pub shield: bool,
     /// A seeker of its own still hunts the foe.
     pub seeker_out: bool,
+    /// The skill it is using, if any.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub act: Option<Acting>,
 }
 
 /// The foe.
@@ -190,6 +211,11 @@ pub struct Sense {
     /// or shrink in a fight says so here), in that order; a skill past the end of the list strikes at 1.
     #[cfg_attr(feature = "serde", serde(default))]
     pub power: Vec<f64>,
+    /// How many times each skill handed to `Mind::new` lands its stacking statuses (`Inflicts::chill`, `shock`) now,
+    /// as a multiple of what it inflicts (a game whose skills grow says so here), in that order; a skill past the
+    /// end of the list lands them once.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub stacks: Vec<f64>,
     /// The game's castable slots in its own fixed layout, each the index of a skill handed to `Mind::new` or `None`
     /// for an empty slot. Only a policy reads it (`policy::observe`, `policy::legal`); the utility mind does not.
     #[cfg_attr(feature = "serde", serde(default))]

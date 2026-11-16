@@ -29,7 +29,7 @@ pub use pick::{Read, pick};
 pub use posture::{Category, Held, POSTURES, PostureDef, choose_posture};
 pub use reading::{Reading, is_area, is_close, is_ranged, punisher, read_posture};
 pub use rng::Rng;
-pub use sense::{ActPhase, Arena, Doing, Foe, Me, Sense, Threat, ThreatShape};
+pub use sense::{ActPhase, Acting, Arena, Doing, Foe, Me, Sense, Threat, ThreatShape};
 pub use skill::{BodySize, Inflicts, Profile, Skill, SkillKind};
 pub use view::Delayed;
 pub use yomi::Yomi;

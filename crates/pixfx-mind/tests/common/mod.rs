@@ -100,6 +100,7 @@ pub fn me(x: f64) -> Me {
         barrier: false,
         shield: false,
         seeker_out: false,
+        act: None,
     }
 }
 
@@ -143,6 +144,7 @@ pub fn sense(time: f64, me: Me, foe: Foe) -> Sense {
         threats: vec![],
         ready: vec![true; n],
         power: vec![],
+        stacks: vec![],
         slots: vec![],
     }
 }
@@ -156,6 +158,7 @@ pub fn blade_windup(t: f64) -> Doing {
         recover: 0.32,
         reach: 24.0,
         damage: 5.0,
+        ultimate: false,
     }
 }
 

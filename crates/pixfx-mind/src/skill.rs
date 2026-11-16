@@ -31,7 +31,8 @@ pub enum SkillKind {
     Blink,
 }
 
-/// What a skill does to the one it lands on, besides damage.
+/// What a skill does to the one it lands on (or, for a skill that answers a blow, to the one that strikes it), besides
+/// damage: each kind of effect with its size and how long it lasts. Zero where it does not.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -40,17 +41,38 @@ pub enum SkillKind {
 )]
 #[cfg_attr(feature = "ts", derive(tsify::Tsify))]
 pub struct Inflicts {
-    /// Seconds frozen.
+    /// Seconds frozen: no moving, no acting.
     pub freeze: f64,
-    pub shock: bool,
-    /// Seconds silenced.
+    /// Seconds stunned: no moving, no acting.
+    pub stun: f64,
+    /// Seconds silenced: no casting.
     pub silence: f64,
     /// Seconds of broken defence.
     pub def_down: f64,
-    pub burn: bool,
-    pub chill: bool,
+    /// Share of defence lost while it is broken.
+    pub def_loss: f64,
+    /// Seconds it burns.
+    pub burn: f64,
+    /// Share of the caster's attack a burn takes each second.
+    pub burn_rate: f64,
+    /// Chill stacks one hit adds: each slows, the last one it can hold freezes.
+    pub chill: f64,
+    /// The most chill stacks it can hold.
+    pub chill_max: f64,
+    /// Share of walking speed each chill stack takes.
+    pub slow: f64,
+    /// Shock stacks one hit adds: each twitches once, hurting and holding it.
+    pub shock: f64,
+    /// The most shock stacks it can hold.
+    pub shock_max: f64,
+    /// Seconds each twitch holds it.
+    pub shock_hold: f64,
+    /// Share of the caster's attack each twitch takes.
+    pub shock_rate: f64,
     /// How hard it drags the foe in, game pixels a second.
     pub pull: f64,
+    /// Rage taken from it (and given to the caster).
+    pub steal_rage: f64,
 }
 
 /// One skill a fighter holds. Times in seconds, lengths in game pixels.

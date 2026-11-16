@@ -15,6 +15,7 @@ fn opening_counts_recovery() {
         recover: 0.32,
         reach: 24.0,
         damage: 5.0,
+        ultimate: false,
     };
     let r = reading(&me(40.0), &f, &[]);
     assert!((r.opening - 0.22).abs() < 1e-9, "{}", r.opening);
@@ -39,6 +40,7 @@ fn a_long_cast_is_an_opening() {
         recover: 0.3,
         reach: 0.0,
         damage: 25.0,
+        ultimate: false,
     };
     let r = reading(&me(40.0), &f, &[]);
     assert!((r.opening - 0.7).abs() < 1e-9);
@@ -163,6 +165,7 @@ fn inputs_stay_in_unit_range() {
             recover: rng.next(),
             reach: rng.next() * 50.0,
             damage: rng.next() * 30.0,
+            ultimate: false,
         };
         let threats: Vec<Threat> = (0..i % 7)
             .map(|k| Threat {

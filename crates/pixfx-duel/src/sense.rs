@@ -1,12 +1,14 @@
 //! What a brain is told: each spell as pixfx-mind reads it (`skill_of`), and what a fighter could perceive this tick
 //! (`sense_of`).
 
-use crate::bar::{ready, slot_of};
-use crate::data::{BAR, Kind, RAGE, school, spell};
-use crate::fighter::{Fighter, Phase, Slot, State};
+use crate::bar::{has_trait, ready, slot_of};
+use crate::data::{
+    BAR, BURN, CHILL, DEF_DOWN, Kind, RAGE, SHOCK, Spell, TRAITS, Trait, school, spell,
+};
+use crate::fighter::{Act, Fighter, Phase, Slot, State};
 use crate::shot::{ShotKind, orb_at};
 use pixfx_mind::{
-    ActPhase, Arena, Doing, Foe, Inflicts, Me, Sense, Skill, SkillKind, Threat, ThreatShape,
+    ActPhase, Acting, Arena, Doing, Foe, Inflicts, Me, Sense, Skill, SkillKind, Threat, ThreatShape,
 };
 
 /// Spell `name` as pixfx-mind reads it: what it does, never what it is called (a heal's `damage` is what it heals).
@@ -26,15 +28,7 @@ pub fn skill_of(name: &str) -> Skill {
             strikes: 1,
             ultimate: false,
             grounded: false,
-            inflicts: Inflicts {
-                freeze: 0.0,
-                shock: false,
-                silence: 0.0,
-                def_down: 0.0,
-                burn: false,
-                chill: false,
-                pull: 0.0,
-            },
+            inflicts: Inflicts::default(),
         };
     };
     let kind = if s.dive {
@@ -83,36 +77,90 @@ pub fn skill_of(name: &str) -> Skill {
         strikes: s.strikes.map_or(1, |n| n as u32),
         ultimate: s.ultimate,
         grounded: s.grounded,
-        inflicts: Inflicts {
-            freeze: s.freeze.unwrap_or(0.0),
-            shock: s.shock,
-            silence: s.silence.unwrap_or(0.0),
-            def_down: s.def_down.unwrap_or(0.0),
-            burn: s.burn,
-            chill: s.chill,
-            pull: s.pull.unwrap_or(0.0),
-        },
+        inflicts: inflicts_of(s),
     }
+}
+
+/// What spell `s` leaves on the one it lands on (the bell: on the one striking it), with the duel's sizes.
+fn inflicts_of(s: &Spell) -> Inflicts {
+    let def_down = s.def_down.unwrap_or(0.0);
+    let (chill, shock) = (
+        if s.chill { 1.0 } else { 0.0 },
+        if s.shock { 1.0 } else { 0.0 },
+    );
+    Inflicts {
+        freeze: s.freeze.unwrap_or(0.0),
+        stun: s.counter.map_or(0.0, |c| c.stun),
+        silence: s.silence.unwrap_or(0.0),
+        def_down,
+        def_loss: if def_down != 0.0 { DEF_DOWN } else { 0.0 },
+        burn: if s.burn { BURN.time } else { 0.0 },
+        burn_rate: if s.burn { BURN.share / BURN.every } else { 0.0 },
+        chill,
+        chill_max: CHILL.max * chill,
+        slow: (1.0 - CHILL.slow) * chill,
+        shock,
+        shock_max: SHOCK.max * shock,
+        shock_hold: SHOCK.hold * shock,
+        shock_rate: SHOCK.share * shock,
+        pull: s.pull.unwrap_or(0.0),
+        steal_rage: s.steal_rage.unwrap_or(0.0),
+    }
+}
+
+/// The skill fighter `f` is using, as pixfx-mind reads it.
+fn acting_of(f: &Fighter) -> Option<Acting> {
+    let a = f.act?;
+    let (windup, recover) = spell(a.spell).map_or((0.0, 0.0), |s| (s.windup, recover_span(&a, s)));
+    let phase = if a.phase == Phase::Windup {
+        ActPhase::Windup
+    } else {
+        ActPhase::Recover
+    };
+    Some(Acting {
+        phase,
+        t: a.t,
+        windup,
+        recover,
+    })
+}
+
+/// Seconds act `a` of spell `sp` recovers for.
+fn recover_span(_a: &Act, sp: &Spell) -> f64 {
+    sp.recover
+}
+
+/// How many times each spell of fighter `f` lands its stacks now: once, once more evolved, more again lingering
+/// (as `act::begin` counts them).
+fn stacks_of(f: &Fighter) -> Vec<f64> {
+    f.spells
+        .iter()
+        .map(|n| {
+            let slot = slot_of(f, n);
+            let evolved = matches!(slot, Some(Slot::Held { evolved: true, .. }));
+            let lingering = if has_trait(slot, Trait::Lingering) {
+                TRAITS.lingering_stacks
+            } else {
+                0.0
+            };
+            1.0 + if evolved { 1.0 } else { 0.0 } + lingering
+        })
+        .collect()
 }
 
 /// What fighter `f` is doing, as pixfx-mind reads it.
 pub fn doing_of(f: &Fighter) -> Doing {
-    if let Some(a) = f.act {
+    if let (Some(a), Some(acting)) = (f.act, acting_of(f)) {
         let skill = skill_of(a.spell);
-        let (windup, recover) = spell(a.spell).map_or((0.0, 0.0), |s| (s.windup, s.recover));
-        let phase = if a.phase == Phase::Windup {
-            ActPhase::Windup
-        } else {
-            ActPhase::Recover
-        };
         return Doing::Act {
             kind: skill.kind,
-            phase,
-            t: a.t,
-            windup,
-            recover,
+            phase: acting.phase,
+            t: acting.t,
+            windup: acting.windup,
+            recover: acting.recover,
             reach: skill.reach,
             damage: skill.damage,
+            ultimate: skill.ultimate,
         };
     }
     if f.guard > 0.0 {
@@ -235,6 +283,7 @@ pub fn sense_of(state: &State, me: usize) -> Sense {
                 .shots
                 .iter()
                 .any(|s| matches!(s.kind, ShotKind::Orb { .. }) && s.owner == me),
+            act: acting_of(f),
         },
         foe: Foe {
             x: foe.body.x,
@@ -266,6 +315,7 @@ pub fn sense_of(state: &State, me: usize) -> Sense {
                 _ => 1.0,
             })
             .collect(),
+        stacks: stacks_of(f),
         slots: slots_of(f),
     }
 }

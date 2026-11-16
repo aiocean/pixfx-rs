@@ -120,6 +120,7 @@ fn scenario_punishes_a_whiff() {
             recover: 3.0,
             reach: 24.0,
             damage: 5.0,
+            ultimate: false,
         };
         sense(t, me(40.0), f)
     });

@@ -168,6 +168,7 @@ fn a_barrier_answers_a_big_threat() {
         recover: 0.35,
         reach: 38.0,
         damage: 20.0,
+        ultimate: false,
     };
     let cands = Case::new(me(40.0), f).candidates();
     assert!(casts(&cands).contains(&"mirror".to_string()));

@@ -53,7 +53,8 @@ mod serde_shapes {
                 windup: 0.2,
                 recover: 0.32,
                 reach: 24.0,
-                damage: 5.0
+                damage: 5.0,
+                ultimate: false
             }
         );
         assert_eq!(sense.ready, vec![true, false]);
