@@ -1,7 +1,7 @@
 //! The screen's answer to the fight, driven the way a game drives it: what the fight did, then real time passing
 //! (the site's `duel-feel.test.js`).
 
-use pixfx_fighter::feel::{Cue, Feel, NumberKind};
+use pixfx_fighter::feel::{Cue, Feel, How, NumberKind};
 
 const FRAME: f64 = 1.0 / 60.0;
 
@@ -33,7 +33,45 @@ fn hit(
         damage,
         x,
         y,
+        how: How::Plain,
     }
+}
+
+/// The same blow, landed as `how` (a counter, a punish).
+fn landed(cue: Cue, as_how: How) -> Cue {
+    match cue {
+        Cue::Hit {
+            by,
+            power,
+            launch,
+            crit,
+            ranged,
+            share,
+            damage,
+            x,
+            y,
+            ..
+        } => Cue::Hit {
+            by,
+            power,
+            launch,
+            crit,
+            ranged,
+            share,
+            damage,
+            x,
+            y,
+            how: as_how,
+        },
+        other => other,
+    }
+}
+
+/// Seconds of fight a cue's hit-stop takes out of the next second.
+fn stopped(cue: Cue) -> f64 {
+    let mut feel = Feel::new();
+    feel.react(&[cue]);
+    1.0 - fight_time(&mut feel, 1.0)
 }
 
 #[test]
@@ -105,6 +143,81 @@ fn damage_floats_up_from_the_blow_and_fades_away() {
     assert!(later.y > first.y);
     fight_time(&mut feel, 1.0);
     assert_eq!(feel.numbers(), vec![]);
+}
+
+#[test]
+fn a_counter_or_a_punish_stops_the_fight_longer_than_the_same_plain_blow_never_past_the_cap() {
+    let medium = hit(0, (9.0, false, false), 10.0, 100.0, (0.0, 0.0));
+    let plain = stopped(medium);
+    let counter = stopped(landed(medium, How::Counter));
+    let punish = stopped(landed(medium, How::Punish));
+    assert!(
+        (counter - plain - 2.0 / 60.0).abs() < 0.5 / 60.0,
+        "plain {plain} counter {counter}"
+    );
+    assert!(
+        (punish - plain - 3.0 / 60.0).abs() < 0.5 / 60.0,
+        "plain {plain} punish {punish}"
+    );
+    // a crit that throws already sits at the cap: a punish adds nothing past it
+    let heaviest = landed(
+        hit(0, (20.0, true, true), 30.0, 0.0, (0.0, 0.0)),
+        How::Punish,
+    );
+    assert!(stopped(heaviest) <= 13.0 / 60.0 + 1e-9);
+}
+
+#[test]
+fn a_counter_or_a_punish_shakes_the_screen_like_a_crit() {
+    let blow = hit(0, (9.0, false, false), 10.0, 100.0, (0.0, 0.0));
+    let shaken = |cue: Cue| {
+        let mut feel = Feel::new();
+        feel.react(&[cue]);
+        feel.trauma()
+    };
+    let crit = shaken(hit(0, (9.0, false, true), 10.0, 100.0, (0.0, 0.0)));
+    assert!((shaken(landed(blow, How::Counter)) - crit).abs() < 1e-9);
+    assert!((shaken(landed(blow, How::Punish)) - crit).abs() < 1e-9);
+}
+
+#[test]
+fn a_punish_floats_its_word_above_the_damage() {
+    let mut feel = Feel::new();
+    feel.react(&[landed(
+        hit(1, (9.0, false, false), 9.4, 940.0, (80.0, 20.0)),
+        How::Punish,
+    )]);
+    let numbers = feel.numbers();
+    assert_eq!(numbers.len(), 2);
+    let (damage, word) = (&numbers[0], &numbers[1]);
+    assert_eq!(
+        (damage.text.as_str(), damage.kind),
+        ("940", NumberKind::Hit)
+    );
+    assert_eq!(
+        (word.x, word.text.as_str(), word.by, word.kind),
+        (80.0, "PUNISH!", Some(1), NumberKind::Punish)
+    );
+    assert!(word.y > damage.y);
+}
+
+#[test]
+fn a_counter_floats_counter_and_a_plain_blow_floats_no_word() {
+    let blow = hit(0, (5.0, false, false), 5.0, 50.0, (40.0, 20.0));
+    let words = |cue: Cue| {
+        let mut feel = Feel::new();
+        feel.react(&[cue]);
+        feel.numbers()
+            .into_iter()
+            .filter(|n| n.kind != NumberKind::Hit)
+            .map(|n| (n.text, n.kind))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        words(landed(blow, How::Counter)),
+        vec![("COUNTER!".to_string(), NumberKind::Counter)]
+    );
+    assert_eq!(words(blow), vec![]);
 }
 
 mod effect_cues {
