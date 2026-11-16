@@ -42,7 +42,7 @@ const HIT_Y: NumOpt = NumOpt::new("hitY", -34.0).within(-90.0, 6.0);
 const META: Meta = Meta {
     id: "shadow/blood-shield",
     name: "Blood shield",
-    desc: "A pool of blood spreads under the character and six streams curl up from it into a crimson dome laced with veins; it beats like a heart while droplets slide down it; a blow dents it, ripples run across it and droplets splatter away; then it sags, drips and drains back into the ground.",
+    desc: "A pool of blood spreads under the character and veins grow up out of it into a glassy crimson dome; it beats like a heart while droplets slide down it; a blow dents it, ripples run across it and droplets splatter away; then the bubble pops into shards and the veins sink back into the pool.",
     tags: &[
         "shadow",
         "blood",
@@ -94,21 +94,20 @@ const LIGHT: (f64, f64) = (-0.6, -0.8);
 /// The red the dome and the pool light with.
 const GLOW: Rgba = Rgba::hex24(0xff2a36);
 
-/// Seconds: the pool is full, the streams have met, the dome is whole, the blow, the melt starts, it has drained,
-/// the stain is gone.
+/// Seconds: the pool is full, the film starts to close, the dome is whole, the blow, the bubble pops, the veins are
+/// back in the pool, the pool is gone.
 const POOLED: f64 = 0.25;
 const MET: f64 = 0.62;
 const WHOLE: f64 = 0.9;
 const HIT: f64 = 1.6;
-/// The bubble pops.
 const POP: f64 = 2.6;
 const DRAINED: f64 = 3.3;
 const GONE: f64 = 3.8;
 /// The heartbeat's period while it holds.
 const BEAT: f64 = 0.6;
-/// The drips, the splatter.
 /// The shards the rim breaks into when the bubble pops.
 const SHARDS: usize = 30;
+/// The droplets the blow throws.
 const SPLATTER: usize = 10;
 /// How deep the dent goes and how wide it is.
 const DENT: f64 = 7.0;
@@ -221,13 +220,7 @@ const MAIN_VEINS: [&[(f64, f64)]; 6] = [
 /// then painted as strokes tapering from trunk to twig. Each pixel holds its tone (an index into [`BLOOD`]: a dark core, a lighter edge) and when it grew
 /// (0 the trunks' feet, 1 the last twig), so INIT grows them and the heartbeat runs out along them.
 fn grow_veins(seed: f64) -> Vec<(u8, f32, f32)> {
-    let whole = Dome {
-        rx: RX,
-        h: H,
-        fill: 1.0,
-        left: 1.0,
-        grow: 1.0,
-    };
+    let whole = whole_dome();
     let mut tree = Tree::default();
     for (i, path) in MAIN_VEINS.iter().enumerate() {
         let points: Vec<(f64, f64)> = path.iter().map(|&(u, v)| (u * RX, -v * H)).collect();
@@ -303,6 +296,17 @@ struct Dome {
     grow: f64,
 }
 
+/// The dome whole and still: its full size, filled, the veins grown.
+fn whole_dome() -> Dome {
+    Dome {
+        rx: RX,
+        h: H,
+        fill: 1.0,
+        left: 1.0,
+        grow: 1.0,
+    }
+}
+
 fn dome(t: f64) -> Dome {
     // the film and rim are there until the bubble pops; the veins then draw back into the pool, INIT in reverse
     let popped = if t >= POP { 0.0 } else { 1.0 };
@@ -330,6 +334,64 @@ fn beat(t: f64) -> f64 {
 /// `v` to the power the dome's outline takes (its sides near upright, its crown round).
 fn pw(v: f64) -> f64 {
     libm::pow(v.max(0.0), 2.0 / N)
+}
+
+/// [`reach`] for every pixel centre of the whole dome's box, worked out once for every shield: the dome keeps its
+/// size, so a frame reads its pixels' reach here instead of paying three `pow`s a pixel. The same numbers as
+/// [`reach`], bit for bit; a point off the table (the dent moved it, or it is outside the box) is worked out.
+struct ReachTable {
+    x0: f64,
+    y0: f64,
+    w: usize,
+    v: Vec<f64>,
+}
+
+/// The box the table covers, in whole pixels: the rim reaches 4 past the outline.
+const TABLE_X0: f64 = -RX - 6.0;
+const TABLE_Y0: f64 = -H - 6.0;
+const TABLE_W: usize = (2.0 * RX + 12.0) as usize;
+const TABLE_H: usize = (H + 8.0) as usize;
+
+static REACH: std::sync::OnceLock<ReachTable> = std::sync::OnceLock::new();
+
+fn reach_table() -> &'static ReachTable {
+    REACH.get_or_init(|| {
+        let whole = whole_dome();
+        let mut v = Vec::with_capacity(TABLE_W * TABLE_H);
+        for j in 0..TABLE_H {
+            for i in 0..TABLE_W {
+                v.push(reach(
+                    &whole,
+                    TABLE_X0 + i as f64 + 0.5,
+                    TABLE_Y0 + j as f64 + 0.5,
+                ));
+            }
+        }
+        ReachTable {
+            x0: TABLE_X0,
+            y0: TABLE_Y0,
+            w: TABLE_W,
+            v,
+        }
+    })
+}
+
+/// [`reach`] at a pixel, from the table when the point is one of its pixel centres on the whole dome.
+fn reach_px(d: &Dome, x: f64, y: f64) -> f64 {
+    if d.rx == RX && d.h == H {
+        let tb = reach_table();
+        let (fi, fj) = (x - 0.5 - tb.x0, y - 0.5 - tb.y0);
+        if fi >= 0.0
+            && fj >= 0.0
+            && fi == libm::floor(fi)
+            && fj == libm::floor(fj)
+            && (fi as usize) < tb.w
+            && let Some(&r) = tb.v.get(fj as usize * tb.w + fi as usize)
+        {
+            return r;
+        }
+    }
+    reach(d, x, y)
 }
 
 /// How far out a point is, 1 on the outline: the dome is the superellipse |x/rx|^N + |y/h|^N = 1 above the base.
@@ -541,7 +603,7 @@ impl State {
             if -y > top {
                 return;
             }
-            let e = reach(d, x, y);
+            let e = reach_px(d, x, y);
             if e >= 1.0 || self.vein_at(d, x, y, t).is_some() {
                 return;
             }
@@ -590,7 +652,7 @@ impl State {
             if -sy > top + 1.0 {
                 return;
             }
-            let r = reach(d, sx, sy);
+            let r = reach_px(d, sx, sy);
             if r <= 0.0 {
                 return;
             }
