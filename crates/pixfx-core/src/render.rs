@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::actor::Actor;
 use crate::effect::{Effect, Instance, Layer, Options};
+use pixfx_draw::Painter;
 use pixfx_draw::frame::Frame;
 use pixfx_draw::math::js_round;
 
@@ -72,6 +73,57 @@ pub fn render_frames_with_actor(
         fps: meta.fps,
         origin: canvas.origin,
         margin,
+        frames,
+    }
+}
+
+/// Every frame of `effect` on its own canvas with the sprite it wraps drawn too: its back layer, the sprite
+/// (`actor(k)` at frame `k`, placed in the effect's space and handed to it), then its front layer, as a game shows
+/// them. For previews of a sprite-aware effect, which [`render_frames_with_actor`] leaves with a hole where the
+/// sprite stands.
+pub fn render_frames_on_actor(
+    effect: &'static dyn Effect,
+    opts: &Options,
+    actor: impl Fn(u64) -> Option<Arc<Actor>>,
+) -> Rendered {
+    let meta = effect.meta();
+    let canvas = effect.canvas(opts);
+    let (w, h) = canvas.size;
+    let (ox, oy) = (f64::from(canvas.origin.0), f64::from(canvas.origin.1));
+    let at_origin = Options {
+        x: ox,
+        y: oy,
+        ..opts.clone()
+    };
+    let mut inst = Instance::new(effect, at_origin);
+    let fade = !meta.is_screen();
+    let n = meta.frames();
+    let mut frames = Vec::with_capacity(n as usize);
+    for k in 0..n {
+        let sprite = actor(k);
+        inst.set_actor(sprite.clone());
+        inst.seek(k);
+        let mut frame = Frame::new(w, h, 0, 0);
+        inst.draw(&mut frame, Layer::Back, inst.placement());
+        if let Some(a) = &sprite {
+            let mut p = Painter::new(&mut frame);
+            p.place(ox, oy, false, 0.0);
+            for (x, y, c) in a.opaque() {
+                p.px(f64::from(x), f64::from(y), c);
+            }
+        }
+        inst.draw(&mut frame, Layer::Front, inst.placement());
+        if fade {
+            edge_fade(&mut frame);
+        }
+        frames.push(frame);
+    }
+    Rendered {
+        w,
+        h,
+        fps: meta.fps,
+        origin: canvas.origin,
+        margin: 0,
         frames,
     }
 }

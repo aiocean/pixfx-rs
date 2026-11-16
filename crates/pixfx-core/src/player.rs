@@ -46,6 +46,16 @@ impl Clip {
         self.effect.meta()
     }
 
+    /// The effect it plays.
+    pub fn effect(&self) -> &'static dyn Effect {
+        self.effect
+    }
+
+    /// The options it plays with, its origin where its canvas puts it.
+    pub fn opts(&self) -> &Options {
+        &self.opts
+    }
+
     /// Whether its effect grips the character it plays on ([`Effect::wraps_actor`]).
     pub fn wraps_actor(&self) -> bool {
         self.effect.wraps_actor()
@@ -358,7 +368,11 @@ pub fn light_rgba_in<'a>(frame: &Frame, b: PixelBox, out: &'a mut [u8]) -> &'a [
     let b = b.within(frame.w, frame.h);
     unpack(&frame.light, frame.w, b, out, |word| {
         // most of a frame is unlit, and unlit is transparent: skip the blend for it
-        if word & 0x00ff_ffff == 0 { [0; 4] } else { composite_px(0, word, None) }
+        if word & 0x00ff_ffff == 0 {
+            [0; 4]
+        } else {
+            composite_px(0, word, None)
+        }
     })
 }
 

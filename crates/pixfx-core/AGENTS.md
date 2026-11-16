@@ -11,6 +11,13 @@ The effect model and game feel, painted with `pixfx-draw`:
   (`render_frames`, `edge_fade`), `player` (`Player`: one effect on its own canvas), `key` (`ClipKey`, `FrameId`),
   `frames` (`FrameStore`, `FRAME_BUDGET`), `state` (`Creature`), `light_color` (the colour an effect lights its
   surroundings in).
+- Orders: `volley` (`Order` with the caster's body, `Aim`, `Launch`, `Path`, `Tail`, and `Volley::aim`, which plans
+  like pieces toward a point: converge or pierce, each held first, flying on past the point, with a tail). An effect
+  answers `Effect::order`; `pixfx-scene` flies what it returns and strikes it on bodies. `Effect::loop_from`
+  lets a loop open once and then repeat only what follows.
+- Motion: `trace` (`Trace`, `TracePoint` with its angle, `steps`) and `motion` (`at`, `velocity`, `speed`,
+  `heading`, `turn`, `spin`, `acceleration`, `poses` for `pixfx_draw::sweep`): how a moving thing moves, read
+  once for every effect. An effect asks for its trace with `Effect::traces` and takes it in `set_trace`.
 - Sprite awareness: `actor` (`Actor`: the sprite an effect wraps, `opaque()` its pixels) and `silhouette`
   (`Silhouette`, `Area`: the body in the effect's cells, its edge, an outline ring, the cells round it by distance,
   a random cell of it). Every effect that reads its sprite goes through these, so a new query lands here once.

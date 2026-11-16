@@ -131,6 +131,30 @@ pub trait Effect: Send + Sync {
     fn replaces_actor(&self) -> bool {
         false
     }
+    /// It draws the way a mover came ([`crate::trace`], `pixfx_scene::Scene::trail`): the seconds of trace it
+    /// wants, or none (the default). Its frames depend on the trace and are its instance's own, never shared.
+    fn traces(&self, _opts: &Options) -> Option<f64> {
+        None
+    }
+    /// For a looping effect that opens once before it loops: the seconds its opening takes. Its frames from then to
+    /// [`Meta::duration`] repeat; the ones before play once. None (the default) loops from the start. Cues, if
+    /// the effect fires any, repeat every `duration` as for any loop.
+    fn loop_from(&self) -> Option<f64> {
+        None
+    }
+    /// Its answer to `order` while an instance plays: the volley the scene launches in its place
+    /// ([`crate::volley`]), from where the instance stands (`at`, game pixels on the stage, mirrored when
+    /// `flip`) at time `t` into it. Empty (the default) when it takes no orders.
+    fn order(
+        &self,
+        _opts: &Options,
+        _t: f64,
+        _at: (f64, f64),
+        _flip: bool,
+        _order: &crate::volley::Order,
+    ) -> Vec<crate::volley::Launch> {
+        Vec::new()
+    }
 }
 
 /// One instance's state.
@@ -144,6 +168,9 @@ pub trait EffectState: Send {
     /// The character it plays on, as its sprite shows now, or none; [`Sim`] hands it over before every step and
     /// again after a respawn. Only an effect that [`Effect::wraps_actor`] reads it.
     fn set_actor(&mut self, _actor: Option<Arc<Actor>>) {}
+    /// The way its mover came, or none; [`Sim`] hands it over before every step and again after a respawn. Only
+    /// an effect that [`Effect::traces`] reads it.
+    fn set_trace(&mut self, _trace: Option<Arc<crate::trace::Trace>>) {}
 }
 
 /// An option value beyond the common ones: a number, a colour ramp or a single colour.
@@ -500,7 +527,19 @@ impl Clock {
         let n = self.effect.meta().frames();
         let k = self.clock_frame();
         if self.effect.meta().looping {
-            k % n
+            match self.effect.loop_from() {
+                // the opening plays once, then the rest loops
+                Some(a) => {
+                    let fps = f64::from(self.effect.meta().fps);
+                    let open = (libm::floor(a * fps + FRAME_SLACK).max(0.0) as u64).min(n - 1);
+                    if k < open {
+                        k
+                    } else {
+                        open + (k - open) % (n - open)
+                    }
+                }
+                None => k % n,
+            }
         } else {
             k.min(n - 1)
         }
@@ -562,6 +601,8 @@ pub struct Sim {
     tick_t: f64,
     /// The character it plays on, handed to the state again whenever it is respawned.
     actor: Option<Arc<Actor>>,
+    /// The way its mover came, handed to the state again whenever it is respawned.
+    trace: Option<Arc<crate::trace::Trace>>,
 }
 
 impl Sim {
@@ -575,6 +616,21 @@ impl Sim {
             tick: 0,
             tick_t: 0.0,
             actor: None,
+            trace: None,
+        }
+    }
+
+    /// The way its mover came from the next step, or none ([`EffectState::set_trace`]). Handing over the same
+    /// trace again changes nothing.
+    pub fn set_trace(&mut self, trace: Option<Arc<crate::trace::Trace>>) {
+        let same = match (&self.trace, &trace) {
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+            (None, None) => true,
+            _ => false,
+        };
+        if !same {
+            self.trace = trace;
+            self.state.set_trace(self.trace.clone());
         }
     }
 
@@ -604,6 +660,7 @@ impl Sim {
         if k < self.tick {
             self.state = self.effect.spawn(&self.opts, self.seed);
             self.state.set_actor(self.actor.clone());
+            self.state.set_trace(self.trace.clone());
             self.tick = 0;
             self.tick_t = 0.0;
         }

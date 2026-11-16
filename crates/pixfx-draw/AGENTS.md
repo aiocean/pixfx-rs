@@ -5,10 +5,13 @@ before changing anything here; this file only says what this crate holds.
 
 ## Job
 
-Pixels and nothing else: `Frame` with a colour layer and an additive light layer, the `painter`, `shapes`, `blend`
-and `composite`, `frame_hash`, `color` (`Rgba`, `hex`), `palette` presets, `RgbaImage`
-(plain RGBA bytes: a sprite leaving the engine or a picture coming in), and the JS-number maths in `math`
-(`js_round`, `js_max`, `js_min`, `clamp`). Every other crate paints through it.
+Pixels and nothing else: `Frame` with a colour layer and an additive light layer, the `painter`, `shapes`, `halo`
+(a glow painted in solid steps round strokes, as pixel artists draw it), `blend` and `composite`, `frame_hash`,
+`sweep` (a `Brush` of cells swept along poses, coloured by age: every streak, trail and smear; the brush is the
+mover's cross-section: `column` for a thin mover, `edge` for a broad body's back edge, `from_column` for a turning
+blade), `color` (`Rgba`,
+`hex`), `palette` presets, `RgbaImage` (plain RGBA bytes: a sprite leaving the engine or a picture
+coming in), and the JS-number maths in `math` (`js_round`, `js_max`, `js_min`, `clamp`). Every other crate paints through it.
 
 ## Belongs here
 

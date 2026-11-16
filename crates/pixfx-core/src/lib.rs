@@ -10,6 +10,7 @@ pub mod frames;
 pub mod hit_flash;
 pub mod key;
 pub mod light_color;
+pub mod motion;
 pub mod particles;
 pub mod player;
 pub mod render;
@@ -18,6 +19,8 @@ pub mod silhouette;
 pub mod sim;
 pub mod squash;
 pub mod state;
+pub mod trace;
+pub mod volley;
 
 pub use actor::{Actor, ActorError};
 pub use cue::{Cue, FEEL, TimedCue, cues_between, cues_of, impact};
@@ -30,7 +33,9 @@ pub use frames::{FRAME_BUDGET, FrameStore};
 pub use key::{ClipKey, FrameId};
 pub use light_color::light_color;
 pub use player::{Clip, PixelBox, Player, color_rgba_in, light_rgba_in};
-pub use render::{Rendered, edge_fade, render_frames, render_frames_with_actor};
+pub use render::{
+    Rendered, edge_fade, render_frames, render_frames_on_actor, render_frames_with_actor,
+};
 pub use screen::{Ripple, flash, ripple};
 pub use silhouette::{Area, Silhouette};
 pub use sim::{
@@ -39,3 +44,5 @@ pub use sim::{
 };
 pub use squash::{Blink, Moving, Squash, SquashSpec};
 pub use state::{Creature, StateError, StateMeta};
+pub use trace::{Step, Trace, TracePoint};
+pub use volley::{Aim, Launch, Order, Path, Shot, Tail, Volley};
