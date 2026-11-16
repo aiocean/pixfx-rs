@@ -18,7 +18,8 @@ pub enum Phase {
 }
 
 /// A cast under way: its spell, phase and time in it, where it aims, the power and stacks it strikes with, whether
-/// it pierces a guard, and the rune circle it stands in.
+/// it pierces a guard, the rune circle it stands in, and whether its blow was guarded (`blocked`: an unsafe skill
+/// then recovers longer, `FRAMES.blocked_recover`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Act {
     pub spell: &'static str,
@@ -29,6 +30,7 @@ pub struct Act {
     pub stacks: f64,
     pub pierce: bool,
     pub circle: Option<u32>,
+    pub blocked: bool,
 }
 
 /// A slot of the rotating bar: counting down to a draw, or holding a skill drawn with its tier and traits.

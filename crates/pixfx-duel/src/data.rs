@@ -457,6 +457,41 @@ pub const RING: f64 = 0.22;
 pub const BARRIER_THREAT: f64 = 10.0;
 pub const CLASH: &str = "impacts/parry";
 
+/// What being struck at a weak moment adds to a blow: its power is multiplied by `power` (the power damage and launch
+/// read), and a blow that staggers rather than throws holds its target `stagger` seconds longer.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Bonus {
+    pub power: f64,
+    pub stagger: f64,
+}
+
+/// Frame data, the way Street Fighter has it: a fighter struck while it gathers a cast takes a COUNTER, one struck
+/// while it recovers takes a PUNISH (a field's strike gives neither); the skills in `unsafe_on_block` recover
+/// `blocked_recover` seconds longer when their blow is guarded; an ultimate cannot be hit for its windup's first
+/// `ultimate_invincible` seconds. The feel answers a counter and a punish with its own longer hit-stop.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Frames {
+    pub counter: Bonus,
+    pub punish: Bonus,
+    pub blocked_recover: f64,
+    pub unsafe_on_block: &'static [&'static str],
+    pub ultimate_invincible: f64,
+}
+pub const FRAMES: Frames = Frames {
+    counter: Bonus {
+        power: 1.2,
+        stagger: 0.1,
+    },
+    punish: Bonus {
+        power: 1.2,
+        stagger: 0.2,
+    },
+    blocked_recover: 0.15,
+    // dive, dash and the close blasts; an ultimate falls as a zone, which no guard stops
+    unsafe_on_block: &["dive", "step", "palm", "burst", "lotus"],
+    ultimate_invincible: 0.3,
+};
+
 /// What a spell does when it lands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -690,7 +725,7 @@ static SPELLS: [Spell; 27] = [
         fx: Some("spawn/poof"),
         cost: 24.0,
         windup: 0.26,
-        recover: 0.32,
+        recover: 0.45,
         cooldown: 3.4,
         distance: Some(72.0),
         damage: Some(15.0),
@@ -722,7 +757,7 @@ static SPELLS: [Spell; 27] = [
         fx: Some("holy/feather-burst"),
         cost: 24.0,
         windup: 0.3,
-        recover: 0.3,
+        recover: 0.45,
         cooldown: 2.2,
         range: Some(40.0),
         damage: Some(18.0),
@@ -775,7 +810,7 @@ static SPELLS: [Spell; 27] = [
         dive: true,
         cost: 12.0,
         windup: 0.22,
-        recover: 0.4,
+        recover: 0.5,
         cooldown: 1.6,
         range: Some(26.0),
         damage: Some(11.0),
@@ -863,7 +898,7 @@ static SPELLS: [Spell; 27] = [
         fx: Some("explosions/plasma-explosion"),
         cost: 27.0,
         windup: 0.32,
-        recover: 0.35,
+        recover: 0.5,
         cooldown: 2.8,
         range: Some(38.0),
         damage: Some(20.0),
@@ -879,7 +914,7 @@ static SPELLS: [Spell; 27] = [
         ultimate: true,
         cost: 0.0,
         windup: 0.7,
-        recover: 0.5,
+        recover: 0.8,
         cooldown: 0.0,
         impact: Some(0.08),
         radius: Some(12.0),
@@ -900,7 +935,7 @@ static SPELLS: [Spell; 27] = [
         ultimate: true,
         cost: 0.0,
         windup: 0.7,
-        recover: 0.5,
+        recover: 0.8,
         cooldown: 0.0,
         impact: Some(1.02),
         radius: Some(26.0),
@@ -939,7 +974,7 @@ static SPELLS: [Spell; 27] = [
         fx: Some("holy/feather-burst"),
         cost: 35.0,
         windup: 0.85,
-        recover: 0.3,
+        recover: 0.45,
         cooldown: 9.0,
         amount: Some(20.0),
         ..BASE
@@ -1017,7 +1052,7 @@ static SPELLS: [Spell; 27] = [
         fx: Some("explosions/plasma-explosion"),
         cost: 30.0,
         windup: 0.36,
-        recover: 0.4,
+        recover: 0.5,
         cooldown: 3.0,
         range: Some(30.0),
         damage: Some(24.0),
@@ -1077,7 +1112,7 @@ static SPELLS: [Spell; 27] = [
         spray: Some(0.6),
         cost: 22.0,
         windup: 0.3,
-        recover: 0.3,
+        recover: 0.35,
         cooldown: 2.4,
         range: Some(56.0),
         damage: Some(14.0),

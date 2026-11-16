@@ -4,11 +4,11 @@
 
 use crate::bar::{has_trait, slot_of, spend};
 use crate::data::{
-    BURN, Blow, CAST_CIRCLE, CHIP, CLASH, FURY, GUARD_COST, KNOCKBACK, Kind, LUCKY, Luck, RING,
-    Spell, Status, TRAITS, Trait, WARD, block_chance, payoff, school, spell, tint,
+    BURN, Blow, CAST_CIRCLE, CHIP, CLASH, FRAMES, FURY, GUARD_COST, KNOCKBACK, Kind, LUCKY, Luck,
+    RING, Spell, Status, TRAITS, Trait, WARD, block_chance, payoff, school, spell, tint,
 };
 use crate::fighter::{Act, Burning, Phase, Slot, State, Told};
-use crate::out::{Out, PlayOpts};
+use crate::out::{How, Out, PlayOpts};
 use crate::shot::{Shot, ShotKind};
 use crate::status::{
     ControlKind, add_chill, add_shock, cleanse, control, damage_of, gain_rage, take,
@@ -122,8 +122,8 @@ pub fn pose(state: &mut State, f: usize) {
     me.body.set_pose(pose);
 }
 
-/// Fighter `me` begins casting `name` at `target`: pays for it, starts its cooldown, spends its bar slot, and may be
-/// lucky.
+/// Fighter `me` begins casting `name` at `target`: drops its guard, pays for it, starts its cooldown, spends its bar
+/// slot, and may be lucky.
 pub fn begin(state: &mut State, me: usize, name: &'static str, target: Option<f64>) {
     let Some(sp) = spell(name) else { return };
     let f = &state.fighters[me];
@@ -169,6 +169,7 @@ pub fn begin(state: &mut State, me: usize, name: &'static str, target: Option<f6
         stacks,
         pierce,
         circle: None,
+        blocked: false,
     };
     // luck smiles on a bar skill now and then; Again keeps it on its slot, ready at once, for another cast
     if let (Some(held), Some(at)) = (slot, at)
@@ -214,6 +215,8 @@ pub fn begin(state: &mut State, me: usize, name: &'static str, target: Option<f6
         state.emit(Out::Lucky { by: me, kind, x, y });
     }
     state.fighters[me].act = Some(act);
+    // a fighter casting is not guarding, as its pose shows
+    state.fighters[me].guard = 0.0;
     set_meditating(state, me, false);
     // longer casts stand in a rune circle while they gather
     if !matches!(
@@ -255,12 +258,37 @@ pub fn advance(state: &mut State, me: usize, dt: f64) {
                         state.emit(Out::Stop { key });
                     }
                 }
-            } else if act.phase == Phase::Recover && act.t >= sp.recover {
+            } else if act.phase == Phase::Recover && act.t >= recover_of(&act, sp) {
                 state.fighters[me].act = None;
             }
         }
     }
     pose(state, me);
+}
+
+/// How long `act` of `sp` recovers: an unsafe skill whose blow was guarded recovers longer.
+pub fn recover_of(act: &Act, sp: &Spell) -> f64 {
+    if act.blocked && FRAMES.unsafe_on_block.contains(&act.spell) {
+        sp.recover + FRAMES.blocked_recover
+    } else {
+        sp.recover
+    }
+}
+
+/// Fighter `me`'s blow was guarded: its act remembers it.
+fn guarded(state: &mut State, me: usize) {
+    if let Some(a) = state.fighters[me].act.as_mut() {
+        a.blocked = true;
+    }
+}
+
+/// Is fighter `f` in its ultimate's opening, where nothing touches it?
+fn opening(state: &State, f: usize) -> bool {
+    state.fighters[f].act.is_some_and(|a| {
+        a.phase == Phase::Windup
+            && a.t < FRAMES.ultimate_invincible
+            && spell(a.spell).is_some_and(|s| s.ultimate)
+    })
 }
 
 /// The moment fighter `me`'s spell lands: it hits, flies, falls or heals.
@@ -321,6 +349,7 @@ pub fn release(state: &mut State, me: usize, sp: &'static Spell) {
                     a.spell == "slash" && a.phase == Phase::Windup && a.t > slash_windup * 0.6
                 });
                 if !act.pierce && blocks(state, foe, mx, hit, blow) {
+                    guarded(state, me);
                     clash(state, (mx + fx) / 2.0, g - mspec.chest - mair, &[me, foe]);
                 } else if crossing {
                     // both blades swing at once: they meet
@@ -439,6 +468,7 @@ pub fn release(state: &mut State, me: usize, sp: &'static Spell) {
                 && fhp > 0.0
             {
                 if !act.pierce && blocks(state, foe, mx, hit, blow) {
+                    guarded(state, me);
                     clash(state, fx - face * 4.0, g - fspec.chest - fair, &[foe]);
                 } else if hurt(state, foe, hit, face, act.spell, act.stacks) && sp.shock {
                     add_shock(state, foe, me, act.stacks);
@@ -503,6 +533,7 @@ pub fn release(state: &mut State, me: usize, sp: &'static Spell) {
             );
             if fx > lo && fx < hi && (fair - mair).abs() < fspec.body && fhp > 0.0 {
                 if !act.pierce && blocks(state, foe, from, hit, blow) {
+                    guarded(state, me);
                     clash(state, fx, g - fspec.chest - fair, &[foe]);
                 } else {
                     hurt(state, foe, hit, face, act.spell, act.stacks);
@@ -729,7 +760,8 @@ pub fn drop_barrier(state: &mut State, f: usize) {
 }
 
 /// Fighter `f` takes a blow of `power` from spell `name`, pushed toward `dir`; reported as a `Hit` (or a `Dodge`).
-/// Returns whether it landed.
+/// Caught gathering a cast it is a COUNTER, caught recovering a PUNISH (never from a field's strike): harder, and
+/// staggered longer. An ultimate's opening lets the blow through, drawing no dice. Returns whether it landed.
 pub fn hurt(
     state: &mut State,
     f: usize,
@@ -739,6 +771,12 @@ pub fn hurt(
     stacks: f64,
 ) -> bool {
     if state.fighters[f].hp <= 0.0 || state.fighters[f].body.untouchable() {
+        return false;
+    }
+    if opening(state, f) {
+        let me = &state.fighters[f];
+        let (x, y) = (me.body.x, me.chest());
+        state.emit(Out::Dodge { x, y });
         return false;
     }
     if turns_aside(state, f, dir, name) {
@@ -782,6 +820,21 @@ pub fn hurt(
             }
         }
     }
+    // caught at a weak moment, decided from what it was doing before the blow breaks it
+    let how = match state.fighters[f].act.map(|a| a.phase) {
+        _ if s.is_some_and(|s| s.kind == Kind::Void) => How::Plain,
+        Some(Phase::Windup) => How::Counter,
+        Some(Phase::Recover) => How::Punish,
+        None => How::Plain,
+    };
+    let bonus = match how {
+        How::Plain => None,
+        How::Counter => Some(FRAMES.counter),
+        How::Punish => Some(FRAMES.punish),
+    };
+    if let Some(b) = bonus {
+        power *= b.power;
+    }
     let crit = state.rng.next() < state.fighters[by].stats.crit;
     let roll = state.rng.next();
     let blow = s.and_then(|s| s.blow).unwrap_or(Blow::Magic);
@@ -814,6 +867,7 @@ pub fn hurt(
         ranged,
         damage: amount,
         crit,
+        how,
         share,
         x,
         y,
@@ -842,6 +896,12 @@ pub fn hurt(
         freeze,
         flying,
     });
+    // a blow that staggers rather than throws holds a fighter caught at a weak moment longer
+    if let Some(b) = bonus
+        && me.body.down.is_none()
+    {
+        me.body.stun += b.stagger;
+    }
     me.fly = false;
     // struck while recovering from a move: the move was punished, and its mind learns so
     if let Some(a) = me.act

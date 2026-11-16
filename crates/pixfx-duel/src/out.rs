@@ -28,6 +28,18 @@ pub struct PlayOpts {
     pub seed: Option<u32>,
 }
 
+/// When a blow caught the one it struck: at no weak moment, gathering a cast (a COUNTER) or recovering from one (a
+/// PUNISH).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+pub enum How {
+    #[default]
+    Plain,
+    Counter,
+    Punish,
+}
+
 /// One command or event of a step, in the order the rules made it.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -67,6 +79,7 @@ pub enum Out {
         ranged: bool,
         damage: f64,
         crit: bool,
+        how: How,
         share: f64,
         x: f64,
         y: f64,

@@ -33,6 +33,7 @@ fn act(name: &'static str, target: f64, before: f64) -> Act {
         stacks: 1.0,
         pierce: false,
         circle: None,
+        blocked: false,
     }
 }
 

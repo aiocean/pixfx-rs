@@ -39,6 +39,7 @@ fn strike(s: &mut State, by: usize, name: &'static str) -> Vec<Out> {
         stacks: 1.0,
         pierce: false,
         circle: None,
+        blocked: false,
     });
     s.fighters[by].body.x = fx - 20.0 * js_sign(or_one(fx - bx));
     s.fighters[by].body.face = js_sign(fx - s.fighters[by].body.x);
@@ -133,6 +134,7 @@ fn a_ward_holds_1_to_3_charges() {
             stacks: 1.0,
             pierce: false,
             circle: None,
+            blocked: false,
         });
         advance(&mut s, 1, 1.0 / 60.0);
         let c = s.fighters[1].charges;
@@ -189,6 +191,7 @@ fn a_bolt_flies_strikes_and_ends_its_effect() {
         stacks: 1.0,
         pierce: false,
         circle: None,
+        blocked: false,
     });
     advance(&mut s, 0, 1.0 / 60.0);
     assert_eq!(s.shots.len(), 1);
@@ -237,6 +240,7 @@ fn two_bolts_meeting_head_on_are_both_spent() {
             stacks: 1.0,
             pierce: false,
             circle: None,
+            blocked: false,
         });
         advance(&mut s, me, 1.0 / 60.0);
     }
@@ -281,6 +285,7 @@ fn a_bolt_spent_in_a_clash_neither_lands_nor_takes_another_shot_with_it() {
             stacks: 1.0,
             pierce: false,
             circle: None,
+            blocked: false,
         });
         advance(&mut s, me, 1.0 / 60.0);
     }

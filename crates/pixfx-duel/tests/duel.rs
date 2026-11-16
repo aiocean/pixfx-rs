@@ -87,6 +87,7 @@ fn a_heavy_blow_throws_its_target_which_lands_lies_and_gets_up() {
         stacks: 1.0,
         pierce: false,
         circle: None,
+        blocked: false,
     });
     duel.step(1.0 / 60.0);
     assert!(duel.state.fighters[1].body.down.is_some());

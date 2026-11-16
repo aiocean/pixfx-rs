@@ -350,6 +350,15 @@ fn rarity_traits_luck_and_payoffs_are_ported() -> Result<(), String> {
     assert_eq!(data::RAGE, num(&f["constants"]["RAGE"]));
     assert_eq!(data::STALE, num(&f["constants"]["STALE"]));
     assert_eq!(data::POOL_SIZE as f64, num(&f["constants"]["POOL_SIZE"]));
+    let fr = data::FRAMES;
+    let frames = json!({
+        "counter": { "power": fr.counter.power, "stagger": fr.counter.stagger },
+        "punish": { "power": fr.punish.power, "stagger": fr.punish.stagger },
+        "blockedRecover": fr.blocked_recover,
+        "unsafeOnBlock": fr.unsafe_on_block,
+        "ultimateInvincible": fr.ultimate_invincible,
+    });
+    assert_eq!(norm(&frames), norm(&f["constants"]["FRAMES"]));
     assert_eq!(
         json!({ "lamp": data::DECOR[0], "night": data::DECOR[1] }),
         f["constants"]["DECOR"]
