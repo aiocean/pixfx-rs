@@ -42,7 +42,7 @@ impl SeatKind {
             SeatKind::Policy => {
                 let Some(p) = policy else {
                     return Err(JsError::new(
-                        "Duel: a \"policy\" seat needs the trained policy: Duel.withPolicy(config, seats, new Policy(bytes))",
+                        "Duel: a \"policy\" seat needs a trained policy for its corner: Duel.withPolicies(config, seats, left, right)",
                     ));
                 };
                 PolicySeat::make(Rc::clone(&p.net))
@@ -53,8 +53,8 @@ impl SeatKind {
     }
 }
 
-/// The trained policy, read from the bytes of `policy.bin` (`crates/pixfx-duel/weights/`), which the page fetches
-/// beside the wasm instead of carrying it inside. Read once, shared by every duel it seats.
+/// A trained policy, read from the bytes of a weights file (`crates/pixfx-duel/weights/*.bin`), which the page fetches
+/// beside the wasm instead of carrying it inside. Read once, shared by every duel and every corner it seats.
 #[wasm_bindgen]
 pub struct Policy {
     net: Rc<Net>,
@@ -62,7 +62,7 @@ pub struct Policy {
 
 #[wasm_bindgen]
 impl Policy {
-    /// The policy in `bytes` (a `Uint8Array` of `policy.bin`); throws when they are not a policy of this duel's shape.
+    /// The policy in `bytes` (a `Uint8Array` of a weights file); throws when they are not a policy of this duel's shape.
     #[wasm_bindgen(constructor)]
     pub fn new(bytes: &[u8]) -> Result<Policy, JsError> {
         let net = Net::load(bytes).map_err(|e| JsError::new(&e.to_string()))?;
@@ -77,12 +77,17 @@ pub struct Duel {
 }
 
 impl Duel {
-    /// The duel `config` says, its corners seated by `seats`, or by the policy when given and the brain when not.
-    fn seated(config: &JsValue, seats: &JsValue, policy: Option<&Policy>) -> Result<Duel, JsError> {
+    /// The duel `config` says, its corners seated by `seats`, or by each corner's policy when given and the brain when
+    /// not.
+    fn seated(
+        config: &JsValue,
+        seats: &JsValue,
+        policies: Option<[&Policy; 2]>,
+    ) -> Result<Duel, JsError> {
         let c: Config = parse("config", config)?;
         let [a, b] = if !(seats.is_undefined() || seats.is_null()) {
             parse("seats", seats)?
-        } else if policy.is_some() {
+        } else if policies.is_some() {
             [SeatKind::Policy, SeatKind::Policy]
         } else {
             [SeatKind::Brain, SeatKind::Brain]
@@ -96,7 +101,13 @@ impl Duel {
             effects: c.effects,
         };
         Ok(Duel {
-            inner: d::Duel::new(config, [a.make(policy)?, b.make(policy)?]),
+            inner: d::Duel::new(
+                config,
+                [
+                    a.make(policies.map(|[l, _]| l))?,
+                    b.make(policies.map(|[_, r]| r))?,
+                ],
+            ),
         })
     }
 }
@@ -105,7 +116,7 @@ impl Duel {
 impl Duel {
     /// A duel fought where `config` says (`{seed, left, right, ground, sky, effects}`), its corners seated by `seats`
     /// (`["brain" | "first", ...]`, the brain when left out), its first round begun. A duel with the trained policy is
-    /// `Duel.withPolicy`.
+    /// `Duel.withPolicies`.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(
@@ -120,10 +131,11 @@ impl Duel {
         Duel::seated(config, seats, None)
     }
 
-    /// As `new Duel`, with the trained `policy` to seat: `seats` are `["policy" | "brain" | "first", ...]`, the
-    /// policy in both corners when left out.
-    #[wasm_bindgen(js_name = withPolicy)]
-    pub fn with_policy(
+    /// As `new Duel`, with a trained policy for each corner, `left` and `right` (the same one twice for a mirror):
+    /// `seats` are `["policy" | "brain" | "first", ...]`, each corner's policy when left out. A corner seated by the
+    /// brain or the first mind ignores its policy.
+    #[wasm_bindgen(js_name = withPolicies)]
+    pub fn with_policies(
         #[wasm_bindgen(
             unchecked_param_type = "{ seed: number, left: number, right: number, ground: number, sky: number, effects: string[] }"
         )]
@@ -132,9 +144,10 @@ impl Duel {
             unchecked_param_type = "[\"policy\" | \"brain\" | \"first\", \"policy\" | \"brain\" | \"first\"] | undefined"
         )]
         seats: &JsValue,
-        policy: &Policy,
+        left: &Policy,
+        right: &Policy,
     ) -> Result<Duel, JsError> {
-        Duel::seated(config, seats, Some(policy))
+        Duel::seated(config, seats, Some([left, right]))
     }
 
     /// Advance by `dt` seconds: the effect commands and events of this step.

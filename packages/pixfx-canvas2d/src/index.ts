@@ -8,5 +8,6 @@ export type { ActorFrame, ActorSource, Counts, Cut, DrawnImage, EffectMeta, Engi
 // (`Fx`) and the colour it lights its surroundings in (`lightColor`), and fighters and scene light for games that
 // draw them (`Sprites`, `Lighting` give pictures to `drawPicture`)
 export { Body, effects, FightFeel, Fx, Lighting, lightColor, lookColors, meta, Mind, putOutLight, Sprites, stepLights } from "pixfx-web/wasm";
-// the landing duel's rules (pixfx-duel), for the site's duel: `Duel` and its tables
-export { damageOf, Duel, duelConstants, duelSpells, duelStats, duelTraits, orbOffset } from "pixfx-web/wasm";
+// the landing duel's rules (pixfx-duel), for the site's duel: `Duel`, the trained `Policy` each corner seats, and its
+// tables
+export { damageOf, Duel, duelConstants, duelSpells, duelStats, duelTraits, orbOffset, Policy } from "pixfx-web/wasm";

@@ -3,11 +3,12 @@
 ## Unreleased
 
 - The duel's trained policy is a file of its own: the wasm no longer carries `policy.bin` (1.35 MB to 660 KB gzip),
-  and the painting workers no longer hold a copy of it. `pixfx-wasm`: `new Policy(bytes)` reads the weights once;
-  `Duel.withPolicy(config, seats?, policy)` seats it (both corners when `seats` is left out), and `new Duel(config,
-  seats?)` seats the brain (`"brain" | "first"`). The site's `duel.js` takes it with `usePolicy(bytes)`; the landing
-  page fetches `pkg/policy.bin` once the engine is in, so the first frame never waits for it, and seats the brain
-  until it arrives.
+  and the painting workers no longer hold a copy of it. Each corner seats a policy of its own. `pixfx-wasm`:
+  `new Policy(bytes)` reads a weights file once; `Duel.withPolicies(config, seats?, left, right)` seats one per corner
+  (the same one twice for a mirror), and `new Duel(config, seats?)` seats the brain (`"brain" | "first"`). The site's
+  `duel.js` takes them with `usePolicies([left, right])`; the landing page names each corner's file in
+  `POLICY_FILES` (both `policy.bin` today), fetches each file once after the engine is in, so the first frame never
+  waits for them, and seats the brain until they arrive. `site/build.sh` copies every `crates/pixfx-duel/weights/*.bin`.
 
 - `arcane/sword-slash` (new): a spirit sword appears beside the foe, winds back and cuts down through it in one fast
   arc. The blade sweeps a crescent of its own pixels (each blade row's edge colour, `pixfx_draw::sweep` with the brush
