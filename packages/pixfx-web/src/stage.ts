@@ -3,7 +3,7 @@
 import { z } from "zod";
 import type * as Wasm from "../wasm/pixfx_wasm.js";
 import type { ActorSource } from "./actor";
-import type { Counts, EffectHost, FollowTarget } from "./effect";
+import type { Aim, Counts, EffectHost, FollowTarget, Strike } from "./effect";
 import { PixfxEffect } from "./effect";
 import type { Delivering, Game } from "./game";
 import type { GfxImage, GfxImages } from "./gfx";
@@ -75,7 +75,7 @@ export class Stage<P> implements EffectHost<P>, Delivering {
 
   /** Play effect `id` at world (`x`, `y`); throws on an unknown id or options the engine refuses. */
   play(id: string, x: number, y: number, engine: Record<string, unknown>, place: P, depth = DEFAULT_DEPTHS): PixfxEffect<P> {
-    const handle = this.scene.play(this.game.frames, this.game.effectId(id), x, y, engine);
+    const handle = this.scene.play(this.game.effectId(id), x, y, engine);
     const effect = new PixfxEffect<P>(this, handle, depth, place);
     this.effects.set(handle, effect);
     return effect;
@@ -83,6 +83,32 @@ export class Stage<P> implements EffectHost<P>, Delivering {
 
   stop(handle: number): void {
     this.scene.stop(handle);
+  }
+
+  order(handle: number, x: number, y: number, aim: Aim, caster: number | undefined): boolean {
+    return this.scene.order(handle, x, y, aim, caster);
+  }
+
+  trail(mover: PixfxEffect<P>, id: string, engine: Record<string, unknown>): PixfxEffect<P> | null {
+    const handle = this.scene.trail(mover.handle, this.game.effectId(id), engine);
+    if (handle === undefined) return null;
+    const effect = new PixfxEffect<P>(this, handle, { back: mover.depthOf(0), front: mover.depthOf(1) }, mover.place);
+    this.effects.set(handle, effect);
+    return effect;
+  }
+
+  burst(handle: number): boolean {
+    return this.scene.burst(handle);
+  }
+
+  /** Body `id` (a fighter, a wall) is the box (`x`, `y`, `w`, `h`) in world pixels: volley pieces strike it. Set it as it moves. */
+  setBody(id: number, x: number, y: number, w: number, h: number): void {
+    this.scene.setBody(id, x, y, w, h);
+  }
+
+  /** Body `id` is gone: nothing strikes it any more. */
+  clearBody(id: number): void {
+    this.scene.clearBody(id);
   }
 
   remove(effect: PixfxEffect<P>): void {
@@ -137,6 +163,9 @@ export class Stage<P> implements EffectHost<P>, Delivering {
         this.follows.delete(e.handle);
         this.actors.delete(e.handle);
         effect?.complete();
+      } else if (e.type === "strike") {
+        const strike: Strike = { index: e.index, x: e.x, y: e.y, body: e.body ?? null };
+        effect?.emit("strike", strike, effect);
       } else {
         const cue: WorldCue = { t: e.t, pan: e.pan, cue: e.cue };
         effect?.emit("cue", cue, effect);

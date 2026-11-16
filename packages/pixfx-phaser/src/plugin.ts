@@ -121,6 +121,22 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     this.stageHeld?.setDrawBudget(this.drawBudget);
   }
 
+  /**
+   * Body `id` (a fighter, a wall) is the box (`x`, `y`, `w`, `h`) in world pixels: the pieces of a volley an effect
+   * was ordered to launch (`effect.attack`) strike it when they meet it. Set it as the thing moves. Throws before
+   * `loadPixfx()`.
+   */
+  setBody(id: number, x: number, y: number, w: number, h: number): void {
+    const stage = this.stage();
+    if (!stage) throw new Error("pixfx: call await loadPixfx() before setBody()");
+    stage.setBody(id, x, y, w, h);
+  }
+
+  /** Body `id` is gone: nothing strikes it any more. */
+  clearBody(id: number): void {
+    this.stageHeld?.clearBody(id);
+  }
+
   /** Effects playing in this scene, textures the game holds for every scene, and this scene's images. */
   stats(): Counts {
     return this.stageHeld?.counts() ?? { engines: 0, textures: loadedGame()?.counts().textures ?? 0, images: 0 };

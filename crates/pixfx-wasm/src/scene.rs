@@ -34,20 +34,22 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use js_sys::{Int32Array, JSON, Uint8Array, Uint8ClampedArray};
+use pixfx_core::volley::{Aim, Order};
 use pixfx_core::{
-    Actor, Clip, Feel, Layer, PixelBox, Placement, Sim, color_rgba_in, light_rgba_in,
+    Actor, Clip, Feel, Layer, PixelBox, Placement, Sim, Trace, TracePoint, color_rgba_in,
+    light_rgba_in,
 };
 use pixfx_draw::Frame;
 use pixfx_scene::{
-    EffectKey, InlinePainter, Job, Painter, Pass, PlacementChange, Receive, Shell, StageError,
-    Target, View,
+    Body, EffectKey, InlinePainter, Job, Painter, Pass, PlacementChange, Receive, Shell,
+    StageError, Target, View,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 
 use crate::js::{parse, to_js};
-use crate::{find, parse_options};
+use crate::{find, options_json, parse_options};
 
 /// Numbers per op in a draw list.
 pub const OP_STRIDE: usize = 8;
@@ -253,7 +255,7 @@ fn clamp_i32(v: i64) -> i32 {
     v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
 }
 
-/// What a worker needs to make an effect's state: its id and its options as the game gave them (JSON).
+/// What a worker needs to make an effect's state: its id and its options (JSON, [`crate::options_json`]).
 #[derive(Clone, Debug)]
 pub struct Spec {
     pub effect: String,
@@ -285,6 +287,8 @@ pub struct PaintJob {
     pub actor_version: f64,
     /// That character's sprite, sent with the first job of each version (a worker keeps it); `null` after.
     pub actor: Option<ActorPixels>,
+    /// For a trail: the way its mover came, `x, y, angle, age` per point, newest first; empty otherwise.
+    pub trace: Vec<f64>,
 }
 
 /// Where a character's sprite frame shows (`scene.setActor`): its top-left at game pixel (`x`, `y`), its bytes
@@ -369,7 +373,11 @@ impl Painter for Paint {
         match self {
             Self::Inline(p) => p.paint(job),
             Self::Workers(w) => {
-                let spec = w.specs.get(&job.effect)?;
+                // made from the clip, so an effect the scene played itself (a volley's shot) paints as well
+                let spec = w.specs.entry(job.effect).or_insert_with(|| Spec {
+                    effect: job.clip.effect().meta().id.to_string(),
+                    opts: options_json(job.clip.opts()),
+                });
                 let n = w.next_job;
                 w.next_job = w.next_job.wrapping_add(1);
                 let (fw, fh) = job.clip.size();
@@ -401,6 +409,12 @@ impl Painter for Paint {
                     layer: layer_code(job.layer),
                     actor_version: version as f64,
                     actor,
+                    trace: job.trace.map_or_else(Vec::new, |t| {
+                        t.points
+                            .iter()
+                            .flat_map(|p| [p.x, p.y, p.angle, p.age])
+                            .collect()
+                    }),
                 });
                 w.asked.insert(
                     n,
@@ -506,26 +520,9 @@ impl Scene {
         &mut self.inner
     }
 
-    /// Play `clip` at game pixel (`x`, `y`); `spec` is what a worker needs to paint it.
-    pub fn play_clip(
-        &mut self,
-        frames: &mut Frames,
-        clip: Clip,
-        spec: Spec,
-        x: f64,
-        y: f64,
-    ) -> Result<u32, StageError> {
-        let handle = self.inner.play(clip, x, y)?;
-        if let Paint::Workers(w) = frames.inner.painter_mut() {
-            w.specs.insert(
-                EffectKey {
-                    scene: self.inner.id(),
-                    handle,
-                },
-                spec,
-            );
-        }
-        Ok(handle)
+    /// Play `clip` at game pixel (`x`, `y`).
+    pub fn play_clip(&mut self, clip: Clip, x: f64, y: f64) -> Result<u32, StageError> {
+        self.inner.play(clip, x, y)
     }
 
     /// Draw both layers; returns the draw list.
@@ -626,6 +623,17 @@ impl Painting {
             .filter(|(v, _)| version != 0 && *v == version)
             .map(|(_, a)| Arc::clone(a));
         sim.set_actor(actor);
+        sim.set_trace((!job.trace.is_empty()).then(|| {
+            Arc::new(Trace {
+                points: job
+                    .trace
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|&[x, y, angle, age]| TracePoint { x, y, angle, age })
+                    .collect(),
+            })
+        }));
         sim.seek(job.frame as u64);
         clip.draw(sim, frame, layer, place, job.fade);
         Some(frame)
@@ -772,7 +780,6 @@ impl JsScene {
     /// a shell hands on the game's options as they came.
     pub fn play(
         &mut self,
-        frames: &mut JsFrames,
         #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
         x: f64,
         y: f64,
@@ -786,20 +793,8 @@ impl JsScene {
                 "margin: the scene sizes each effect's margin itself",
             ));
         }
-        let json = if opts.is_undefined() || opts.is_null() {
-            String::new()
-        } else {
-            JSON::stringify(&opts)
-                .ok()
-                .and_then(|s| s.as_string())
-                .unwrap_or_default()
-        };
-        let spec = Spec {
-            effect: id.to_string(),
-            opts: json,
-        };
         self.inner
-            .play_clip(&mut frames.inner, Clip::live(fx, o), spec, x, y)
+            .play_clip(Clip::live(fx, o), x, y)
             .map_err(js_err)
     }
 
@@ -857,6 +852,69 @@ impl JsScene {
     /// Let the effect end: loops fade out, one-shots are cut short. False for an unknown handle.
     pub fn stop(&mut self, handle: u32) -> bool {
         self.inner.scene().stop(handle)
+    }
+
+    /// Play effect `id` as the trail of the effect `handle`: an effect that draws the way a mover came
+    /// (`projectiles/trail`), bending with it and as long as it is fast, drawn under it, ending soon after it. Its
+    /// handle, or `undefined` for an unknown handle or an effect that draws no trail; throws on an unknown id or
+    /// options the engine refuses.
+    pub fn trail(
+        &mut self,
+        handle: u32,
+        #[wasm_bindgen(unchecked_param_type = "EffectId")] id: &str,
+        #[wasm_bindgen(unchecked_optional_param_type = "FxOptions | Record<string, unknown>")]
+        opts: JsValue,
+    ) -> Result<Option<u32>, JsError> {
+        let fx = find(id)?;
+        let (o, _) = parse_options(fx.meta(), &opts)?;
+        self.inner
+            .scene()
+            .trail(handle, Clip::live(fx, o))
+            .map_err(js_err)
+    }
+
+    /// Order an effect that takes orders (`arcane/sword-formation`) to attack toward world (`x`, `y`): `aim` is
+    /// `"converge"` (every piece curves onto the line through the point and bursts on the first body it meets) or
+    /// `"pierce"` (straight at it and on, through every body). Each strike comes back as a `"strike"` event naming
+    /// the body it hit (`setBody`); `caster`, the attacker's own body, is never struck. False for an unknown
+    /// handle, an effect that takes no orders, or one already ordered; throws on another `aim` or a point that is
+    /// not finite.
+    pub fn order(
+        &mut self,
+        handle: u32,
+        x: f64,
+        y: f64,
+        #[wasm_bindgen(unchecked_param_type = "Aim")] aim: &str,
+        caster: Option<u32>,
+    ) -> Result<bool, JsError> {
+        let aim = Aim::parse(aim).ok_or_else(|| {
+            JsError::new(&format!(
+                "aim must be \"converge\" or \"pierce\", not {aim:?}"
+            ))
+        })?;
+        self.inner
+            .scene()
+            .order(handle, Order { x, y, aim, caster })
+            .map_err(js_err)
+    }
+
+    /// Body `id` (a fighter, a wall) is the box (`x`, `y`, `w`, `h`) in world pixels from now on: a volley's
+    /// piece that meets it strikes it. Set it every frame the thing moves.
+    #[wasm_bindgen(js_name = setBody)]
+    pub fn set_body(&mut self, id: u32, x: f64, y: f64, w: f64, h: f64) {
+        self.inner.scene().set_body(id, Some(Body { x, y, w, h }));
+    }
+
+    /// Body `id` is gone: nothing strikes it any more.
+    #[wasm_bindgen(js_name = clearBody)]
+    pub fn clear_body(&mut self, id: u32) {
+        self.inner.scene().set_body(id, None);
+    }
+
+    /// The game says volley piece `piece` hit something (its own collisions): it strikes where its tip is (a
+    /// `"strike"` event with no body) and goes. False if `piece` is not a piece in flight.
+    pub fn burst(&mut self, piece: u32) -> Result<bool, JsError> {
+        self.inner.scene().burst(piece).map_err(js_err)
     }
 
     /// Drop the effect now. False for an unknown handle.

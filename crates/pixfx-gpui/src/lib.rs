@@ -17,9 +17,12 @@ use gpui::{
     Bounds, Corners, Pixels, Point, RenderImage, SpriteBlend, SpriteFilter, Window, point, px, size,
 };
 use image::{Frame as ImageFrame, RgbaImage};
+use pixfx_core::volley::{Aim, Order};
 use pixfx_core::{Actor, Clip, Effect, Layer, Options};
 use pixfx_draw::Frame;
-use pixfx_scene::{Frames, InlinePainter, Job, Painter, Pass, Receive, Scene, Shell, Target};
+use pixfx_scene::{
+    Body, Frames, InlinePainter, Job, Painter, Pass, Receive, Scene, Shell, StageEvent, Target,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 mod threads;
@@ -292,6 +295,63 @@ impl FxScene {
     /// Let it end: loops fade out, one-shots are cut short. False if it is gone.
     pub fn stop(&mut self, fx: FxHandle) -> bool {
         self.scene.stop(fx.0)
+    }
+
+    /// Order `fx` to attack toward the point (`x`, `y`) in effect pixels from its own origin, at any distance: an
+    /// effect that takes orders (`arcane/sword-formation`) launches its volley ([`FxScene::launched`]), whose
+    /// pieces strike the bodies they meet ([`FxScene::set_body`]) but `caster`, and ends once the last piece is
+    /// done. False if it takes no orders, was ordered already, or is gone.
+    pub fn order(
+        &mut self,
+        fx: FxHandle,
+        x: f64,
+        y: f64,
+        aim: Aim,
+        caster: Option<u32>,
+    ) -> Result<bool> {
+        self.scene
+            .order(fx.0, Order { x, y, aim, caster })
+            .map_err(|e| anyhow!(e))
+    }
+
+    /// Body `id` (a fighter, a wall) is `body`, in the same pixels as [`FxScene::order`]'s point, or none to drop
+    /// it: volley pieces that meet it strike it. Set it as it moves.
+    pub fn set_body(&mut self, id: u32, body: Option<Body>) {
+        self.scene.set_body(id, body);
+    }
+
+    /// The game's own collisions say volley piece `piece` (one of [`FxScene::launched`]) hit something: it strikes
+    /// where its tip is and goes. False if it is not a piece in flight.
+    pub fn burst(&mut self, piece: FxHandle) -> Result<bool> {
+        self.scene.burst(piece.0).map_err(|e| anyhow!(e))
+    }
+
+    /// Lay `effect` (`projectiles/trail`) under `mover` as its trail: it draws the way `mover` came, curving with
+    /// it, as long as it is fast, and ends soon after it. Paint it where `mover` is painted. None if `mover` is
+    /// gone or `effect` draws no trail.
+    pub fn trail(
+        &mut self,
+        mover: FxHandle,
+        effect: &'static dyn Effect,
+        opts: Options,
+    ) -> Result<Option<FxHandle>> {
+        Ok(self
+            .scene
+            .trail(mover.0, Clip::live(effect, opts))
+            .map_err(|e| anyhow!(e))?
+            .map(FxHandle))
+    }
+
+    /// What the volley `fx` was ordered to launch still plays: its shots in flight and what they played where
+    /// they struck, placed from `fx`'s origin. Paint each where `fx` is painted; they outlive `fx` itself.
+    pub fn launched(&self, fx: FxHandle) -> Vec<FxHandle> {
+        self.scene.launched(fx.0).map(FxHandle).collect()
+    }
+
+    /// What happened since the last call, oldest first: effects that ended, cues they fired, and each shot of an
+    /// ordered volley striking (`StageEvent::Strike`, in effect pixels from the ordered effect's origin).
+    pub fn events(&mut self) -> Vec<StageEvent> {
+        self.scene.drain_events()
     }
 
     /// Drop it now; its images leave the atlas at the end of the next frame. False if it is gone.

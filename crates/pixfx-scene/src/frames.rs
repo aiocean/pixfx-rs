@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use pixfx_core::{Actor, Clip, FrameId, FrameStore, Layer, PixelBox, Placement, Sim};
+use pixfx_core::{Actor, Clip, FrameId, FrameStore, Layer, PixelBox, Placement, Sim, Trace};
 use pixfx_draw::Frame;
 
 use crate::{Receive, Scene, Shell};
@@ -30,12 +30,13 @@ pub enum Target {
 }
 
 /// What an effect's own frame was drawn at: clock frame `clock`, placed as `place`, with version `actor` of its
-/// actor (0 for none). It is drawn again when any of them changes.
+/// actor and version `trace` of the trace it draws (0 for none). It is drawn again when any of them changes.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct OwnAt {
     pub clock: u64,
     pub place: Placement,
     pub actor: u64,
+    pub trace: u64,
 }
 
 /// The character an effect plays on, as the scene last set it ([`crate::Scene::set_actor`]): its sprite in the
@@ -59,6 +60,8 @@ pub struct Job<'a> {
     pub target: Target,
     /// The character it plays on, for an effect that wraps one; `None` otherwise.
     pub actor: Option<&'a ActorFrame>,
+    /// The way its mover came, for a trail ([`crate::Scene::trail`]); `None` otherwise.
+    pub trace: Option<&'a Arc<Trace>>,
 }
 
 /// Paints the frames scenes ask for. It keeps each effect's state between paints, so stepping a playing effect
@@ -96,6 +99,7 @@ impl Painter for InlinePainter {
             .entry(job.effect)
             .or_insert_with(|| (job.clip.sim(), job.clip.blank()));
         sim.set_actor(job.actor.map(|a| Arc::clone(&a.actor)));
+        sim.set_trace(job.trace.map(Arc::clone));
         sim.seek(job.frame);
         job.clip.draw(sim, frame, job.layer, job.place, job.fade);
         Some(frame)

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { z } from "zod";
+import type { Strike } from "../src/effect";
 import { PixfxFeel } from "../src/feel";
 import type { WorkerPort } from "../src/game";
 import { Game } from "../src/game";
@@ -263,4 +264,45 @@ test("a draw budget shows effects that share nothing a few per frame, until ever
 test("a draw budget is a whole number of layers, 0 or more", () => {
   const { stage } = setup();
   for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) expect(() => stage.setDrawBudget(bad)).toThrow();
+});
+
+test("an ordered volley flies its shots across the stage, each showing on its way, and reports each strike", () => {
+  const { gfx, game, stage } = setup();
+  const fx = stage.play("arcane/sword-formation", 40, 100, {}, 1);
+  for (let i = 0; i < 40; i++) frame(game, stage);
+  const strikes: Strike[] = [];
+  fx.on("strike", (s: Strike) => strikes.push(s));
+  stage.setBody(1, 290, 60, 20, 40);
+  expect(fx.attack(300, 80)).toBe(true);
+  expect(fx.attack(300, 80)).toBe(false);
+  let farthest = 0;
+  for (let i = 0; i < 90; i++) {
+    frame(game, stage);
+    for (const [x] of places(gfx)) farthest = Math.max(farthest, x);
+  }
+  // the shots showed far past the formation's own canvas, out to the target
+  expect(farthest).toBeGreaterThan(250);
+  expect(strikes.length).toBe(8);
+  for (const s of strikes) expect(Math.abs(s.x - 300) + Math.abs(s.y - 80)).toBeLessThan(32);
+});
+
+test("a trail follows a moving effect, drawn where it went, and ends after it", () => {
+  const { gfx, game, stage } = setup();
+  const bolt = stage.play("projectiles/laser-bolt", 40, 100, {}, 1);
+  expect(bolt.trail("fire/candle")).toBeNull();
+  const tail = bolt.trail("projectiles/trail", { secs: 0.3 });
+  if (!tail) throw new Error("no trail");
+  let ended = false;
+  tail.on("complete", () => (ended = true));
+  let leftmost = Number.POSITIVE_INFINITY;
+  for (let i = 1; i <= 20; i++) {
+    bolt.setPosition(40 + 8 * i, 100);
+    frame(game, stage);
+  }
+  for (const [x] of places(gfx)) leftmost = Math.min(leftmost, x);
+  // drawn back along the way the bolt came, not only round where it is now
+  expect(leftmost).toBeLessThan(140);
+  bolt.destroy();
+  for (let i = 0; i < 20; i++) frame(game, stage);
+  expect(ended).toBe(true);
 });

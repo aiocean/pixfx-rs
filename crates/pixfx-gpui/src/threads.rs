@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread::JoinHandle;
 
-use pixfx_core::{Actor, Clip, Layer, Placement, Sim};
+use pixfx_core::{Actor, Clip, Layer, Placement, Sim, Trace};
 use pixfx_draw::Frame;
 use pixfx_scene::{EffectKey, Job, Painter, Target};
 
@@ -26,6 +26,7 @@ struct Paint {
     target: Target,
     /// The character the effect plays on, handed to its state before it is brought to `frame`.
     actor: Option<Arc<Actor>>,
+    trace: Option<Arc<Trace>>,
 }
 
 enum ToThread {
@@ -99,6 +100,7 @@ impl Painter for ThreadPainter {
             layer: job.layer,
             target: job.target.clone(),
             actor: job.actor.map(|a| Arc::clone(&a.actor)),
+            trace: job.trace.map(Arc::clone),
         };
         // a thread that is gone (it panicked) paints nothing: the effect keeps the frame it had
         if let Some((tx, _)) = self.threads.get(owner) {
@@ -144,6 +146,7 @@ fn run(rx: &Receiver<ToThread>, done: &Sender<Done>) {
                     continue;
                 };
                 sim.set_actor(p.actor);
+                sim.set_trace(p.trace);
                 sim.seek(p.frame);
                 clip.draw(sim, frame, p.layer, p.place, p.fade);
                 let painted = Painted::of(frame);
@@ -232,8 +235,10 @@ mod tests {
                         clock: frame,
                         place: clip.placement(),
                         actor: 0,
+                        trace: 0,
                     }),
                     actor: None,
+                    trace: None,
                 };
                 assert!(threads.paint(&job).is_none(), "painted elsewhere");
                 let painted = inline.paint(&job).ok_or("inline paints")?;
@@ -299,8 +304,10 @@ mod tests {
                     clock: frame,
                     place: clip.placement(),
                     actor: actor.version,
+                    trace: 0,
                 }),
                 actor: Some(actor),
+                trace: None,
             };
             threads.paint(&job);
             let painted = inline.paint(&job).ok_or("inline paints")?;
@@ -337,8 +344,10 @@ mod tests {
                 clock: frame,
                 place: clip.placement(),
                 actor: 0,
+                trace: 0,
             }),
             actor: None,
+            trace: None,
         };
         threads.paint(&job(2));
         threads.end(effect);
@@ -390,8 +399,10 @@ mod tests {
                             clock: frame,
                             place: clip.placement(),
                             actor: 0,
+                            trace: 0,
                         }),
                         actor: None,
+                        trace: None,
                     });
                 }
                 assert_eq!(wait(&mut threads, n).len(), n);

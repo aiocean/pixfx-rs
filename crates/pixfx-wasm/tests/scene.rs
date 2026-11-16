@@ -8,20 +8,14 @@ use std::num::NonZeroU32;
 use pixfx_core::{Clip, Options};
 use pixfx_effects::effect;
 use pixfx_wasm::scene::{
-    Cut, Frames, OP_FREE, OP_MAKE, OP_REFILL, OP_SHOW, OP_STRIDE, Painting, Scene, Shape, Spec,
+    Cut, Frames, OP_FREE, OP_MAKE, OP_REFILL, OP_SHOW, OP_STRIDE, Painting, Scene, Shape,
 };
 
 type Res = Result<(), Box<dyn Error>>;
 
-fn candle() -> Result<(Clip, Spec), Box<dyn Error>> {
+fn candle() -> Result<Clip, Box<dyn Error>> {
     let fx = effect("fire/candle").ok_or("fire/candle not registered")?;
-    Ok((
-        Clip::live(fx, Options::default()),
-        Spec {
-            effect: "fire/candle".into(),
-            opts: String::new(),
-        },
-    ))
+    Ok(Clip::live(fx, Options::default()))
 }
 
 fn scale(n: u32) -> Result<NonZeroU32, Box<dyn Error>> {
@@ -41,8 +35,8 @@ fn kinds(list: &[i32]) -> Vec<i32> {
 fn the_first_draw_makes_each_surface_before_showing_it() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(2)?);
-    let (clip, spec) = candle()?;
-    scene.play_clip(&mut frames, clip, spec, 30.0, 40.0)?;
+    let clip = candle()?;
+    scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     let list = scene.draw_ops(&mut frames)?;
     let mut made = Vec::new();
@@ -61,8 +55,8 @@ fn the_first_draw_makes_each_surface_before_showing_it() -> Res {
 fn a_surface_is_shown_where_its_lit_pixels_land() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(3)?);
-    let (clip, spec) = candle()?;
-    let h = scene.play_clip(&mut frames, clip, spec, 30.0, 40.0)?;
+    let clip = candle()?;
+    let h = scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     let rect = scene.scene().rect(h).ok_or("no rect")?;
     let list = scene.draw_ops(&mut frames)?;
@@ -84,8 +78,8 @@ fn a_surface_is_shown_where_its_lit_pixels_land() -> Res {
 fn a_hit_stop_paints_nothing_new() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(1)?);
-    let (clip, spec) = candle()?;
-    scene.play_clip(&mut frames, clip, spec, 30.0, 40.0)?;
+    let clip = candle()?;
+    scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     scene.draw_ops(&mut frames)?;
     frames.end_frame_ops()?;
@@ -142,8 +136,8 @@ fn shown_pixels(
     let mut scene = Scene::new(frames, scale(1)?);
     let mut worker = Painting::default();
     let mut host = Host::default();
-    let (clip, spec) = candle()?;
-    let h = scene.play_clip(frames, clip, spec, 30.0, 40.0)?;
+    let clip = candle()?;
+    let h = scene.play_clip(clip, 30.0, 40.0)?;
     let mut last = Vec::new();
     for step in 0..steps {
         if step == stop_at {
@@ -155,7 +149,7 @@ fn shown_pixels(
         host.apply(&list, frames, None)?;
         let (jobs, _) = frames.take_jobs();
         for job in &jobs {
-            let (clip, _) = candle()?;
+            let clip = candle()?;
             let cut = Cut::of(worker.paint_with(job, || Some(clip)).ok_or("not painted")?);
             let list = scene.deliver_ops(frames, job.job, cut.shape)?;
             host.apply(&list, frames, Some(&cut.color))?;
@@ -176,8 +170,8 @@ fn shown_pixels(
 fn a_shape_that_does_not_fit_the_frame_asked_for_is_refused() -> Res {
     let mut frames = Frames::with(true);
     let mut scene = Scene::new(&mut frames, scale(1)?);
-    let (clip, spec) = candle()?;
-    scene.play_clip(&mut frames, clip, spec, 30.0, 40.0)?;
+    let clip = candle()?;
+    scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     scene.draw_ops(&mut frames)?;
     let (jobs, _) = frames.take_jobs();
@@ -209,8 +203,8 @@ fn frames_painted_on_a_worker_equal_frames_painted_on_the_spot() -> Res {
 fn every_surface_made_is_freed_once_the_scene_clears() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(1)?);
-    let (clip, spec) = candle()?;
-    let h = scene.play_clip(&mut frames, clip, spec, 30.0, 40.0)?;
+    let clip = candle()?;
+    let h = scene.play_clip(clip, 30.0, 40.0)?;
     let mut all = Vec::new();
     for step in 0..10 {
         if step == 5 {

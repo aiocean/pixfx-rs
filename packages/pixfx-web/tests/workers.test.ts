@@ -182,3 +182,31 @@ function jobKey(job: unknown): { scene: number; handle: number } {
   if (typeof scene !== "number" || typeof handle !== "number") throw new Error("not a job");
   return { scene, handle };
 }
+
+test("an ordered volley's shots, painted on workers, show across the stage", () => {
+  const ports = [new LoopPort(), new LoopPort()];
+  const { gfx, game, stage } = setup(ports);
+  const fx = stage.play("arcane/sword-formation", 40, 100, {}, 1);
+  const step = () => {
+    stage.update(1 / 30);
+    stage.draw();
+    game.endFrame();
+    for (const p of ports) p.run();
+    stage.update(0);
+    stage.draw();
+    game.endFrame();
+  };
+  for (let i = 0; i < 40; i++) step();
+  let strikes = 0;
+  fx.on("strike", () => strikes++);
+  stage.setBody(1, 290, 60, 20, 40);
+  expect(fx.attack(300, 80)).toBe(true);
+  let farthest = 0;
+  for (let i = 0; i < 90; i++) {
+    step();
+    for (const im of gfx.showing()) farthest = Math.max(farthest, im.shown?.x ?? 0);
+  }
+  expect(farthest).toBeGreaterThan(250);
+  expect(strikes).toBe(8);
+});
+

@@ -99,6 +99,19 @@ export class Pixfx {
     this.stage.scene.clearView();
   }
 
+  /**
+   * Body `id` (a fighter, a wall) is the box (`x`, `y`, `w`, `h`) in game pixels: the pieces of a volley an effect
+   * was ordered to launch (`effect.attack`) strike it when they meet it. Set it as the thing moves.
+   */
+  setBody(id: number, x: number, y: number, w: number, h: number): void {
+    this.stage.setBody(id, x, y, w, h);
+  }
+
+  /** Body `id` is gone: nothing strikes it any more. */
+  clearBody(id: number): void {
+    this.stage.clearBody(id);
+  }
+
   /** Draw the effects' `layer` onto the canvas, in the context's current transform. */
   drawLayer(layer: Layer): void {
     this.images.draw(this.ctx, this.scale, DEPTH[layer]);

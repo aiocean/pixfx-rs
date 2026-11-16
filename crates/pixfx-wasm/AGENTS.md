@@ -10,12 +10,17 @@ The engine for JavaScript. It translates and decides nothing: `effects()`, `meta
 `new Squash(spec?)`, `new Blink(spec?)`, and `parse_options`. Every JS shell (Canvas 2D, Phaser, Pixi) loads the engine through it.
 
 `src/scene.rs` is the `pixfx-scene` scene for JS shells: `new Frames(workers)` once per game, `frames.scene(scale)`
-per stage, `scene.play/moveTo/stop/update/events`, then `scene.draw(frames)` and `frames.endFrame()`, which return a
+per stage, `scene.play/moveTo/stop/order/update/events` (`order(handle, x, y, aim, caster)`: an effect that takes
+orders launches its volley; each piece's strike comes back as a `"strike"` event naming the body; `setBody(id, x, y,
+w, h)`, `clearBody(id)`, `burst(piece)`, `trail(handle, id, opts)`; a paint job carries a trail's trace as
+`x, y, angle, age` per point), then `scene.draw(frames)` and `frames.endFrame()`, which return a
 draw list (`Int32Array`, `OP_STRIDE` numbers per op: make, refill, show, free) with the pixels at
 `frames.colorPtr(id)` / `lightPtr(id)` when painted on the spot. With workers (every JS shell), `frames.takeJobs()`
 gives the frames to paint, a worker's `new Painting()` paints, cuts and turns each into RGBA (`painted.shape()`,
 `color()`, `light()`), the worker transfers the bytes, and `scene.deliver(frames, job, shape)` takes back only the
 shape: the make or refill it returns uploads the worker's bytes, which never pass through wasm on the main thread.
+A worker makes an effect's state from its id and options as JSON (`options_json`, the reverse of `parse_options`),
+taken from the effect's clip, so it paints what the scene played itself (a volley's shots) as well as what JS played.
 Presets come from `palettePresets()`; `scene.setView(x, y, w, h, scrollX, scrollY)` and `scene.setScrollFactor(handle, f)` say what a camera sees and how
 far each effect moves with it, so the scene draws only those it sees. `scene.bend(src, w, h, unit)` bends a picture of the
 host's screen by the feel's live ripples (`pixfx_core::screen::ripple_rgba`), for a shell that bends pixels on the

@@ -32,6 +32,9 @@ effect at its view's origin (`Scene::draw_handle`), then `end_frame` once per wi
 `ThreadPainter` (`src/threads.rs`, `FxScene::with_threads(n)`, not on wasm), which keeps each effect's state on one
 thread for its life and sends back ready images (`Painted`), taken at the first `paint` of the next window frame
 (`Receive<Painted>`).
+An effect that takes orders: declare bodies with `set_body`, `order(fx, x, y, aim, caster)` (from its origin), paint
+each of `launched(fx)` where `fx` is painted, and read strikes from `events()`; `burst` bursts a piece. `trail(fx,
+id, opts)` lays a trail under a moving effect.
 Images the scene lets go of are queued and dropped from the atlas at `end_frame`, never mid-frame. New behaviour goes
 into `Scene`, not here.
 

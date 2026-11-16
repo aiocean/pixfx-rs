@@ -10,7 +10,15 @@ What a stage shows and where, decided once in Rust for every shell. `Scene` hold
 ones go, which frame each shows, which effects the host can see (a `View` with the camera's scroll, and each
 effect's scroll factor: the rest play on undrawn), the character each effect plays on (`set_actor`, kept in the
 effect's own space and mirrored with its flip), the game's answer to their cues (a `Feel`), and events
-(`StageEvent`).
+(`StageEvent`). It carries out orders (`order`): an effect that takes one answers with a volley
+(`pixfx_core::volley`), and the scene plays each shot when it is due, flies it along its path turned to its heading
+(snapped to 32, so frames are shared), sends a `Strike` event and plays the hit effect where it strikes, and ends
+the ordered effect after its last shot. A piece flies on past the point and strikes the first body the game
+declared (`set_body`, `Body`; its caster's spared, a piercing piece through every one) or where the game bursts it
+(`burst`). A trail (`trail(mover, clip)`, an effect whose `traces` asks for it) is handed its mover's trace, in its own
+space (turned and mirrored back), after every update; an effect that asks for a trace played on its own trails
+itself as the game moves it, and ends once stopped. `follows(handle)` names a trail's mover. `launched(handle)` names what a volley launched, for a host that paints
+each effect on its own (gpui).
 
 `Frames` is game-wide and shared by every `Scene` of the game (a canvas, a Phaser scene, a gpui window each, made
 with `Frames::scene`): the shared frames under one budget (`FRAME_BUDGET`) and the `Painter` that paints them. A
@@ -55,7 +63,7 @@ only when every shell needs it, and say so in the commit.
 
 ## Dependencies
 
-- Required: `pixfx-core`, `pixfx-draw`.
+- Required: `pixfx-core`, `pixfx-draw`, `libm` (a trail's trace turned into its own space, the same bits natively and in wasm).
 - Optional, behind `serde` / `ts` only: `serde`, `tsify`, `wasm-bindgen`.
 - Never `js-sys`, `web-sys`, gpui, or any shell crate. Not `pixfx-effects`: a scene plays any `Effect` it is given.
 

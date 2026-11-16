@@ -13,7 +13,7 @@ What every JS shell (Phaser, Pixi, the next ones) shares, so a shell adds only i
 | `game.ts` | The game-wide wasm `Frames`, the surfaces, jobs routed to workers (one per effect for its life), painted frames handed back. |
 | `surfaces.ts` | The draw-list op codes; makes, refills and frees surfaces on the shell's `GfxTexture`s. |
 | `stage.ts` | One host scene's wasm `Scene`: plays, follow targets read each update, events, the show ops on the shell's images. |
-| `effect.ts`, `feel.ts` | `PixfxEffect` and `PixfxFeel`, the handles a game holds (eventemitter3). |
+| `effect.ts`, `feel.ts` | `PixfxEffect` and `PixfxFeel`, the handles a game holds (eventemitter3); `effect.attack(x, y, aim, caster)` orders an effect that takes orders, which emits `"strike"` per piece (`body`: the one struck), `effect.burst()` bursts one, `effect.trail(id, opts)` lays a trail under it; the stage's `setBody` / `clearBody` declare what pieces strike. |
 | `worker.ts`, `paint.ts`, `protocol.ts` | The painting worker, what it does with a message, and the messages (zod). |
 | `options.ts` | Splitting play options into a shell's own fields and the engine's. |
 | `actor.ts` | A character an effect plays on: an image cut's pixels read once and kept (`cutPixels`), and `imageActor` for sprites a game draws itself. |

@@ -15,9 +15,29 @@ export interface FollowTarget {
   active: boolean;
 }
 
+/**
+ * How an ordered volley flies toward its point: every piece curving onto the line through it and bursting on the
+ * first body it meets, or straight at it and on through every body.
+ */
+export type Aim = "converge" | "pierce";
+
+/**
+ * Where one piece of an ordered volley struck, in world pixels: `index` counts the volley's pieces from 0, `body` is
+ * the body it hit (`stage.setBody`), or null (the point a thrown volley lands on, or a `burst()`).
+ */
+export interface Strike {
+  index: number;
+  x: number;
+  y: number;
+  body: number | null;
+}
+
 /** What an effect asks of its scene. */
 export interface EffectHost<P> {
   stop(handle: number): void;
+  order(handle: number, x: number, y: number, aim: Aim, caster: number | undefined): boolean;
+  trail(mover: PixfxEffect<P>, id: string, engine: Record<string, unknown>): PixfxEffect<P> | null;
+  burst(handle: number): boolean;
   remove(effect: PixfxEffect<P>): void;
   follow(handle: number, target: FollowTarget | null, dx: number, dy: number): void;
   moveTo(handle: number, x: number, y: number): void;
@@ -27,7 +47,8 @@ export interface EffectHost<P> {
 /**
  * One effect in a scene, played and drawn by the Rust scene. Emits `"complete"` when it finishes on its own and
  * `"destroy"` when destroyed; either way it is already gone when the event fires. Emits `"cue"` with each cue it
- * fires (`{t, pan, cue}`, a ripple's and a sound's `x`/`y` in the world), on the update that passes it.
+ * fires (`{t, pan, cue}`, a ripple's and a sound's `x`/`y` in the world), on the update that passes it. Emits
+ * `"strike"` (`{index, x, y, body}`) as each piece of a volley it was ordered to launch (`attack`) strikes.
  */
 export class PixfxEffect<P = null> extends EventEmitter {
   private gone = false;
@@ -51,6 +72,32 @@ export class PixfxEffect<P = null> extends EventEmitter {
   stop(): this {
     if (!this.gone) this.host.stop(this.handle);
     return this;
+  }
+
+  /**
+   * Order it to attack toward world (`x`, `y`), at any distance: an effect that takes orders
+   * (`arcane/sword-formation`) launches its volley; each piece strikes the bodies it meets (`stage.setBody`),
+   * emitting `"strike"`, and the effect ends once the last piece is done. `caster`, the attacker's own body, is
+   * never struck. False when it takes no orders, was already ordered, or is gone.
+   */
+  attack(x: number, y: number, aim: Aim = "converge", caster?: number): boolean {
+    return !this.gone && this.host.order(this.handle, x, y, aim, caster);
+  }
+
+  /**
+   * Lay a trail under it: effect `id` (`projectiles/trail`) drawing the way it came, curving with it, as long as it
+   * is fast, ending soon after it. Null when it is gone or `id` draws no trail; throws on an unknown id.
+   */
+  trail(id: string, engine: Record<string, unknown> = {}): PixfxEffect<P> | null {
+    return this.gone ? null : this.host.trail(this, id, engine);
+  }
+
+  /**
+   * For a game with collisions of its own: this volley piece hit something, so it strikes where its tip is and goes.
+   * False unless it is a piece in flight.
+   */
+  burst(): boolean {
+    return !this.gone && this.host.burst(this.handle);
   }
 
   /** Remove at once; emits `"destroy"` (never `"complete"`). Does nothing if already gone. */

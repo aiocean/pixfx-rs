@@ -8,7 +8,7 @@ export type { CueSink, WorldCue } from "./stage";
 export { cutPixels, imageActor } from "./actor";
 export type { ActorFrame, ActorSource, Cut, DrawnImage } from "./actor";
 export { PixfxEffect } from "./effect";
-export type { Counts, EffectHost, FollowTarget } from "./effect";
+export type { Aim, Counts, EffectHost, FollowTarget, Strike } from "./effect";
 export { PixfxFeel } from "./feel";
 export { splitPlayOptions } from "./options";
 export type { Play } from "./options";

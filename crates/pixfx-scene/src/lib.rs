@@ -12,11 +12,16 @@ mod frames;
 
 pub use frames::{ActorFrame, EffectKey, Frames, InlinePainter, Job, OwnAt, Painter, Target};
 
+use core::f64::consts::{PI, TAU};
 use frames::frame_bytes;
 use pixfx_core::cue::Cue;
-use pixfx_core::{Actor, Clip, Clock, Feel, FrameId, Layer, Placement, TimedCue, valid_dt};
-use pixfx_draw::math::clamp;
+
+use pixfx_core::volley::{Launch, Order};
+use pixfx_core::{
+    Actor, Clip, Clock, Feel, FrameId, Layer, Placement, TimedCue, Trace, TracePoint, valid_dt,
+};
 use pixfx_draw::math::js_round;
+use pixfx_draw::math::{clamp, smooth};
 use pixfx_draw::{Frame, composite_px};
 
 /// A change to where and how an effect draws ([`Scene::set`] after [`PlacementChange::over`]): each field left out
@@ -134,6 +139,17 @@ pub enum StageEvent {
         pan: Option<f64>,
         cue: Cue,
     },
+    /// Piece `index` of the volley instance `handle` was ordered to launch ([`Scene::order`]) struck at game
+    /// pixel (`x`, `y`): the body `body` it met ([`Scene::set_body`]), or none (the point it lands on, or a
+    /// [`Scene::burst`]). What the strike does to the game (damage, a reel) is the game's to decide.
+    Strike {
+        handle: u32,
+        index: u32,
+        x: f64,
+        y: f64,
+        #[cfg_attr(feature = "ts", tsify(type = "number | null"))]
+        body: Option<u32>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -245,6 +261,13 @@ struct Entry<S> {
     waiting: [Option<u64>; 3],
     /// Plays real time through a hit-stop instead of freezing with the rest ([`Scene::set_plays_through_hitstop`]).
     through_hitstop: bool,
+    /// It answered an order ([`Scene::order`]): its volley flies in its place, so it is no longer drawn, and it
+    /// ends when the last piece is gone.
+    ordered: bool,
+    /// The instance whose ordered volley launched it (a piece in flight, or what a piece played where it struck).
+    launched_by: Option<u32>,
+    /// The mover it draws the way of, for a trail ([`Scene::trail`]).
+    trail: Option<Trail>,
     /// How far it moves when the camera scrolls, as a share of the scroll (1: with the world, 0: fixed to the
     /// camera); the view culls it where the camera shows it ([`View`]).
     scroll_factor: f64,
@@ -278,7 +301,13 @@ impl<S> Entry<S> {
             clock: self.clock.clock_frame(),
             place: self.place,
             actor: self.wrapped().map_or(0, |a| a.version),
+            trace: self.trail.as_ref().map_or(0, |t| t.version),
         }
+    }
+
+    /// The trace it draws, for a trail.
+    fn traced(&self) -> Option<&Arc<Trace>> {
+        self.trail.as_ref().map(|t| &t.trace)
     }
 }
 
@@ -316,6 +345,109 @@ pub struct Scene<S> {
     drawn: u32,
     /// What the host can see; `None` draws every effect.
     view: Option<View>,
+    /// Seconds the scene has played (hit-stops add nothing): the clock volleys launch and fly by.
+    time: f64,
+    /// The pieces of ordered volleys, waiting to launch or in flight.
+    flights: Vec<Flight>,
+    /// The bodies volleys strike, by id.
+    bodies: Vec<(u32, Body)>,
+}
+
+/// What a trail follows: the mover's game pixel at each scene time it was seen, oldest first, kept for `secs`;
+/// the trace made of them in the trail's own space, under a version that changes with it.
+struct Trail {
+    /// The instance it follows, or none for a trail played on its own, which follows where the game moves it.
+    mover: Option<u32>,
+    secs: f64,
+    /// When, where and turned how far.
+    seen: Vec<(f64, (i64, i64), f64)>,
+    trace: Arc<Trace>,
+    version: u64,
+}
+
+/// One piece of a volley: held as instance `held` from `ordered` until `due`, then flying as instance `flying`
+/// since `started`, mirrored as the instance that launched it was (`flip`).
+struct Flight {
+    /// The instance that was ordered, and which piece of its volley this is.
+    by: u32,
+    index: u32,
+    launch: Launch,
+    flip: bool,
+    ordered: f64,
+    due: f64,
+    held: Option<u32>,
+    flying: Option<u32>,
+    started: f64,
+    /// The body that ordered it, never struck; the bodies it struck; whether it struck its mark.
+    caster: Option<u32>,
+    hits: Vec<u32>,
+    marked: bool,
+    /// How far along its way it was, its tip and heading there, at the last step.
+    dist: f64,
+    tip: (f64, f64),
+    heading: f64,
+}
+
+/// A body a volley's pieces strike when they meet it ([`Scene::set_body`]): a box in game pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Body {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
+impl Body {
+    /// How far along the segment from `a` to `b` (0 to 1) it first enters the box, if it does (0 when `a` is
+    /// inside).
+    fn entered(&self, a: (f64, f64), b: (f64, f64)) -> Option<f64> {
+        let (mut lo, mut hi) = (0.0_f64, 1.0_f64);
+        for (p, d, min, max) in [
+            (a.0, b.0 - a.0, self.x, self.x + self.w),
+            (a.1, b.1 - a.1, self.y, self.y + self.h),
+        ] {
+            if d.abs() < 1e-12 {
+                if p < min || p > max {
+                    return None;
+                }
+                continue;
+            }
+            let (t0, t1) = ((min - p) / d, (max - p) / d);
+            let (t0, t1) = if t0 < t1 { (t0, t1) } else { (t1, t0) };
+            lo = lo.max(t0);
+            hi = hi.min(t1);
+            if lo > hi {
+                return None;
+            }
+        }
+        Some(lo)
+    }
+}
+
+/// Headings a flying piece is drawn at: a full turn in this many steps, so pieces heading the same way share frames
+/// and turn the way pixel art turns, a step at a time.
+const HEADINGS: f64 = 32.0;
+
+/// `a` snapped to the nearest of [`HEADINGS`].
+fn snap_heading(a: f64) -> f64 {
+    let step = TAU / HEADINGS;
+    js_round(a / step) * step
+}
+
+/// How a piece heading `a` is drawn: its flip and angle. A piece keeps the mirroring of the instance that launched
+/// it, so it looks as it did there (its lit side, its guard) whichever way it flies: mirrored, a piece drawn
+/// pointing along +x points along `a` turned half a turn less.
+fn orient(a: f64, flip: bool) -> (bool, f64) {
+    if flip {
+        (true, snap_heading(a - PI))
+    } else {
+        (false, snap_heading(a))
+    }
+}
+
+/// The shortest turn from angle `a` to angle `b`, radians.
+fn turn_to(a: f64, b: f64) -> f64 {
+    (b - a + PI).rem_euclid(TAU) - PI
 }
 
 impl<S> Scene<S> {
@@ -335,6 +467,9 @@ impl<S> Scene<S> {
             draw_budget: None,
             drawn: 0,
             view: None,
+            time: 0.0,
+            flights: Vec::new(),
+            bodies: Vec::new(),
         }
     }
 
@@ -389,11 +524,21 @@ impl<S> Scene<S> {
     }
 
     /// Play `clip` from its start with its origin at game pixel (`x`, `y`), rounded as JS `Math.round` does;
-    /// returns its handle.
+    /// returns its handle. An effect that draws the way a mover came ([`pixfx_core::Effect::traces`]) played on its
+    /// own trails itself: moved with [`Scene::move_to`] (with a fighter, a cursor), it draws the way it went, and
+    /// once stopped it shrinks to where it was last and ends.
     pub fn play(&mut self, clip: Clip, x: f64, y: f64) -> Result<u32, StageError> {
         let at = game_pixel(x, y)?;
         let handle = self.next.ok_or(StageError::OutOfHandles)?;
         self.next = handle.checked_add(1);
+        let angle = clip.placement().angle;
+        let trail = clip.effect().traces(clip.opts()).map(|secs| Trail {
+            mover: None,
+            secs: secs.max(0.0),
+            seen: vec![(self.time, at, angle)],
+            trace: Arc::new(Trace::default()),
+            version: 1,
+        });
         self.entries.push(Entry {
             handle,
             at,
@@ -410,8 +555,119 @@ impl<S> Scene<S> {
             actor_sets: 0,
             through_hitstop: false,
             scroll_factor: 1.0,
+            ordered: false,
+            launched_by: None,
+            trail,
         });
         Ok(handle)
+    }
+
+    /// Play `clip` as the trail of instance `mover`: an effect that draws the way a mover came
+    /// ([`pixfx_core::Effect::traces`]), handed the mover's last positions (as many seconds of them as it asks
+    /// for) in its own space after every update, so it bends where the mover turned and is as long as it was fast.
+    /// It draws just under the mover, plays where the mover is, and once the mover is gone it shrinks to where it
+    /// was last and ends. Its frames are its own. `Ok(None)` if no instance has this handle or the effect draws
+    /// no trace.
+    pub fn trail(&mut self, mover: u32, clip: Clip) -> Result<Option<u32>, StageError> {
+        let Some(secs) = clip.effect().traces(clip.opts()) else {
+            return Ok(None);
+        };
+        let Some(m) = self.entries.iter().position(|e| e.handle == mover) else {
+            return Ok(None);
+        };
+        let (at, by, angle) = (
+            self.entries[m].at,
+            self.entries[m].launched_by,
+            self.entries[m].place.angle,
+        );
+        let h = self.play(clip, at.0 as f64, at.1 as f64)?;
+        if let Some(mut e) = self.entries.pop() {
+            e.launched_by = by;
+            e.trail = Some(Trail {
+                mover: Some(mover),
+                secs: secs.max(0.0),
+                seen: vec![(self.time, at, angle)],
+                trace: Arc::new(Trace::default()),
+                version: 1,
+            });
+            // drawn under its mover
+            self.entries.insert(m, e);
+        }
+        Ok(Some(h))
+    }
+
+    /// The mover instance `handle` trails, if it is a trail ([`Scene::trail`]).
+    pub fn follows(&self, handle: u32) -> Option<u32> {
+        self.entries
+            .iter()
+            .find(|e| e.handle == handle)
+            .and_then(|e| e.trail.as_ref().and_then(|t| t.mover))
+    }
+
+    /// Bring every trail to its mover: where the mover is now joins what it has seen, what is older than the
+    /// trail asks for goes (but the last point before that, so the trace reaches its full age), and a trail whose
+    /// mover is gone shrinks until nothing of its trace is left, then ends.
+    fn follow(&mut self) {
+        let time = self.time;
+        let movers: Vec<(u32, (i64, i64), f64)> = self
+            .entries
+            .iter()
+            .map(|e| (e.handle, e.at, e.place.angle))
+            .collect();
+        let mut spent = Vec::new();
+        for e in &mut self.entries {
+            let stopped = e.clock.stopped();
+            // the trace in the trail's own space: the painter mirrors x, then turns by the trail's angle, so the
+            // trace is turned back, then mirrored back
+            let sx = if e.place.flip { -1.0 } else { 1.0 };
+            let own = e.place.angle;
+            let (cs, sn) = (libm::cos(own), libm::sin(own));
+            let Some(t) = &mut e.trail else { continue };
+            let now = match t.mover {
+                Some(mover) => movers.iter().find(|m| m.0 == mover).map(|m| (m.1, m.2)),
+                None => (!stopped).then_some((e.at, e.place.angle)),
+            };
+            if let Some((at, angle)) = now {
+                t.seen.push((time, at, angle));
+                e.at = at;
+            }
+            let keep = t
+                .seen
+                .iter()
+                .rposition(|s| time - s.0 > t.secs)
+                .unwrap_or(0);
+            t.seen.drain(..keep);
+            let alive = t.seen.iter().any(|s| time - s.0 <= t.secs);
+            if now.is_none() && !alive {
+                spent.push(e.handle);
+                continue;
+            }
+            let trace = Trace {
+                points: t
+                    .seen
+                    .iter()
+                    .rev()
+                    .map(|&(when, (x, y), angle)| {
+                        let (dx, dy) = ((x - e.at.0) as f64, (y - e.at.1) as f64);
+                        let a = angle - own;
+                        TracePoint {
+                            x: sx * (dx * cs + dy * sn),
+                            y: -dx * sn + dy * cs,
+                            // mirrored like x: a heading a turns to PI - a
+                            angle: if sx < 0.0 { PI - a } else { a },
+                            age: time - when,
+                        }
+                    })
+                    .collect(),
+            };
+            if *t.trace != trace {
+                t.trace = Arc::new(trace);
+                t.version = t.version.wrapping_add(1);
+            }
+        }
+        for h in spent {
+            self.remove(h);
+        }
     }
 
     /// Put the instance's origin at game pixel (`x`, `y`), rounded as [`Scene::play`] does, keeping its time:
@@ -540,6 +796,280 @@ impl<S> Scene<S> {
         true
     }
 
+    /// Order the instance to strike: its effect answers with a volley ([`pixfx_core::Effect::order`]) from where
+    /// it stands and the frame it shows, the scene stops drawing it and launches the volley's pieces in its place,
+    /// flies them, sends a [`StageEvent::Strike`] for each, and ends the instance once the last piece is gone.
+    /// `Ok(false)` if no instance has this handle, it was ordered already or stopped, or its effect takes no orders.
+    pub fn order(&mut self, handle: u32, order: Order) -> Result<bool, StageError> {
+        if !order.x.is_finite() || !order.y.is_finite() {
+            return Err(StageError::NotFinite);
+        }
+        let Some(e) = self
+            .entries
+            .iter_mut()
+            .find(|e| e.handle == handle && !e.ordered && !e.clock.stopped())
+        else {
+            return Ok(false);
+        };
+        let fps = f64::from(e.clip.meta().fps);
+        // the time of the frame it shows, so the volley starts where the pieces are seen
+        let t = e.clock.frame() as f64 / fps;
+        let at = (e.at.0 as f64, e.at.1 as f64);
+        let volley = e
+            .clip
+            .effect()
+            .order(e.clip.opts(), t, at, e.place.flip, &order);
+        if volley.is_empty() {
+            return Ok(false);
+        }
+        e.ordered = true;
+        let flip = e.place.flip;
+        for (i, launch) in volley.into_iter().enumerate() {
+            // held where the piece was in the instance, pointing as it did, from this frame on
+            let (flip_now, angle) = orient(launch.rest, flip);
+            let opts = pixfx_core::Options {
+                flip: flip_now,
+                angle,
+                ..launch.opts.clone()
+            };
+            let (x, y) = launch.path.from;
+            let launch_heading = launch.path.heading(0.0);
+            let tip = launch.tip((x, y), launch_heading);
+            let held = if launch.after > 0.0 {
+                let still = launch.held.unwrap_or(launch.effect);
+                Some(self.play_launched(Clip::live(still, opts), x, y, handle)?)
+            } else {
+                None
+            };
+            self.flights.push(Flight {
+                by: handle,
+                index: u32::try_from(i).unwrap_or(u32::MAX),
+                flip,
+                ordered: self.time,
+                due: self.time + launch.after.max(0.0),
+                launch,
+                held,
+                flying: None,
+                started: 0.0,
+                caster: order.caster,
+                hits: Vec::new(),
+                marked: false,
+                dist: 0.0,
+                tip,
+                heading: launch_heading,
+            });
+        }
+        Ok(true)
+    }
+
+    /// Launch the volley pieces that are due, fly the ones in the air to the scene's time, strike, and end what
+    /// is done: a piece past its path, and an ordered instance whose pieces are all gone.
+    /// Play `clip` for the volley of instance `by` ([`Scene::launched`]).
+    fn play_launched(&mut self, clip: Clip, x: f64, y: f64, by: u32) -> Result<u32, StageError> {
+        let h = self.play(clip, x, y)?;
+        if let Some(e) = self.entries.last_mut() {
+            e.launched_by = Some(by);
+        }
+        Ok(h)
+    }
+
+    /// The instances the volley of `by` launched that still play, oldest first: its pieces in flight and what they
+    /// played where they struck. A host that paints each effect on its own (a gpui view per effect) paints these
+    /// where it paints `by`; they keep playing after `by` itself is gone.
+    pub fn launched(&self, by: u32) -> impl Iterator<Item = u32> + '_ {
+        self.entries
+            .iter()
+            .filter(move |e| e.launched_by == Some(by))
+            .map(|e| e.handle)
+    }
+
+    /// Piece `f` strikes at game pixel `at` heading `heading`: the strike event, and its hit effect played there
+    /// turned to its heading.
+    fn strike(
+        &mut self,
+        f: &Flight,
+        at: (f64, f64),
+        heading: f64,
+        body: Option<u32>,
+    ) -> Result<(), StageError> {
+        let (flip, angle) = orient(heading, f.flip);
+        self.events.push(StageEvent::Strike {
+            handle: f.by,
+            index: f.index,
+            x: at.0,
+            y: at.1,
+            body,
+        });
+        if let Some(hit) = f.launch.hit {
+            let opts = pixfx_core::Options {
+                flip,
+                angle,
+                ..f.launch.hit_opts.clone()
+            };
+            self.play_launched(Clip::live(hit, opts), at.0, at.1, f.by)?;
+        }
+        Ok(())
+    }
+
+    /// Body `id` is the box `body` in game pixels from now on (the game sets it each frame as the thing moves), or
+    /// none to drop it. A volley's piece that meets it strikes it ([`StageEvent::Strike`] names it), unless the
+    /// body ordered that volley ([`Order::caster`]). Throws nothing; a box that is not finite is dropped.
+    pub fn set_body(&mut self, id: u32, body: Option<Body>) {
+        self.bodies.retain(|(b, _)| *b != id);
+        if let Some(b) = body.filter(|b| [b.x, b.y, b.w, b.h].iter().all(|v| v.is_finite())) {
+            let at = self.bodies.partition_point(|(b, _)| *b < id);
+            self.bodies.insert(at, (id, b));
+        }
+    }
+
+    /// The game says the volley piece `piece` (one of [`Scene::launched`]) hit something: it strikes where its tip
+    /// is (a strike event naming no body, its hit effect played there) and goes. For a game with collisions of its
+    /// own. False if `piece` is not a piece in flight.
+    pub fn burst(&mut self, piece: u32) -> Result<bool, StageError> {
+        let Some(i) = self.flights.iter().position(|f| f.flying == Some(piece)) else {
+            return Ok(false);
+        };
+        let f = self.flights.remove(i);
+        self.strike(&f, f.tip, f.heading, None)?;
+        self.remove(piece);
+        Ok(true)
+    }
+
+    fn fly(&mut self) -> Result<(), StageError> {
+        let mut flights = std::mem::take(&mut self.flights);
+        let mut gone = Vec::new();
+        for (i, f) in flights.iter_mut().enumerate() {
+            let l = &f.launch;
+            if f.flying.is_none() {
+                let (x, y) = l.path.from;
+                let aim = l.path.heading(0.0);
+                if self.time < f.due {
+                    // held, turning from where it pointed to where it will leave
+                    let Some(h) = f.held else { continue };
+                    let Some(place) = self.placement(h) else {
+                        gone.push(i);
+                        continue;
+                    };
+                    let k = smooth(f.ordered, f.due, self.time);
+                    let (flip, angle) = orient(l.rest + turn_to(l.rest, aim) * k, f.flip);
+                    self.set(
+                        h,
+                        Placement {
+                            x,
+                            y,
+                            flip,
+                            angle,
+                            ..place
+                        },
+                    )?;
+                    continue;
+                }
+                let (flip, angle) = orient(aim, f.flip);
+                // what stood in its place goes; the piece starts its own clock as it leaves
+                if let Some(h) = f.held.take() {
+                    self.remove(h);
+                }
+                let opts = pixfx_core::Options {
+                    flip,
+                    angle,
+                    ..l.opts.clone()
+                };
+                let h = self.play_launched(Clip::live(l.effect, opts), x, y, f.by)?;
+                if let Some((tail, opts)) = &l.tail {
+                    self.trail(h, Clip::live(*tail, opts.clone()))?;
+                }
+                f.flying = Some(h);
+                f.started = f.due;
+            }
+            let Some(h) = f.flying else { continue };
+            let s = if l.secs > 0.0 {
+                clamp((self.time - f.started) / l.secs, 0.0, 1.0)
+            } else {
+                1.0
+            };
+            let dist = l.along(s);
+            let ((x, y), heading) = l.point(dist);
+            let (flip, angle) = orient(heading, f.flip);
+            let Some(place) = self.placement(h) else {
+                // the host took it away
+                gone.push(i);
+                continue;
+            };
+            self.set(
+                h,
+                Placement {
+                    x,
+                    y,
+                    flip,
+                    angle,
+                    ..place
+                },
+            )?;
+            // what its tip met since the last step, in the order it met them: bodies, and its mark
+            let tip = l.tip((x, y), heading);
+            let (through, mark) = (l.through, l.mark);
+            let mut met: Vec<(f64, Option<u32>)> = self
+                .bodies
+                .iter()
+                .filter(|(id, _)| Some(*id) != f.caster && !f.hits.contains(id))
+                .filter_map(|(id, b)| b.entered(f.tip, tip).map(|t| (t, Some(*id))))
+                .collect();
+            if let Some(m) = mark
+                && !f.marked
+                && dist >= m
+            {
+                let t = if dist > f.dist {
+                    (m - f.dist) / (dist - f.dist)
+                } else {
+                    1.0
+                };
+                met.push((clamp(t, 0.0, 1.0), None));
+            }
+            met.sort_by(|a, b| a.0.total_cmp(&b.0));
+            let mut spent = false;
+            for (t, body) in met {
+                let at = (
+                    f.tip.0 + (tip.0 - f.tip.0) * t,
+                    f.tip.1 + (tip.1 - f.tip.1) * t,
+                );
+                match body {
+                    Some(id) => f.hits.push(id),
+                    None => f.marked = true,
+                }
+                self.strike(f, at, heading, body)?;
+                if !through {
+                    spent = true;
+                    break;
+                }
+            }
+            f.dist = dist;
+            f.tip = tip;
+            f.heading = heading;
+            if spent {
+                self.remove(h);
+                gone.push(i);
+            } else if s >= 1.0 {
+                // struck nothing more by the end of its way: it fades out there
+                self.stop(h);
+                gone.push(i);
+            }
+        }
+        for i in gone.into_iter().rev() {
+            flights.remove(i);
+        }
+        let spent: Vec<u32> = self
+            .entries
+            .iter()
+            .filter(|e| e.ordered && !flights.iter().any(|f| f.by == e.handle))
+            .map(|e| e.handle)
+            .collect();
+        for h in spent {
+            self.remove(h);
+        }
+        self.flights = flights;
+        Ok(())
+    }
+
     /// The events since the last drain, oldest first; the queue is empty afterwards.
     pub fn drain_events(&mut self) -> Vec<StageEvent> {
         std::mem::take(&mut self.events)
@@ -561,8 +1091,11 @@ impl<S> Scene<S> {
     /// Whether the effect's frame is seen: it overlaps the view where the camera shows the effect, or there is no
     /// view.
     fn in_view(&self, e: &Entry<S>) -> bool {
-        self.view
-            .is_none_or(|v| v.overlaps(self.rect_of(e), e.scroll_factor, self.scale))
+        // an ordered instance is drawn no more: its volley flies in its place
+        !e.ordered
+            && self
+                .view
+                .is_none_or(|v| v.overlaps(self.rect_of(e), e.scroll_factor, self.scale))
     }
 
     /// The instance's frame (its canvas plus margin) placed so the effect's origin lands on `e.at`.
@@ -629,9 +1162,12 @@ impl<S> Scene<S> {
                 pan: c.pan,
                 cue: c.cue,
             }));
+        self.time += run;
+        self.fly()?;
+        self.follow();
         let (done, playing): (Vec<_>, Vec<_>) = std::mem::take(&mut self.entries)
             .into_iter()
-            .partition(|e| e.clock.done());
+            .partition(|e| e.clock.done() && !e.ordered && e.trail.is_none());
         self.entries = playing;
         for e in done {
             self.ended.push(e.handle);
@@ -790,7 +1326,10 @@ impl<S> Scene<S> {
             e.asked[slot] = None;
         }
         match &mut e.own[slot] {
-            Some(o) if (o.drawn.clock, o.drawn.actor) > (drawn.clock, drawn.actor) => {
+            Some(o)
+                if (o.drawn.clock, o.drawn.actor, o.drawn.trace)
+                    > (drawn.clock, drawn.actor, drawn.trace) =>
+            {
                 return Ok(false);
             }
             Some(o) => {
@@ -883,6 +1422,7 @@ impl<S> Scene<S> {
                         layer,
                         target: Target::Shared(id.clone()),
                         actor: None,
+                        trace: None,
                     };
                     match painter.paint(&job) {
                         Some(frame) => {
@@ -930,6 +1470,7 @@ impl<S> Scene<S> {
                         layer,
                         target: Target::Own(drawn),
                         actor: e.wrapped(),
+                        trace: e.traced(),
                     };
                     match frames.painter.paint(&job) {
                         Some(frame) => {
@@ -973,6 +1514,7 @@ impl<S> Scene<S> {
         frames: &mut Frames<S, P>,
         shell: &mut H,
     ) -> Result<(), H::Error> {
+        self.flights.clear();
         for e in std::mem::take(&mut self.entries) {
             self.ended.push(e.handle);
             self.events.push(StageEvent::End { handle: e.handle });
@@ -990,7 +1532,7 @@ impl<S> Scene<S> {
 /// The shared frame entry `e` shows now, or none while it fades out after a stop or wraps its actor (those
 /// frames are its own). Effects showing the same id draw byte-equal frames.
 fn shown<S>(e: &Entry<S>) -> Option<FrameId> {
-    (!e.clock.stopped() && e.wrapped().is_none()).then(|| FrameId {
+    (!e.clock.stopped() && e.wrapped().is_none() && e.trail.is_none()).then(|| FrameId {
         key: e.clip.key(e.place),
         index: e.clock.frame(),
     })

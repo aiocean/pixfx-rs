@@ -23,7 +23,7 @@ mod squash;
 pub use feel::Feel;
 pub use hit_flash::HitFlash;
 use js::to_js;
-pub use options::{MAX_MARGIN, parse_options};
+pub use options::{MAX_MARGIN, options_json, parse_options};
 #[cfg(any(feature = "fighter", feature = "light"))]
 pub use picture::Picture;
 pub use pixfx_core::Player;

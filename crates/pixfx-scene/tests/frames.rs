@@ -83,6 +83,7 @@ fn deliver(
             layer: a.layer,
             target: a.target.clone(),
             actor: a.actor.as_ref(),
+            trace: None,
         };
         let frame = frames
             .painter_mut()

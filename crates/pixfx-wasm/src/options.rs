@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use pixfx_core::{Meta, OptValue, Options, check_options};
+use pixfx_draw::color::to_hex;
 use pixfx_draw::{Rgba, hex};
 use serde::Deserialize;
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
@@ -183,4 +184,31 @@ pub fn parse_options(meta: &Meta, v: &JsValue) -> Result<(Options, Option<u32>),
     };
     check_options(meta, &opts).map_err(|e| JsError::new(&e.to_string()))?;
     Ok((opts, w.margin))
+}
+
+/// `opts` as the JSON [`parse_options`] reads back into the same options: what a worker needs to make an effect
+/// that Rust played (a shot an ordered volley launched) as well as one JS played. `x`/`y` are left out: an
+/// instance draws at its origin.
+pub fn options_json(opts: &Options) -> String {
+    use serde_json::{Map, Value};
+    let ramp = |r: &[Rgba]| Value::from(r.iter().map(|c| to_hex(*c)).collect::<Vec<_>>());
+    let mut m = Map::new();
+    if let Some(seed) = opts.seed {
+        m.insert("seed".into(), seed.into());
+    }
+    m.insert("flip".into(), opts.flip.into());
+    m.insert("angle".into(), opts.angle.into());
+    m.insert("light".into(), opts.light.into());
+    if let Some(p) = &opts.palette {
+        m.insert("palette".into(), ramp(p));
+    }
+    for (k, v) in &opts.extra {
+        let v = match v {
+            OptValue::Num(n) => Value::from(*n),
+            OptValue::Color(c) => Value::from(to_hex(*c)),
+            OptValue::Ramp(r) => ramp(r),
+        };
+        m.insert(k.clone(), v);
+    }
+    Value::Object(m).to_string()
 }
