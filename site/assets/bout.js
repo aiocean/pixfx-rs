@@ -8,7 +8,7 @@
 //
 // Units are game pixels and seconds. x grows to the right; heights (`air`, event y) are measured up from the ground,
 // effect y in screen rows like the duel's play commands.
-import { SPELLS, STATS, damageOf, orbOffset } from "./duel.js";
+import { SPELLS, STATS, damageOf, orbOffset } from "../arena/duel.js";
 
 /** How high a fighter may fly. */
 const TOP = 96;

@@ -27,16 +27,6 @@ host's screen by the feel's live ripples (`pixfx_core::screen::ripple_rgba`), fo
 CPU. Behind the `fighter`, `light` and `mind` features (all default): `src/fighter.rs` (`Body`, `FightFeel`, `Sprites`,
 `lookColors`), `src/light.rs` (`stepLights`, `putOutLight`, `Lighting`; the game owns its list of lights) and
 `src/mind.rs` (`Mind`, a fighter's brain: `meet(foeSkills)`, `think(sense, dt)`, `tell`, `reset`, `hold`, `explain`, `posture`).
-Behind `duel` (default): `src/duel.rs`, the landing duel's rules from `pixfx-duel`: `new Duel(config, seats?)`
-(`seats`: `["brain" | "first", ...]`, the brain when left out) or `Duel.withPolicies(config, seats?, left, right)`, a
-trained policy per corner (`seats`: `["policy" | "brain" | "first", ...]`, each corner's policy when left out),
-`step(dt)` (commands and events), `view()`, `hold(me, seconds)`; `new Policy(bytes)`, a trained policy read from a
-weights file (`games/arena/crates/pixfx-duel/weights/*.bin`), which the page fetches beside the wasm (the wasm never carries the
-weights); its tables as
-the page reads (`duelSpells()`, `duelTraits()`, `duelStats()`, `duelConstants()`), `damageOf` and `orbOffset`.
-A `hit` event says what kind of blow it was (`how`: `"plain"`, `"counter"` on a fighter gathering a cast, `"punish"`
-on one recovering); `FightFeel.react` reads it, stops longer and floats the word (`tests/hit_words.rs` keeps the
-duel's and the feel's spelling the same).
 `Sprites.picture()` and `Lighting.paint()` return a `Picture` (`src/picture.rs`: the lit box's colour and light
 RGBA) that a shell draws. `Squash.step(dt, x, y, vx?, vy?)` works out velocity from movement.
 
@@ -61,7 +51,8 @@ The test: if a gpui game would need the same behaviour, it is not translation, a
 
 `pixfx-core` (with `ts`), `pixfx-draw`, `pixfx-scene` (with `ts`), `pixfx-effects` (`default-features = false`; the `all` feature turns every
 effect on), `js-sys`, `wasm-bindgen`, `serde`, `serde-wasm-bindgen`, `serde_json`, `serde_path_to_error`, `tsify`;
-optional behind their features: `pixfx-fighter`, `pixfx-light`, `pixfx-mind`, and `pixfx-duel` (`duel`).
+optional behind their features: `pixfx-fighter`, `pixfx-light` and `pixfx-mind`. Never a game's crate: the arena's duel
+has its own wasm (`projects/arena/crates/arena-wasm`), which a page loads beside this one.
 
 ## Known drift
 

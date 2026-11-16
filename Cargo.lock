@@ -275,21 +275,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pixfx-duel"
-version = "0.1.0"
-dependencies = [
- "libm",
- "pixfx-draw",
- "pixfx-effects",
- "pixfx-fighter",
- "pixfx-mind",
- "serde",
- "serde_json",
- "tsify",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "pixfx-effects"
 version = "0.1.0"
 dependencies = [
@@ -411,7 +396,6 @@ dependencies = [
  "js-sys",
  "pixfx-core",
  "pixfx-draw",
- "pixfx-duel",
  "pixfx-effects",
  "pixfx-export",
  "pixfx-fighter",

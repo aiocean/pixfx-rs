@@ -1,15 +1,17 @@
-// The engine's wasm package for the tests: pixfx-web's, which the site's pixfx-canvas2d bundle carries
-// (`site/build.sh` builds it; `cd packages/pixfx-web && bun run build:wasm` alone is enough here).
+// The two wasm modules the site's pages load, for the tests: the engine's (pixfx-web's, which the site's
+// pixfx-canvas2d bundle carries; `cd packages/pixfx-web && bun run build:wasm`) and the arena's rules, which
+// `site/build.sh` embeds into site/arena (the arena's `site/embed.sh`).
 import { readFileSync } from "node:fs";
-import { useEngine, usePolicies } from "../assets/duel.js";
+import { useRules } from "../arena/duel.js";
 
 const dir = new URL("../../packages/pixfx-web/wasm/", import.meta.url);
 const pkg = await import(new URL("pixfx_wasm.js", dir).href);
 pkg.initSync({ module: readFileSync(new URL("pixfx_wasm_bg.wasm", dir)) });
 
-useEngine(pkg);
-// the trained policy in both corners, as the landing page seats it once its file arrives
-export const policyBytes = readFileSync(new URL("../../games/arena/crates/pixfx-duel/weights/policy.bin", import.meta.url));
-usePolicies([policyBytes, policyBytes]);
+const rulesDir = new URL("../arena/wasm/", import.meta.url);
+const rules = await import(new URL("arena_wasm.js", rulesDir).href);
+rules.initSync({ module: readFileSync(new URL("arena_wasm_bg.wasm", rulesDir)) });
+useRules(rules);
+
 export { pkg };
 export const { Body, Fx, Mind, effects } = pkg;

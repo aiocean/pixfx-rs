@@ -10,4 +10,4 @@ crates/pixfx-canvas/demo/pkg/
 # built static site
 site/dist/
 .wrangler/
-games/arena/site/dist/
+site/arena/

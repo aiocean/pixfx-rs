@@ -1,5 +1,5 @@
 //! The policy network, run in plain `f32` in one fixed order on every target (no FMA, each row summed in 8 partial
-//! sums joined in a fixed tree; `games/arena/train/net.py` mirrors it), so every target computes the same bits: `relu(in · x)`,
+//! sums joined in a fixed tree; the arena's `train/net.py` mirrors it), so every target computes the same bits: `relu(in · x)`,
 //! two residual blocks `h + down(relu(up(ln(h))))`, a final LayerNorm, a simplicial embedding (`sem`: 16 softmaxes
 //! of 8), and the policy head (`pi`). The trainer's value head is not shipped.
 //!

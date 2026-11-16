@@ -1,12 +1,12 @@
-// The landing page: a live duel in the hero, drawn by pixfx-canvas2d (workers paint the effects). The page owns the
-// animation-frame loop: each frame it draws the scene, the effects' back layers, the fighters, then the front layers.
+// The landing page: a live duel in the hero, drawn by pixfx-canvas2d (workers paint the effects). The duel is the
+// arena's (projects/arena), embedded by `site/build.sh` into site/arena: its page kit and its wasm, beside the engine's.
+// The page owns the animation-frame loop.
 import { loadPixfx } from "../pkg/pixfx-canvas2d.js";
-import * as pixfx from "../pkg/pixfx-canvas2d.js";
-import { useEngine, usePolicies } from "./duel.js";
-import { createHero, loadIcons, loadPolicies } from "./duel-hero.js";
+import loadRules, * as rules from "../arena/wasm/arena_wasm.js";
+import { usePolicies, useRules } from "../arena/duel.js";
+import { createHero, loadIcons, loadPolicies } from "../arena/duel-hero.js";
 
-/** Each corner's trained policy, `[left, right]`: a weights file in `games/arena/crates/pixfx-duel/weights/`, which `site/build.sh`
- *  copies beside the wasm. A new policy is a new file there and its name here. */
+/** Each corner's trained policy, `[left, right]`: a weights file of the arena's (`site/arena/weights/`). */
 const POLICY_FILES = ["policy.bin", "policy.bin"];
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -15,12 +15,11 @@ export async function mount() {
   const off = new AbortController();
   setupTabs(document.getElementById("targets"));
 
-  // the skill icon atlases (site/art/skill-icons.sh), by icon size; the hero waits for them, as for the engine
-  const [engine, icons] = await Promise.all([loadPixfx(), loadIcons([32, 24])]);
-  useEngine(pixfx);
-  // each corner's trained policy is a file of its own beside the wasm (`site/build.sh` copies every
-  // `games/arena/crates/pixfx-duel/weights/*.bin`), about as heavy as the engine: fetched only once the engine is in, so it never
-  // holds back the first frame, and seated from the next duel on. A file named twice is fetched once. Until both
+  // the engine, the arena's rules and its skill icon atlases, by icon size; the hero waits for all three
+  const [engine, icons] = await Promise.all([loadPixfx(), loadIcons([32, 24]), loadRules()]);
+  useRules(rules);
+  // each corner's trained policy is a file of its own, about as heavy as the engine: fetched only once the engine is
+  // in, so it never holds back the first frame, and seated from the next duel on. A file named twice is fetched once. Until both
   // arrive, or if one never does, the duel seats the brain.
   loadPolicies(POLICY_FILES)
     .then(usePolicies)

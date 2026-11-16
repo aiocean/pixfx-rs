@@ -16,9 +16,10 @@ and yomi levels (`habits`, `yomi`), postures chosen by scored considerations wit
 A trained policy's runtime too (`policy`): what it sees (`observe`, a frame where the foe is ahead), the acts it can
 take and which are legal now (`Act`, `legal`, `choice`), the network in plain `f32` with its weights file (`Net`,
 `sample`), and `PolicyMind`, which sees as late and thinks as often as `Mind` and acts on the tick after it decides.
-The trainer that makes the weights is `games/arena/train/`; the duel's weights live in `pixfx-duel` (`games/arena`).
+The trainer that makes the weights is the arena's (`projects/arena/train/`, outside this repo); the duel's weights live
+in its `pixfx-duel`.
 
-The policy sees frame data (`games/arena/docs/specs/2026-11-16-duel-frames-design.md`): its own act (`Me.act`:
+The policy sees frame data (`projects/arena/docs/specs/2026-11-16-duel-frames-design.md`): its own act (`Me.act`:
 winding up or recovering, and the seconds left), the foe's phase with the seconds left in it, its span and whether
 it is an ultimate (whose opening cannot be hit), and each slot's windup, recover and what it inflicts in sizes
 (`Inflicts`), so a slow recovery reads as an opening to punish. `observe.rs`'s header lists every float (`OBS` = 354);
@@ -32,7 +33,7 @@ a change to it changes the weights file's input size and needs a retrain.
 
 | If the code... | It goes to |
 |---|---|
-| is the rules of a fight: damage, cooldowns, shots, statuses | the game (the landing duel's: `pixfx-duel`) |
+| is the rules of a fight: damage, cooldowns, shots, statuses | the game (the arena's: `pixfx-duel`, in `projects/arena`) |
 | names a game's skill or school | the game, as `Skill` and `Profile` data |
 | moves a body or poses it | `pixfx-fighter` |
 | is a JS binding of these types | `pixfx-wasm` (`mind` feature) |
@@ -48,7 +49,7 @@ a change to it changes the weights file's input size and needs a retrain.
 - Pure: no clock (time comes in the `Sense`), no I/O, randomness only from the seed `Mind::new` takes.
 - `dt = 0` (hit-stop) must hold every clock of the mind still (`PolicyMind` holds its queued act too).
 - `policy::Net` sums each row in 8 partial sums joined in a fixed tree: change that order and every target's bits,
-  the pinned hash in `tests/policy_net.rs`, and `games/arena/train/net.py`'s match (within 1e-4) must all be checked.
+  the pinned hash in `tests/policy_net.rs`, and the arena's `train/net.py` match (within 1e-4) must all be checked.
 - A skill is known by its `SkillKind`, never its name: the name is only handed back in `Choice::Cast`.
 
 ## Before you finish

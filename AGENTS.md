@@ -104,14 +104,15 @@ the number of effects, so they leave it:
 
 ## Layers and where code goes
 
-Dependencies point one way, top to bottom. A lower layer never depends on a higher one.
+Dependencies point one way, top to bottom. A lower layer never depends on a higher one. Games live outside this
+repo and depend on it; the engine never depends on a game. The arena (`../../projects/arena`, arena.aiocean.io) is
+one: its rules, trainer and its own wasm; this site's landing and effect pages embed its duel (`site/build.sh`).
 
 | Layer | Crate (target) | Holds | Rules |
 |---|---|---|---|
 | Shells | `pixfx-canvas2d`, `pixfx-phaser`, `pixfx-pixi`, `pixfx-gpui`, `pixfx-export` | Host objects, the host loop, workers, surface caches | No decisions. Thin enough that a second shell for the same host would be the same code. |
 | JS runtime | `packages/pixfx-web` (TypeScript) | Loading the wasm, painting workers, the game-wide frames and their surfaces, a stage per host scene following the draw list, effect handles, the feel's JS face | Host-neutral: no Phaser, no Pixi. A JS shell adds only its host objects and its loop. |
 | JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it, by way of `pixfx-web`. |
-| Game | `pixfx-duel` (`games/arena`) | The landing duel's rules: fighters, skills, the rotating bar, statuses, shots, rounds, the seats that decide for each corner (the brain from `pixfx-mind`, or the first mind), and the view the page reads | Deterministic from a seed: no clock, no I/O, no host types. Every decision of the duel is here; the page plays the commands and events it returns. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
 | Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter`, `pixfx-body` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies; the rig every pose, direction and clip is made with, and its mannequin | Pure and deterministic: no clock, no I/O, no host types. |
 | Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `halo`, `blend`, `color`, `palette`, `math`) | Frames with colour and light, painting, painted glow, compositing | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |

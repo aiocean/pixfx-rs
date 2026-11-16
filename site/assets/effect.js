@@ -3,14 +3,14 @@
 // and Frost on the mountain dais, the effect staged by its role in a short take that ends at its impact), or alone
 // on a plain floor. One-shots and takes play, rest a moment, and play again.
 import { Body, FightFeel, Lighting, Sprites, createPixfx, effects, lightColor, loadPixfx, meta, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
-import * as pixfx from "../pkg/pixfx-canvas2d.js";
-import { useEngine } from "./duel.js";
+import loadRules, * as rules from "../arena/wasm/arena_wasm.js";
+import { useRules } from "../arena/duel.js";
 import { createBout, impact, step, take } from "./bout.js";
 import { roleFor } from "./effect-roles.js";
 import { TARGETS, codeFor } from "./effect-code.js";
-import { actorOf, drawNumbers, drawStreaks, paintFighters } from "./duel-art.js";
-import { createScene, drawScene } from "./duel-scene.js";
-import { kindle } from "./duel-light.js";
+import { actorOf, drawNumbers, drawStreaks, paintFighters } from "../arena/duel-art.js";
+import { createScene, drawScene } from "../arena/duel-scene.js";
+import { kindle } from "../arena/duel-light.js";
 
 /** The plain stage's sky and floor. */
 const COLORS = { sky: "#13101b", ground: "#1e1a24" };
@@ -75,8 +75,8 @@ const MODES = [{ value: "duel", label: "In a duel" }, { value: "alone", label: "
 
 /** Mount the effect page now in the document. Returns how to unmount it. */
 export async function mount() {
-  await loadPixfx();
-  useEngine(pixfx);
+  await Promise.all([loadPixfx(), loadRules()]);
+  useRules(rules);
   const id = new URLSearchParams(location.search).get("id");
   const root = document.getElementById("effect");
   const ids = effects();
