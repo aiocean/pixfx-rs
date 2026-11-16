@@ -25,7 +25,7 @@ test), `pixfx-effect`, `pixfx-play`, `pixfx-render`, `pixfx-perf`, `pixfx-pixel`
 - **A Rust game** (gpui, a native tool) depends on the crates by path and calls them.
 - **A JS game** builds the wasm itself (`bun run build:wasm` in `packages/pixfx-web`) and plays through a JS shell:
   `pixfx-canvas2d`, `pixfx-phaser` or `pixfx-pixi`.
-- **Files** (sprite sheets, gifs, baked clips, pose sheets) come from the scripts below. Each is a cargo example,
+- **Files** (sprite sheets, gifs, rendered clips, pose sheets) come from the scripts below. Each is a cargo example,
   a short `main` over the library: run it as it is, or change it or copy it when its flags do not cover what you
   need.
 
@@ -34,7 +34,7 @@ test), `pixfx-effect`, `pixfx-play`, `pixfx-render`, `pixfx-perf`, `pixfx-pixel`
 | `cargo run -p pixfx-export --example sprite_sheet -- <id>` | Composite, colour and light PNGs and the beanfx-layout JSON |
 | `cargo run -p pixfx-export --example gif -- <id>` | A looping gif |
 | `cargo run -p pixfx-export --example mp4 -- <id>` | A video (needs ffmpeg) |
-| `cargo run -p pixfx-export --example bake -- <id>` | A baked clip hosts play without drawing (`loadBaked`) |
+| `cargo run -p pixfx-export --example render_clip -- <id>` | A rendered clip hosts play without drawing (`loadClip`) |
 | `cargo run -p pixfx-export --example parity -- <id>` | The parity gate for one effect |
 | `cargo run --release -p pixfx-effects --example bench` | What a frame of effects costs natively |
 | `cargo run -p pixfx-fighter --example poses -- <look>` | Every pose of a fighter look on one sheet |
@@ -55,7 +55,7 @@ Each script's first lines say what it takes and writes.
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
 | `crates/pixfx-pixel` | Pixels for agents, not shipped in a game: a picture (an image model's, an artist's, a customer's sprite) cleaned to its pixel grid, read as text and drawn back, viewed, critiqued, split into parts; blank sheets for an image model (`pixfx_pixel::tool`, a script per step in `examples/`, skill `.claude/skills/pixfx-pixel/SKILL.md`). |
 | `crates/pixfx-ref` | Effect references from an image model, not shipped in a game: a spec of an effect's look and moments becomes a labelled template sheet and a prompt, the OpenRouter request is built and read, and the sheet the model drew is cut back into frames as colour and light layers with a review page (a script per step in `examples/`, the xianxia shields as worked specs, skill `.claude/skills/pixfx-ref/SKILL.md`). |
-| `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF, baked clips, and the parity check (`parity`); the scripts that write them in `examples/`. |
+| `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF, rendered clips, and the parity check (`parity`); the scripts that write them in `examples/`. |
 | `crates/pixfx-duel` | The landing duel's rules, deterministic from a seed: fighters, skills, the rotating bar, statuses, shots, rounds, the brain or the first mind in each corner, and the view the page reads. The site plays it through the wasm `Duel` (`site/assets/duel.js`). |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
 | `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |

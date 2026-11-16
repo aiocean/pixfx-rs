@@ -125,8 +125,8 @@ impl EffectState for State {
   | only where a pixel is, the same on every frame (a shape's reach, a highlight's angle) | a table built once (`OnceLock`), read per pixel; a point off it (moved by a dent, a turned painter) is worked out as before, so the pixels stay the same bit for bit | `blood_shield.rs` `Px`: 3 `pow` and an `atan2` a pixel gone |
   | the time, an option (`hitX`), the seed | live, every frame | the blow, the heartbeat |
 
-  A whole effect with no options and a costly draw can also ship as a baked clip of frames (skill `pixfx-render`,
-  `loadBaked`); a clip is fixed to one set of options and costs download and memory, so bake data first. A bake made
+  A whole effect with no options and a costly draw can also ship as a rendered clip of frames (skill `pixfx-render`,
+  `loadClip`); a clip is fixed to one set of options and costs download and memory, so bake data first. A bake made
   from one seed gives every seed that layout: bless the goldens again and say so in the commit. Profile before you
   bake (`sample <pid>` on the bench): bake what the profile shows, not what looks heavy.
 

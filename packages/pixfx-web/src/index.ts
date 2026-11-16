@@ -12,7 +12,7 @@ export type { Aim, Counts, EffectHost, FollowTarget, Strike } from "./effect";
 export { PixfxFeel } from "./feel";
 export { splitPlayOptions } from "./options";
 export type { Play } from "./options";
-export { defaultWorkers, loadBaked, loadedEngine, loadedGame, loadPixfx, openWorkers, workerPort } from "./load";
+export { defaultWorkers, loadClip, loadedEngine, loadedGame, loadPixfx, openWorkers, workerPort } from "./load";
 export type { LoadOptions } from "./load";
 export { wasmEngine } from "./engine";
 export type { BlinkLike, EffectMeta, Engine, SquashLike } from "./engine";

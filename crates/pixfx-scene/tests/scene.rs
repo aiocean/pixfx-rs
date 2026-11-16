@@ -618,9 +618,9 @@ fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
 }
 
 #[test]
-fn a_baked_clip_is_shown_without_drawing() -> Res {
+fn a_rendered_clip_is_shown_without_drawing() -> Res {
     let fx = effect("fire/candle").ok_or("no candle")?;
-    let clip = pixfx_export::bake(fx, Options::default())?;
+    let clip = pixfx_export::render_clip(fx, Options::default())?;
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let mut loader = Recorder::default();
@@ -636,7 +636,7 @@ fn a_baked_clip_is_shown_without_drawing() -> Res {
         );
     }
     scene.play(player("fire/candle")?, 20.0, 40.0)?;
-    // a whole loop at uneven steps: every frame shown comes from the bake
+    // a whole loop at uneven steps: every frame shown comes from the clip
     for step in [0.013, 0.021, 0.034, 0.008].iter().cycle().take(100) {
         scene.update(*step)?;
         let r = draw_once(&mut frames, &mut scene);

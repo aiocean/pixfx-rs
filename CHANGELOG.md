@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Words: **bake** now means only data a script computes once into a file an effect reads; images are **rendered**.
+  The frame clips are renamed to match: `pixfx_export::render_clip` and `write_clip` (were `bake`, `write_bake`),
+  module `pixfx_export::clip` with `ClipIndex`, `ClipPage`, `ClipSprite`, `ClipFiles`, `ClipLayer`, `CLIP_VERSION`;
+  the script `examples/render_clip.rs`; files `<name>.clip.json` and `<name>.clip.<n>.png`; in JS `loadClip()` in every
+  shell and `Frames.loadClip` in the wasm (were `loadBaked`). The index's content and version are unchanged; a file
+  written as `.bake.json` loads once renamed to `.clip.json` (its pages too, and the `file` names in it).
+
 - Effects: `shadow/winter-ordeal`, the winter shadow of heaven, made here. Over the foe the
   night sky darkens in and cracks like glass: jagged cracks run out from a keystone where an eye opens, and rings of
   cracks cut the sky into slabs. Then the sky falls: ring by ring the slabs tremble, drop and turn, showing a lit top

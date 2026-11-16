@@ -19,11 +19,19 @@ yourself, and run or edit scripts.
 | A new effect from an idea: storyboard, sketch, questions, then the whole way to the library | `pixfx-new-effect` |
 | Reference sheets from an image model: spec, template, draw, extract, compare | `pixfx-ref` |
 | Play effects in a game (Phaser, Canvas 2D, Pixi, Rust/gpui) | `pixfx-play` |
-| Make files: sprite sheet, gif, baked clip, pose sheet, a new output | `pixfx-render` |
+| Make files: sprite sheet, gif, rendered clip, pose sheet, a new output | `pixfx-render` |
 | Measure or improve speed | `pixfx-perf` |
 | Read a picture as pixels, redraw a sprite | `pixfx-pixel` |
 | Pose skeleton sheets for an image model | `pixfx-pose` |
 | A character's poses, clips and directions as a mannequin sheet (hull, bones, part map, joints) | `pixfx-body` |
+
+Two words that are never mixed up:
+
+- **Bake** is data. A script in a crate's `examples/` (`bake_<name>.rs`) computes something once (a grown tree,
+  cracks, a layout) and writes it as a Rust data file the effect reads (`<name>_<what>.rs`, "Baked by ...").
+  Skill `pixfx-effect`, "Bake what nothing changes".
+- **Render** or **export** is images. Sprite sheets, gifs, videos and rendered clips (`pixfx_export::render_clip`,
+  `<name>.clip.json`, `loadClip`) are files made from an effect's frames. Skill `pixfx-render`.
 
 ## Where code goes
 

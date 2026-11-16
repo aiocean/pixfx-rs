@@ -11,11 +11,11 @@ use std::fmt;
 use crate::effect::{OptValue, Options, Placement};
 use pixfx_draw::color::Rgba;
 
-/// Bumped whenever the encoding changes, so keys written by an older build (baked sheets) never match.
+/// Bumped whenever the encoding changes, so keys written by an older build (rendered clips) never match.
 const VERSION: u8 = 2;
 
 /// One effect with one set of options and margin, placed one way: its frames are the same wherever it plays.
-/// Shown as lowercase hex, the form hosts pass to JS and write into baked sheets.
+/// Shown as lowercase hex, the form hosts pass to JS and write into rendered clips.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ClipKey(Vec<u8>);
 

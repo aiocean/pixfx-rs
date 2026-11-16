@@ -61,13 +61,13 @@ export function loadedGame(): Game | null {
 }
 
 /**
- * Hold the frames of a clip the bake script (`crates/pixfx-export/examples/bake.rs`) wrote: `<name>.bake.json` and
+ * Hold the frames of a clip the render_clip script (`crates/pixfx-export/examples/render_clip.rs`) wrote: `<name>.clip.json` and
  * the PNG pages it names, fetched from `url`'s folder. Effects playing that effect with the same options then show
- * the baked frames instead of painting them. Baked frames are held like painted ones: past the frame budget they go, and are painted again if shown.
+ * the rendered frames instead of painting them. Rendered frames are held like painted ones: past the frame budget they go, and are painted again if shown.
  * Returns how many frames were loaded. Call after `loadPixfx()` resolves and a scene of the shell has started.
  */
-export async function loadBaked(url: string): Promise<number> {
-  if (!loaded) throw new Error("pixfx: call await loadPixfx() before loadBaked()");
+export async function loadClip(url: string): Promise<number> {
+  if (!loaded) throw new Error("pixfx: call await loadPixfx() before loadClip()");
   const { game } = loaded;
   const fetchOk = async (u: URL): Promise<Response> => {
     const r = await fetch(u);
@@ -76,15 +76,15 @@ export async function loadBaked(url: string): Promise<number> {
   };
   const jsonUrl = new URL(url, globalThis.location?.href);
   const json = await (await fetchOk(jsonUrl)).text();
-  const { pages } = bakeIndexSchema.parse(JSON.parse(json));
+  const { pages } = clipIndexSchema.parse(JSON.parse(json));
   const bytes = await Promise.all(
     pages.map(async (p) => new Uint8Array(await (await fetchOk(new URL(p.file, jsonUrl))).arrayBuffer())),
   );
-  return game.loadBaked(json, bytes);
+  return game.loadClip(json, bytes);
 }
 
-/** The part of a bake index the loader reads itself: the page files (the engine reads the rest). */
-const bakeIndexSchema = z.object({ pages: z.array(z.object({ file: z.string() })) });
+/** The part of a clip index the loader reads itself: the page files (the engine reads the rest). */
+const clipIndexSchema = z.object({ pages: z.array(z.object({ file: z.string() })) });
 
 /** Wrap a module worker running `worker.ts`. */
 export function workerPort(worker: Worker): WorkerPort {

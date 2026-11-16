@@ -5,7 +5,7 @@ to WebAssembly), starts the workers that paint, holds the frames every scene of 
 list the Rust scene hands it each frame. A shell gives it two things: room for a surface (`GfxTextures`) and images
 that show one (`GfxImages`), and calls a `Stage` from its loop.
 
-Games use a shell package, not this one, except for `loadPixfx()` and `loadBaked()`, which every shell re-exports.
+Games use a shell package, not this one, except for `loadPixfx()` and `loadClip()`, which every shell re-exports.
 
 ```sh
 bun install

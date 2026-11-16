@@ -1,6 +1,6 @@
 ---
 name: pixfx-play
-description: Use when putting pixfx effects into a game - a Phaser 4, Canvas 2D or Pixi 8 game in TypeScript, or a Rust game on gpui - including building the wasm, linking the package, Vite setup, following a sprite, playing on a character, answering shake and hit-stop cues, baked frames, or when play() throws or nothing shows.
+description: Use when putting pixfx effects into a game - a Phaser 4, Canvas 2D or Pixi 8 game in TypeScript, or a Rust game on gpui - including building the wasm, linking the package, Vite setup, following a sprite, playing on a character, answering shake and hit-stop cues, rendered frames, or when play() throws or nothing shows.
 ---
 
 # Play pixfx effects in a game
@@ -100,10 +100,10 @@ The game's own hits: `feel.addTrauma(k)`, `feel.freeze(secs)`, `feel.slow(secs, 
 `setShakeStrength`, `setFlashStrength`. `feel: 0` on an effect silences its cues; `feel.setEnabled(false)` leaves
 everything to the game. Phaser sprites squash, stretch and blink with `this.pixfx.squash(sprite)` (`land`, `blink`).
 
-## Baked frames (no painting at run time)
+## Rendered frames (no painting at run time)
 
-`cargo run -p pixfx-export --example bake -- fire/campfire --out public/fx` (see `pixfx-render`), then in the game
-`await loadBaked("fx/fire_campfire.bake.json")`. Effects with the same options show the baked frames; others paint.
+`cargo run -p pixfx-export --example render_clip -- fire/campfire --out public/fx` (see `pixfx-render`), then in the game
+`await loadClip("fx/fire_campfire.clip.json")`. Effects with the same options show the rendered frames; others paint.
 
 ## Rust game on gpui
 

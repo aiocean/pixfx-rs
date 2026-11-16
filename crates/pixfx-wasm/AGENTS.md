@@ -66,7 +66,7 @@ optional behind their features: `pixfx-fighter`, `pixfx-light`, `pixfx-mind`, an
 ## Known drift
 
 - It depends on `pixfx-export` (a file shell) for `pixfx_export::decode` in `src/lib.rs`: a binding reaching up into
-  a shell. Decoding a bake is a format every host reads; it belongs lower. Do not add more uses of `pixfx-export`
+  a shell. Decoding a clip is a format every host reads; it belongs lower. Do not add more uses of `pixfx-export`
   here.
 
 ## Before you finish

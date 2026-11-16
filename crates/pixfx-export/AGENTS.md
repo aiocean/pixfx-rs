@@ -6,7 +6,7 @@ changing anything here; this file only says what this crate holds.
 ## Job
 
 An effect written out as files: sprite sheets (composite, colour and light PNG) with beanfx's Aseprite-style JSON
-(`write_sheet`), a GIF (`write_gif`), a video through ffmpeg on `PATH` (`write_video`), baked clips that hosts play without drawing (`bake`, `write_bake`,
+(`write_sheet`), a GIF (`write_gif`), a video through ffmpeg on `PATH` (`write_video`), rendered clips that hosts play without drawing (`render_clip`, `write_clip`,
 `decode`), and the parity check of a port against its source (`parity`: `compare`, `read_reference`,
 `write_side_gif`, `ParityOpts`, `Actors`; `gif --actor` reads its sprite frames through `Actors` too).
 
@@ -38,8 +38,8 @@ shell: no crate below the shell layer may depend on it (see "Known drift" in `cr
 
 ## Traps
 
-- Bake pages hold `color` as straight RGBA and `light` as `r, g, b, 255`; decoding must give back the exact frames.
-- A bake is keyed by `ClipKey`; a field missing from the key gives two clips the same name.
+- Clip pages hold `color` as straight RGBA and `light` as `r, g, b, 255`; decoding must give back the exact frames.
+- A clip is keyed by `ClipKey`; a field missing from the key gives two clips the same name.
 
 ## Before you finish
 

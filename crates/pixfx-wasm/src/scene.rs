@@ -474,10 +474,10 @@ impl Frames {
         Ok(self.rec.take())
     }
 
-    /// Hold the frames of a clip the bake script (`crates/pixfx-export/examples/bake.rs`) wrote, its index JSON and
+    /// Hold the frames of a clip the render_clip script (`crates/pixfx-export/examples/render_clip.rs`) wrote, its index JSON and
     /// PNG pages, as shared frames, so effects reaching them paint nothing; returns how many were loaded and the ops (makes, their pixels read like those
     /// painted on the spot).
-    pub fn load_baked_ops(
+    pub fn load_clip_ops(
         &mut self,
         json: &str,
         pages: &[&[u8]],
@@ -733,11 +733,11 @@ impl JsFrames {
         self.inner.rec.light(id).map_or(0, |b| b.as_ptr() as usize)
     }
 
-    /// Hold the frames of a clip the bake script (`crates/pixfx-export/examples/bake.rs`) wrote, its index JSON and
+    /// Hold the frames of a clip the render_clip script (`crates/pixfx-export/examples/render_clip.rs`) wrote, its index JSON and
     /// PNG pages: effects playing that effect with the same options show them instead of painting them. Returns a draw list (makes; read their pixels
     /// with `colorPtr` / `lightPtr`). How many frames loaded is the number of makes.
-    #[wasm_bindgen(js_name = loadBaked)]
-    pub fn load_baked(
+    #[wasm_bindgen(js_name = loadClip)]
+    pub fn load_clip(
         &mut self,
         json: &str,
         pages: Vec<Uint8Array>,
@@ -746,7 +746,7 @@ impl JsFrames {
         let refs: Vec<&[u8]> = pages.iter().map(Vec::as_slice).collect();
         let (_, ops) = self
             .inner
-            .load_baked_ops(json, &refs)
+            .load_clip_ops(json, &refs)
             .map_err(|e| JsError::new(&e))?;
         Ok(Int32Array::from(ops.as_slice()))
     }

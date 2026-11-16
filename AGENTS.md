@@ -54,7 +54,7 @@ Every shell is equal. None is the main one:
 | Canvas 2D | `packages/pixfx-canvas2d` | shipped |
 | Phaser 4 | `packages/pixfx-phaser` | shipped |
 | gpui | `crates/pixfx-gpui` | shipped (own workspace, needs the gpui fork) |
-| Files (PNG sheets, beanfx JSON, GIF, baked clips) | `crates/pixfx-export` and its `examples/` scripts | shipped |
+| Files (PNG sheets, beanfx JSON, GIF, rendered clips) | `crates/pixfx-export` and its `examples/` scripts | shipped |
 | Pixi 8 | `packages/pixfx-pixi` | shipped |
 | CSS and DOM | `packages/pixfx-dom` | possible |
 | WebGL | a shell of its own | possible |

@@ -71,7 +71,7 @@ impl Args {
         Ok(out)
     }
 
-    /// The options of a sheet, gif or bake: `--seed N` (a whole number; left out, the effect's own seed),
+    /// The options of a sheet, gif or clip: `--seed N` (a whole number; left out, the effect's own seed),
     /// `--palette` (a preset: fire, ice, poison, holy, shadow, arcane, blood, electric, nature, gold) and `--num NAME=V`
     /// for each of the effect's own number options to set (`--num hitX=-20 --num hitY=-48`). Left out, the effect
     /// looks as designed.

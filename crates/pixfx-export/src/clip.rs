@@ -1,10 +1,10 @@
-//! Baked clips: every frame of an effect, drawn as live hosts draw it ([`Player::live`], back and front layer),
+//! Rendered clips: every frame of an effect, drawn as live hosts draw it ([`Player::live`], back and front layer),
 //! cropped to what shows and packed onto PNG pages, with a JSON index keyed by the clip's [`ClipKey`]. A host
 //! loads them into its frame store ([`decode`]) and plays the effect without drawing it.
 //!
 //! Pages hold two kinds of sprite: `color`, the colour layer as straight RGBA, and `light`, the light layer as
 //! `r, g, b, 255` (unlit pixels `0, 0, 0, 0`), which adds as is. Both are exact: decoding gives back the frames.
-//! Rendering, packing and decoding are pure; only [`write_bake`] touches files.
+//! Rendering, packing and decoding are pure; only [`write_clip`] touches files.
 
 use std::fs;
 
@@ -17,12 +17,12 @@ use serde::{Deserialize, Serialize};
 use crate::ExportError;
 
 /// The JSON layout version [`decode`] reads.
-pub const BAKE_VERSION: u32 = 1;
+pub const CLIP_VERSION: u32 = 1;
 
 /// Widest a page grows, unless one sprite is wider; also how tall before the next page starts.
 const PAGE: u32 = 2048;
 
-/// The layers a host shows, in the order baked: back, then front.
+/// The layers a host shows, in the order rendered: back, then front.
 const LAYERS: [(Layer, &str); 2] = [(Layer::Back, "back"), (Layer::Front, "front")];
 
 /// Every frame of one effect with one set of options, drawn by layer.
@@ -37,7 +37,7 @@ pub struct Clip {
 
 /// `effect` with `opts` drawn frame by frame as a live host plays it: frame k is what [`Player::live`] shows
 /// with its clock on frame k.
-pub fn bake(effect: &'static dyn Effect, opts: Options) -> Result<Clip, String> {
+pub fn render_clip(effect: &'static dyn Effect, opts: Options) -> Result<Clip, String> {
     let meta = effect.meta();
     let mut player = Player::live(effect, opts);
     let place = player.placement();
@@ -73,9 +73,9 @@ pub fn bake(effect: &'static dyn Effect, opts: Options) -> Result<Clip, String> 
     })
 }
 
-/// The JSON index of a baked clip.
+/// The JSON index of a rendered clip.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct BakeIndex {
+pub struct ClipIndex {
     pub version: u32,
     pub id: String,
     /// The [`ClipKey`] the frames are shown under, as hex.
@@ -87,12 +87,12 @@ pub struct BakeIndex {
     pub size: (u32, u32),
     pub corner: (i32, i32),
     pub frames: u64,
-    pub pages: Vec<BakePage>,
-    pub sprites: Vec<BakeSprite>,
+    pub pages: Vec<ClipPage>,
+    pub sprites: Vec<ClipSprite>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct BakePage {
+pub struct ClipPage {
     pub file: String,
     pub size: (u32, u32),
 }
@@ -100,7 +100,7 @@ pub struct BakePage {
 /// One cropped layer half on a page: `rect` (`[x, y, w, h]` on page `page`) goes at `at` on the frame. A layer
 /// half without a sprite shows nothing.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct BakeSprite {
+pub struct ClipSprite {
     pub frame: u64,
     /// `"back"` or `"front"`.
     pub layer: String,
@@ -143,8 +143,8 @@ fn crop(f: &Frame, px: fn(&Frame, usize) -> [u8; 4]) -> Option<(u32, u32, u32, u
     (x0 != u32::MAX).then(|| (x0, y0, x1 - x0 + 1, y1 - y0 + 1))
 }
 
-/// Lay `clip` out on pages: the index (page files `<name>.bake.<n>.png`) and the page images.
-pub fn pack(clip: &Clip, name: &str) -> (BakeIndex, Vec<PageImage>) {
+/// Lay `clip` out on pages: the index (page files `<name>.clip.<n>.png`) and the page images.
+pub fn pack(clip: &Clip, name: &str) -> (ClipIndex, Vec<PageImage>) {
     // every sprite, tallest first, onto shelves left to right
     let mut cut = Vec::new();
     for (k, layers) in (0..).zip(&clip.frames) {
@@ -173,7 +173,7 @@ pub fn pack(clip: &Clip, name: &str) -> (BakeIndex, Vec<PageImage>) {
         if let Some(size) = sizes.last_mut() {
             size.1 = size.1.max(shelf_y + rh);
         }
-        sprites.push(BakeSprite {
+        sprites.push(ClipSprite {
             frame: k,
             layer: layer.to_string(),
             kind: kind.to_string(),
@@ -211,8 +211,8 @@ pub fn pack(clip: &Clip, name: &str) -> (BakeIndex, Vec<PageImage>) {
         .frames
         .first()
         .map_or(((0, 0), (0, 0)), |[f, _]| ((f.w, f.h), (f.ox, f.oy)));
-    let index = BakeIndex {
-        version: BAKE_VERSION,
+    let index = ClipIndex {
+        version: CLIP_VERSION,
         id: clip.id.to_string(),
         key: clip.key.to_string(),
         fps: clip.fps,
@@ -222,8 +222,8 @@ pub fn pack(clip: &Clip, name: &str) -> (BakeIndex, Vec<PageImage>) {
         frames: clip.frames.len() as u64,
         pages: (0..)
             .zip(&sizes)
-            .map(|(n, &size)| BakePage {
-                file: format!("{name}.bake.{n}.png"),
+            .map(|(n, &size)| ClipPage {
+                file: format!("{name}.clip.{n}.png"),
                 size,
             })
             .collect(),
@@ -232,19 +232,19 @@ pub fn pack(clip: &Clip, name: &str) -> (BakeIndex, Vec<PageImage>) {
     (index, pages)
 }
 
-/// Paths of the files [`write_bake`] wrote.
+/// Paths of the files [`write_clip`] wrote.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BakeFiles {
+pub struct ClipFiles {
     pub json: PathBuf,
     pub pages: Vec<PathBuf>,
 }
 
-/// Write `<name>.bake.json` and its pages into `out_dir`, creating it.
-pub fn write_bake(clip: &Clip, out_dir: &Path, name: &str) -> Result<BakeFiles, ExportError> {
+/// Write `<name>.clip.json` and its pages into `out_dir`, creating it.
+pub fn write_clip(clip: &Clip, out_dir: &Path, name: &str) -> Result<ClipFiles, ExportError> {
     fs::create_dir_all(out_dir)?;
     let (index, pages) = pack(clip, name);
-    let mut files = BakeFiles {
-        json: out_dir.join(format!("{name}.bake.json")),
+    let mut files = ClipFiles {
+        json: out_dir.join(format!("{name}.clip.json")),
         pages: Vec::new(),
     };
     for (page, image) in index.pages.iter().zip(&pages) {
@@ -257,24 +257,24 @@ pub fn write_bake(clip: &Clip, out_dir: &Path, name: &str) -> Result<BakeFiles, 
 }
 
 /// A decoded frame layer: show `frame` as `layer` of frame `id`.
-pub struct BakedLayer {
+pub struct ClipLayer {
     pub id: FrameId,
     pub layer: Layer,
     pub frame: Frame,
 }
 
-/// The frames of a baked clip from its JSON index and its pages' PNG bytes, in the index's page order.
-pub fn decode(json: &str, pages: &[&[u8]]) -> Result<Vec<BakedLayer>, String> {
-    let index: BakeIndex = serde_json::from_str(json).map_err(|e| format!("bake index: {e}"))?;
-    if index.version != BAKE_VERSION {
+/// The frames of a rendered clip from its JSON index and its pages' PNG bytes, in the index's page order.
+pub fn decode(json: &str, pages: &[&[u8]]) -> Result<Vec<ClipLayer>, String> {
+    let index: ClipIndex = serde_json::from_str(json).map_err(|e| format!("clip index: {e}"))?;
+    if index.version != CLIP_VERSION {
         return Err(format!(
-            "bake index version {}, this build reads {BAKE_VERSION}",
+            "clip index version {}, this build reads {CLIP_VERSION}",
             index.version
         ));
     }
     if pages.len() != index.pages.len() {
         return Err(format!(
-            "the bake index names {} pages, {} were given",
+            "the clip index names {} pages, {} were given",
             index.pages.len(),
             pages.len()
         ));
@@ -286,9 +286,9 @@ pub fn decode(json: &str, pages: &[&[u8]]) -> Result<Vec<BakedLayer>, String> {
         .collect::<Result<Vec<_>, _>>()?;
     let (w, h) = index.size;
     let (ox, oy) = index.corner;
-    let mut layers: Vec<BakedLayer> = (0..index.frames)
+    let mut layers: Vec<ClipLayer> = (0..index.frames)
         .flat_map(|k| {
-            LAYERS.map(|(layer, _)| BakedLayer {
+            LAYERS.map(|(layer, _)| ClipLayer {
                 id: FrameId {
                     key: key.clone(),
                     index: k,
@@ -341,5 +341,5 @@ pub fn decode(json: &str, pages: &[&[u8]]) -> Result<Vec<BakedLayer>, String> {
 }
 
 fn read_png(bytes: &[u8]) -> Result<PageImage, String> {
-    crate::decode_png_rgba(bytes).map_err(|e| format!("bake page: {e}"))
+    crate::decode_png_rgba(bytes).map_err(|e| format!("clip page: {e}"))
 }

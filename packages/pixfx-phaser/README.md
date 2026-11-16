@@ -111,20 +111,20 @@ scene's images.
 at once cannot make one frame slow: the ones left over keep their last frame and are drawn in a later frame, the
 longest waiting first. 0 (the default) draws every one that changed.
 
-### Baked frames
+### Rendered frames
 
-`cargo run -p pixfx-export --example bake -- <id> [--palette WORD] --out public/fx` (in the
-pixfx repo) writes `<name>.bake.json` and its PNG pages:
+`cargo run -p pixfx-export --example render_clip -- <id> [--palette WORD] --out public/fx` (in the
+pixfx repo) writes `<name>.clip.json` and its PNG pages:
 every frame of the effect as the game would paint it, cropped. Load it once a scene with the plugin has started:
 
 ```ts
 await loadPixfx();
 // in a scene's create():
-await loadBaked("fx/fire_campfire.bake.json"); // pages are fetched from the same folder
+await loadClip("fx/fire_campfire.clip.json"); // pages are fetched from the same folder
 ```
 
-Effects playing that effect with the same options then show the baked frames and paint nothing; other options
-paint live. Baked frames are held like painted ones, under `frameBudget`: past it they go and are painted again if
+Effects playing that effect with the same options then show the rendered frames and paint nothing; other options
+paint live. Rendered frames are held like painted ones, under `frameBudget`: past it they go and are painted again if
 shown.
 
 ## Play an effect

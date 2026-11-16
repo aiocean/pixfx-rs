@@ -37,7 +37,7 @@ impl Clip {
     }
 
     /// `effect` with `opts` as live hosts play it: with [`Meta::glow_margin`] round its canvas, so nothing at
-    /// the canvas edge is faded or cut. Baked frames are drawn the same way, so they share its keys.
+    /// the canvas edge is faded or cut. Rendered clips are drawn the same way, so they share its keys.
     pub fn live(effect: &'static dyn Effect, opts: Options) -> Self {
         Self::new(effect, opts, effect.meta().glow_margin())
     }

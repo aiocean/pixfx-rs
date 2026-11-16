@@ -161,7 +161,7 @@ impl<S, P: Painter> Frames<S, P> {
     }
 
     /// Hold `frame` (a [`Frame`], or what the shell takes from a painter elsewhere: [`Receive`]) as `layer` of
-    /// frame `id`, painted elsewhere ([`Painter::paint`] gave `None`) or baked, so
+    /// frame `id`, painted elsewhere ([`Painter::paint`] gave `None`) or from a rendered clip, so
     /// effects showing it paint nothing. Held like a painted frame: past the budget it goes, least recently shown
     /// first, and is painted again if shown again. A frame already held keeps what it has.
     pub fn deliver<D, H: Receive<D, Surface = S>>(

@@ -114,8 +114,8 @@ ${play}
       `cargo run -p pixfx-export --example sprite_sheet -- ${args} --out out`,
       "# a looping gif, each pixel 4 x 4",
       `cargo run -p pixfx-export --example gif -- ${args} --scale 4 --out out`,
-      "# every frame baked, for a game to play without painting (loadBaked)",
-      `cargo run -p pixfx-export --example bake -- ${args} --out out`,
+      "# every frame rendered, for a game to play without painting (loadClip)",
+      `cargo run -p pixfx-export --example render_clip -- ${args} --out out`,
     ];
     const unflagged = Object.keys(o).filter((k) => k !== "seed" && k !== "palette");
     if (unflagged.length > 0) {

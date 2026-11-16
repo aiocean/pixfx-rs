@@ -101,9 +101,9 @@ export class Game {
     if (this.lanes.length > 0) this.send();
   }
 
-  /** Hold the frames of a baked clip; returns how many were loaded. */
-  loadBaked(json: string, pages: Uint8Array[]): number {
-    const ops = this.frames.loadBaked(json, pages);
+  /** Hold the frames of a rendered clip; returns how many were loaded. */
+  loadClip(json: string, pages: Uint8Array[]): number {
+    const ops = this.frames.loadClip(json, pages);
     this.apply(ops);
     let n = 0;
     for (let i = 0; i < ops.length; i += OP_STRIDE) if (ops[i] === OP_MAKE) n += 1;

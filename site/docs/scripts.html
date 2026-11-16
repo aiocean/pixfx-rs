@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Scripts · pixfx docs</title>
-  <meta name="description" content="pixfx ships as source: short Rust scripts over the library render sprite sheets, GIFs and baked clips, and check ports against their source.">
+  <meta name="description" content="pixfx ships as source: short Rust scripts over the library render sprite sheets, GIFs and rendered clips, and check ports against their source.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
@@ -24,7 +24,7 @@
     <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
     <main class="doc">
 <h1>Scripts</h1>
-<p class="lead">pixfx ships as source, with no binary to install. Short Rust scripts over the library render effects to sprite sheets, GIFs and baked clips, and check ports against their source. You, or your agent, run them as they are, or change them when their flags do not cover what you need.</p>
+<p class="lead">pixfx ships as source, with no binary to install. Short Rust scripts over the library render effects to sprite sheets, GIFs and rendered clips, and check ports against their source. You, or your agent, run them as they are, or change them when their flags do not cover what you need.</p>
 
 <h2>Run one</h2>
 <p>Each script is a cargo example in the crate whose library it calls. Run it from the repository:</p>
@@ -35,7 +35,7 @@
   <tbody>
     <tr><td><code>pixfx-export</code> <code>sprite_sheet &lt;id&gt;</code></td><td>Composite, colour and light PNGs and the beanfx-layout JSON.</td></tr>
     <tr><td><code>pixfx-export</code> <code>gif &lt;id&gt;</code></td><td>A looping GIF.</td></tr>
-    <tr><td><code>pixfx-export</code> <code>bake &lt;id&gt;</code></td><td>A baked clip that the JS shells play without drawing (<code>loadBaked</code>).</td></tr>
+    <tr><td><code>pixfx-export</code> <code>render_clip &lt;id&gt;</code></td><td>A rendered clip that the JS shells play without drawing (<code>loadClip</code>).</td></tr>
     <tr><td><code>pixfx-export</code> <code>parity &lt;id&gt;</code></td><td>The parity check of one effect against its source.</td></tr>
     <tr><td><code>pixfx-effects</code> <code>bench</code></td><td>What a frame of effects costs natively (run with <code>--release</code>).</td></tr>
     <tr><td><code>pixfx-fighter</code> <code>poses &lt;look&gt;</code></td><td>Every pose of a fighter look on one sheet.</td></tr>
