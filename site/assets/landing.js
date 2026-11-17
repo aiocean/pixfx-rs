@@ -3,11 +3,11 @@
 // The page owns the animation-frame loop.
 import { loadPixfx } from "../pkg/pixfx-canvas2d.js";
 import loadRules, * as rules from "../arena/wasm/arena_wasm.js";
-import { usePolicies, useRules } from "../arena/duel.js";
-import { createHero, loadIcons, loadPolicies } from "../arena/duel-hero.js";
+import { useBots, useRules } from "../arena/duel.js";
+import { createHero, loadBots, loadIcons } from "../arena/duel-hero.js";
 
-/** Each corner's trained policy, `[left, right]`: a weights file of the arena's (`site/arena/weights/`). */
-const POLICY_FILES = ["policy.bin", "policy.bin"];
+/** Each corner's bot, `[left, right]`: the arena's house bot module (`site/arena/bots/`), one instance a corner. */
+const BOT_FILES = ["policy.wasm", "policy.wasm"];
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Mount the landing page: the tabs and the hero. Returns how to unmount it. */
@@ -18,12 +18,12 @@ export async function mount() {
   // the engine, the arena's rules and its skill icon atlases, by icon size; the hero waits for all three
   const [engine, icons] = await Promise.all([loadPixfx(), loadIcons([32, 24]), loadRules()]);
   useRules(rules);
-  // each corner's trained policy is a file of its own, about as heavy as the engine: fetched only once the engine is
-  // in, so it never holds back the first frame, and seated from the next duel on. A file named twice is fetched once. Until both
+  // each corner's bot is a module of its own, heavier than the engine: fetched only once the engine is in, so it never
+  // holds back the first frame, and seated from the next duel on. A file named twice is fetched once. Until both
   // arrive, or if one never does, the duel seats the brain.
-  loadPolicies(POLICY_FILES)
-    .then(usePolicies)
-    .catch((e) => console.warn("landing: the duel seats the brain, a trained policy did not load:", e));
+  loadBots(BOT_FILES)
+    .then(useBots)
+    .catch((e) => console.warn("landing: the duel seats the brain, a bot did not load:", e));
 
   const hero = createHero(document.getElementById("scene"), off.signal, icons, engine);
   let last = null;

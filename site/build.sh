@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the static site into site/dist: the pages as they are, the engine in dist/pkg (the pixfx-canvas2d bundle, its
 # painting worker and the pixfx-web wasm), and the arena's duel, which the landing and effect pages show: its page
-# kit (page modules, its own wasm, the trained policies), written into site/arena by the arena's site/embed.sh from
+# kit (page modules, its own wasm, the house bot module), written into site/arena by the arena's site/embed.sh from
 # the checkout at ../../projects/arena (or $ARENA).
 # Usage: site/build.sh            (from anywhere in the repo)
 #        site/build.sh --serve    (build, then serve dist on http://127.0.0.1:8770/)
