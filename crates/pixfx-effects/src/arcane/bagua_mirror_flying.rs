@@ -161,6 +161,7 @@ impl EffectState for Flying {
             shift: frame,
             light: 0.4,
             skip: 0.0,
+            soft: 1.0,
         };
         sweep(
             p,

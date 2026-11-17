@@ -41,3 +41,9 @@
 //! | `appear/` | The entrance counterpart: plays as the object arrives. |
 //! | `explosions/body-burst` | Permanent violent destruction (`replaces_actor = true`). |
 //! | `transitions/` | Full-screen (16:9) scene wipes; not tied to one object. |
+
+#[cfg(feature = "disappear-fade")]
+mod fade;
+
+#[cfg(feature = "disappear-fade")]
+pub use fade::FADE;

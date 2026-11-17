@@ -185,6 +185,7 @@ impl Slash {
             shift: libm::floor(t * 30.0),
             light: 0.6,
             skip: 0.0,
+            soft: 1.0,
         };
         sweep(p, &poses, &self.brush, &RAMP, &look);
     }

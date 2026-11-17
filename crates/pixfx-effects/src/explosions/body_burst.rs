@@ -566,6 +566,7 @@ fn smear(p: &mut Painter, ch: &Chunk) {
         shift: 0.0,
         light: 0.0,
         skip: 0.0,
+        soft: 1.0,
     };
     sweep(p, &poses, &brush, &[], &look);
 }

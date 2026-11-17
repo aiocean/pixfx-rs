@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Effects: `disappear/fade`, the first disappear effect. It wraps a sprite, swells it a little (`grow`) and fades it
+  into light (`whiten`), its edges first and its heart last, over 0.45 s: a soft exit where `explosions/body-burst`
+  blows a body apart. It follows the sprite it is handed each frame, so a shape still spinning keeps spinning as it
+  fades, and it never replaces its actor. With no actor it fades a stand-in disc.
+- `projectiles/trail` on a body takes `taper` (its width at the end, a share of the body's height: 0 a point),
+  `soft` (where along it the smear turns translucent, clear at its end) and `breakup` (where the dither starts eating
+  it). The defaults (1, 1, 0.2) draw as before. A pointed, soft tail: `taper` 0, `soft` 0.15, `breakup` 1.
+- Drawing: `sweep::Look` has `soft`, the age from which a streak is blended translucent toward its end instead of
+  dithered away (1 for none, as every effect had it).
+- Goldens: `impacts/hit` and `disappear/fade` pinned.
+
 - Arena: the duel is its own project, `game-factory/projects/arena` (arena.aiocean.io), with its history: the rules
   (`pixfx-duel`), their Python module, the trainer, the duel's page code and its own wasm (`arena-wasm`), on this
   engine through path dependencies. `pixfx-wasm` has no `duel` feature and `pixfx-canvas2d` no duel exports: the

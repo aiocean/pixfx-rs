@@ -82,6 +82,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &arcane::BAGUA_MIRROR_BURST,
     #[cfg(feature = "critters-wisp")]
     &critters::WISP,
+    #[cfg(feature = "disappear-fade")]
+    &disappear::FADE,
     #[cfg(feature = "feedback-heal-sparkle")]
     &feedback::HEAL_SPARKLE,
     #[cfg(feature = "feedback-outline")]

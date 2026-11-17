@@ -8,9 +8,10 @@
 //! trace (`pixfx_draw::sweep`), for a thin mover (a sword's point, a drop, a bolt). Played on a character (it wraps
 //! the sprite it plays on) it smears that body instead: the sprite's back edge, away from the way it goes, as tall as
 //! it is and in its own colours (`Brush::edge`, one in from its outline), standing upright as the body does,
-//! dissolving behind it; `width`, `wave`, `turn` and the palette
-//! shape only the ribbon. A broad effect of its own (a mirror) smears its own edge in its own draw
-//! (`arcane/bagua-mirror-flying`). Lay it under any projectile
+//! dissolving behind it, narrowing to `taper` of its height and turning translucent from `soft` along it (a pointed,
+//! soft tail: `taper` 0, `soft` 0.3); `width`, `wave`, `turn` and the palette shape only the ribbon. A broad
+//! effect of its own (a mirror) smears its own edge in its own draw (`arcane/bagua-mirror-flying`). Lay it under any
+//! projectile
 //! (`pixfx_scene::Scene::trail`), or play it on its own and move it with a character: it draws the way it was
 //! moved. It draws on the back layer, behind a character.
 //!
@@ -35,6 +36,12 @@ const WIDTH: NumOpt = NumOpt::new("width", 3.0).within(1.0, 7.0);
 const WAVE: NumOpt = NumOpt::new("wave", 1.2).within(0.0, 4.0);
 const SKIP: NumOpt = NumOpt::new("skip", 0.0).within(0.0, 40.0);
 const TURN: NumOpt = NumOpt::new("turn", 0.0).within(0.0, 1.0);
+/// On a body: how wide its smear is at the end, a share of the body's height (1 as tall as it, 0 a point); from
+/// where along it the smear turns translucent, clear at its end (1 never: the dither alone eats it); and from where
+/// the dither starts eating it.
+const TAPER: NumOpt = NumOpt::new("taper", 1.0).within(0.0, 1.0);
+const SOFT: NumOpt = NumOpt::new("soft", 1.0).within(0.0, 1.0);
+const BREAKUP: NumOpt = NumOpt::new("breakup", 0.2).within(0.0, 1.0);
 
 const META: Meta = Meta {
     id: "projectiles/trail",
@@ -54,6 +61,9 @@ const META: Meta = Meta {
         WAVE.spec(),
         SKIP.spec(),
         TURN.spec(),
+        TAPER.spec(),
+        SOFT.spec(),
+        BREAKUP.spec(),
     ],
 };
 
@@ -81,6 +91,9 @@ impl Effect for TrailFx {
             wave: opts.num(&WAVE),
             skip: opts.num(&SKIP),
             turn: opts.num(&TURN),
+            taper: opts.num(&TAPER),
+            soft: opts.num(&SOFT),
+            breakup: opts.num(&BREAKUP),
             trace: None,
             body: None,
         })
@@ -100,6 +113,9 @@ struct State {
     wave: f64,
     skip: f64,
     turn: f64,
+    taper: f64,
+    soft: f64,
+    breakup: f64,
     trace: Option<Arc<Trace>>,
     /// The sprite it plays on, as its opaque pixels in its own space, when it wraps one.
     body: Option<Vec<(f64, f64, Rgba)>>,
@@ -177,13 +193,14 @@ impl EffectState for State {
             let look = Look {
                 secs: self.secs.max(1e-6),
                 fade: 0.0,
-                taper: 1.0,
+                taper: self.taper,
                 wave: 0.0,
                 phase: 0.0,
-                breakup: 0.2,
+                breakup: self.breakup,
                 shift: frame,
                 light: 0.0,
                 skip: 0.0,
+                soft: self.soft,
             };
             let mut poses = trace.poses(look.secs);
             for q in &mut poses {
@@ -208,6 +225,7 @@ impl EffectState for State {
             shift: frame,
             light: 0.35,
             skip: self.skip,
+            soft: 1.0,
         };
         sweep(p, &trace.poses(look.secs), &brush, &self.ramp, &look);
     }

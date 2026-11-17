@@ -154,6 +154,9 @@ pub struct Look {
     /// pixels (a frame count makes it crawl).
     pub breakup: f64,
     pub shift: f64,
+    /// The `u` from which the streak turns translucent, clear by `u` = 1: a soft, blended fade where `breakup`'s
+    /// dither is a hard pixel one (1 for none).
+    pub soft: f64,
     /// How much a cell's light adds at the head, falling to none at `u` = 1.
     pub light: f64,
     /// Pixels at the head left undrawn (the mover's own body over them).
@@ -328,8 +331,17 @@ pub fn sweep(p: &mut Painter, poses: &[Pose], brush: &Brush, ramp: &[Rgba], look
                 continue;
             }
         }
-        p.dot(x, y, m.color, 1.0);
-        let k = look.light * m.light * (1.0 - u);
+        let clear = if u > look.soft && look.soft < 1.0 {
+            (u - look.soft) / (1.0 - look.soft)
+        } else {
+            0.0
+        };
+        if clear > 0.0 {
+            p.blend(x, y, m.color, 1.0 - clear);
+        } else {
+            p.dot(x, y, m.color, 1.0);
+        }
+        let k = look.light * m.light * (1.0 - u) * (1.0 - clear);
         if k > 0.0 {
             p.light(x, y, m.color, k);
         }

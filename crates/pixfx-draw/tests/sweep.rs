@@ -22,6 +22,7 @@ const PLAIN: Look = Look {
     shift: 0.0,
     light: 0.0,
     skip: 0.0,
+    soft: 1.0,
 };
 
 fn pose(x: f64, y: f64, angle: f64, age: f64) -> Pose {
@@ -254,4 +255,32 @@ fn edge_takes_each_rows_pixel_furthest_back() {
             "row {y} not smeared"
         );
     }
+}
+
+#[test]
+fn a_soft_streak_turns_translucent_toward_its_end_and_stays_whole() {
+    let mut f = Frame::new(64, 64, 0, 0);
+    let mut p = Painter::new(&mut f);
+    p.place(32.0, 32.0, false, 0.0);
+    // newest at x 20, a second old at x 0: soft from halfway
+    sweep(
+        &mut p,
+        &[pose(20.0, 0.0, 0.0, 0.0), pose(0.0, 0.0, 0.0, 1.0)],
+        &point(RED),
+        &[],
+        &Look { soft: 0.5, ..PLAIN },
+    );
+    let alpha = |x: i32| f.color[32 * 64 + (32 + x) as usize] >> 24;
+    assert_eq!(alpha(20), 255, "the head stays solid");
+    assert_eq!(alpha(12), 255, "solid until halfway");
+    assert!(
+        alpha(5) > 0 && alpha(5) < 255,
+        "translucent past halfway: {}",
+        alpha(5)
+    );
+    assert!(alpha(2) < alpha(5), "clearer toward the end");
+    assert!(
+        (1..=20).all(|x| alpha(x) > 0),
+        "no pixel dithered away: a blend, not a dither"
+    );
 }
