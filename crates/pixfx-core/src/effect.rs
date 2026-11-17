@@ -37,7 +37,7 @@ const FRAME_SLACK: f64 = 1e-6;
 /// the effect, the backdrop belongs to the tools).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Meta {
-    /// `category/name`, as pixelfx's file path under `src/fx` (`fire/candle`).
+    /// `category/name` (`feedback/outline`).
     pub id: &'static str,
     pub name: &'static str,
     pub desc: &'static str,

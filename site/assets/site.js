@@ -1,5 +1,5 @@
 // Every page loads this one script. It mounts the page's own script (picked by the body's class), starts the
-// site's fx, and with fx on changes pages in place so the old page can burn open over the new one.
+// site's fx, and with fx on changes pages in place.
 import { mount as mountDocs } from "./docs.js";
 import { mount as mountEffect } from "./effect.js";
 import { mount as mountGallery } from "./gallery.js";

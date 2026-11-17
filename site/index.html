@@ -23,12 +23,12 @@
   <main>
     <section class="hero" aria-labelledby="hero-title">
       <h1 id="hero-title" class="sr-only">pixfx</h1>
-      <canvas id="scene" aria-label="A live duel on a mountain dais at night: two cultivators, one of thunder and one of frost, fight with spells. Every spell is a pixfx effect, and a small AI chooses each move."></canvas>
+      <canvas id="scene" aria-label="A live duel on a mountain dais at night: two cultivators, one of thunder and one of frost, fight with spells, drawn by pixfx, and a small AI chooses each move."></canvas>
     </section>
 
     <section class="intro-strip" aria-label="What pixfx is">
       <div class="pitch">
-        <p class="lede">Pixel-art effects written once in Rust. Render them to sprite sheets, or play the same effects live in the browser, Phaser and gpui. Every spell in the duel above is one of them.</p>
+        <p class="lede">Pixel-art effects that read the sprite they play on, written once in Rust. Render them to sprite sheets, or play the same effects live in the browser, Phaser and gpui.</p>
         <p class="proof" id="proof">The duel above is drawn live by the engine, every frame.</p>
       </div>
       <div class="actions">
@@ -52,8 +52,8 @@
 
         <div role="tabpanel" id="panel-files" aria-labelledby="tab-files">
           <p>Write a sprite sheet (composite, colour and light PNGs plus beanfx-layout JSON), or a looping GIF.</p>
-<pre><code>cargo run -p pixfx-export --example sprite_sheet -- fire/campfire --out out
-cargo run -p pixfx-export --example gif -- fire/campfire --scale 4 --out out</code></pre>
+<pre><code>cargo run -p pixfx-export --example sprite_sheet -- feedback/power-up --out out
+cargo run -p pixfx-export --example gif -- feedback/power-up --scale 4 --out out</code></pre>
           <p><a href="docs/scripts.html">Scripts</a> · <a href="docs/sheets.html">Sprite sheet format</a></p>
         </div>
 
@@ -63,19 +63,19 @@ cargo run -p pixfx-export --example gif -- fire/campfire --scale 4 --out out</co
 
 await loadPixfx();
 const pixfx = createPixfx(canvas.getContext("2d"), { scale: 4 });
-pixfx.play("fire/campfire", 64, 112, { seed: 3 });
+pixfx.play("feedback/power-up", 64, 112, { seed: 3 });
 // each frame: pixfx.update(dt), then pixfx.draw()</code></pre>
           <p><a href="docs/canvas.html">Canvas 2D shell reference</a></p>
         </div>
 
         <div role="tabpanel" id="panel-phaser" aria-labelledby="tab-phaser" hidden>
-          <p>A scene plugin. Effects show up as ordinary Phaser images, a back pair and a front pair, so sprites can stand inside the fire.</p>
+          <p>A scene plugin. Effects show up as ordinary Phaser images, a back pair and a front pair, so sprites can stand inside an effect.</p>
 <pre><code>import { PixfxPlugin, loadPixfx } from "pixfx-phaser";
 
 await loadPixfx();
 // plugins: { scene: [{ key: "pixfx", plugin: PixfxPlugin, mapping: "pixfx" }] }
-const fire = this.pixfx.play("fire/campfire", 150, 170);
-fire.follow(player, 0, -4);</code></pre>
+const trail = this.pixfx.play("projectiles/trail", 150, 170);
+trail.follow(player);</code></pre>
           <p><a href="docs/phaser.html">Phaser plugin reference</a></p>
         </div>
 
@@ -84,7 +84,7 @@ fire.follow(player, 0, -4);</code></pre>
 <pre><code>import init, { Fx } from "./pkg/pixfx_wasm.js";
 
 await init();
-const fx = new Fx("fire/candle", { seed: 1 });
+const fx = new Fx("projectiles/trail", { seed: 1 });
 fx.update(1 / 60);
 fx.draw("both");
 ctx.putImageData(new ImageData(fx.rgba(), fx.width(), fx.height()), 0, 0);</code></pre>
@@ -95,15 +95,15 @@ ctx.putImageData(new ImageData(fx.rgba(), fx.width(), fx.height()), 0, 0);</code
           <p>Render frames in Rust, hash them, composite them or export them.</p>
 <pre><code>use pixfx_core::{Options, render_frames};
 
-let fx = pixfx_effects::effect("fire/brazier").ok_or("not registered")?;
+let fx = pixfx_effects::effect("feedback/power-up").ok_or("not registered")?;
 let rendered = render_frames(fx, &amp;Options::default(), 0);
-pixfx_export::write_gif(Path::new("brazier.gif"), &amp;rendered, 4)?;</code></pre>
+pixfx_export::write_gif(Path::new("power-up.gif"), &amp;rendered, 4)?;</code></pre>
           <p><a href="docs/rust.html">Rust API reference</a></p>
         </div>
 
         <div role="tabpanel" id="panel-gpui" aria-labelledby="tab-gpui" hidden>
           <p>Paint effects inside a gpui window, light blended additively on the GPU with nearest sampling.</p>
-<pre><code>let mut view = FxView::new(campfire, Options::default());
+<pre><code>let mut view = FxView::new(power_up, Options::default());
 view.tick(dt);
 paint_fx(&amp;mut view, &amp;mut frames, Layer::Both, origin, 4, window)?;
 frames.end_frame(window)?;</code></pre>
@@ -119,8 +119,8 @@ frames.end_frame(window)?;</code></pre>
           <p>Clone the repository. <code>rust-toolchain.toml</code> pins the nightly and the wasm target, so rustup fetches them on first build.</p>
         </li>
         <li>
-          <p>Render the campfire to a GIF:</p>
-<pre><code>cargo run -p pixfx-export --example gif -- fire/campfire --out out</code></pre>
+          <p>Render the power-up to a GIF:</p>
+<pre><code>cargo run -p pixfx-export --example gif -- feedback/power-up --out out</code></pre>
         </li>
         <li>
           <p>Or play it in the browser through the Canvas 2D demo:</p>
@@ -133,7 +133,7 @@ cd ../pixfx-canvas2d &amp;&amp; bun install &amp;&amp; bunx vite demo</code></pr
   </main>
 
   <footer class="footer">
-    <p>MIT licensed. Effects are ports of <a href="https://github.com/patch-gg/pixelfx">pixelfx</a> by Patch and Hugo Duprez (Sprite Fusion), and sheets use the <a href="https://github.com/baenv/beanfx">beanfx</a> layout by bien. See <a href="docs/credits.html">credits</a>.</p>
+    <p>MIT licensed. The engine is a port of <a href="https://github.com/patch-gg/pixelfx">pixelfx</a> by Patch and Hugo Duprez (Sprite Fusion), and sheets use the <a href="https://github.com/baenv/beanfx">beanfx</a> layout by bien. See <a href="docs/credits.html">credits</a>.</p>
   </footer>
 
   <script type="module" src="assets/site.js"></script>

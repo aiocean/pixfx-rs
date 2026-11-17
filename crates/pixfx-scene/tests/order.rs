@@ -1,7 +1,10 @@
-//! Ordering an effect that takes orders (`Scene::order`): `arcane/sword-formation` answers with a volley of eight
-//! flying swords the scene launches, flies and strikes with, at any distance.
+//! Ordering an effect that takes orders (`Scene::order`): a formation (a test effect, `common/formation.rs`)
+//! answers with a volley of eight flying blades the scene launches, flies and strikes with, at any distance.
 
 use std::error::Error;
+
+#[path = "common/formation.rs"]
+mod formation;
 
 use pixfx_core::volley::{Aim, Order};
 use pixfx_core::{Clip, Options};
@@ -20,8 +23,7 @@ fn scene() -> Scene<Frame> {
 }
 
 fn formation() -> Result<Clip, Box<dyn Error>> {
-    let fx = effect("arcane/sword-formation").ok_or("arcane/sword-formation is not built")?;
-    Ok(Clip::live(fx, Options::default()))
+    Ok(Clip::live(&formation::FORMATION, Options::default()))
 }
 
 /// Run the scene for `secs`, returning every event with the scene time it came at.
@@ -291,7 +293,7 @@ fn a_volley_spares_its_caster_and_the_game_can_burst_a_piece_itself() -> Res {
 #[test]
 fn an_effect_that_takes_no_orders_refuses_one() -> Res {
     let mut s = scene();
-    let fx = effect("fire/candle").ok_or("fire/candle is not built")?;
+    let fx = effect("feedback/power-up").ok_or("feedback/power-up is not built")?;
     let h = s.play(Clip::live(fx, Options::default()), 10.0, 10.0)?;
     assert!(!s.order(h, order(50.0, 10.0, Aim::Converge))?);
     assert!(!s.order(999, order(50.0, 10.0, Aim::Converge))?);
@@ -299,11 +301,9 @@ fn an_effect_that_takes_no_orders_refuses_one() -> Res {
 }
 
 #[test]
-fn the_bagua_mirror_is_thrown_once_and_bursts_on_a_far_target() -> Res {
+fn a_thrown_piece_lands_once_and_bursts_on_a_far_target() -> Res {
     let mut s = scene();
-    let fx =
-        effect("arcane/bagua-mirror-strike").ok_or("arcane/bagua-mirror-strike is not built")?;
-    let h = s.play(Clip::live(fx, Options::default()), 100.0, 200.0)?;
+    let h = s.play(Clip::live(&formation::THROW, Options::default()), 100.0, 200.0)?;
     run(&mut s, 0.0, 1.5)?;
     let target = (420.0, 178.0);
     assert!(s.order(h, order(target.0, target.1, Aim::Converge))?);
@@ -322,7 +322,7 @@ fn the_bagua_mirror_is_thrown_once_and_bursts_on_a_far_target() -> Res {
     assert_eq!(
         s.handles().count(),
         0,
-        "the mirror, its flight and its burst all ended"
+        "the thrower, its flight and its burst all ended"
     );
     Ok(())
 }

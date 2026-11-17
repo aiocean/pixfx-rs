@@ -27,7 +27,7 @@ export default { optimizeDeps: { exclude: ["pixfx-web"] } };
 ## Use
 
 ```ts
-import { Application, Container } from "pixi.js";
+import { Application, Container, Sprite } from "pixi.js";
 import { createPixfx, loadPixfx } from "pixfx-pixi";
 
 await loadPixfx(); // once, before createPixfx()
@@ -39,9 +39,11 @@ world.scale.set(4);                          // one effect pixel is 4 screen pix
 const fx = world.addChild(new Container());  // the effects' sprites go here, sorted by zIndex
 const pixfx = createPixfx(app, { container: fx, camera: world });
 
-pixfx.play("fire/campfire", 168, 160);
-const hero = { x: 100, y: 142, active: true };  // anything with x, y and active
-pixfx.play("fire/candle", 0, 0).follow(hero);
+const heroSprite = fx.addChild(new Sprite(heroTexture)); // your character, its feet at its position
+heroSprite.anchor.set(0.5, 1);
+const hero = { x: 100, y: 160, active: true };          // anything with x, y and active; move it with heroSprite
+pixfx.play("feedback/outline", 0, 0).follow(hero, 0, -11).wrap(pixfx.actorOf(heroSprite)); // a ring round its sprite
+pixfx.play("explosions/body-burst", 168, 160);  // with no character, a stand-in body blows apart
 pixfx.feel.on("cue", (c) => { if (c.cue.type === "sound") playSound(c.cue.name); });
 ```
 
@@ -79,7 +81,7 @@ on WebGPU each frame is a buffer texture.
 ## Demo and checks
 
 ```sh
-bunx vite demo             # campfire, braziers, a candle following a walker; click for an explosion with shake
+bunx vite demo             # a walker ringed and trailed, a hero powering up; click for a body burst with shake
 bun run check              # tsc, eslint, bun test (real Pixi objects, real wasm)
-bun run check:browser      # Chrome: fires show and animate, ticker stop freezes, shake comes back, destroy frees
+bun run check:browser      # Chrome: effects show and animate, ticker stop freezes, shake comes back, destroy frees
 ```

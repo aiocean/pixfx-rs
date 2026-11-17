@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { z } from "zod";
+import type { ActorFrame } from "../src/actor";
 import type { Strike } from "../src/effect";
 import { PixfxFeel } from "../src/feel";
 import type { WorkerPort } from "../src/game";
@@ -41,6 +42,13 @@ function frame(game: GameT, stage: StageT, dt = 1 / 30): number {
   return played;
 }
 
+/** A character's sprite frame: a block of one colour `w` wide and 20 tall, its feet at (`x`, `y`). */
+function sprite(x: number, y: number, w: number): ActorFrame {
+  const rgba = new Uint8Array(w * 20 * 4);
+  for (let i = 0; i < rgba.length; i += 4) rgba.set([224, 192, 128, 255], i);
+  return { at: { x: x - Math.floor(w / 2), y: y - 20, w, h: 20 }, rgba };
+}
+
 /** Where every image shown now sits. */
 function places(gfx: FakeGfx): [number, number][] {
   return gfx.showing().map((i) => [i.shown?.x ?? Number.NaN, i.shown?.y ?? Number.NaN]);
@@ -48,7 +56,7 @@ function places(gfx: FakeGfx): [number, number][] {
 
 test("an effect shows its colour normally and its light added over it, at its lit pixels near where it plays", () => {
   const { gfx, game, stage } = setup();
-  stage.play("fire/candle", 30, 40, {}, 1);
+  stage.play("explosions/body-burst", 30, 40, {}, 1);
   frame(game, stage);
   const shown = gfx.picture();
   expect(shown.length).toBeGreaterThan(0);
@@ -56,7 +64,7 @@ test("an effect shows its colour normally and its light added over it, at its li
   for (const s of shown) {
     expect(s.bytes.length).toBe(s.at.w * s.at.h * 4);
     expect(s.bytes.some((b) => b !== 0)).toBe(true);
-    // a candle's flame sits on its origin
+    // the body about to burst stands on its origin
     expect(s.at.x).toBeLessThanOrEqual(30);
     expect(s.at.x + s.at.w).toBeGreaterThan(30);
     expect(s.at.y).toBeLessThan(40);
@@ -65,7 +73,7 @@ test("an effect shows its colour normally and its light added over it, at its li
 
 test("moving an effect moves its images by as much, showing the same frame", () => {
   const { gfx, game, stage } = setup();
-  const fx = stage.play("fire/candle", 30, 40, {}, 1);
+  const fx = stage.play("explosions/body-burst", 30, 40, {}, 1);
   frame(game, stage);
   const before = gfx.picture();
   fx.setPosition(40, 45);
@@ -79,9 +87,9 @@ test("an effect's back and front depths and its placement are the play's", () =>
   const { gfx, game, stage } = setup();
   const p = splitPlayOptions(OWN, { depth: { back: 5, front: 7 }, place: 0.5, seed: 2 });
   expect(p.engine).toEqual({ seed: 2 });
-  // a rune circle draws behind and in front of what stands in it
-  stage.play("arcane/rune-circle", 30, 40, p.engine, p.own.place, p.own.depth);
-  frame(game, stage);
+  // a power-up's aura draws behind and in front of the body it grips, once it has come in
+  stage.play("feedback/power-up", 30, 40, p.engine, p.own.place, p.own.depth);
+  for (let i = 0; i < 16; i++) frame(game, stage);
   const shown = gfx.showing().map((i) => i.shown);
   expect(new Set(shown.map((s) => s?.depth))).toEqual(new Set([5, 7]));
   expect(shown.every((s) => s?.place === 0.5)).toBe(true);
@@ -90,12 +98,17 @@ test("an effect's back and front depths and its placement are the play's", () =>
 test("a followed effect tracks its target, stops when the target goes inactive, and completes once faded", () => {
   const { gfx, game, stage } = setup();
   const target = { x: 30, y: 40, active: true };
-  const fx = stage.play("fire/candle", 0, 0, {}, 1).follow(target, 0, -4);
+  // an outline round the target's sprite, a loop: it plays until the target goes
+  const fx = stage
+    .play("feedback/outline", 0, 0, {}, 1)
+    .follow(target, 0, -4)
+    .wrap(() => sprite(target.x, target.y, 8));
   const events: string[] = [];
   fx.on("complete", () => events.push("complete"));
   fx.on("destroy", () => events.push("destroy"));
   frame(game, stage);
   const at = places(gfx);
+  expect(at.length).toBeGreaterThan(0);
   target.x += 12;
   frame(game, stage, 0);
   expect(places(gfx)).toEqual(at.map(([x, y]) => [x + 12, y]));
@@ -108,7 +121,7 @@ test("a followed effect tracks its target, stops when the target goes inactive, 
 
 test("destroying an effect emits destroy, never complete, and it shows no more", () => {
   const { gfx, game, stage } = setup();
-  const fx = stage.play("fire/candle", 30, 40, {}, 1);
+  const fx = stage.play("feedback/power-up", 30, 40, {}, 1);
   const events: string[] = [];
   fx.on("complete", () => events.push("complete"));
   fx.on("destroy", () => events.push("destroy"));
@@ -122,7 +135,7 @@ test("destroying an effect emits destroy, never complete, and it shows no more",
 
 test("an effect's cues reach it and the feel, placed in the world; its hit-stop freezes play", () => {
   const { game, stage, feel, cues } = setup();
-  const fx = stage.play("impacts/parry", 100, 80, {}, 1);
+  const fx = stage.play("explosions/body-burst", 100, 80, {}, 1);
   const own: WorldCue[] = [];
   fx.on("cue", (c: WorldCue) => own.push(c));
   const played: number[] = [];
@@ -146,7 +159,7 @@ test("an effect's cues reach it and the feel, placed in the world; its hit-stop 
 test("with the feel off, play runs every second and cues still reach the game", () => {
   const { game, stage, feel, cues } = setup();
   feel.setEnabled(false);
-  stage.play("impacts/parry", 100, 80, {}, 1);
+  stage.play("explosions/body-burst", 100, 80, {}, 1);
   const played: number[] = [];
   for (let i = 0; i < 20; i++) played.push(frame(game, stage));
   expect(played.every((p) => p > 0)).toBe(true);
@@ -156,7 +169,7 @@ test("with the feel off, play runs every second and cues still reach the game", 
 
 test("the game's own freeze holds play, and timeScale says so", () => {
   const { game, stage, feel } = setup();
-  stage.play("fire/candle", 30, 40, {}, 1);
+  stage.play("feedback/power-up", 30, 40, {}, 1);
   feel.freeze(0.1);
   const played = frame(game, stage);
   feel.played(1 / 30, played);
@@ -166,11 +179,11 @@ test("the game's own freeze holds play, and timeScale says so", () => {
 
 test("two scenes of a game showing identical effects paint each frame once", () => {
   const one = setup();
-  one.stage.play("fire/candle", 30, 40, { seed: 3 }, 1);
+  one.stage.play("feedback/power-up", 30, 40, { seed: 3 }, 1);
   const two = setup();
   const other = scene(two.game, two.gfx);
-  two.stage.play("fire/candle", 30, 40, { seed: 3 }, 1);
-  other.stage.play("fire/candle", 90, 10, { seed: 3 }, 1);
+  two.stage.play("feedback/power-up", 30, 40, { seed: 3 }, 1);
+  other.stage.play("feedback/power-up", 90, 10, { seed: 3 }, 1);
   for (let i = 0; i < 10; i++) {
     frame(one.game, one.stage);
     two.stage.update(1 / 30);
@@ -187,16 +200,16 @@ test("two scenes of a game showing identical effects paint each frame once", () 
 test("an unknown effect or an option the engine refuses throws, naming it", () => {
   const { stage } = setup();
   expect(() => stage.play("fire/nope", 0, 0, {}, 1)).toThrow(/fire\/nope/);
-  expect(() => stage.play("fire/candle", 0, 0, { palette: "lava" }, 1)).toThrow(/lava|palette/);
-  expect(() => stage.play("fire/candle", 0, 0, { margin: 3 }, 1)).toThrow(/margin/);
+  expect(() => stage.play("feedback/power-up", 0, 0, { palette: "lava" }, 1)).toThrow(/lava|palette/);
+  expect(() => stage.play("feedback/power-up", 0, 0, { margin: 3 }, 1)).toThrow(/margin/);
   expect(() => splitPlayOptions(OWN, { depth: { back: 1 } })).toThrow(/depth/);
 });
 
 test("shutting a scene down ends its effects; clearing the game lets go of every texture", () => {
   const { gfx, game, stage } = setup();
   const ended: string[] = [];
-  for (let i = 0; i < 3; i++) stage.play("fire/candle", 20 * i, 40, { seed: i }, 1).on("destroy", () => ended.push("destroy"));
-  const stopping = stage.play("fire/candle", 80, 40, {}, 1);
+  for (let i = 0; i < 3; i++) stage.play("feedback/power-up", 20 * i, 40, { seed: i }, 1).on("destroy", () => ended.push("destroy"));
+  const stopping = stage.play("feedback/outline", 80, 40, {}, 1).wrap(() => sprite(80, 40, 8));
   frame(game, stage);
   stopping.stop();
   frame(game, stage);
@@ -210,7 +223,7 @@ test("shutting a scene down ends its effects; clearing the game lets go of every
 
 test("a scene's feel reads still once the scene shut down, as a host loop may read it after destroy", () => {
   const { game, stage, feel } = setup();
-  stage.play("explosions/small-explosion", 40, 40, {}, 1);
+  stage.play("explosions/body-burst", 40, 40, {}, 1);
   for (let i = 0; i < 10; i++) frame(game, stage);
   expect(feel.trauma).toBeGreaterThan(0);
   stage.clear();
@@ -228,7 +241,7 @@ test("a heavy blow's ring bends a picture of the screen while it lasts; at shake
   // stripes, so moving any pixel sideways or up changes it
   const src = new Uint8ClampedArray(w * h * 4).map((_, i) => ((i >> 2) % w) * 4 + (Math.floor((i >> 2) / w) % 2) * 100);
   expect(feel.bend(src, w, h, 1)).toBeUndefined();
-  stage.play("explosions/plasma-explosion", 32, 24, {}, 1);
+  stage.play("explosions/body-burst", 32, 24, {}, 1);
   let bent: Uint8ClampedArray | undefined;
   for (let i = 0; i < 90 && !bent; i++) {
     frame(game, stage);
@@ -245,7 +258,7 @@ test("a draw budget shows effects that share nothing a few per frame, until ever
   const run = (budget: number) => {
     const { gfx, game, stage } = setup();
     stage.setDrawBudget(budget);
-    for (let seed = 1; seed <= 4; seed++) stage.play("fire/candle", 20 * seed, 40, { seed }, 1);
+    for (let seed = 1; seed <= 4; seed++) stage.play("feedback/power-up", 20 * seed, 40, { seed }, 1);
     const shown: number[] = [];
     for (let i = 0; i < 6; i++) {
       frame(game, stage, i === 0 ? 1 / 30 : 0);
@@ -266,30 +279,23 @@ test("a draw budget is a whole number of layers, 0 or more", () => {
   for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) expect(() => stage.setDrawBudget(bad)).toThrow();
 });
 
-test("an ordered volley flies its shots across the stage, each showing on its way, and reports each strike", () => {
+test("an effect that takes no orders refuses an attack and plays on, striking nothing", () => {
   const { gfx, game, stage } = setup();
-  const fx = stage.play("arcane/sword-formation", 40, 100, {}, 1);
-  for (let i = 0; i < 40; i++) frame(game, stage);
+  const fx = stage.play("feedback/power-up", 40, 100, {}, 1);
+  for (let i = 0; i < 10; i++) frame(game, stage);
   const strikes: Strike[] = [];
   fx.on("strike", (s: Strike) => strikes.push(s));
   stage.setBody(1, 290, 60, 20, 40);
-  expect(fx.attack(300, 80)).toBe(true);
   expect(fx.attack(300, 80)).toBe(false);
-  let farthest = 0;
-  for (let i = 0; i < 90; i++) {
-    frame(game, stage);
-    for (const [x] of places(gfx)) farthest = Math.max(farthest, x);
-  }
-  // the shots showed far past the formation's own canvas, out to the target
-  expect(farthest).toBeGreaterThan(250);
-  expect(strikes.length).toBe(8);
-  for (const s of strikes) expect(Math.abs(s.x - 300) + Math.abs(s.y - 80)).toBeLessThan(32);
+  frame(game, stage);
+  expect(gfx.showing().length).toBeGreaterThan(0);
+  expect(strikes).toEqual([]);
 });
 
 test("a trail follows a moving effect, drawn where it went, and ends after it", () => {
   const { gfx, game, stage } = setup();
-  const bolt = stage.play("projectiles/laser-bolt", 40, 100, {}, 1);
-  expect(bolt.trail("fire/candle")).toBeNull();
+  const bolt = stage.play("feedback/power-up", 40, 100, {}, 1);
+  expect(bolt.trail("feedback/outline")).toBeNull();
   const tail = bolt.trail("projectiles/trail", { secs: 0.3 });
   if (!tail) throw new Error("no trail");
   let ended = false;

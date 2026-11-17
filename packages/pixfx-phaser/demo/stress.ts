@@ -16,9 +16,10 @@ import { seedsParam, stressSeed } from "./seeds";
 
 const WIDTH = 640;
 const HEIGHT = 360;
-const IDS = ["fire/candle", "fire/campfire", "fire/brazier"] as const;
+/** Played on their own: power-up and body-burst on a stand-in body, the trail behind a mover flying along +x. */
+const IDS = ["feedback/power-up", "projectiles/trail", "explosions/body-burst"] as const;
 
-type Mix = "candle" | "campfire" | "brazier" | "mixed";
+type Mix = "power-up" | "trail" | "body-burst" | "mixed";
 
 interface Config {
   n: number;
@@ -68,7 +69,7 @@ function num(key: string, fallback: number): number {
 
 function mixParam(): Mix {
   const v = params.get("mix");
-  return v === "candle" || v === "campfire" || v === "brazier" ? v : "mixed";
+  return v === "power-up" || v === "trail" || v === "body-burst" ? v : "mixed";
 }
 
 const base: Config = {
@@ -140,7 +141,10 @@ class StressScene extends Phaser.Scene {
     while (this.churnDebt >= 1 && this.live.length > 0) {
       this.churnDebt -= 1;
       const victim = this.live[Math.floor(this.rand() * this.live.length)];
-      victim?.stop();
+      if (victim) {
+        this.live = this.live.filter((e) => e !== victim);
+        victim.stop();
+      }
       this.spawn();
     }
   }
@@ -160,7 +164,7 @@ class StressScene extends Phaser.Scene {
   }
 
   private pickIndex(): number {
-    const i = this.cfg.mix === "mixed" ? this.spawned % IDS.length : IDS.findIndex((id) => id === `fire/${this.cfg.mix}`);
+    const i = this.cfg.mix === "mixed" ? this.spawned % IDS.length : IDS.findIndex((id) => id.endsWith(`/${this.cfg.mix}`));
     return i < 0 ? 0 : i;
   }
 
@@ -177,7 +181,13 @@ class StressScene extends Phaser.Scene {
     const forget = (): void => {
       this.live = this.live.filter((e) => e !== fx);
     };
-    fx.on("complete", forget);
+    // the one-shots end on their own: another takes each one's place, so `n` stay alive
+    fx.on("complete", () => {
+      // one churn stopped has its place taken already
+      const ended = this.live.includes(fx);
+      forget();
+      if (ended && this.scene.isActive()) this.spawn();
+    });
     fx.on("destroy", forget);
     return { fx, x, y };
   }

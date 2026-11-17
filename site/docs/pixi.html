@@ -47,8 +47,8 @@ world.scale.set(4);
 const fx = world.addChild(new Container());
 const pixfx = createPixfx(app, { container: fx, camera: world });
 
-pixfx.play("fire/campfire", 168, 160);
-pixfx.play("fire/candle", 0, 0).follow(hero);</code></pre>
+pixfx.play("feedback/power-up", 168, 160);
+pixfx.play("projectiles/trail", 0, 0).follow(hero);</code></pre>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Option of <code>createPixfx</code></th><th>Meaning</th></tr></thead>
@@ -62,7 +62,7 @@ pixfx.play("fire/candle", 0, 0).follow(hero);</code></pre>
 <p>Effects advance on <code>app.ticker</code>, after the game's own callbacks and before the render: <code>ticker.speed</code> scales them, <code>ticker.stop()</code> freezes them. <code>pixfx.destroy()</code> ends every effect and frees its sprites. On WebGL every frame is a region of a few atlas pages, filled straight from the bytes the workers painted.</p>
 
 <h2>Demo and checks</h2>
-<pre><code>bunx vite demo           # campfire, braziers, a candle following a walker; click for an explosion with shake
+<pre><code>bunx vite demo           # effects on a walker; click for one with shake
 bun run check            # tsc, eslint, bun test
 bun run check:browser    # Chrome: show, animate, freeze, shake and destroy</code></pre>
     </main>

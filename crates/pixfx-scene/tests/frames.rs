@@ -15,8 +15,8 @@ use recorder::Recorder;
 
 type Res = Result<(), Box<dyn Error>>;
 
-fn candle() -> Result<Clip, Box<dyn Error>> {
-    let fx = effect("fire/candle").ok_or("fire/candle not registered")?;
+fn buff() -> Result<Clip, Box<dyn Error>> {
+    let fx = effect("feedback/power-up").ok_or("feedback/power-up not registered")?;
     Ok(Clip::live(fx, Options::default()))
 }
 
@@ -124,8 +124,8 @@ fn host_frame<P: Painter>(
 fn scenes_sharing_frames_paint_each_frame_once() -> Res {
     let mut frames = Frames::default();
     let (mut a, mut b): (Scene<Frame>, Scene<Frame>) = (frames.scene(one()?), frames.scene(one()?));
-    a.play(candle()?, 20.0, 40.0)?;
-    b.play(candle()?, 60.0, 10.0)?;
+    a.play(buff()?, 20.0, 40.0)?;
+    b.play(buff()?, 60.0, 10.0)?;
     let mut shell = Recorder::default();
     for _ in 0..30 {
         a.update(1.0 / 60.0)?;
@@ -148,8 +148,8 @@ fn a_frame_painted_elsewhere_shows_once_delivered_and_is_asked_for_once() -> Res
     let mut frames = Frames::new(Later::default());
     let mut scene: Scene<Frame> = frames.scene(one()?);
     let mut shell = Recorder::default();
-    scene.play(candle()?, 20.0, 40.0)?;
-    scene.play(candle()?, 20.0, 40.0)?;
+    scene.play(buff()?, 20.0, 40.0)?;
+    scene.play(buff()?, 20.0, 40.0)?;
     scene.update(0.1)?;
     // nothing painted yet: nothing to show, and each layer is asked for once though two effects show it
     assert!(host_frame(&mut frames, &mut scene, &mut shell)?.is_empty());
@@ -166,8 +166,8 @@ fn a_frame_painted_elsewhere_shows_once_delivered_and_is_asked_for_once() -> Res
     // the same frames an inline painter paints
     let mut inline = Frames::default();
     let mut twin: Scene<Frame> = inline.scene(one()?);
-    twin.play(candle()?, 20.0, 40.0)?;
-    twin.play(candle()?, 20.0, 40.0)?;
+    twin.play(buff()?, 20.0, 40.0)?;
+    twin.play(buff()?, 20.0, 40.0)?;
     twin.update(0.1)?;
     assert_eq!(
         shown,
@@ -181,7 +181,7 @@ fn a_new_frame_on_its_way_leaves_the_last_one_shown() -> Res {
     let mut frames = Frames::new(Later::default());
     let mut scene: Scene<Frame> = frames.scene(one()?);
     let mut shell = Recorder::default();
-    scene.play(candle()?, 20.0, 40.0)?;
+    scene.play(buff()?, 20.0, 40.0)?;
     scene.update(0.1)?;
     host_frame(&mut frames, &mut scene, &mut shell)?;
     deliver(&mut frames, &mut scene, &mut shell)?;
@@ -202,7 +202,7 @@ fn a_fading_effect_painted_elsewhere_shows_its_own_frames() -> Res {
     let mut frames = Frames::new(Later::default());
     let mut scene: Scene<Frame> = frames.scene(one()?);
     let mut shell = Recorder::default();
-    let h = scene.play(candle()?, 20.0, 40.0)?;
+    let h = scene.play(buff()?, 20.0, 40.0)?;
     scene.update(0.1)?;
     scene.stop(h);
     scene.update(0.05)?;
@@ -219,7 +219,7 @@ fn a_fading_effect_painted_elsewhere_shows_its_own_frames() -> Res {
     let shown = host_frame(&mut frames, &mut scene, &mut shell)?;
     let mut inline = Frames::default();
     let mut twin: Scene<Frame> = inline.scene(one()?);
-    let t = twin.play(candle()?, 20.0, 40.0)?;
+    let t = twin.play(buff()?, 20.0, 40.0)?;
     twin.update(0.1)?;
     twin.stop(t);
     twin.update(0.05)?;
@@ -235,9 +235,9 @@ fn the_painter_lets_go_of_every_effect_that_ends() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(one()?);
     let mut shell = Recorder::default();
-    let stopped = scene.play(candle()?, 20.0, 40.0)?;
-    let removed = scene.play(candle()?, 60.0, 40.0)?;
-    scene.play(candle()?, 90.0, 40.0)?;
+    let stopped = scene.play(buff()?, 20.0, 40.0)?;
+    let removed = scene.play(buff()?, 60.0, 40.0)?;
+    scene.play(buff()?, 90.0, 40.0)?;
     scene.update(0.1)?;
     host_frame(&mut frames, &mut scene, &mut shell)?;
     assert_eq!(
@@ -263,7 +263,7 @@ fn a_painter_that_falls_behind_is_asked_for_one_frame_per_layer_at_a_time() -> R
     let mut frames = Frames::new(Later::default());
     let mut scene: Scene<Frame> = frames.scene(one()?);
     let mut shell = Recorder::default();
-    let h = scene.play(candle()?, 20.0, 40.0)?;
+    let h = scene.play(buff()?, 20.0, 40.0)?;
     for _ in 0..20 {
         scene.update(1.0 / 30.0)?;
         host_frame(&mut frames, &mut scene, &mut shell)?;
@@ -289,7 +289,7 @@ fn a_frame_that_comes_back_after_its_clock_moved_on_still_shows() -> Res {
     let mut frames = Frames::new(Later::default());
     let mut scene: Scene<Frame> = frames.scene(one()?);
     let mut shell = Recorder::default();
-    scene.play(candle()?, 20.0, 40.0)?;
+    scene.play(buff()?, 20.0, 40.0)?;
     scene.update(0.1)?;
     host_frame(&mut frames, &mut scene, &mut shell)?;
     // the clock moves on while the frame of 0.1 s is painted elsewhere
@@ -300,7 +300,7 @@ fn a_frame_that_comes_back_after_its_clock_moved_on_still_shows() -> Res {
     // the frame of 0.1 s, as painted on the spot
     let mut inline = Frames::default();
     let mut twin: Scene<Frame> = inline.scene(one()?);
-    twin.play(candle()?, 20.0, 40.0)?;
+    twin.play(buff()?, 20.0, 40.0)?;
     twin.update(0.1)?;
     assert!(!shown.is_empty());
     assert_eq!(
@@ -323,7 +323,7 @@ fn a_frame_that_comes_back_after_its_clock_moved_on_still_shows() -> Res {
 fn a_shared_frame_counts_against_the_budget_as_the_lit_box_a_shell_holds() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(one()?);
-    scene.play(candle()?, 30.0, 40.0)?;
+    scene.play(buff()?, 30.0, 40.0)?;
     let mut shell = Recorder::default();
     scene.update(1.0 / 60.0)?;
     let shown = host_frame(&mut frames, &mut scene, &mut shell)?;
@@ -337,7 +337,7 @@ fn a_shared_frame_counts_against_the_budget_as_the_lit_box_a_shell_holds() -> Re
         .iter()
         .map(|f| u64::from(f.w) * u64::from(f.h) * 8)
         .sum();
-    assert!(lit < whole, "a candle lights a small part of its frame");
+    assert!(lit < whole, "a power-up lights a small part of its frame");
     assert_eq!(frames.bytes(), lit);
     Ok(())
 }

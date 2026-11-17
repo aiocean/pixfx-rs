@@ -1,5 +1,5 @@
-//! Writes the TypeScript union of every registered effect id (`type EffectId = "fire/brazier" | ...`) from the
-//! registry itself, so the declarations cannot drift from it.
+//! Writes the TypeScript union of every registered effect id (`type EffectId = "explosions/body-burst" | ...`)
+//! from the registry itself, so the declarations cannot drift from it.
 
 use std::fmt::Write as _;
 use std::path::PathBuf;

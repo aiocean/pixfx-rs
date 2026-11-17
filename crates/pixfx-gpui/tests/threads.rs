@@ -75,10 +75,10 @@ fn frames_painted_on_threads_show_once_they_come_back_and_are_shared(cx: &mut Te
     let cx = cx.add_empty_window();
     let one = paint(
         cx,
-        &site(FxScene::default(), &["fire/campfire"], 1, |_| None),
+        &site(FxScene::default(), &["feedback/power-up"], 1, |_| None),
     );
     assert!(one > 0);
-    let site = site(threads(2), &["fire/campfire"], 20, |_| None);
+    let site = site(threads(2), &["feedback/power-up"], 20, |_| None);
     assert_eq!(paint(cx, &site), 0, "nothing came back yet: nothing shows");
     let until = Instant::now() + Duration::from_secs(2);
     let mut held = 0;
@@ -88,16 +88,16 @@ fn frames_painted_on_threads_show_once_they_come_back_and_are_shared(cx: &mut Te
     }
     assert_eq!(
         held, one,
-        "twenty campfires hold the frame of one, as painted on the spot"
+        "twenty power-ups hold the frame of one, as painted on the spot"
     );
 }
 
-/// Main-thread milliseconds per window frame (median) for `n` fires of their own seeds over `frames` frames of
+/// Main-thread milliseconds per window frame (median) for `n` effects of their own seeds over `frames` frames of
 /// 1/60 s, painted by `scene`.
 fn per_frame(cx: &mut VisualTestContext, scene: FxScene, n: usize, frames: usize) -> f64 {
     let site = site(
         scene,
-        &["fire/candle", "fire/campfire", "fire/brazier"],
+        &["feedback/power-up", "explosions/body-burst", "projectiles/trail"],
         n,
         |i| Some(i as u64 + 1),
     );
@@ -122,7 +122,7 @@ fn bench(cx: &mut TestAppContext) {
     let cx = cx.add_empty_window();
     let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
     let n_threads = (cores / 2).max(1);
-    println!("| fires | on the spot, ms/frame | {n_threads} threads, ms/frame |");
+    println!("| effects | on the spot, ms/frame | {n_threads} threads, ms/frame |");
     println!("|---:|---:|---:|");
     for n in [10, 25, 50, 100] {
         let inline = per_frame(cx, FxScene::default(), n, 120);

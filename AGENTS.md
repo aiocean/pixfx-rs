@@ -12,6 +12,9 @@ is to Zed: the games are the product, and the engine grows only what a real game
 
 - **Strong.** Effects look hand-made and land with weight: light, cues for shake, hit-stop, ripple, flash and sound,
   and bodies that react to a hit. Sprites and UI share the same look.
+- **Effects read the sprite.** An engine effect reads the sprite it plays on (`Silhouette`, `Actor`) or the way it
+  moved (`Trace`): an outline, an aura gripping a body, a body bursting apart, a trail. One that reads neither (a
+  fire, an explosion, a shield) is a sprite the game plays, drawn and animated as sprite art, not an engine effect.
 - **Convenient.** A game draws with a few calls and plain-data options, from TypeScript or from Rust.
 - **Composable.** Every new building block is generic and atomic: it does one thing, works for any effect, sprite or object — not just the one that first needed it — and composes at the right layer. Reuse happens by pulling shared code down to the lowest layer every caller can reach (`pixfx-draw`, `pixfx-core`, a category's `lib.rs`), never by coupling one effect to another. The Unix principle applies: small pieces that each do one thing well; the game and scene compose them. Performance is non-negotiable: a change that claims better reuse must not regress any benchmark.
 - **Fast.** Many sprites and effects at once on a mid-range phone at 60 fps. Play speed comes before download size: a
@@ -120,10 +123,12 @@ one: its rules, trainer and its own wasm; this site's landing and effect pages e
 
 Where a new piece of code goes:
 
-- A new effect: `pixfx-effects`, behind its own cargo feature (for example `fire-candle`) listed in its category
-  feature (`fire`) and in `all` in `crates/pixfx-effects/Cargo.toml`, with `#[cfg(feature = "...")]` on its `mod`,
+- A new effect, one that reads the sprite it plays on or the way it moved: `pixfx-effects`, behind its own cargo
+  feature (for example `feedback-outline`) listed in its category feature (`feedback`) and in `all` in `crates/pixfx-effects/Cargo.toml`, with `#[cfg(feature = "...")]` on its `mod`,
   `pub use` and `EFFECTS` entry; `crates/pixfx-effects/tests/features.rs` fails otherwise. A new feel rule or body
   behaviour: `pixfx-core` or `pixfx-fighter`.
+- A fire, an explosion, a shield or anything else that reads neither the sprite nor its motion: not here. It is
+  sprite art the game plays (a sheet, frames), made outside the engine.
 - A pose, a camera, an animation clip or the mannequin painted from them (hull, bones, part map): `pixfx-body`.
 - A new way to paint pixels (sprite, text, nine-slice, UI box): the drawing layer, driven by the first game that
   needs it; that game decides its API.

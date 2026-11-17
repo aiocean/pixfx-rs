@@ -1,5 +1,11 @@
 //! An ordered volley in a gpui window: the shots it launched (and their trails) are named so a view paints them
-//! where it paints the formation, and each strike on a body comes back as an event naming it.
+//! where it paints the formation, and each strike on a body comes back as an event naming it. No effect in
+//! `pixfx-effects` takes orders: the formation is the scene's test effect.
+
+// only the formation is ordered here; the thrower and its spark serve the scene's own tests
+#[allow(dead_code)]
+#[path = "../../pixfx-scene/tests/common/formation.rs"]
+mod formation;
 
 use pixfx_core::Options;
 use pixfx_core::volley::Aim;
@@ -9,9 +15,8 @@ use pixfx_scene::{Body, StageEvent};
 #[test]
 fn an_ordered_formation_launches_shots_a_view_can_paint_and_reports_each_strike()
 -> Result<(), Box<dyn std::error::Error>> {
-    let fx = pixfx_effects::effect("arcane/sword-formation").ok_or("no sword formation")?;
     let mut s = FxScene::default();
-    let h = s.play(fx, Options::default())?;
+    let h = s.play(&formation::FORMATION, Options::default())?;
     for _ in 0..90 {
         s.tick(1.0 / 60.0)?;
     }

@@ -5,6 +5,9 @@ description: Use when putting pixfx effects into a game - a Phaser 4, Canvas 2D 
 
 # Play pixfx effects in a game
 
+The engine's effects read the sprite they play on or the way it moved (`explosions/body-burst`, `feedback/outline`,
+`feedback/power-up`, `projectiles/trail`). A fire, an explosion or a shield is sprite art the game plays itself.
+
 A JS game reaches the engine through the wasm (`crates/pixfx-wasm`), the runtime `packages/pixfx-web`, and one shell
 package. A Rust game uses `crates/pixfx-gpui`. Nothing is on npm or crates.io: you build and link from this repo.
 Each shell's `README.md` has the full API; this is the path through it.
@@ -18,7 +21,7 @@ cd /path/to/game && bun add /abs/path/to/pixfx-rs/packages/pixfx-phaser   # abso
 ```
 
 - Build only the effects the game plays (a smaller `.wasm`):
-  `bun run build:wasm --no-default-features --features pixfx-effects/fire-candle,pixfx-effects/explosions`.
+  `bun run build:wasm --no-default-features --features pixfx-effects/feedback-outline,pixfx-effects/explosions`.
   Feature = the id with `/` as `-`, or a whole category. `--no-default-features` also drops `fighter` and `light`
   (fighters, scene light): add `,fighter,light` when the game uses them, and always for **pixfx-canvas2d**, whose
   `index.ts` re-exports them (without them its build fails: `"Body" is not exported`). The wasm's `EffectId` type
@@ -37,7 +40,7 @@ import { PixfxPlugin, loadPixfx } from "pixfx-phaser";
 await loadPixfx();
 new Phaser.Game({ pixelArt: true, scene: [Play],
   plugins: { scene: [{ key: "pixfx", plugin: PixfxPlugin, mapping: "pixfx" }] } });
-// in Play.create(): this.pixfx.play("fire/campfire", 150, 170);
+// in Play.create(): this.pixfx.play("feedback/power-up", 150, 170).wrap(this.pixfx.actorOf(hero));
 
 // Canvas 2D: you run the loop and draw between the layers
 import { createPixfx, loadPixfx } from "pixfx-canvas2d";
@@ -67,7 +70,7 @@ adapter object), `setPosition`, `setDepths(back, front)` (Phaser, Pixi), `wrap(.
 - A world bigger than the screen (Canvas 2D, Pixi): `pixfx.setView(x, y, w, h)` so off-screen effects cost no
   painting. Phaser reads the main camera itself.
 - Many effects at once: `setDrawBudget(n)`.
-- Throw at a foe at any distance (`arcane/sword-formation`, an effect tagged `volley`): play it where it gathers
+- Throw at a foe at any distance (an effect tagged `volley`; none ships today): play it where it gathers
   (at the caster, `follow` keeps it there); declare every body a piece may hit with `pixfx.setBody(id, x, y, w, h)`
   (world pixels, each frame it moves; `clearBody(id)` when gone), then `effect.attack(x, y, "converge" | "pierce" | "orbit",
   casterId)` (`"orbit"`: round the point on a ring first, then in): the point gives the direction, the pieces fly on past it and burst on the first body they meet (the
@@ -77,12 +80,10 @@ adapter object), `setPosition`, `setDepths(back, front)` (Phaser, Pixi), `wrap(.
 - A trail (`projectiles/trail`): `effect.trail("projectiles/trail", opts)` lays one under any moving effect; or play
   it on its own and move it with a sprite (`setPosition` each frame): it draws the way it went, behind the
   character, and ends after `stop()`. `turn: 1` turns it with its mover's angle.
-- A fire carried along (`fire/campfire`, `fire/brazier` with `carried: 1`), moved with `setPosition`: it bends back
-  as it moves.
 
 ## Game feel: the game must answer it
 
-Impact effects fire `shake`, `hitstop`, `ripple` and `flash` cues (the cue type also has `sound`, which no
+Impact effects (`explosions/body-burst`, `feedback/power-up`) fire `shake`, `hitstop`, `ripple` and `flash` cues (the cue type also has `sound`, which no
 shipped effect fires yet: load audio under the cue's `name` before playing it); `pixfx.feel` answers shake and flash on
 the camera and freezes effects in a hit-stop. **The game's own world does not freeze by itself.** Multiply every
 motion the game owns by `feel.timeScale` (0 in a hit-stop, a fraction in slow motion, else 1):
@@ -102,8 +103,8 @@ everything to the game. Phaser sprites squash, stretch and blink with `this.pixf
 
 ## Rendered frames (no painting at run time)
 
-`cargo run -p pixfx-export --example render_clip -- fire/campfire --out public/fx` (see `pixfx-render`), then in the game
-`await loadClip("fx/fire_campfire.clip.json")`. Effects with the same options show the rendered frames; others paint.
+`cargo run -p pixfx-export --example render_clip -- projectiles/trail --out public/fx` (see `pixfx-render`), then in the game
+`await loadClip("fx/projectiles_trail.clip.json")`. Effects with the same options show the rendered frames; others paint.
 
 ## Rust game on gpui
 
@@ -112,8 +113,8 @@ everything to the game. Phaser sprites squash, stretch and blink with `this.pixf
 
 ```rust
 let mut fx = FxScene::default();                // or FxScene::with_threads(n)? for many effects
-let fire = pixfx_effects::effect("fire/campfire").ok_or_else(|| anyhow!("not built"))?;
-let h = fx.play(fire, Options { x: 0.0, y: 0.0, ..Options::default() })?;
+let power_up = pixfx_effects::effect("feedback/power-up").ok_or_else(|| anyhow!("not built"))?;
+let h = fx.play(power_up, Options { x: 0.0, y: 0.0, ..Options::default() })?;
 // each window frame:
 fx.tick(dt)?;
 fx.paint(h, Layer::Back, origin, 4, window)?;   // your sprite in between

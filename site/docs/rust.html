@@ -42,17 +42,17 @@ use pixfx_core::{Frame, Instance, Layer, OptValue, Options, composite, frame_has
 use pixfx_export::{write_gif, write_sheet};
 
 fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
-    let fx = pixfx_effects::effect("fire/campfire").ok_or("fire/campfire is not registered")?;
+    let fx = pixfx_effects::effect("projectiles/trail").ok_or("projectiles/trail is not registered")?;
 
     // render one loop with options, glow room and no edge fade
     let mut opts = Options { seed: Some(7), light: 1.2, ..Options::default() };
     opts.palette = Some(vec![hex("#0d1033")?, hex("#3a62e0")?, hex("#ffffff")?]);
-    opts.extra.insert("height".into(), OptValue::Num(30.0));
+    opts.extra.insert("width".into(), OptValue::Num(5.0));
     let rendered = render_frames(fx, &amp;opts, fx.meta().glow_margin());
 
     let out = Path::new("out");
-    let files = write_sheet(&amp;rendered, fx.meta(), out, "blue_campfire")?;
-    write_gif(&amp;out.join("blue_campfire.gif"), &amp;rendered, 3)?;
+    let files = write_sheet(&amp;rendered, fx.meta(), out, "blue_trail")?;
+    write_gif(&amp;out.join("blue_trail.gif"), &amp;rendered, 3)?;
     println!("{}", files.json.display());
 
     // live: step an instance and draw it into a frame you own, the size of the canvas its options give it
@@ -80,7 +80,7 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
   <tbody>
     <tr><td><code>EFFECTS: &amp;[&amp;'static dyn Effect]</code></td><td>Every effect, in registry order.</td></tr>
     <tr><td><code>effect(id) -&gt; Option&lt;&amp;'static dyn Effect&gt;</code></td><td>Look one up by id.</td></tr>
-    <tr><td><code>fire::CANDLE</code>, <code>fire::CAMPFIRE</code>, <code>fire::BRAZIER</code></td><td>The effects as statics.</td></tr>
+    <tr><td><code>explosions::BODY_BURST</code>, <code>feedback::OUTLINE</code>, <code>feedback::POWER_UP</code>, <code>projectiles::TRAIL</code></td><td>The effects as statics.</td></tr>
   </tbody>
 </table>
 </div>
@@ -91,7 +91,7 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
 <table>
   <thead><tr><th>Item</th><th>What it is</th></tr></thead>
   <tbody>
-    <tr><td><code>trait Effect</code></td><td><code>meta() -&gt; &amp;Meta</code>, <code>canvas(&amp;Options) -&gt; Canvas</code> (the size and origin an instance with those options draws on: <code>meta.canvas()</code> unless the effect sizes it from its options, as weather does with <code>width</code> and <code>height</code>) and <code>spawn(&amp;Options, seed) -&gt; Box&lt;dyn EffectState&gt;</code>. See <a href="writing-effects.html">Write an effect</a>.</td></tr>
+    <tr><td><code>trait Effect</code></td><td><code>meta() -&gt; &amp;Meta</code>, <code>canvas(&amp;Options) -&gt; Canvas</code> (the size and origin an instance with those options draws on: <code>meta.canvas()</code> unless the effect sizes it from its options, as outline does with <code>w</code> and <code>h</code>) and <code>spawn(&amp;Options, seed) -&gt; Box&lt;dyn EffectState&gt;</code>. See <a href="writing-effects.html">Write an effect</a>.</td></tr>
     <tr><td><code>trait EffectState</code></td><td><code>update(dt)</code> for one simulation sub-step (default: nothing) and <code>draw(&amp;mut Painter, t, Layer)</code>.</td></tr>
     <tr><td><code>struct Meta</code></td><td><code>id, name, desc, tags, size, origin, duration, looping, fps, seed, state, options</code>; <code>is_screen()</code> and <code>glow_margin()</code>. See <a href="concepts.html#metadata">Concepts</a>.</td></tr>
     <tr><td><code>struct Options</code></td><td><code>x, y, flip, angle, seed: Option&lt;u64&gt;, light, palette: Option&lt;Vec&lt;Rgba&gt;&gt;, extra: BTreeMap&lt;String, OptValue&gt;</code>. <code>Default</code> is origin (0, 0), no flip, angle 0, effect seed, light 1, effect palette.</td></tr>

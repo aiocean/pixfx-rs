@@ -27,7 +27,7 @@
 <p class="lead">The ideas every pixfx package shares: effects and instances, the colour and light layers, back and front, origins and margins, time, and seeds.</p>
 
 <h2>Effects and instances</h2>
-<p>An <strong>effect</strong> is a static description: its metadata plus a way to spawn state. Effects are listed in one registry (<code>pixfx_effects::EFFECTS</code>) and looked up by id, a <code>category/name</code> string such as <code>fire/candle</code>.</p>
+<p>An <strong>effect</strong> is a static description: its metadata plus a way to spawn state. Effects are listed in one registry (<code>pixfx_effects::EFFECTS</code>) and looked up by id, a <code>category/name</code> string such as <code>feedback/outline</code>.</p>
 <p>An <strong>instance</strong> is one playing copy of an effect, with its own options, seed and clock. You can spawn any number of instances of the same effect.</p>
 
 <h3>Metadata</h3>
@@ -39,7 +39,7 @@
     <tr><td><code>id</code></td><td><code>category/name</code>.</td></tr>
     <tr><td><code>name</code>, <code>desc</code>, <code>tags</code></td><td>Display name, one-sentence description, search tags.</td></tr>
     <tr><td><code>size</code></td><td><code>[w, h]</code>: the effect's canvas in pixels.</td></tr>
-    <tr><td><code>origin</code></td><td><code>[x, y]</code>: where the effect's local (0, 0) sits on its canvas. For a fire, the point on the ground under it.</td></tr>
+    <tr><td><code>origin</code></td><td><code>[x, y]</code>: where the effect's local (0, 0) sits on its canvas. For an effect on a character, the point between its feet.</td></tr>
     <tr><td><code>duration</code></td><td>Seconds: one loop, or the whole one-shot.</td></tr>
     <tr><td><code>loop</code> (Rust <code>looping</code>)</td><td>Whether it loops. A one-shot holds its last moment and is done at <code>duration</code>.</td></tr>
     <tr><td><code>fps</code></td><td>Frame rate of exported sheets and GIFs. Live playback runs at any rate.</td></tr>
@@ -55,7 +55,7 @@
   <li><strong>Colour</strong>: ordinary pixels with alpha, drawn normally (source-over). Stored as one ABGR word per pixel, which is the byte order of <code>ImageData</code> in memory: R, G, B, A.</li>
   <li><strong>Light</strong>: additive glow, one xBGR word per pixel with the top byte unused. Light is added to whatever is underneath, saturating at 255 per channel.</li>
 </ul>
-<p>Keeping light separate is what lets a fire light up the ground and the sprites standing next to it. Every live renderer draws colour first, then light with additive blending (Canvas 2D <code>"lighter"</code>, Phaser <code>BlendModes.ADD</code>, gpui <code>SpriteBlend::Additive</code>).</p>
+<p>Keeping light separate is what lets an effect light up the ground and the sprites standing next to it. Every live renderer draws colour first, then light with additive blending (Canvas 2D <code>"lighter"</code>, Phaser <code>BlendModes.ADD</code>, gpui <code>SpriteBlend::Additive</code>).</p>
 <div class="note"><p>Additive light only shows over an opaque, darker background. Over a transparent target there is nothing to add to: the canvas renderer and the exports then turn light into colour whose alpha is its brightest channel, which reads correctly once composited over a dark ground. Phaser's WebGL renderer adds nothing over a transparent render target; see <a href="phaser.html#limitation-transparent-render-targets">Phaser</a>.</p></div>
 
 <h3>Compositing</h3>
@@ -72,7 +72,7 @@
   <li><strong>Back</strong>: what goes behind a character standing in the effect.</li>
   <li><strong>Front</strong>: everything else, drawn over the character.</li>
 </ul>
-<p>When drawing <code>Both</code>, back is drawn first, then front, into the same frame. An effect with nothing behind a character draws nothing for back. The three effects shipped today (candle, campfire, brazier) draw everything in front; the split is part of the effect contract, so an effect can wrap around a character.</p>
+<p>When drawing <code>Both</code>, back is drawn first, then front, into the same frame. An effect with nothing behind a character draws nothing for back. The split is part of the effect contract, so an effect can wrap around a character: <code>feedback/outline</code> draws its ring in back, <code>feedback/power-up</code> draws its aura on both sides.</p>
 <p>To put your own sprite inside an effect, draw the back layer, your sprite, then the front layer:</p>
 <pre><code>stage.update(dt);
 drawGround();
@@ -82,7 +82,7 @@ stage.drawLayer("front");</code></pre>
 <p>The Phaser plugin does the same with depths: its back images sit at one depth and front images at another, and you put your sprite between them.</p>
 
 <h2>Origin, placement and margin</h2>
-<p>When you play an effect "at" a point, that point is where the effect's <strong>origin</strong> lands. Its canvas extends from there by <code>-origin</code> to <code>size - origin</code>. The candle is 56×76 with origin (28, 64): its canvas reaches 28 pixels left, 28 right, 64 up and 12 down from the point you give.</p>
+<p>When you play an effect "at" a point, that point is where the effect's <strong>origin</strong> lands. Its canvas extends from there by <code>-origin</code> to <code>size - origin</code>. The power-up is 160×144 with origin (80, 104): its canvas reaches 80 pixels left, 80 right, 104 up and 40 down from the point you give.</p>
 <p>Positions are rounded to whole pixels as JavaScript's <code>Math.round</code> does.</p>
 <p>An instance can draw on a canvas bigger than <code>size</code> by a <strong>margin</strong> of empty pixels on every side. Light often spills past an effect's canvas, so:</p>
 <ul>
@@ -120,10 +120,9 @@ stage.drawLayer("front");</code></pre>
 
 <h3>Palettes and ramps</h3>
 <p>A ramp is a list of colours from dark to bright. Colours are <code>"#rgb"</code>, <code>"#rrggbb"</code> or <code>"#rrggbbaa"</code>, with or without the <code>#</code>; they are always opaque (alpha digits are ignored, as in pixelfx). A ramp of a different length from the default is resampled to the default's length, so a 3-colour ramp works on a 9-colour slot. An empty ramp falls back to the default.</p>
-<pre><code>stage.play("fire/campfire", 64, 112, {
-  palette: ["#0d1033", "#3a62e0", "#7fb4ff", "#ffffff"], // a blue fire
-  wood: ["#1a1a1a", "#4a4a4a"],                          // the campfire's own ramp
-  height: 30,                                            // the campfire's own number
+<pre><code>stage.play("projectiles/trail", 64, 112, {
+  palette: ["#ffffff", "#ffc23d", "#f2561d", "#4a1712"], // a hot trail, head to end
+  width: 5,                                              // the trail's own number
 });</code></pre>
 
 <h2>Determinism</h2>

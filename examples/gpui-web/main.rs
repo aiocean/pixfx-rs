@@ -1,4 +1,5 @@
-//! A candle and a campfire burning live in gpui, on a dark ground the campfire lights up.
+//! A trail streaking and a power-up rising on its stand-in body, live in gpui, on a dark ground. The power-up plays
+//! again each time it ends.
 //!
 //! `trunk serve --release` in this directory, then open http://127.0.0.1:8090 (`?backend=webgl` or
 //! `?backend=webgpu` forces a renderer). The console logs the frame rate every two seconds.
@@ -20,40 +21,48 @@ const GROUND: u32 = 0x1e1a24;
 /// Seconds between frame-rate log lines.
 const FPS_EVERY: f64 = 2.0;
 
-struct Campsite {
+struct Stage {
     /// The effects and the frames they paint from.
     fx: FxScene,
-    candle: FxHandle,
-    campfire: FxHandle,
+    trail: FxHandle,
+    power_up: &'static dyn Effect,
+    buff: FxHandle,
     last: Option<Instant>,
     frames: u32,
     since: Option<Instant>,
 }
 
-impl Campsite {
+impl Stage {
     fn new(
-        candle: &'static dyn Effect,
-        campfire: &'static dyn Effect,
+        trail: &'static dyn Effect,
+        power_up: &'static dyn Effect,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut fx = FxScene::default();
-        let candle = fx.play(candle, Options::default())?;
-        let campfire = fx.play(campfire, Options::default())?;
+        let trail = fx.play(trail, Options::default())?;
+        let buff = fx.play(power_up, Options::default())?;
         Ok(Self {
             fx,
-            candle,
-            campfire,
+            trail,
+            power_up,
+            buff,
             last: None,
             frames: 0,
             since: None,
         })
     }
 
-    /// Advance both effects by the real time since the last frame.
+    /// Advance both effects by the real time since the last frame, and play the power-up again once it ended.
     fn tick(&mut self, now: Instant) {
         if let Some(last) = self.last {
             let dt = now.duration_since(last).as_secs_f64();
             if let Err(error) = self.fx.tick(dt) {
                 log::error!("pixfx: failed to advance the effects: {error:#}");
+            }
+        }
+        if self.fx.done(self.buff) {
+            match self.fx.play(self.power_up, Options::default()) {
+                Ok(buff) => self.buff = buff,
+                Err(error) => log::error!("pixfx: failed to play the power-up again: {error:#}"),
             }
         }
         self.last = Some(now);
@@ -75,7 +84,7 @@ impl Campsite {
         }
     }
 
-    /// Sky, ground, and the two effects standing on the ground: candle left of centre, campfire right.
+    /// Sky, ground, and the two effects standing on the ground: the trail left of centre, the power-up right.
     fn paint(&mut self, bounds: Bounds<Pixels>, window: &mut Window) {
         window.paint_quad(fill(bounds, rgb(SKY)));
         let ground_y = (bounds.origin.y + bounds.size.height * 0.72).round();
@@ -93,7 +102,7 @@ impl Campsite {
                 ground_y,
             )
         };
-        for (fx, x) in [(self.candle, 0.3), (self.campfire, 0.62)] {
+        for (fx, x) in [(self.trail, 0.3), (self.buff, 0.62)] {
             if let Err(error) = self.fx.paint(fx, Layer::Both, at(x), SCALE, window) {
                 log::error!("pixfx: failed to paint an effect: {error:#}");
             }
@@ -104,15 +113,15 @@ impl Campsite {
     }
 }
 
-impl Render for Campsite {
+impl Render for Stage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.tick(Instant::now());
         window.request_animation_frame();
-        let campsite = cx.entity();
+        let stage = cx.entity();
         canvas(
             |_, _, _| {},
             move |bounds, _, window, cx| {
-                campsite.update(cx, |campsite, _| campsite.paint(bounds, window));
+                stage.update(cx, |stage, _| stage.paint(bounds, window));
             },
         )
         .size_full()
@@ -121,15 +130,15 @@ impl Render for Campsite {
 
 fn run(application: Application) {
     application.run(|cx: &mut App| {
-        let (Some(candle), Some(campfire)) = (
-            pixfx_effects::effect("fire/candle"),
-            pixfx_effects::effect("fire/campfire"),
+        let (Some(trail), Some(power_up)) = (
+            pixfx_effects::effect("projectiles/trail"),
+            pixfx_effects::effect("feedback/power-up"),
         ) else {
-            log::error!("pixfx: fire/candle or fire/campfire is missing from pixfx-effects");
+            log::error!("pixfx: projectiles/trail or feedback/power-up is missing from pixfx-effects");
             return;
         };
-        let campsite = match Campsite::new(candle, campfire) {
-            Ok(campsite) => campsite,
+        let stage = match Stage::new(trail, power_up) {
+            Ok(stage) => stage,
             Err(error) => {
                 log::error!("pixfx: failed to start the effects: {error}");
                 return;
@@ -141,7 +150,7 @@ fn run(application: Application) {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |_, cx| cx.new(|_| campsite),
+            |_, cx| cx.new(|_| stage),
         );
         if let Err(error) = opened {
             log::error!("pixfx: failed to open the window: {error:#}");

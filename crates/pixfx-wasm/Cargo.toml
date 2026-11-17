@@ -32,7 +32,7 @@ pixfx-effects = { path = "../pixfx-effects", default-features = false }
 [features]
 default = ["all", "fighter", "light", "mind"]
 # every effect. For fewer, build with --no-default-features and name the effects or categories of pixfx-effects:
-# --features pixfx-effects/fire-candle,pixfx-effects/explosions (EffectId then lists only those)
+# --features pixfx-effects/feedback-outline,pixfx-effects/explosions (EffectId then lists only those)
 all = ["pixfx-effects/all"]
 # pixfx-fighter for JS: `Body`, `FightFeel`, `Sprites`, `lookColors`. A game without fighters builds without it.
 fighter = ["dep:pixfx-fighter"]

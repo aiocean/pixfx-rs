@@ -14,3 +14,8 @@ crates/pixfx-canvas/demo/pkg/
 site/dist/
 .wrangler/
 site/arena/
+
+# agent sessions: worktrees and locks of Claude Code
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+node_modules/

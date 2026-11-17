@@ -298,7 +298,7 @@ impl FxScene {
     }
 
     /// Order `fx` to attack toward the point (`x`, `y`) in effect pixels from its own origin, at any distance: an
-    /// effect that takes orders (`arcane/sword-formation`) launches its volley ([`FxScene::launched`]), whose
+    /// effect that takes orders ([`pixfx_core::Effect::order`]) launches its volley ([`FxScene::launched`]), whose
     /// pieces strike the bodies they meet ([`FxScene::set_body`]) but `caster`, and ends once the last piece is
     /// done. False if it takes no orders, was ordered already, or is gone.
     pub fn order(

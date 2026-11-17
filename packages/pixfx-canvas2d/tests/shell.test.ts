@@ -85,13 +85,13 @@ const DEPTHS = { back: 0, front: 1 };
 
 test("an effect draws near where it plays, scaled, its colour normally then its light added", () => {
   const { stage, frame, draw } = setup(3);
-  stage.play("fire/candle", 30, 40, {}, null, DEPTHS);
+  stage.play("explosions/body-burst", 30, 40, {}, null, DEPTHS);
   frame();
   const drawn = draw(null);
   expect(drawn.length).toBeGreaterThan(0);
   expect(new Set(drawn.map((d) => d.op))).toEqual(new Set(["source-over", "lighter"]));
   for (const d of drawn) {
-    // a candle's flame sits on its origin, three canvas pixels to a game pixel
+    // the body about to burst stands on its origin, three canvas pixels to a game pixel
     expect(d.dx).toBeLessThanOrEqual(30 * 3);
     expect(d.dx + d.dw).toBeGreaterThan(30 * 3);
     expect(d.dy).toBeLessThan(40 * 3);
@@ -103,8 +103,9 @@ test("an effect draws near where it plays, scaled, its colour normally then its 
 
 test("a layer draws only its own depth; both draw back first", () => {
   const { stage, frame, draw } = setup();
-  stage.play("arcane/rune-circle", 30, 40, {}, null, DEPTHS);
-  frame();
+  // a power-up's aura draws behind and in front of the body it grips, once it has come in
+  stage.play("feedback/power-up", 30, 40, {}, null, DEPTHS);
+  for (let i = 0; i < 16; i++) frame();
   const back = draw(0).length;
   const front = draw(1).length;
   expect(back).toBeGreaterThan(0);
@@ -114,7 +115,7 @@ test("a layer draws only its own depth; both draw back first", () => {
 
 test("the pixels Rust painted reach the holder, colour on the left and light on the right", () => {
   const { stage, frame, draw } = setup();
-  stage.play("fire/candle", 30, 40, {}, null, DEPTHS);
+  stage.play("explosions/body-burst", 30, 40, {}, null, DEPTHS);
   frame();
   const lit = (d: Drawn): number => {
     let n = 0;
@@ -130,7 +131,7 @@ test("the pixels Rust painted reach the holder, colour on the left and light on 
 
 test("an effect removed draws nothing more", () => {
   const { stage, frame, draw } = setup();
-  const fx = stage.play("fire/candle", 30, 40, {}, null, DEPTHS);
+  const fx = stage.play("explosions/body-burst", 30, 40, {}, null, DEPTHS);
   frame();
   expect(draw(null).length).toBeGreaterThan(0);
   fx.destroy();

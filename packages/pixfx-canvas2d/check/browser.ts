@@ -1,5 +1,5 @@
 // `bun run check:browser`: in a clean Chrome, run the demo (painting on workers) and check what a player sees: the
-// fires show and animate, a paused loop holds them still, an explosion's cues shake the view, a view away from
+// effects show and animate, a paused loop holds them still, a body burst's cues shake the view, a view away from
 // the effects draws none of them, and `destroy()` leaves nothing drawn. Prints one line per check; exits 1 if any fails.
 import { spawn } from "node:child_process";
 import { join } from "node:path";
@@ -47,17 +47,17 @@ const PICTURE = `(() => {
   return { hash: h, lit };
 })()`;
 
-/** The view's shake each frame while an explosion plays out (5.4 s). */
+/** The view's shake each frame while a body burst plays out (3 s). */
 const SHAKE = `(async () => {
   const { pixfx, events } = window.pixfxCanvasDemo;
   let frames = 0, moved = 0, on = true;
   const watch = () => { if (!on) return; frames++; const [x, y] = pixfx.feel.shake; if (x !== 0 || y !== 0) moved++; requestAnimationFrame(watch); };
   requestAnimationFrame(watch);
-  pixfx.play("explosions/small-explosion", 168, 120).on("complete", () => events.push("explosion complete"));
-  await new Promise((r) => setTimeout(r, 6500));
+  pixfx.play("explosions/body-burst", 168, 120).on("complete", () => events.push("burst complete"));
+  await new Promise((r) => setTimeout(r, 4500));
   on = false;
   const [x, y] = pixfx.feel.shake;
-  return { frames, moved, rest: x === 0 && y === 0, complete: events.includes("explosion complete"), cues: events.filter((e) => e.startsWith("cue")).length };
+  return { frames, moved, rest: x === 0 && y === 0, complete: events.includes("burst complete"), cues: events.filter((e) => e.startsWith("cue")).length };
 })()`;
 
 const pictureSchema = z.object({ hash: z.number(), lit: z.number() });
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     await waitFor(b, "window.pixfxCanvasDemo !== undefined && window.pixfxCanvasDemo.events.includes('ready')", 30000);
     await Bun.sleep(1500);
     const a = await picture();
-    check("the fires show", a.lit > 2000, `${a.lit} pixels drawn by effects`);
+    check("the effects show", a.lit > 2000, `${a.lit} pixels drawn by effects`);
     await Bun.sleep(400);
     const a2 = await picture();
     check("they animate", a2.hash !== a.hash, "two pictures 400 ms apart differ");
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
     await b.evaluate("window.pixfxCanvasDemo.running = true, true");
     const s = z.object({ frames: z.number(), moved: z.number(), rest: z.boolean(), complete: z.boolean(), cues: z.number() }).parse(await b.evaluate(SHAKE));
     check(
-      "an explosion shakes the view, which comes to rest",
+      "a body burst shakes the view, which comes to rest",
       s.moved > 0 && s.rest && s.complete && s.cues > 0,
       `${s.moved}/${s.frames} frames shaken, at rest after: ${s.rest}, ${s.cues} cues, completed: ${s.complete}`,
     );
@@ -108,14 +108,14 @@ async function main(): Promise<void> {
       `${away.lit} effect pixels with the view away, ${back.lit} after clearView`,
     );
     const d = z
-      .object({ stats: z.object({ engines: z.number(), images: z.number() }).passthrough(), candle: z.boolean() })
-      .parse(await b.evaluate(`(() => { const { pixfx, events } = window.pixfxCanvasDemo; pixfx.destroy(); return { stats: pixfx.stats(), candle: events.includes("candle destroy") }; })()`));
+      .object({ stats: z.object({ engines: z.number(), images: z.number() }).passthrough(), outline: z.boolean() })
+      .parse(await b.evaluate(`(() => { const { pixfx, events } = window.pixfxCanvasDemo; pixfx.destroy(); return { stats: pixfx.stats(), outline: events.includes("outline destroy") }; })()`));
     await Bun.sleep(300);
     const after = await picture();
     check(
       "destroy() leaves nothing drawn",
-      d.stats.engines === 0 && d.stats.images === 0 && d.candle && after.lit === 0,
-      `stats ${JSON.stringify(d.stats)}; candle destroyed: ${d.candle}; ${after.lit} effect pixels after`,
+      d.stats.engines === 0 && d.stats.images === 0 && d.outline && after.lit === 0,
+      `stats ${JSON.stringify(d.stats)}; outline destroyed: ${d.outline}; ${after.lit} effect pixels after`,
     );
     const errors = b.takeErrors().filter((e) => !e.includes("favicon"));
     check("no page errors", errors.length === 0, JSON.stringify(errors));

@@ -35,22 +35,22 @@
 <pre><code>use pixfx_core::{Layer, Options};
 use pixfx_gpui::FxScene;
 
-let campfire = pixfx_effects::effect("fire/campfire").ok_or("missing")?;
+let power_up = pixfx_effects::effect("feedback/power-up").ok_or("missing")?;
 let mut fx = FxScene::default();
-let fire = fx.play(campfire, Options::default())?;
+let aura = fx.play(power_up, Options::default())?;
 
 // each frame
 fx.tick(dt_seconds)?;
 
 // inside a canvas paint callback
-fx.paint(fire, Layer::Both, origin, 4, window)?;
+fx.paint(aura, Layer::Both, origin, 4, window)?;
 fx.end_frame(window)?;</code></pre>
-<p><code>examples/gpui-web/main.rs</code> is a complete app: a candle and a campfire on a ground, ticked from <code>Instant::now()</code> and repainted every animation frame.</p>
+<p><code>examples/gpui-web/main.rs</code> is a complete app: effects on a ground, ticked from <code>Instant::now()</code> and repainted every animation frame.</p>
 
 <h2>API</h2>
 <p><code>FxScene</code> is the gpui shell over a <code>pixfx-scene</code> <code>Scene</code>: the scene decides which frame each effect shows, which frames are shared and when one leaves the atlas; <code>FxScene</code> uploads, paints and drops images.</p>
 <h3><code>FxScene::default()</code>, <code>FxScene::with_threads(n)</code></h3>
-<p><code>default()</code> paints each frame on the spot, on the window's thread. <code>with_threads(n)</code> (native only) paints on <code>n</code> threads: each effect is stepped, drawn and turned into images on one of them, and the window's thread only paints images. A frame shows from the window frame after it comes back; until then the effect shows the one it had, so an effect's first frame shows one window frame late. For windows with many effects at once: with 100 fires, the window's thread spends 1.4 ms a frame instead of 81 ms, and 5 threads paint a frame's layers in 30 ms (16 ms for 50 fires).</p>
+<p><code>default()</code> paints each frame on the spot, on the window's thread. <code>with_threads(n)</code> (native only) paints on <code>n</code> threads: each effect is stepped, drawn and turned into images on one of them, and the window's thread only paints images. A frame shows from the window frame after it comes back; until then the effect shows the one it had, so an effect's first frame shows one window frame late. For windows with many effects at once: with 100 effects, the window's thread spends 1.4 ms a frame instead of 81 ms, and 5 threads paint a frame's layers in 30 ms (16 ms for 50).</p>
 <h3><code>FxScene::play(effect, opts)</code></h3>
 <p>Play an effect on a canvas with <code>glow_margin</code> room on every side; returns its <code>FxHandle</code>.</p>
 <h3><code>FxScene::tick(dt)</code></h3>
@@ -61,7 +61,7 @@ fx.end_frame(window)?;</code></pre>
 <p>Paint <code>layer</code> with the effect's origin at <code>origin</code> (logical pixels), each effect pixel <code>scale</code>×<code>scale</code> logical pixels (0 paints as 1). Colour is painted with <code>SpriteBlend::Normal</code>, then light with <code>SpriteBlend::Additive</code>, both with <code>SpriteFilter::Nearest</code>. Call it during the paint phase.</p>
 <h3><code>end_frame(window)</code></h3>
 <p>Run once after every effect is painted. It drops from the atlas the images replaced or released this frame and, past the byte budget (<code>set_budget</code>, 64 MiB by default), the frames painted least recently, never one painted this frame. <code>bytes()</code> is what the shared frames hold.</p>
-<p>A frame is rasterised and uploaded only when no effect has painted it yet. Effects with the same options on the same frame paint the same images, wherever they stand, so twenty campfires cost one upload. Only the occupied rectangle of each layer is uploaded. An effect fading out after <code>stop</code> paints its own images, redrawn once per frame of its clock. Paint a scene into one window only.</p>
+<p>A frame is rasterised and uploaded only when no effect has painted it yet. Effects with the same options on the same frame paint the same images, wherever they stand, so twenty alike cost one upload. Only the occupied rectangle of each layer is uploaded. An effect fading out after <code>stop</code> paints its own images, redrawn once per frame of its clock. Paint a scene into one window only.</p>
 
 <h2>Web demo</h2>
 <pre><code>cd examples/gpui-web

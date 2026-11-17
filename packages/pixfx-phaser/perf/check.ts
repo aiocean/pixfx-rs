@@ -1,4 +1,4 @@
-// `bun run perf:check`: in a clean Chrome, check that the demo (default worker pool) shows its fires, that pausing
+// `bun run perf:check`: in a clean Chrome, check that the demo (default worker pool) shows its effects, that pausing
 // the scene freezes them, and that an effect drawn by a worker uploads exactly the bytes the main thread uploads
 // for the same effect, seed and steps, and that the camera culls: an effect off camera shows no image until the
 // camera scrolls onto it, and one fixed to the camera (scroll factor 0) shows wherever it scrolls. Prints one line per check; exits 1 if any fails.
@@ -52,7 +52,7 @@ const LIT_PIXELS = `(() => {
 })()`;
 
 /**
- * Play a candle far off camera and one fixed to the camera, count the visible pixfx images of each with the camera
+ * Play a power-up far off camera and one fixed to the camera, count the visible pixfx images of each with the camera
  * at the start and scrolled onto the far one, then put everything back.
  */
 const CAMERA_CULLS = `(async () => {
@@ -64,8 +64,8 @@ const CAMERA_CULLS = `(async () => {
     const all = images();
     return { far: all.filter((o) => o.x > 4000).length, fixed: all.filter((o) => o.scrollFactorX === 0).length };
   };
-  const far = s.pixfx.play("fire/candle", 5000, 5000, { seed: 11 });
-  const fixed = s.pixfx.play("fire/candle", 40, 40, { seed: 12, scrollFactor: 0 });
+  const far = s.pixfx.play("feedback/power-up", 5000, 5000, { seed: 11 });
+  const fixed = s.pixfx.play("feedback/power-up", 40, 40, { seed: 12, scrollFactor: 0 });
   await frames(30);
   const atStart = count();
   cam.setScroll(5000 - cam.width / 2, 5000 - cam.height / 2);
@@ -78,7 +78,7 @@ const CAMERA_CULLS = `(async () => {
 })()`;
 
 /**
- * Play fire/campfire (seed 3) in a game painting on the main thread and in one painting on a real worker, each
+ * Play feedback/power-up (seed 3) in a game painting on the main thread and in one painting on a real worker, each
  * with textures that record every fill, step both by the same scene times (the worker's game draws again once its
  * frames are back), and compare the filled sizes and bytes.
  */
@@ -107,8 +107,8 @@ const SAME_PIXELS = `(async () => {
   off.useTextures(b.texture);
   const sa = new Stage(inline, a.image, () => {}, 1);
   const sb = new Stage(off, b.image, () => {}, 1);
-  sa.play("fire/campfire", 50, 50, { seed: 3 }, 1);
-  sb.play("fire/campfire", 50, 50, { seed: 3 }, 1);
+  sa.play("feedback/power-up", 50, 50, { seed: 3 }, 1);
+  sb.play("feedback/power-up", 50, 50, { seed: 3 }, 1);
   const step = (game, stage, dt) => { stage.update(dt); stage.draw(); game.endFrame(); };
   for (let i = 0; i < 12; i++) {
     step(inline, sa, 1 / 12);
@@ -141,11 +141,11 @@ async function main(): Promise<void> {
     await Bun.sleep(1000);
     const stats = await b.evaluate("window.pixfxDemo.stats()");
     const lit = z.number().parse(await b.evaluate(LIT_PIXELS));
-    check("demo shows its fires", lit > 0, `${lit} non-transparent pixels in pixfx textures, stats ${JSON.stringify(stats)}`);
+    check("demo shows its effects", lit > 0, `${lit} non-transparent pixels in pixfx textures, stats ${JSON.stringify(stats)}`);
     const r1 = await screenshot(b);
     await Bun.sleep(400);
     const r2 = await screenshot(b);
-    check("running fires animate", r1 !== r2, "two screenshots 400 ms apart differ");
+    check("running effects animate", r1 !== r2, "two screenshots 400 ms apart differ");
     await b.evaluate("window.pixfxDemo.scene.scene.pause(), true");
     await Bun.sleep(300);
     const p1 = await screenshot(b);

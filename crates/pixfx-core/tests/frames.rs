@@ -12,7 +12,7 @@ fn id(index: u64) -> FrameId {
         light: 1.0,
     };
     FrameId {
-        key: ClipKey::new("fire/candle", &Options::default(), 0, place),
+        key: ClipKey::new("feedback/outline", &Options::default(), 0, place),
         index,
     }
 }

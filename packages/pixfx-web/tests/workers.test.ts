@@ -50,12 +50,12 @@ function setup(ports: LoopPort[]) {
 }
 
 /**
- * Play a candle (stopped at `stopAt`) for `steps` host frames of 1/30 s. With workers, each step's frames are
+ * Play a power-up (stopped at `stopAt`) for `steps` host frames of 1/30 s. With workers, each step's frames are
  * painted and delivered, then the scene draws again without time passing, so it shows the frames of that step.
  */
 function run(ports: LoopPort[], steps: number, stopAt: number) {
   const { gfx, game, stage } = setup(ports);
-  const fx = stage.play("fire/candle", 30, 40, { seed: 4 }, 1);
+  const fx = stage.play("feedback/power-up", 30, 40, { seed: 4 }, 1);
   const pictures: ReturnType<FakeGfx["picture"]>[] = [];
   for (let i = 0; i < steps; i++) {
     if (i === stopAt) fx.stop();
@@ -85,7 +85,7 @@ test("frames painted on workers show the same pixels at the same places as frame
 test("until a worker sends its frame back, an effect shows the last one it had", () => {
   const port = new LoopPort();
   const { gfx, game, stage } = setup([port]);
-  stage.play("fire/candle", 30, 40, {}, 1);
+  stage.play("feedback/power-up", 30, 40, {}, 1);
   stage.update(1 / 30);
   stage.draw();
   game.endFrame();
@@ -105,7 +105,7 @@ test("until a worker sends its frame back, an effect shows the last one it had",
 test("an effect is painted by one worker, which lets go of its state when it ends", () => {
   const ports = [new LoopPort(), new LoopPort()];
   const { game, stage } = setup(ports);
-  const fxs = [0, 1, 2, 3].map((i) => stage.play("fire/candle", 20 * i, 40, { seed: i }, 1));
+  const fxs = [0, 1, 2, 3].map((i) => stage.play("feedback/power-up", 20 * i, 40, { seed: i }, 1));
   for (let i = 0; i < 5; i++) {
     stage.update(1 / 30);
     stage.draw();
@@ -183,10 +183,14 @@ function jobKey(job: unknown): { scene: number; handle: number } {
   return { scene, handle };
 }
 
-test("an ordered volley's shots, painted on workers, show across the stage", () => {
+test("a trail the scene lays under a mover, painted on workers, shows back along the way it came and ends after it", () => {
   const ports = [new LoopPort(), new LoopPort()];
   const { gfx, game, stage } = setup(ports);
-  const fx = stage.play("arcane/sword-formation", 40, 100, {}, 1);
+  const mover = stage.play("feedback/power-up", 40, 100, {}, 1);
+  const tail = mover.trail("projectiles/trail", { secs: 0.3 });
+  if (!tail) throw new Error("no trail");
+  let ended = false;
+  tail.on("complete", () => (ended = true));
   const step = () => {
     stage.update(1 / 30);
     stage.draw();
@@ -196,17 +200,14 @@ test("an ordered volley's shots, painted on workers, show across the stage", () 
     stage.draw();
     game.endFrame();
   };
-  for (let i = 0; i < 40; i++) step();
-  let strikes = 0;
-  fx.on("strike", () => strikes++);
-  stage.setBody(1, 290, 60, 20, 40);
-  expect(fx.attack(300, 80)).toBe(true);
-  let farthest = 0;
-  for (let i = 0; i < 90; i++) {
+  for (let i = 1; i <= 20; i++) {
+    mover.setPosition(40 + 8 * i, 100);
     step();
-    for (const im of gfx.showing()) farthest = Math.max(farthest, im.shown?.x ?? 0);
   }
-  expect(farthest).toBeGreaterThan(250);
-  expect(strikes).toBe(8);
+  let leftmost = Number.POSITIVE_INFINITY;
+  for (const im of gfx.showing()) leftmost = Math.min(leftmost, im.shown?.x ?? Number.POSITIVE_INFINITY);
+  expect(leftmost).toBeLessThan(140);
+  mover.destroy();
+  for (let i = 0; i < 20; i++) step();
+  expect(ended).toBe(true);
 });
-

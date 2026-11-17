@@ -1,6 +1,6 @@
 ---
 name: pixfx-new-effect
-description: Use when the user asks for a new pixfx effect from an idea, often one sentence ("make a phoenix that dives at the enemy", "a sword formation round the character", "another shield like the lotus"), wants help designing or storyboarding an effect, or says they do not want to think the design through themselves. The entry point before pixfx-ref and pixfx-effect.
+description: Use when the user asks for a new pixfx effect from an idea, often one sentence ("the hero dissolves into ash when it dies", "an aura that grips the character as it powers up", "the sword leaves a smear as it swings"), wants help designing or storyboarding an effect, or says they do not want to think the design through themselves. The entry point before pixfx-ref and pixfx-effect.
 ---
 
 # A new pixfx effect, from an idea to the library
@@ -10,6 +10,14 @@ picks, sketch it, and bring the user only the few real forks, as choices with yo
 through the reference sheets (skill `pixfx-ref`) and the painter code (skill `pixfx-effect`), stopping at the
 checkpoints below. Run from `tools/pixfx-rs`.
 
+## 0. Does it read the sprite or its motion?
+
+An engine effect reads the sprite it plays on (its outline, its pixels, its colours: skill `pixfx-sprite-aware`) or
+the way it moved (its trace). An idea that reads neither (a fire, an explosion, a shield, a phoenix, a sword
+formation, weather) is turned away before any research: it is a sprite the game plays, drawn and animated as sprite
+art, not a pixfx effect. Say that in one line, and offer the version that reads the sprite if there is one (not "a
+shield" but "a rim of light that grips the character's outline when it blocks").
+
 ## The questions: propose, never interrogate
 
 Every question goes through `AskUserQuestion`, at most 3 at a time, and each one:
@@ -18,22 +26,20 @@ Every question goes through `AskUserQuestion`, at most 3 at a time, and each one
   seen);
 - has 2 to 4 options, **your pick first, marked "(Recommended)"**, each option saying what it changes in the effect;
 - shows the alternatives in `preview` when they look different: a few lines of text sketch (what each moment shows);
-- is a choice. "What style do you want?" makes the user design; "Gold spirit phoenix (Recommended) / Red fire
-  phoenix / Ice phoenix" lets them pick.
+- is a choice. "What style do you want?" makes the user design; "Gold ash (Recommended) / Grey dust / Ice
+  shards" lets them pick.
 
 A fork you can settle from the repo or from convention is not a question: decide it, and say it in one line in the
-storyboard ("Category: `fire`, next to `fire/brazier`").
+storyboard ("Category: `feedback`, next to `feedback/power-up`").
 
 ## 1. Research (no questions yet)
 
 - `rg -n -i '<idea words>' crates/pixfx-effects/src crates/pixfx-ref/examples/specs` and `target/ref/*/`: an effect
-  or a drawn sheet may already exist (`shield/sword-ring` was drawn and never written). Reuse what exists; say so.
-- The closest existing effects: their duration, size, origin, how their moments run. Read their files.
-- How the game will use it: the role table in `site/assets/effect-roles.js` (strike, projectile, ward, buff,
-  volley, ...).
-- Does it reach a target that may be far off (swords, arrows, talismans, a barrage)? Then the far part is not drawn
-  on the effect's own canvas: the effect takes an order and the scene flies its shots (the volley row below;
-  `arcane/sword-formation` is the worked example).
+  or a drawn sheet may already exist. Reuse what exists; say so.
+- The closest existing effects (`explosions/body-burst`, `feedback/outline`, `feedback/power-up`,
+  `projectiles/trail`): their duration, size, origin, how their moments run, how they read the sprite or the trace.
+  Read their files.
+- How the game will use it: the role table in `site/assets/effect-roles.js` (buff, death, trail, ...).
 
 ## 2. Storyboard: draft it whole
 
@@ -43,17 +49,11 @@ follow-through, a settle.
 
 | Role | Moments (beats) | Usual length |
 |---|---|---|
-| ward / shield | INIT (forms), IDLE (holds, loops), HIT (takes a blow), BREAK (ends) | 3 to 4 s one-shot |
-| strike on the foe | CAST (gathers, anticipation), TRAVEL or APPEAR, IMPACT (cue), AFTER (debris, fade) | 1 to 2 s |
-| projectile | SPAWN, FLY (loops), HIT | 0.5 s plus flight |
-| buff on the caster | GATHER, BURST (cue), AURA (loops), FADE | 1 s plus aura |
-| ambient | one LOOP | 1 to 4 s loop |
-| volley: hits a point at any distance when the game orders it | GATHER, HOLD (loops until ordered), then each SHOT flies (its own effect, the scene flies it), STRIKE (a hit effect where it lands, with the cue), SCATTER or spent | opening once, then a loop; the flight is the scene's |
-
-A volley is three effects: the formation that holds and is ordered, the piece that flies (drawn pointing along +x,
-no streak of its own: its trail is `projectiles/trail` swept along its real path, in its colours), and the strike
-played where a piece meets a body. Storyboard all three; the parts sheet holds the
-shot and the strike as parts.
+| buff on the caster: an aura gripping its outline | GATHER, BURST (cue), AURA (loops), FADE | 1 s plus aura |
+| death: the body breaks apart | SWELL (anticipation), BURST (cue), PIECES fly and settle, FADE | 2 to 3 s one-shot |
+| mark: the sprite ringed, lit or tinted | one LOOP, following each frame | 1 s loop |
+| trail: the way it moved, a smear of its body | follows the trace, shrinks once it stops | a loop while it moves |
+| appear / disappear: the sprite materialises or dissolves | GATHER, the sprite pixel by pixel, SETTLE | 0.5 to 1.5 s one-shot |
 
 The storyboard has these parts, in order, in your reply:
 
@@ -61,14 +61,14 @@ The storyboard has these parts, in order, in your reply:
 2. **Moments**: a table: moment, frames, seconds, a caption per frame.
 3. **Parts**: the main object, its pieces with the `forms` each takes (a wing folded, half open, spread, swept), the
    small effects, the light; a `pivot` for each piece that turns.
-4. **Exact in code**: counts, order, paths, spin ("8 swords, launched 0.1 s apart"). The image model will not keep
+4. **Exact in code**: counts, order, paths, spin ("12 shards, the head's first"). The image model will not keep
    these across sheets; the code will.
-5. **What the game sets**: where a blow lands (`hitX`, `hitY`), size, colour as options; a target that may be far off
-   as an **order** (`effect.attack(x, y, "converge" | "pierce")`), never a target option sized to the canvas.
+5. **What the game sets**: the sprite it wraps, size, colour as options.
 6. **Look**: palette (from a `pixfx_draw::palette` preset or the nearest effect), glow painted in steps
    (`pixfx_draw::halo`), category and id.
 7. **Scale**: each object's size against the ruler, as a body part and a ratio (skill `pixfx`, "One scale: the
-   ruler"): "the bell's rim 3 heads wide: 21 px", "each sword one blade: 16 px", "a talisman 2 hands tall: 4 px".
+   ruler"): "the aura reaches a head above the head: 7 px", "each shard 2 hands: 4 px", "the smear as tall as the
+   body: 40 px".
    Nothing under 1 px.
 8. **Cost**: sheets to draw (a parts sheet and one per moment, about $0.07 each).
 
@@ -101,7 +101,7 @@ even when the user's request names only some stops, or none. Every stop is the s
 | 2 | Parts sheet: template, `generate --dry-run`, draw, extract | `pixfx-ref` | the drawn sheet beside its template, and a link to `parts/review/index.html` (the cut cells, colour and light) |
 | 3 | Moment sheets, in parallel; extract; `whole` | `pixfx-ref` | `whole.gif`, `whole.png`, a link to each `<moment>/review/index.html`, and every drift from MAIN named (count, size, a cracked form too early) |
 | 4 | Painter code, a function per part; a held frame beside the sheet, a round per difference | `pixfx-effect` | the effect's gif beside `whole.gif`, and held frames beside the sheet frames they copy |
-| 5 | Options (`hitX`/`hitY`, targets), site role and sliders, bench | `pixfx-effect` | the gif at a few option values (`gif ... --num hitX=-20 --out target/ref/<slug>/opt-a`), the bench numbers |
+| 5 | Options, site role and sliders, bench | `pixfx-effect` | the gif at a few option values (`gif ... --num width=2 --out target/ref/<slug>/opt-a`), the bench numbers |
 | 6 | Goldens, CHANGELOG | `pixfx-effect` | what was blessed and the test output; bless only after the user said the look is right at stop 4 or 5 |
 | 7 | Commit | | only when asked; own hunks through a temporary index |
 
@@ -123,4 +123,4 @@ finished step now, open it, and stop there.
 | Taking a count or a motion from the sheets | Write it in code; say so in "Exact in code" |
 | Sizing an object by eye, or copying the sheet's size at 64 squares as engine pixels | Size it against the ruler (a part and a ratio, `Ruler::size`); a 64-square sheet draws 2/3 of engine size |
 | A new spec for something already drawn | Search `target/ref` and the specs first |
-| A `targetX`/`targetY` option for a foe that may stand far off (the canvas caps the reach) | An effect that takes orders: the game calls `attack(x, y, aim)` and the scene flies the shots (skill `pixfx-effect`, "Hit at any distance") |
+| Designing a fire, an explosion or a shield as an engine effect | Turn it away: it reads neither the sprite nor its motion, so it is sprite art the game plays (step 0) |

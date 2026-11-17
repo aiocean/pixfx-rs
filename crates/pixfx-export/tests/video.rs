@@ -15,7 +15,7 @@ fn sizes_are_scaled_and_even() {
 #[test]
 #[ignore = "runs ffmpeg"]
 fn mp4_has_every_frame() -> Result<(), String> {
-    let fx = pixfx_effects::effect("fire/campfire").ok_or("no fire/campfire")?;
+    let fx = pixfx_effects::effect("projectiles/trail").ok_or("no projectiles/trail")?;
     let r = render_frames(fx, &Options::default(), 0);
     let path = std::env::temp_dir().join(format!("pixfx-video-{}.mp4", std::process::id()));
     write_video(&path, &r, 3, 2).map_err(|e| e.to_string())?;

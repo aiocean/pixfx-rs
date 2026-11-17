@@ -3,20 +3,10 @@
 //! A disappear effect is always a one-shot. It plays at the object's last position and shows the
 //! object dissolving. When it ends, the object is gone from the scene.
 //!
-//! # Two kinds
+//! It always wraps the object's sprite (`Effect::wraps_actor` = true) and reads it: a flourish that does not
+//! read the sprite (a sparkle ring, a puff of smoke) is sprite art the game plays, not an effect here.
 //!
-//! ## Standalone (`Effect::wraps_actor` = false)
-//!
-//! The effect plays a visual flourish — a puff of smoke, a scatter of sparks — without reading the
-//! object's sprite. The game controls when the sprite is hidden.
-//!
-//! Game contract:
-//! 1. Hide the object's own sprite at the moment the effect's `desc` documents.
-//! 2. Play the effect at the object's last position.
-//!
-//! ## Sprite-reading (`Effect::wraps_actor` = true)
-//!
-//! The effect wraps the object's sprite and shows it dissolving (pixels scattering, fading out,
+//! It shows the sprite dissolving (pixels scattering, fading out,
 //! a shimmer wipe). The game hides the object's sprite when the effect starts.
 //!
 //! Game contract:
@@ -37,11 +27,8 @@
 //!
 //! | Category | Description |
 //! |---|---|
-//! | `spawn/` | A cloud or burst after a death/despawn; not wrapping the sprite. |
 //! | `appear/` | The entrance counterpart: plays as the object arrives. |
 //! | `explosions/body-burst` | Permanent violent destruction (`replaces_actor = true`). |
-//! | `transitions/` | Full-screen (16:9) scene wipes; not tied to one object. |
-
 #[cfg(feature = "disappear-fade")]
 mod fade;
 

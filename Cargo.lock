@@ -243,7 +243,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pixfx-body"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "pixfx-core",
@@ -255,7 +255,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "pixfx-draw",
@@ -266,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-draw"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "serde",
@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-effects"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "pixfx-core",
@@ -287,7 +287,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-export"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "gif",
  "libm",
@@ -302,7 +302,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-fighter"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "pixfx-core",
@@ -316,7 +316,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-light"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "pixfx-draw",
@@ -327,7 +327,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-mind"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "serde",
@@ -338,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-pixel"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "pixfx-draw",
@@ -348,7 +348,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-pose"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "pixfx-body",
@@ -361,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-ref"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "gif",
  "libm",
@@ -377,7 +377,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-scene"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libm",
  "pixfx-core",
@@ -391,7 +391,7 @@ dependencies = [
 
 [[package]]
 name = "pixfx-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "js-sys",
  "pixfx-core",

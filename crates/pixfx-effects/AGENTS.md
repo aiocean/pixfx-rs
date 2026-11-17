@@ -5,15 +5,16 @@ anything here; this file only says what this crate holds.
 
 ## Job
 
-The effects, as ports of pixelfx (https://github.com/patch-gg/pixelfx), or of Sprite Fusion's pixel art VFX
-(https://www.spritefusion.com/pixel-art-vfx) where pixelfx has no such effect, or made here when neither has it
-(`feedback/outline`). Each lives in its category folder
-(`src/fire/candle.rs`), is listed in `EFFECTS` and is looked up with `pixfx_effects::effect(id)`.
+The effects that read the sprite they play on (`pixfx_core::Silhouette`, `Actor`) or the way it moved
+(`pixfx_core::Trace`): `explosions/body-burst`, `feedback/outline`, `feedback/power-up` (a port of Sprite Fusion's
+pixel art VFX, https://www.spritefusion.com/pixel-art-vfx), `projectiles/trail`. `appear` and `disappear` are empty
+categories, kept for effects that read the sprite as it enters or leaves. Each effect lives in its category folder
+(`src/feedback/outline.rs`), is listed in `EFFECTS` and is looked up with `pixfx_effects::effect(id)`.
 
 ## Belongs here
 
-An effect: what it draws on each frame, its options and their defaults, its meta, and the cues it fires
-(through `pixfx_core::cue::impact`).
+An effect that reads the sprite it plays on or the way it moved: what it draws on each frame, its options and their
+defaults, its meta, and the cues it fires (through `pixfx_core::cue::impact`).
 
 ## Adding an effect
 
@@ -32,6 +33,7 @@ An effect: what it draws on each frame, its options and their defaults, its meta
 | is shared by several effects as particles, physics, cues or feel | `pixfx-core` |
 | decides where an effect plays, follows a sprite, fades after stop or picks the frame to show | `pixfx-scene` |
 | reads a clock, a file or a host | a shell |
+| reads neither the sprite nor its motion (a fire, an explosion, a shield, weather) | nowhere in the engine: it is sprite art the game plays |
 
 An effect never knows which shell shows it.
 
@@ -59,9 +61,9 @@ Working on one effect, build and test it alone (its id with `/` as `-` is its fe
 effects is left out, and the golden check covers that effect only:
 
 ```
-cargo test -p pixfx-effects --no-default-features --features fire-candle --all-targets
-cargo test -p pixfx-effects --no-default-features --features fire-candle --test determinism -- --ignored
-cargo run --release -p pixfx-effects --no-default-features --features fire-candle --example bench
+cargo test -p pixfx-effects --no-default-features --features feedback-outline --all-targets
+cargo test -p pixfx-effects --no-default-features --features feedback-outline --test determinism -- --ignored
+cargo run --release -p pixfx-effects --no-default-features --features feedback-outline --example bench
 ```
 
 A change shared by many effects (`lib` modules, a category's helpers) runs the same with the default `all`, and the

@@ -8,11 +8,14 @@ description: Use when drawing an effect's reference sheets with an image model a
 Effect references from an image model, in `tools/pixfx-rs`. The library is `crates/pixfx-ref` (pure: no files, no
 network); a script per step in `crates/pixfx-ref/examples/` does the I/O. The sheet is a **reference the agent
 reads**: you write the effect's painter code by hand in `pixfx-effects` (skill `pixfx-effect`). Nothing in the
-engine paints from what this crate extracts.
+engine paints from what this crate extracts. The effect it is for reads the sprite it plays on or the way it
+moved (skill `pixfx-new-effect`, step 0); a fire, an explosion or a shield is sprite art the game plays, not an
+engine effect.
 
 ## What works, and what does not
 
-Learned making the xianxia shields (2026-11-14 to 15):
+Learned making the xianxia shields (2026-11-14 to 15; the shields have since left the engine as effects that read no
+sprite, and their specs stay as worked examples):
 
 - **The model designs, the agent draws.** The model is good at the idea, the silhouette, the moments and the
   palette. It does not place pixels: copying its finished illustration into painter code came out muddy twice
@@ -26,7 +29,7 @@ Learned making the xianxia shields (2026-11-14 to 15):
   - a mid pink edge pixel, a white rim inside it and 2 to 3 pixels of glow outside;
   - white at the base and in a vein down the middle, pinker to the sides and deepest at the tip;
   - low contrast inside (neighbouring tones about 15 apart);
-  - tones mixed pixel by pixel where they meet (`lotus.rs` `bayer`), not hard bands.
+  - tones mixed pixel by pixel where they meet (an ordered Bayer dither), not hard bands.
 
   Read off the map which way each tone runs (along the part, across it, toward its edge) and what colour the edge
   pixel is. Where pieces overlap, a deep edge line keeps them apart: with a light edge they merge into one blob.
@@ -46,7 +49,7 @@ Learned making the xianxia shields (2026-11-14 to 15):
   and the prompt, it drew four rings in every moment after INIT (3 tries). Told "each rune lighting as it is
   written" and "the rings turn against each other", it drew whole rings popping in and rings standing still. Take
   the look from the sheets (a ring, a rune, the colours, how the glow is made) and write the count, the writing
-  order and the spin in code: `arcane/restriction` writes rune by rune and spins each ring exactly.
+  order and the spin in code: the restriction seal was written rune by rune, each ring spun exactly.
 - **Match the look by reading how the model makes it, not by turning numbers up.** Restriction looked thin, then
   blurred, beside the model's until its colour and light layers were read: the light layer was almost empty and
   every halo was opaque pixels in steps (white, pale, mid, dark, a dither) round each stroke. Painting the glow that
@@ -187,15 +190,15 @@ colour pickers that recolour every frame, to try a palette before writing it.
    far its halo reaches.
 6. A glow the sheet paints as steps of colour: stamp each stroke into a `pixfx_draw::halo::Halo` with a heat and a
    kind, `spread(fall)`, then paint each pixel with the ramp colour of its heat's step, dithering the last step
-   (`arcane/restriction.rs` `paint`). Keep additive light as a faint bloom on top. A grid per depth (behind and in
+   (`pixfx_draw::halo`). Keep additive light as a faint bloom on top. A grid per depth (behind and in
    front of the character), `Halo::none()` for the depth not being drawn.
 7. A blow the effect takes: let the game say where it lands with number options in local pixels from the feet
    (`hitX`, `hitY`, defaulting to where the sheet drew it), and derive everything from that point (which piece is
    struck, where its flare starts, which way it tilts, where sparks fly, where `impact` fires its cue). Try them with
    `gif ... --num hitX=-20 --num hitY=-48`.
-8. On the site, give a new effect with a blow its role and blow time in `site/assets/effect-roles.js` (a shield:
-   `role: "ward", blows: [<its HIT>], directional: true`, so the take flips it to face the striker), and its own
-   options sliders in `site/assets/effect.js` `OWN`.
+8. On the site, give a new effect with a blow its role and blow time in `site/assets/effect-roles.js` (`role`, and
+   `impact` or `blows` at its cue times; `directional: true` flips it to face the foe), and its own options sliders
+   in `site/assets/effect.js` `OWN`.
 
 ## Reading compare
 

@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn layers_painted_on_threads_are_the_images_painted_on_the_spot()
     -> Result<(), Box<dyn std::error::Error>> {
-        let fx = pixfx_effects::effect("fire/campfire").ok_or("no campfire")?;
+        let fx = pixfx_effects::effect("feedback/power-up").ok_or("no power-up")?;
         let clips: Vec<Clip> = (0..3)
             .map(|seed| {
                 Clip::live(
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn an_effect_ended_and_played_again_under_its_key_still_paints()
     -> Result<(), Box<dyn std::error::Error>> {
-        let fx = pixfx_effects::effect("fire/candle").ok_or("no candle")?;
+        let fx = pixfx_effects::effect("feedback/power-up").ok_or("no power-up")?;
         let clip = Clip::live(fx, Options::default());
         let mut threads = ThreadPainter::new(1)?;
         let effect = EffectKey {
@@ -357,19 +357,19 @@ mod tests {
         Ok(())
     }
 
-    /// How long `threads` threads take to paint one window frame's layers of `n` fires (median of 60 frames,
+    /// How long `threads` threads take to paint one window frame's layers of `n` effects (median of 60 frames,
     /// every effect at a new frame each time): under 16.7 ms they keep up at 60 fps.
     #[test]
     #[ignore = "a measurement: run in release with --ignored --nocapture"]
     fn bench_threads_keep_up() -> Result<(), Box<dyn std::error::Error>> {
         let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
         let n_threads = (cores / 2).max(1);
-        println!("| fires | {n_threads} threads, ms to paint a frame's layers |");
+        println!("| effects | {n_threads} threads, ms to paint a frame's layers |");
         println!("|---:|---:|");
         for n in [10usize, 25, 50, 100] {
             let clips: Vec<Clip> = (0..n)
                 .filter_map(|i| {
-                    let id = ["fire/candle", "fire/campfire", "fire/brazier"][i % 3];
+                    let id = ["feedback/power-up", "explosions/body-burst", "projectiles/trail"][i % 3];
                     let fx = pixfx_effects::effect(id)?;
                     Some(Clip::live(
                         fx,

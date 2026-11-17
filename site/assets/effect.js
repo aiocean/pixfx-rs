@@ -33,33 +33,12 @@ const PALETTES = ["default", "fire", "ice", "poison", "holy", "shadow", "arcane"
 
 /** Options each effect takes beyond the shared ones, for the controls. */
 const OWN = {
-  "fire/campfire": [{ key: "height", label: "Height", min: 8, max: 40, step: 1, value: 22 }],
-  // where the blow lands on the seal, from the feet (arcane/restriction.rs HIT_X, HIT_Y)
-  "arcane/restriction": [
-    { key: "hitX", label: "Hit x", min: -30, max: 30, step: 1, value: 22 },
-    { key: "hitY", label: "Hit y", min: -60, max: 0, step: 1, value: -29 },
-  ],
   // how long, wide and wavy the trail is (projectiles/trail.rs SECS, WIDTH, WAVE)
   "projectiles/trail": [
     { key: "secs", label: "Seconds", min: 0.02, max: 0.5, step: 0.01, value: 0.12 },
     { key: "width", label: "Width", min: 1, max: 7, step: 1, value: 3 },
     { key: "wave", label: "Wave", min: 0, max: 4, step: 0.1, value: 1.2 },
     { key: "turn", label: "Turn with it", min: 0, max: 1, step: 1, value: 0 },
-  ],
-  // where the blow lands on the mirror, from the feet (arcane/bagua_mirror.rs HIT_X, HIT_Y)
-  "arcane/sword-slash": [
-    { key: "size", label: "Size", min: 1, max: 3, step: 0.5, value: 2 },
-    { key: "hitX", label: "Hit x", min: -40, max: 40, step: 1, value: 0 },
-    { key: "hitY", label: "Hit y", min: -60, max: 0, step: 1, value: -22 },
-  ],
-  "arcane/bagua-mirror": [
-    { key: "hitX", label: "Hit x", min: -40, max: 40, step: 1, value: 26 },
-    { key: "hitY", label: "Hit y", min: -50, max: -5, step: 1, value: -26 },
-  ],
-  // where the blow lands on the dome, from the feet (shadow/blood_shield.rs HIT_X, HIT_Y)
-  "shadow/blood-shield": [
-    { key: "hitX", label: "Hit x", min: -60, max: 60, step: 1, value: 38 },
-    { key: "hitY", label: "Hit y", min: -90, max: 6, step: 1, value: -34 },
   ],
 };
 

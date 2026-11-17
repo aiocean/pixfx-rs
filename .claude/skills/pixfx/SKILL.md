@@ -5,10 +5,11 @@ description: Use when starting any work in pixfx-rs, the Rust pixel-effects engi
 
 # pixfx
 
-pixfx is a pixel render engine in Rust: effects (fire, explosions, shields), game feel (shake, hit-stop, flash,
-ripples, squash) and fighters, the same pixels natively, in wasm and on every shell. It ships as **source**: there
+pixfx is a pixel render engine in Rust: effects that read the sprite they play on or the way it moved (an outline,
+an aura, a body bursting apart, a trail), game feel (shake, hit-stop, flash, ripples, squash) and fighters, the same pixels natively, in wasm and on every shell. It ships as **source**: there
 is no binary and no package to install. You work inside this repo, import the crates or JS packages, build the wasm
-yourself, and run or edit scripts.
+yourself, and run or edit scripts. A fire, an explosion or a shield reads neither the sprite nor its motion: it is
+sprite art the game plays, not a pixfx effect.
 
 ## Which skill
 
@@ -53,7 +54,7 @@ Rust decides, a shell draws. Dependencies point down this table only.
 - Something thrown across the stage (an effect's pieces, at any distance): `pixfx_core::volley` plans it,
   `Scene::order` flies it and strikes it on the bodies the game declares; every shell gets it through `attack` and
   `setBody` / `FxScene::order` and `set_body`. Never a canvas sized to the distance.
-- Veins, lightning, cracks, roots: a branching tree from `pixfx_draw::growth` (`dbm`, `colonize_from` off a `Tree::path` you set, `murray` fork angles, `radii` + `stroke` for tapered tubes; `shadow/blood_shield.rs` is the worked example)
+- Veins, lightning, cracks, roots: a branching tree from `pixfx_draw::growth` (`dbm`, `colonize_from` off a `Tree::path` you set, `murray` fork angles, `radii` + `stroke` for tapered tubes)
 - A way to follow (a loop before the target, a ring, a spiral; growth laid along it): `pixfx_draw::path::Path`,
   read by pixels along it. Never a curve of an effect's own.
 - A streak or a trail: a brush swept along a path (`pixfx_draw::sweep`); how something moves: `pixfx_core::motion`

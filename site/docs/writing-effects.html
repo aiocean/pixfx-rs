@@ -27,69 +27,74 @@
 <p class="lead">An effect is a Rust static with metadata and a <code>spawn</code> function. This page shows its parts, the drawing API, the rules that keep it deterministic, and how to register and test it.</p>
 
 <h2>Anatomy</h2>
-<p>Effects live in <code>crates/pixfx-effects/src/&lt;category&gt;/&lt;name&gt;.rs</code>. The skeleton below follows <code>fire/candle.rs</code>:</p>
-<pre><code>use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options};
+<p>An effect here reads the sprite it plays on (<code>pixfx_core::Silhouette</code> and <code>Actor</code>) or the way it moved (<code>pixfx_core::Trace</code>). One that reads neither, such as a fire, an explosion or a shield, is sprite art the game plays, not an engine effect.</p>
+<p>Effects live in <code>crates/pixfx-effects/src/&lt;category&gt;/&lt;name&gt;.rs</code>. The skeleton below follows <code>feedback/outline.rs</code>:</p>
+<pre><code>use std::sync::Arc;
+
+use pixfx_core::{Actor, Area, Effect, EffectState, Layer, Meta, NumOpt, Options, Silhouette};
 use pixfx_draw::Painter;
 use pixfx_draw::color::Rgba;
 
-pub struct Ember;
-pub static EMBER: Ember = Ember;
+pub struct Rim;
+pub static RIM: Rim = Rim;
 
-const SIZE: NumOpt = NumOpt::new("size", 3.0).within(1.0, 8.0); // an option of its own, held to a range
+const WIDTH: NumOpt = NumOpt::new("width", 1.0).within(1.0, 3.0); // an option of its own, held to a range
 const META: Meta = Meta {
-    id: "fire/ember",
-    name: "Ember",
-    desc: "A single coal glowing and dimming.",
-    tags: &amp;["fire", "prop", "light", "loop"],
-    size: (40, 40),   // room for the glow's radius on every side of the origin
-    origin: (20, 24), // the point that lands where the caller plays it
+    id: "feedback/rim",
+    name: "Rim",
+    desc: "A light pulsing round the sprite it wraps.",
+    tags: &amp;["feedback", "outline", "light", "character", "loop"],
+    size: (128, 128), // room for the sprite and its glow on every side of the origin
+    origin: (64, 64), // the point that lands where the caller plays it
     duration: 2.0,    // seconds per loop (or of the one-shot)
     looping: true,
     fps: 30,
     seed: 1,
     state: None,
-    options: &amp;[SIZE.spec()],
+    options: &amp;[WIDTH.spec()],
 };
-const PALETTE: [Rgba; 3] = [
-    Rgba::hex24(0x4a1712),
-    Rgba::hex24(0xf2561d),
-    Rgba::hex24(0xffc23d),
-];
+const PALETTE: [Rgba; 2] = [Rgba::hex24(0x3a62e0), Rgba::hex24(0x7fb4ff)];
 
-impl Effect for Ember {
+impl Effect for Rim {
     fn meta(&amp;self) -&gt; &amp;Meta {
         &amp;META
     }
-    fn spawn(&amp;self, opts: &amp;Options, seed: u64) -&gt; Box&lt;dyn EffectState&gt; {
-        Box::new(State {
-            ramp: opts.palette_or(&amp;PALETTE),
-            size: opts.num(&amp;SIZE),
-            seed: seed as f64,
-        })
+    fn wraps_actor(&amp;self) -&gt; bool {
+        true // the scene hands it the sprite it plays on, every frame
+    }
+    fn spawn(&amp;self, opts: &amp;Options, _seed: u64) -&gt; Box&lt;dyn EffectState&gt; {
+        Box::new(State { ramp: opts.palette_or(&amp;PALETTE), width: opts.num(&amp;WIDTH) as u32, ring: Vec::new() })
     }
 }
 
 struct State {
     ramp: Vec&lt;Rgba&gt;,
-    size: f64,
-    seed: f64,
+    width: u32,
+    /// The cells round the sprite as it is now; none without one.
+    ring: Vec&lt;(i32, i32)&gt;,
 }
 
 impl EffectState for State {
+    fn set_actor(&amp;mut self, actor: Option&lt;Arc&lt;Actor&gt;&gt;) {
+        self.ring = actor.map_or_else(Vec::new, |a| {
+            let pad = self.width as i32;
+            let area = Area { x: a.x() - pad, y: a.y() - pad, w: a.w() + 2 * self.width, h: a.h() + 2 * self.width };
+            Silhouette::of(&amp;a, area).ring(self.width, false).collect()
+        });
+    }
     fn draw(&amp;self, p: &amp;mut Painter, t: f64, layer: Layer) {
-        if layer == Layer::Back {
-            return; // nothing behind the character
+        if layer != Layer::Back {
+            return; // off the body: the sprite drawn over it hides none of it
         }
         // 0..1, one period per `duration` (2 s), so the loop closes exactly
-        let k = 0.5 + 0.5 * libm::sin(t * core::f64::consts::PI + self.seed);
-        let last = self.ramp.len().saturating_sub(1);
-        let pick = (k * last as f64) as usize; // dark to bright as it glows
-        let Some(&amp;c) = self.ramp.get(pick.min(last)) else {
+        let k = 0.5 + 0.5 * libm::sin(t * core::f64::consts::PI);
+        let Some(&amp;c) = self.ramp.get(usize::from(k &gt; 0.5)) else {
             return;
         };
-        let s = self.size;
-        p.rect(-s, -s, s * 2.0, s * 2.0, c, 1.0);
-        p.glow(0.0, 0.0, 10.0, c, 0.6 * k); // light is additive, drawn into the light layer
+        for &amp;(x, y) in &amp;self.ring {
+            p.px(f64::from(x), f64::from(y), c);
+            p.glow(f64::from(x), f64::from(y), 3.0, c, 0.3 * k); // light is additive, drawn into the light layer
+        }
     }
 }</code></pre>
 <p>Draw in local space: (0, 0) is the effect's origin, y grows downward. The instance places, mirrors and rotates the painter before calling <code>draw</code>, and applies fade-out and the <code>light</code> option, so the effect never handles them.</p>
@@ -111,7 +116,7 @@ impl EffectState for State {
   </tbody>
 </table>
 </div>
-<p>Shared building blocks for fire (flame tongues, licks, sparks, embers, smoke puffs, floor light) are in <code>crates/pixfx-effects/src/fire/lib.rs</code>.</p>
+<p>Code two effects of a category share goes in that category's <code>lib.rs</code>; code every effect can use goes down to <code>pixfx-draw</code> or <code>pixfx-core</code>.</p>
 
 <h2>Rules</h2>
 <p>These keep native and wasm builds bit-identical and are enforced by the compiler and clippy:</p>
@@ -126,21 +131,21 @@ impl EffectState for State {
 <h2>Register it</h2>
 <p>Each effect has its own cargo feature, the id with <code>/</code> as <code>-</code>, so a game builds only the effects it plays. <code>tests/features.rs</code> fails if one of these is missing:</p>
 <ol>
-  <li>In the category's <code>mod.rs</code> (for example <code>src/fire/mod.rs</code>): <code>#[cfg(feature = "fire-ember")] mod ember;</code> and <code>#[cfg(feature = "fire-ember")] pub use ember::EMBER;</code>.</li>
-  <li>In <code>crates/pixfx-effects/Cargo.toml</code>: <code>fire-ember = []</code>, and add it to its category feature (<code>fire</code>), which is in <code>all</code>.</li>
-  <li>In <code>crates/pixfx-effects/src/lib.rs</code>: <code>#[cfg(feature = "fire-ember")] &amp;fire::EMBER,</code> in <code>EFFECTS</code>. The order there is the order <code>effects()</code> returns.</li>
+  <li>In the category's <code>mod.rs</code> (for example <code>src/feedback/mod.rs</code>): <code>#[cfg(feature = "feedback-rim")] mod rim;</code> and <code>#[cfg(feature = "feedback-rim")] pub use rim::RIM;</code>.</li>
+  <li>In <code>crates/pixfx-effects/Cargo.toml</code>: <code>feedback-rim = []</code>, and add it to its category feature (<code>feedback</code>), which is in <code>all</code>.</li>
+  <li>In <code>crates/pixfx-effects/src/lib.rs</code>: <code>#[cfg(feature = "feedback-rim")] &amp;feedback::RIM,</code> in <code>EFFECTS</code>. The order there is the order <code>effects()</code> returns.</li>
 </ol>
 <p>Check once with every effect built: <code>cargo test -p pixfx-effects --test features</code>. Every renderer, the scripts and the JS shells pick it up from the registry; nothing else needs changing.</p>
 
 <h2>Test it</h2>
 <p>Build and test the effect alone, behind its feature, so nothing else compiles or runs:</p>
-<pre><code>cargo test -p pixfx-effects --no-default-features --features fire-ember --all-targets
-PIXFX_BLESS=1 cargo test -p pixfx-effects --no-default-features --features fire-ember --test determinism -- --ignored
-cargo test -p pixfx-effects --no-default-features --features fire-ember --test determinism -- --ignored
-cargo run -p pixfx-export --example gif -- fire/ember --scale 4
-cargo run --release -p pixfx-effects --no-default-features --features fire-ember --example bench</code></pre>
+<pre><code>cargo test -p pixfx-effects --no-default-features --features feedback-rim --all-targets
+PIXFX_BLESS=1 cargo test -p pixfx-effects --no-default-features --features feedback-rim --test determinism -- --ignored
+cargo test -p pixfx-effects --no-default-features --features feedback-rim --test determinism -- --ignored
+cargo run -p pixfx-export --example gif -- feedback/rim --scale 4
+cargo run --release -p pixfx-effects --no-default-features --features feedback-rim --example bench</code></pre>
 <ol>
-  <li>Look at the gif (<code>target/out/fire_ember.gif</code>) before you bless: blessing records what is drawn, right or wrong. Blessing with one effect built rewrites only its entry in <code>tests/goldens/frame_hashes.json</code>.</li>
+  <li>Look at the gif (<code>target/out/feedback_rim.gif</code>) before you bless: blessing records what is drawn, right or wrong. Blessing with one effect built rewrites only its entry in <code>tests/goldens/frame_hashes.json</code>.</li>
   <li>A change shared by many effects (<code>pixfx-core</code>, <code>pixfx-draw</code>, a category's <code>lib.rs</code>) runs the same tests without the feature flags, and the wasm check once: <code>wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignored</code>.</li>
 </ol>
     </main>

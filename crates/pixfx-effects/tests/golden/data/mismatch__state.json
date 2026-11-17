@@ -1,5 +1,0 @@
-{
-  "cues": [],
-  "act": null,
-  "state": { "set": "bloater", "name": "hurt", "order": 2, "next": "critters/bloater-idle", "carry": ["hits"] }
-}

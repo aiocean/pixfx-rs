@@ -1,5 +1,5 @@
 // `bun run check:browser`: in a clean Chrome, run the demo (painting on workers) and check what a player sees: the
-// fires show and animate, stopping the ticker freezes them, an explosion's cues shake the camera and the camera
+// effects show and animate, stopping the ticker freezes them, a body burst's cues shake the camera and the camera
 // comes back, a view away from the effects draws none of them, and `destroy()` leaves no sprite behind. Prints one line per check; exits 1 if any fails.
 import { spawn } from "node:child_process";
 import { join } from "node:path";
@@ -47,7 +47,7 @@ const PICTURE = `(() => {
   return { hash: hash(withFx), lit };
 })()`;
 
-/** Where the camera sits before the step and as it is rendered, while an explosion plays out (5.4 s). */
+/** Where the camera sits before the step and as it is rendered, while a body burst plays out (3 s). */
 const SHAKE = `(async () => {
   const { app, pixfx, world, events } = window.pixfxPixiDemo;
   const rest = [];
@@ -56,23 +56,23 @@ const SHAKE = `(async () => {
   const during = () => shown.push([world.x, world.y, world.rotation]);
   app.ticker.add(before, undefined, 10);
   app.ticker.add(during, undefined, -20);
-  pixfx.play("explosions/small-explosion", 168, 120).on("complete", () => events.push("explosion complete"));
-  await new Promise((r) => setTimeout(r, 6500));
+  pixfx.play("explosions/body-burst", 168, 120).on("complete", () => events.push("burst complete"));
+  await new Promise((r) => setTimeout(r, 4500));
   app.ticker.remove(before);
   app.ticker.remove(during);
   const moved = shown.filter(([x, y, r]) => x !== 0 || y !== 0 || r !== 0).length;
   const still = rest.every(([x, y, r]) => x === 0 && y === 0 && r === 0);
-  return { frames: shown.length, moved, still, complete: events.includes("explosion complete"), cues: events.filter((e) => e.startsWith("cue")).length };
+  return { frames: shown.length, moved, still, complete: events.includes("burst complete"), cues: events.filter((e) => e.startsWith("cue")).length };
 })()`;
 
 const DESTROY = `(() => {
   const { pixfx, events } = window.pixfxPixiDemo;
   const before = pixfx.container.children.length;
   pixfx.destroy();
-  return { before, after: pixfx.container.children.length, stats: pixfx.stats(), candle: events.includes("candle destroy") };
+  return { before, after: pixfx.container.children.length, stats: pixfx.stats(), outline: events.includes("outline destroy") };
 })()`;
 
-/** How many pixels of the screen the effects' sprites change (the game's own figure in the container left in). */
+/** How many pixels of the screen the effects' sprites change (the game's own figures in the container left in). */
 const EFFECT_PIXELS = `(() => {
   const { app, pixfx } = window.pixfxPixiDemo;
   const shot = () => app.renderer.extract.pixels({ target: app.stage, frame: app.screen }).pixels;
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
     await waitFor(b, "window.pixfxPixiDemo !== undefined && window.pixfxPixiDemo.events.includes('ready')", 30000);
     await Bun.sleep(1500);
     const a = pictureSchema.parse(await b.evaluate(PICTURE));
-    check("the fires show", a.lit > 2000, `${a.lit} pixels change when the effects are hidden`);
+    check("the effects show", a.lit > 2000, `${a.lit} pixels change when the effects are hidden`);
     await Bun.sleep(400);
     const a2 = pictureSchema.parse(await b.evaluate(PICTURE));
     check("they animate", a2.hash !== a.hash, "two renders 400 ms apart differ");
@@ -119,7 +119,7 @@ async function main(): Promise<void> {
       .object({ frames: z.number(), moved: z.number(), still: z.boolean(), complete: z.boolean(), cues: z.number() })
       .parse(await b.evaluate(SHAKE));
     check(
-      "an explosion shakes the camera, which comes back",
+      "a body burst shakes the camera, which comes back",
       s.moved > 0 && s.still && s.complete && s.cues > 0,
       `${s.moved}/${s.frames} rendered frames moved, camera at rest before every step: ${s.still}, ${s.cues} cues, completed: ${s.complete}`,
     );
@@ -135,12 +135,12 @@ async function main(): Promise<void> {
       `${away} pixels drawn by effects with the view away, ${back} after clearView`,
     );
     const d = z
-      .object({ before: z.number(), after: z.number(), stats: z.object({ engines: z.number(), images: z.number() }).passthrough(), candle: z.boolean() })
+      .object({ before: z.number(), after: z.number(), stats: z.object({ engines: z.number(), images: z.number() }).passthrough(), outline: z.boolean() })
       .parse(await b.evaluate(DESTROY));
     check(
-      "destroy() leaves only the game's own sprite",
-      d.after === 1 && d.stats.engines === 0 && d.stats.images === 0 && d.candle,
-      `${d.before} children before, ${d.after} after; stats ${JSON.stringify(d.stats)}; candle destroyed: ${d.candle}`,
+      "destroy() leaves only the game's own figures",
+      d.after === 1 && d.stats.engines === 0 && d.stats.images === 0 && d.outline,
+      `${d.before} children before, ${d.after} after; stats ${JSON.stringify(d.stats)}; outline destroyed: ${d.outline}`,
     );
     const errors = b.takeErrors().filter((e) => !e.includes("favicon"));
     check("no page errors", errors.length === 0, JSON.stringify(errors));

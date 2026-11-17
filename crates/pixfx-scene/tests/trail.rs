@@ -31,7 +31,7 @@ fn trail_box(path: &[(f64, f64)]) -> Result<(u32, u32), Box<dyn Error>> {
     let mut frames: Frames<Frame, InlinePainter> = Frames::default();
     let mut s: Scene<Frame> = frames.scene(std::num::NonZeroU32::MIN);
     let (x0, y0) = path.first().copied().ok_or("no path")?;
-    let mover = s.play(clip("fire/candle", &[])?, x0, y0)?;
+    let mover = s.play(clip("feedback/power-up", &[])?, x0, y0)?;
     let tail = s
         .trail(
             mover,
@@ -104,8 +104,8 @@ fn a_fast_mover_leaves_a_longer_trail_than_a_slow_one() -> Res {
 fn a_trail_ends_soon_after_its_mover_and_an_effect_that_draws_no_trace_is_refused() -> Res {
     let mut frames: Frames<Frame, InlinePainter> = Frames::default();
     let mut s: Scene<Frame> = frames.scene(std::num::NonZeroU32::MIN);
-    let mover = s.play(clip("fire/candle", &[])?, 0.0, 0.0)?;
-    assert_eq!(s.trail(mover, clip("fire/candle", &[])?)?, None);
+    let mover = s.play(clip("feedback/power-up", &[])?, 0.0, 0.0)?;
+    assert_eq!(s.trail(mover, clip("feedback/power-up", &[])?)?, None);
     assert_eq!(s.trail(999, clip("projectiles/trail", &[])?)?, None);
     let tail = s
         .trail(mover, clip("projectiles/trail", &[("secs", 0.2)])?)?

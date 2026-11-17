@@ -873,7 +873,7 @@ impl JsScene {
             .map_err(js_err)
     }
 
-    /// Order an effect that takes orders (`arcane/sword-formation`) to attack toward world (`x`, `y`): `aim` is
+    /// Order an effect that takes orders ([`pixfx_core::Effect::order`]) to attack toward world (`x`, `y`): `aim` is
     /// `"converge"` (every piece curves onto the line through the point and bursts on the first body it meets) or
     /// `"pierce"` (straight at it and on, through every body) or `"orbit"` (round the point on a ring, then in as
     /// converge). Each strike comes back as a `"strike"` event naming

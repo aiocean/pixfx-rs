@@ -1,7 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
+- Effects: pixfx keeps only effects that read the sprite they play on (`Silhouette`, `Actor`) or the way it moved
+  (`Trace`): `disappear/fade`, `explosions/body-burst`, `feedback/outline`, `feedback/power-up` and `projectiles/trail`,
+  with an empty `appear` category for sprite-reading entrances. Every other effect is removed: the
+  fires, the explosions, the shields (`arcane/hex-shield`, `holy/golden-bell`, `holy/lotus`, `arcane/bagua-mirror`
+  and its forms, `shadow/blood-shield`, ...), the swords and the sword formation, the impacts, `projectiles/laser-bolt`,
+  `spawn/poof`, weather, transitions and the Free pack, 56 ids in all. An effect that reads neither the sprite nor its
+  motion is a sprite the game plays, drawn and animated as sprite art; the rule is in `AGENTS.md` and the
+  `pixfx-effect` and `pixfx-new-effect` skills. The site's own fx is now a trail behind the pointer (no click burst,
+  button poof or burn between pages), its effect pages stage the effects left, and `site/tests/bout.test.js`
+  stages the roles no effect plays today with stand-ins. The arena still plays removed ids through the engine; its
+  duel needs those as sprite sheets (it draws four that way already) or an older engine.
 - Effects: `disappear/fade`, the first disappear effect. It wraps a sprite, swells it a little (`grow`) and fades it
   into light (`whiten`), its edges first and its heart last, over 0.45 s: a soft exit where `explosions/body-burst`
   blows a body apart. It follows the sprite it is handed each frame, so a shape still spinning keeps spinning as it
@@ -11,8 +22,6 @@
   it). The defaults (1, 1, 0.2) draw as before. A pointed, soft tail: `taper` 0, `soft` 0.15, `breakup` 1.
 - Drawing: `sweep::Look` has `soft`, the age from which a streak is blended translucent toward its end instead of
   dithered away (1 for none, as every effect had it).
-- Goldens: `impacts/hit` and `disappear/fade` pinned.
-
 - Arena: the duel is its own project, `game-factory/projects/arena` (arena.aiocean.io), with its history: the rules
   (`pixfx-duel`), their Python module, the trainer, the duel's page code and its own wasm (`arena-wasm`), on this
   engine through path dependencies. `pixfx-wasm` has no `duel` feature and `pixfx-canvas2d` no duel exports: the

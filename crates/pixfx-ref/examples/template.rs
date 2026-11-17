@@ -6,7 +6,7 @@
 //! `target/ref/<slug>/parts`), then `--moment NAME` for each moment (its layer rows, in `target/ref/<slug>/<moment>`),
 //! with `--parts` the drawn parts sheet, copied in as `parts.png` for `generate` to send along. Writes into `--out` (default `target/ref/<slug>`, plus the moment): `template.png` (the labelled cells with the guide figure),
 //! `sheet.json` (its grid), `prompt.txt`, and `style.png`: frame `--style-frame` of effect `--style` (default
-//! frame 46 of `arcane/hex-shield`, a square round its origin over a night background, drawn 3x), which shows the
+//! frame 60 of `feedback/power-up`, a square round its origin over a night background, drawn 3x), which shows the
 //! model pixfx's pixel size and look. Read `prompt.txt` before spending money on it.
 
 mod common;
@@ -37,12 +37,12 @@ fn run() -> Result<(), String> {
     let parts_sheet = args.flag("--parts-sheet");
     let style = args
         .value("--style")?
-        .unwrap_or_else(|| "arcane/hex-shield".into());
+        .unwrap_or_else(|| "feedback/power-up".into());
     let frame: usize = match args.value("--style-frame")? {
         Some(v) => v
             .parse()
             .map_err(|_| format!("--style-frame {v}: not a whole number"))?,
-        None => 46,
+        None => 60,
     };
     let rest = args.rest(1..=1)?;
     let spec = read_spec(&PathBuf::from(&rest[0]))?;

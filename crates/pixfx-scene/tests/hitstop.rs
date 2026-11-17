@@ -16,8 +16,8 @@ type Res = Result<(), Box<dyn Error>>;
 
 const FRAME: f64 = 1.0 / 60.0;
 
-fn candle() -> Result<Clip, Box<dyn Error>> {
-    let fx = effect("fire/candle").ok_or("fire/candle not registered")?;
+fn buff() -> Result<Clip, Box<dyn Error>> {
+    let fx = effect("feedback/power-up").ok_or("feedback/power-up not registered")?;
     Ok(Clip::live(fx, Options::default()))
 }
 
@@ -46,10 +46,10 @@ fn t(scene: &Scene<Frame>, h: u32) -> Result<f64, Box<dyn Error>> {
 fn a_marked_effect_plays_on_while_the_rest_freeze() -> Res {
     let mut scene = scene()?;
     let hitter = scene.play(Clip::live(&HITTER, Options::default()), 0.0, 0.0)?;
-    let candle = scene.play(candle()?, 0.0, 0.0)?;
-    assert!(scene.set_plays_through_hitstop(candle, true));
+    let buff = scene.play(buff()?, 0.0, 0.0)?;
+    assert!(scene.set_plays_through_hitstop(buff, true));
     until_frozen(&mut scene)?;
-    let (t_hitter, t_candle) = (t(&scene, hitter)?, t(&scene, candle)?);
+    let (t_hitter, t_buff) = (t(&scene, hitter)?, t(&scene, buff)?);
     for _ in 0..5 {
         assert_eq!(
             scene.update(FRAME)?,
@@ -59,7 +59,7 @@ fn a_marked_effect_plays_on_while_the_rest_freeze() -> Res {
     }
     assert_eq!(t(&scene, hitter)?, t_hitter, "unmarked: frozen");
     assert!(
-        (t(&scene, candle)? - (t_candle + 5.0 * FRAME)).abs() < 1e-9,
+        (t(&scene, buff)? - (t_buff + 5.0 * FRAME)).abs() < 1e-9,
         "marked: plays real time"
     );
     Ok(())
@@ -69,28 +69,28 @@ fn a_marked_effect_plays_on_while_the_rest_freeze() -> Res {
 fn the_effect_that_fires_the_stop_can_play_through_it() -> Res {
     let mut scene = scene()?;
     let hitter = scene.play(Clip::live(&HITTER, Options::default()), 0.0, 0.0)?;
-    let candle = scene.play(candle()?, 0.0, 0.0)?;
+    let buff = scene.play(buff()?, 0.0, 0.0)?;
     assert!(scene.set_plays_through_hitstop(hitter, true));
     until_frozen(&mut scene)?;
-    let (t_hitter, t_candle) = (t(&scene, hitter)?, t(&scene, candle)?);
+    let (t_hitter, t_buff) = (t(&scene, hitter)?, t(&scene, buff)?);
     for _ in 0..3 {
         scene.update(FRAME)?;
     }
     assert!(t(&scene, hitter)? > t_hitter, "the hit spark plays on");
-    assert_eq!(t(&scene, candle)?, t_candle, "the rest holds");
+    assert_eq!(t(&scene, buff)?, t_buff, "the rest holds");
     Ok(())
 }
 
 #[test]
 fn slow_motion_slows_a_marked_effect_too() -> Res {
     let mut scene = scene()?;
-    let candle = scene.play(candle()?, 0.0, 0.0)?;
-    assert!(scene.set_plays_through_hitstop(candle, true));
+    let buff = scene.play(buff()?, 0.0, 0.0)?;
+    assert!(scene.set_plays_through_hitstop(buff, true));
     scene.update(FRAME)?;
     scene.feel_mut().ok_or("no feel")?.slow(1.0, 0.5);
-    let before = t(&scene, candle)?;
+    let before = t(&scene, buff)?;
     scene.update(FRAME)?;
-    assert!((t(&scene, candle)? - (before + 0.5 * FRAME)).abs() < 1e-9);
+    assert!((t(&scene, buff)? - (before + 0.5 * FRAME)).abs() < 1e-9);
     Ok(())
 }
 
@@ -98,14 +98,14 @@ fn slow_motion_slows_a_marked_effect_too() -> Res {
 fn unmarking_freezes_it_again_and_an_unknown_handle_is_false() -> Res {
     let mut scene = scene()?;
     scene.play(Clip::live(&HITTER, Options::default()), 0.0, 0.0)?;
-    let candle = scene.play(candle()?, 0.0, 0.0)?;
-    assert!(scene.set_plays_through_hitstop(candle, true));
-    assert!(scene.set_plays_through_hitstop(candle, false));
+    let buff = scene.play(buff()?, 0.0, 0.0)?;
+    assert!(scene.set_plays_through_hitstop(buff, true));
+    assert!(scene.set_plays_through_hitstop(buff, false));
     assert!(!scene.set_plays_through_hitstop(999, true));
     until_frozen(&mut scene)?;
-    let held = t(&scene, candle)?;
+    let held = t(&scene, buff)?;
     scene.update(FRAME)?;
-    assert_eq!(t(&scene, candle)?, held);
+    assert_eq!(t(&scene, buff)?, held);
     Ok(())
 }
 

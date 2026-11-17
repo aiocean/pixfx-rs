@@ -27,7 +27,7 @@ with each step's change measured as entropy.
 
 `examples/` holds a script per step (`template`, `generate`, `extract`, `compare`, `gallery`), sharing
 `examples/common/mod.rs`, and `examples/specs/`: the eleven xianxia shields (grid sheets with parts; `shield/lotus.json`
-is the worked example, built as `holy/lotus`) and `TEMPLATE.json`. The skill `.claude/skills/pixfx-ref/SKILL.md`
+is the worked example) and `TEMPLATE.json`. The skill `.claude/skills/pixfx-ref/SKILL.md`
 is the agent's guide.
 
 ## Belongs here

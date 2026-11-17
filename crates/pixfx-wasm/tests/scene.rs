@@ -13,8 +13,8 @@ use pixfx_wasm::scene::{
 
 type Res = Result<(), Box<dyn Error>>;
 
-fn candle() -> Result<Clip, Box<dyn Error>> {
-    let fx = effect("fire/candle").ok_or("fire/candle not registered")?;
+fn buff() -> Result<Clip, Box<dyn Error>> {
+    let fx = effect("feedback/power-up").ok_or("feedback/power-up not registered")?;
     Ok(Clip::live(fx, Options::default()))
 }
 
@@ -35,7 +35,7 @@ fn kinds(list: &[i32]) -> Vec<i32> {
 fn the_first_draw_makes_each_surface_before_showing_it() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(2)?);
-    let clip = candle()?;
+    let clip = buff()?;
     scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     let list = scene.draw_ops(&mut frames)?;
@@ -55,7 +55,7 @@ fn the_first_draw_makes_each_surface_before_showing_it() -> Res {
 fn a_surface_is_shown_where_its_lit_pixels_land() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(3)?);
-    let clip = candle()?;
+    let clip = buff()?;
     let h = scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     let rect = scene.scene().rect(h).ok_or("no rect")?;
@@ -78,7 +78,7 @@ fn a_surface_is_shown_where_its_lit_pixels_land() -> Res {
 fn a_hit_stop_paints_nothing_new() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(1)?);
-    let clip = candle()?;
+    let clip = buff()?;
     scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     scene.draw_ops(&mut frames)?;
@@ -126,7 +126,7 @@ impl Host {
     }
 }
 
-/// Play the same candle in `frames` and draw `steps` host frames of 1/30 s, painting jobs on a worker when there
+/// Play the same power-up in `frames` and draw `steps` host frames of 1/30 s, painting jobs on a worker when there
 /// are any; returns the colour bytes of every surface shown in the last draw, as the host holds them.
 fn shown_pixels(
     frames: &mut Frames,
@@ -136,7 +136,7 @@ fn shown_pixels(
     let mut scene = Scene::new(frames, scale(1)?);
     let mut worker = Painting::default();
     let mut host = Host::default();
-    let clip = candle()?;
+    let clip = buff()?;
     let h = scene.play_clip(clip, 30.0, 40.0)?;
     let mut last = Vec::new();
     for step in 0..steps {
@@ -149,7 +149,7 @@ fn shown_pixels(
         host.apply(&list, frames, None)?;
         let (jobs, _) = frames.take_jobs();
         for job in &jobs {
-            let clip = candle()?;
+            let clip = buff()?;
             let cut = Cut::of(worker.paint_with(job, || Some(clip)).ok_or("not painted")?);
             let list = scene.deliver_ops(frames, job.job, cut.shape)?;
             host.apply(&list, frames, Some(&cut.color))?;
@@ -170,7 +170,7 @@ fn shown_pixels(
 fn a_shape_that_does_not_fit_the_frame_asked_for_is_refused() -> Res {
     let mut frames = Frames::with(true);
     let mut scene = Scene::new(&mut frames, scale(1)?);
-    let clip = candle()?;
+    let clip = buff()?;
     scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     scene.draw_ops(&mut frames)?;
@@ -203,7 +203,7 @@ fn frames_painted_on_a_worker_equal_frames_painted_on_the_spot() -> Res {
 fn every_surface_made_is_freed_once_the_scene_clears() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(1)?);
-    let clip = candle()?;
+    let clip = buff()?;
     let h = scene.play_clip(clip, 30.0, 40.0)?;
     let mut all = Vec::new();
     for step in 0..10 {

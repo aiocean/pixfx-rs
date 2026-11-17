@@ -27,7 +27,7 @@ fn features() -> BTreeMap<&'static str, Vec<&'static str>> {
         .collect()
 }
 
-/// The feature that compiles in the effect with this id (`fire/candle` is `fire-candle`).
+/// The feature that compiles in the effect with this id (`feedback/outline` is `feedback-outline`).
 fn feature_of(id: &str) -> String {
     id.replace('/', "-")
 }
@@ -36,10 +36,12 @@ fn feature_of(id: &str) -> String {
 fn each_effect_has_its_own_feature_and_each_effect_feature_an_effect() {
     let features = features();
     let ids: BTreeSet<String> = EFFECTS.iter().map(|e| feature_of(e.meta().id)).collect();
-    // an effect feature turns on nothing else; group features list their members
+    let categories = features.get("all").cloned().unwrap_or_default();
+    // an effect feature turns on nothing else; group features list their members, and a category with no effect yet
+    // (`appear`) lists none
     let effect_features: BTreeSet<String> = features
         .iter()
-        .filter(|(_, members)| members.is_empty())
+        .filter(|(name, members)| members.is_empty() && !categories.contains(name))
         .map(|(name, _)| (*name).to_string())
         .collect();
     assert_eq!(ids, effect_features);
@@ -68,6 +70,10 @@ fn each_category_lists_exactly_its_effects_and_all_lists_every_category() {
         .get("all")
         .map(|m| m.iter().copied().collect())
         .unwrap_or_default();
-    assert_eq!(all, categories.keys().copied().collect());
+    // every category with effects is in `all`; the rest of `all` are categories with none yet
+    assert!(categories.keys().all(|c| all.contains(c)), "`all` misses a category");
+    for c in all.iter().filter(|c| !categories.contains_key(*c)) {
+        assert_eq!(features.get(c), Some(&vec![]), "feature `{c}` is in `all` but no category");
+    }
     assert_eq!(features.get("default"), Some(&vec!["all"]));
 }

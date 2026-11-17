@@ -1,6 +1,6 @@
 [package]
 name = "pixfx-effects"
-description = "Pixel-art effects ported from pixelfx, as pixfx-core effects"
+description = "Pixel-art effects that read the sprite they play on or the way it moved, as pixfx-core effects"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,90 +13,19 @@ pixfx-draw = { path = "../pixfx-draw" }
 [features]
 default = ["all"]
 # every effect; a game that needs a few builds with default-features = false and names them
-all = ["appear", "arcane", "critters", "disappear", "explosions", "feedback", "fire", "holy", "ice", "impacts", "lightning", "nature", "pickups", "projectiles", "scifi", "shadow", "spawn", "transitions", "water", "weather"]
+all = ["appear", "disappear", "explosions", "feedback", "projectiles"]
 # a category: every effect in it
 appear = []
 disappear = ["disappear-fade"]
-arcane = ["arcane-bagua-mirror", "arcane-bagua-mirror-burst", "arcane-bagua-mirror-flying", "arcane-bagua-mirror-strike", "arcane-hex-shield", "arcane-restriction", "arcane-flying-sword", "arcane-held-sword", "arcane-rune-circle", "arcane-sword-formation", "arcane-sword-slash", "arcane-sword-strike", "arcane-blade-pinwheel", "arcane-comet-rings", "arcane-comma-seal", "arcane-shuriken-seal", "arcane-vortex-ring", "arcane-twin-shuriken"]
-critters = ["critters-wisp"]
-explosions = ["explosions-body-burst", "explosions-dirt-explosion", "explosions-implosion", "explosions-plasma-explosion", "explosions-small-explosion", "explosions-swirl-blast", "explosions-puff-burst"]
-feedback = ["feedback-heal-sparkle", "feedback-outline", "feedback-power-up"]
-fire = ["fire-brazier", "fire-campfire", "fire-candle", "fire-spirit-flame"]
-holy = ["holy-feather-burst", "holy-golden-bell", "holy-lotus"]
-ice = ["ice-icicle-fall"]
-impacts = ["impacts-hit", "impacts-parry", "impacts-star-converge", "impacts-twin-converge"]
-lightning = ["lightning-ball-lightning"]
-nature = ["nature-poison-cloud"]
-pickups = ["pickups-coin-spin"]
-projectiles = ["projectiles-laser-bolt", "projectiles-trail", "projectiles-drop-dart"]
-scifi = ["scifi-jetpack"]
-shadow = ["shadow-blood-gush", "shadow-blood-shield", "shadow-void-orb", "shadow-winter-ordeal"]
-spawn = ["spawn-poof", "spawn-swirl-portal"]
-transitions = ["transitions-burn-away", "transitions-crt-off"]
-water = ["water-splash", "water-water-jet"]
-weather = ["weather-fireflies", "weather-snow"]
-# one effect each, named after its id with the / as - (fire/candle is fire-candle)
-arcane-bagua-mirror = []
-arcane-bagua-mirror-burst = []
-arcane-bagua-mirror-flying = []
-arcane-bagua-mirror-strike = []
-arcane-flying-sword = []
-arcane-held-sword = []
-arcane-hex-shield = []
-arcane-restriction = []
-arcane-rune-circle = []
-arcane-sword-formation = []
-arcane-sword-slash = []
-arcane-sword-strike = []
-critters-wisp = []
+explosions = ["explosions-body-burst"]
+feedback = ["feedback-outline", "feedback-power-up"]
+projectiles = ["projectiles-trail"]
+# one effect each, named after its id with the / as - (feedback/outline is feedback-outline)
 disappear-fade = []
 explosions-body-burst = []
-explosions-dirt-explosion = []
-explosions-implosion = []
-explosions-plasma-explosion = []
-explosions-small-explosion = []
-feedback-heal-sparkle = []
 feedback-outline = []
 feedback-power-up = []
-fire-brazier = []
-fire-campfire = []
-fire-candle = []
-fire-spirit-flame = []
-holy-feather-burst = []
-holy-golden-bell = []
-holy-lotus = []
-ice-icicle-fall = []
-impacts-hit = []
-impacts-parry = []
-lightning-ball-lightning = []
-nature-poison-cloud = []
-pickups-coin-spin = []
-projectiles-laser-bolt = []
 projectiles-trail = []
-scifi-jetpack = []
-shadow-blood-gush = []
-shadow-blood-shield = []
-shadow-void-orb = []
-shadow-winter-ordeal = []
-spawn-poof = []
-transitions-burn-away = []
-transitions-crt-off = []
-water-splash = []
-water-water-jet = []
-weather-fireflies = []
-weather-snow = []
-arcane-blade-pinwheel = []
-arcane-comet-rings = []
-arcane-comma-seal = []
-arcane-shuriken-seal = []
-arcane-vortex-ring = []
-arcane-twin-shuriken = []
-explosions-swirl-blast = []
-explosions-puff-burst = []
-impacts-star-converge = []
-impacts-twin-converge = []
-projectiles-drop-dart = []
-spawn-swirl-portal = []
 
 [lints]
 workspace = true
@@ -107,7 +36,7 @@ name = "bench"
 test = true
 
 # Tests about named effects run when those effects are built, so one effect builds and tests alone:
-# `cargo test -p pixfx-effects --no-default-features --features fire-candle`.
+# `cargo test -p pixfx-effects --no-default-features --features feedback-outline`.
 [[test]]
 name = "features"
 required-features = ["all"]
@@ -115,22 +44,6 @@ required-features = ["all"]
 [[test]]
 name = "body_burst"
 required-features = ["explosions-body-burst"]
-
-[[test]]
-name = "data_helper"
-required-features = ["fire-candle"]
-
-[[test]]
-name = "fire"
-required-features = ["fire-campfire"]
-
-[[test]]
-name = "water"
-required-features = ["water-water-jet"]
-
-[[test]]
-name = "weather_size"
-required-features = ["weather-fireflies", "weather-snow"]
 
 [dev-dependencies]
 wasm-bindgen-test = "=0.3.80"

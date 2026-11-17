@@ -16,7 +16,7 @@ fn place() -> Placement {
 }
 
 fn key(opts: &Options, margin: u32, place: Placement) -> ClipKey {
-    ClipKey::new("fire/candle", opts, margin, place)
+    ClipKey::new("feedback/outline", opts, margin, place)
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn every_input_changes_the_key() -> Result<(), String> {
     if key(&base, 1, place()) == k0 {
         return Err("margin does not change the key".into());
     }
-    if ClipKey::new("fire/campfire", &base, 0, place()) == k0 {
+    if ClipKey::new("projectiles/trail", &base, 0, place()) == k0 {
         return Err("the effect does not change the key".into());
     }
     let p = place();

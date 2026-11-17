@@ -24,65 +24,16 @@
     <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
     <main class="doc">
 <h1>Effect catalog</h1>
-<p class="lead">Every effect in the registry, with its metadata and the options it takes. All effects also take the common options <code>seed</code>, <code>flip</code>, <code>angle</code> and <code>light</code>; see <a href="concepts.html#options">Options</a>.</p>
-<p>Effects are listed in registry order, the order <code>effects()</code> returns. Open any of them in the <a href="../effects/">effects gallery</a> to see it live.</p>
+<p class="lead">pixfx keeps only effects that read the sprite they play on, or the way it moved. Each takes the common options <code>seed</code>, <code>flip</code>, <code>angle</code> and <code>light</code>; see <a href="concepts.html#options">Options</a>.</p>
+<p>An effect that reads neither, such as a fire, an explosion or a shield, is not an engine effect: it is sprite art the game plays. Open any effect below in the <a href="../effects/">effects gallery</a> to see it live, with its size, origin, options and tags as the engine reports them.</p>
 
-<h2>Candle</h2>
-<p><code>fire/candle</code>. A wax candle in a brass dish: a calm flame with a blue root that sways and stretches, a halo of light, motes drifting in it, a bead of wax running down a drip.</p>
-<div class="table-wrap"><table><tbody>
-  <tr><th scope="row">Size</th><td>56×76 px</td></tr>
-  <tr><th scope="row">Origin</th><td>(28, 64)</td></tr>
-  <tr><th scope="row">Glow margin</th><td>38 px</td></tr>
-  <tr><th scope="row">Duration</th><td>4 s, looping</td></tr>
-  <tr><th scope="row">Frames per sheet</th><td>120 at 30 fps</td></tr>
-  <tr><th scope="row">Default seed</th><td>2</td></tr>
-  <tr><th scope="row">Layers</th><td>Front only: nothing is drawn behind a character.</td></tr>
-  <tr><th scope="row">Tags</th><td>fire, candle, prop, light, calm, ambient, loop</td></tr>
+<div class="table-wrap"><table><thead><tr><th>Effect</th><th>Reads</th><th>What it does</th></tr></thead><tbody>
+  <tr><td><a href="../effects/effect.html?id=explosions/body-burst"><code>explosions/body-burst</code></a></td><td>the sprite</td><td>The character blows apart into chunks of its own sprite that crack smaller as they fly, down to dust. The game removes the sprite when it starts.</td></tr>
+  <tr><td><a href="../effects/effect.html?id=feedback/outline"><code>feedback/outline</code></a></td><td>the sprite</td><td>A ring round the sprite it wraps, following each frame: to read a character over busy ground, or to show what is picked.</td></tr>
+  <tr><td><a href="../effects/effect.html?id=feedback/power-up"><code>feedback/power-up</code></a></td><td>the sprite</td><td>A buff: streaks drawn in, the character flashing, then an aura gripping its outline and licking upward.</td></tr>
+  <tr><td><a href="../effects/effect.html?id=projectiles/trail"><code>projectiles/trail</code></a></td><td>its motion</td><td>The streak a mover leaves along the way it came, longer the faster it went. Played on a character it smears that body's back edge.</td></tr>
 </tbody></table></div>
-<h3>Options</h3><div class="table-wrap"><table><thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead><tbody>
-  <tr><td><code>palette</code></td><td><span class="swatches" role="img" aria-label="9 colours: #4a1712, #8a1f17, #c9281f, #f2561d, #ff8a2a, #ffc23d, #ffe26b, #fff3a6, #ffffff"><span style="background:#4a1712" title="#4a1712"></span><span style="background:#8a1f17" title="#8a1f17"></span><span style="background:#c9281f" title="#c9281f"></span><span style="background:#f2561d" title="#f2561d"></span><span style="background:#ff8a2a" title="#ff8a2a"></span><span style="background:#ffc23d" title="#ffc23d"></span><span style="background:#ffe26b" title="#ffe26b"></span><span style="background:#fff3a6" title="#fff3a6"></span><span style="background:#ffffff" title="#ffffff"></span></span> <span class="muted">9 colours</span></td><td>Flame, dark to bright.</td></tr>
-  <tr><td><code>root</code></td><td><span class="swatches" role="img" aria-label="3 colours: #1b2a8a, #3a62e0, #7fb4ff"><span style="background:#1b2a8a" title="#1b2a8a"></span><span style="background:#3a62e0" title="#3a62e0"></span><span style="background:#7fb4ff" title="#7fb4ff"></span></span> <span class="muted">3 colours</span></td><td>The blue root of the flame.</td></tr>
-  <tr><td><code>wax</code></td><td><span class="swatches" role="img" aria-label="6 colours: #2e201e, #5e4436, #8e6e58, #b8957a, #d8b896, #f0dcc0"><span style="background:#2e201e" title="#2e201e"></span><span style="background:#5e4436" title="#5e4436"></span><span style="background:#8e6e58" title="#8e6e58"></span><span style="background:#b8957a" title="#b8957a"></span><span style="background:#d8b896" title="#d8b896"></span><span style="background:#f0dcc0" title="#f0dcc0"></span></span> <span class="muted">6 colours</span></td><td>The candle's wax.</td></tr>
-  <tr><td><code>brass</code></td><td><span class="swatches" role="img" aria-label="5 colours: #2a1a10, #6a4a1e, #b4862e, #e8c060, #fff0b0"><span style="background:#2a1a10" title="#2a1a10"></span><span style="background:#6a4a1e" title="#6a4a1e"></span><span style="background:#b4862e" title="#b4862e"></span><span style="background:#e8c060" title="#e8c060"></span><span style="background:#fff0b0" title="#fff0b0"></span></span> <span class="muted">5 colours</span></td><td>The dish.</td></tr>
-</tbody></table></div>
-
-<h2>Campfire</h2>
-<p><code>fire/campfire</code>. Crossed logs on a bed of coals and a lively fire: tongues that lick and leap, popping sparks, embers drifting up, smoke curling off, a warm pool of light.</p>
-<div class="table-wrap"><table><tbody>
-  <tr><th scope="row">Size</th><td>128×128 px</td></tr>
-  <tr><th scope="row">Origin</th><td>(64, 112)</td></tr>
-  <tr><th scope="row">Glow margin</th><td>64 px</td></tr>
-  <tr><th scope="row">Duration</th><td>3 s, looping</td></tr>
-  <tr><th scope="row">Frames per sheet</th><td>90 at 30 fps</td></tr>
-  <tr><th scope="row">Default seed</th><td>3</td></tr>
-  <tr><th scope="row">Layers</th><td>Front only: nothing is drawn behind a character.</td></tr>
-  <tr><th scope="row">Tags</th><td>fire, campfire, prop, light, smoke, ambient, loop</td></tr>
-</tbody></table></div>
-<h3>Options</h3><div class="table-wrap"><table><thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead><tbody>
-  <tr><td><code>palette</code></td><td><span class="swatches" role="img" aria-label="9 colours: #4a1712, #8a1f17, #c9281f, #f2561d, #ff8a2a, #ffc23d, #ffe26b, #fff3a6, #ffffff"><span style="background:#4a1712" title="#4a1712"></span><span style="background:#8a1f17" title="#8a1f17"></span><span style="background:#c9281f" title="#c9281f"></span><span style="background:#f2561d" title="#f2561d"></span><span style="background:#ff8a2a" title="#ff8a2a"></span><span style="background:#ffc23d" title="#ffc23d"></span><span style="background:#ffe26b" title="#ffe26b"></span><span style="background:#fff3a6" title="#fff3a6"></span><span style="background:#ffffff" title="#ffffff"></span></span> <span class="muted">9 colours</span></td><td>Flame, dark to bright.</td></tr>
-  <tr><td><code>wood</code></td><td><span class="swatches" role="img" aria-label="6 colours: #0e080a, #24130f, #3b2216, #5a3520, #8a5a34, #b9884f"><span style="background:#0e080a" title="#0e080a"></span><span style="background:#24130f" title="#24130f"></span><span style="background:#3b2216" title="#3b2216"></span><span style="background:#5a3520" title="#5a3520"></span><span style="background:#8a5a34" title="#8a5a34"></span><span style="background:#b9884f" title="#b9884f"></span></span> <span class="muted">6 colours</span></td><td>Logs.</td></tr>
-  <tr><td><code>height</code></td><td><code>22</code></td><td>Flame height in pixels.</td></tr>
-</tbody></table></div>
-
-<h2>Brazier</h2>
-<p><code>fire/brazier</code>. An iron bowl on a tripod heaped with glowing coals and a big roaring fire, sparks and embers streaming up off it, light on the iron and the floor.</p>
-<div class="table-wrap"><table><tbody>
-  <tr><th scope="row">Size</th><td>112×148 px</td></tr>
-  <tr><th scope="row">Origin</th><td>(56, 136)</td></tr>
-  <tr><th scope="row">Glow margin</th><td>74 px</td></tr>
-  <tr><th scope="row">Duration</th><td>3 s, looping</td></tr>
-  <tr><th scope="row">Frames per sheet</th><td>90 at 30 fps</td></tr>
-  <tr><th scope="row">Default seed</th><td>8</td></tr>
-  <tr><th scope="row">Layers</th><td>Front only: nothing is drawn behind a character.</td></tr>
-  <tr><th scope="row">Tags</th><td>fire, brazier, prop, light, sparks, ambient, loop</td></tr>
-</tbody></table></div>
-<h3>Options</h3><div class="table-wrap"><table><thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead><tbody>
-  <tr><td><code>palette</code></td><td><span class="swatches" role="img" aria-label="9 colours: #4a1712, #8a1f17, #c9281f, #f2561d, #ff8a2a, #ffc23d, #ffe26b, #fff3a6, #ffffff"><span style="background:#4a1712" title="#4a1712"></span><span style="background:#8a1f17" title="#8a1f17"></span><span style="background:#c9281f" title="#c9281f"></span><span style="background:#f2561d" title="#f2561d"></span><span style="background:#ff8a2a" title="#ff8a2a"></span><span style="background:#ffc23d" title="#ffc23d"></span><span style="background:#ffe26b" title="#ffe26b"></span><span style="background:#fff3a6" title="#fff3a6"></span><span style="background:#ffffff" title="#ffffff"></span></span> <span class="muted">9 colours</span></td><td>Flame, dark to bright.</td></tr>
-  <tr><td><code>iron</code></td><td><span class="swatches" role="img" aria-label="5 colours: #0b0910, #1c1924, #302c3a, #4c4658, #78708a"><span style="background:#0b0910" title="#0b0910"></span><span style="background:#1c1924" title="#1c1924"></span><span style="background:#302c3a" title="#302c3a"></span><span style="background:#4c4658" title="#4c4658"></span><span style="background:#78708a" title="#78708a"></span></span> <span class="muted">5 colours</span></td><td>The bowl and tripod.</td></tr>
-</tbody></table></div>
-
-<h2>Exact default colours</h2>
-<p>Hover a swatch for its hex value. The defaults are constants at the top of each effect's file in <code>crates/pixfx-effects/src/fire/</code>, copied from pixelfx's <code>meta.options</code>.</p>
+<p>The <code>appear</code> and <code>disappear</code> categories are empty for now: they hold effects that read the sprite as it enters or leaves the scene.</p>
     </main>
     <aside class="toc" aria-label="On this page"></aside>
   </div>

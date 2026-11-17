@@ -84,7 +84,7 @@ impl Brush {
     /// pixels): on each row the pixel `inset` steps in from its back (0 the backmost; 1 the one inside a sprite's
     /// dark outline, so the smear takes the body's own colour, not its outline's), `across` its row, laid square to
     /// the way it goes (`Turn::Heading`). Swept along its path it smears the thing's own silhouette and colours
-    /// behind it, as tall as it is (`arcane/bagua-mirror-flying`: its jade rim; `projectiles/trail` on a character).
+    /// behind it, as tall as it is (`projectiles/trail` on a character, `explosions/body-burst`'s flying chunks).
     pub fn edge(pixels: impl IntoIterator<Item = (f64, f64, Rgba, f64)>, inset: usize) -> Brush {
         let mut rows: BTreeMap<i64, Vec<(f64, Rgba, f64)>> = BTreeMap::new();
         for (x, y, color, light) in pixels {

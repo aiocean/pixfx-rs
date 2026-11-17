@@ -32,34 +32,54 @@ function logged(effect: PixfxEffect, name: string): PixfxEffect {
 
 class DemoScene extends Phaser.Scene {
   declare pixfx: PixfxPlugin;
-  campfire: PixfxEffect | null = null;
-  walker: Phaser.GameObjects.Rectangle | null = null;
-  character: Phaser.GameObjects.Rectangle | null = null;
+  outline: PixfxEffect | null = null;
+  walker: Phaser.GameObjects.Image | null = null;
+  hero: Phaser.GameObjects.Image | null = null;
 
   constructor() {
     super("demo");
+  }
+
+  /** An image of one `w` x `h` block of `color`, standing on its bottom middle. */
+  private block(key: string, w: number, h: number, color: number): Phaser.GameObjects.Image {
+    if (!this.textures.exists(key)) {
+      const g = this.make.graphics({}, false);
+      g.fillStyle(color).fillRect(0, 0, w, h);
+      g.generateTexture(key, w, h);
+      g.destroy();
+    }
+    return this.add.image(0, 0, key).setOrigin(0.5, 1);
   }
 
   create(): void {
     this.add.rectangle(0, 0, WIDTH, HEIGHT, 0x161620).setOrigin(0, 0).setDepth(-10);
     this.add.rectangle(0, GROUND_Y, WIDTH, HEIGHT - GROUND_Y, 0x24242e).setOrigin(0, 0).setDepth(-9);
 
-    logged(this.pixfx.play("fire/candle", 24, GROUND_Y + 40, { seed: 1 }), "candle");
-    this.campfire = logged(this.pixfx.play("fire/campfire", 150, GROUND_Y + 50, { seed: 3 }), "campfire");
-    logged(this.pixfx.play("fire/brazier", 235, GROUND_Y + 60, { seed: 8 }), "brazier");
+    // A walker the outline rings and the trail smears, drawn between the effects' back and front (depths 0 and 1);
+    // destroying it (D) leaves them to fade where it stood.
+    const walker = this.block("walker", 8, 18, 0x4fd1c5).setPosition(90, GROUND_Y + 40).setDepth(0.5);
+    this.walker = walker;
+    this.tweens.add({ targets: walker, x: 170, duration: 3000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    logged(this.pixfx.play("projectiles/trail", 0, 0, { seed: 3 }), "trail").follow(walker, 0, -9).wrap(this.pixfx.actorOf(walker));
+    this.outline = logged(this.pixfx.play("feedback/outline", 0, 0, { seed: 4 }), "outline")
+      .follow(walker, 0, -9)
+      .wrap(this.pixfx.actorOf(walker));
 
-    // The character walks through the campfire, drawn between its back and front (depths 0 and 1).
-    this.character = this.add.rectangle(110, GROUND_Y + 50, 10, 20, 0xff00ff).setOrigin(0.5, 1).setDepth(0.5);
-    this.tweens.add({ targets: this.character, x: 190, duration: 4000, yoyo: true, repeat: -1, ease: "Linear" });
+    // A hero powering up, again and again.
+    const hero = this.block("hero", 12, 22, 0xd94f5c).setPosition(280, GROUND_Y + 50).setDepth(0.5);
+    this.hero = hero;
+    const powerUp = (): void => {
+      if (!hero.active) return;
+      logged(this.pixfx.play("feedback/power-up", hero.x, hero.y, { seed: 5 }), "power-up")
+        .wrap(this.pixfx.actorOf(hero))
+        .on("complete", powerUp);
+    };
+    powerUp();
 
-    // A candle rides on a second walker; destroying the walker (D) leaves the candle to fade where it stood.
-    this.walker = this.add.rectangle(40, 60, 8, 8, 0x40c0ff).setDepth(2);
-    this.tweens.add({ targets: this.walker, x: 100, duration: 3000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-    logged(this.pixfx.play("fire/candle", 40, 56, { seed: 5, depth: { back: 1.5, front: 3 } }), "follower").follow(this.walker, 0, -4);
-
-    // Two more braziers at the right, with seeds of their own.
-    logged(this.pixfx.play("fire/brazier", 315, GROUND_Y + 60, { seed: 11 }), "brazier-2");
-    logged(this.pixfx.play("fire/brazier", 370, GROUND_Y + 40, { seed: 12 }), "brazier-3");
+    // A body bursts where you click: no character given, it blows apart a stand-in body standing there.
+    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      logged(this.pixfx.play("explosions/body-burst", Math.round(p.worldX), Math.round(p.worldY)), "body-burst");
+    });
 
     events.push("create");
   }
@@ -83,7 +103,7 @@ function bindKeys(game: Phaser.Game): void {
         scene.time.timeScale = scene.time.timeScale === 1 ? 0.25 : 1;
         break;
       case "x":
-        scene.campfire?.stop();
+        scene.outline?.stop();
         break;
       case "d":
         scene.walker?.destroy();

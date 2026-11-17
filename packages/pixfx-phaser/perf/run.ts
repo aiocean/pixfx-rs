@@ -24,8 +24,8 @@ const POOLS = [
   { name: "default worker pool", query: "" },
 ];
 const SCENARIOS = [
-  { name: "fires, one object each", query: "mix=mixed" },
-  { name: "fires, one object each, shared seeds (identical fires share frames)", query: "mix=mixed&seeds=shared" },
+  { name: "effects, one object each", query: "mix=mixed" },
+  { name: "effects, one object each, shared seeds (identical effects share frames)", query: "mix=mixed&seeds=shared" },
   { name: "game-like: half follow sprites, 10 replaced/s", query: "mix=mixed&follow=0.5&churn=10" },
   { name: "world 4× the camera, camera pans", query: "mix=mixed&world=4&pan=1" },
 ];
@@ -156,7 +156,7 @@ async function main(): Promise<void> {
         }
         const p = await profile(b, throttle, pool, workerQuery);
         profiles.push(p);
-        console.log(`\n### where a frame's main-thread time goes — ${p.n} fires, CPU ${throttle}×, ${pool.name} (${p.frames} frames)`);
+        console.log(`\n### where a frame's main-thread time goes — ${p.n} effects, CPU ${throttle}×, ${pool.name} (${p.frames} frames)`);
         for (const c of CATEGORIES) if (c !== "idle") console.log(`- ${c}: ${p.msPerFrame[c]} ms`);
       }
     }

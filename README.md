@@ -9,9 +9,12 @@ It has two modes:
 - **Play live.** Run the same effect in a browser, through plain JS bindings, a self-driving Canvas 2D
   renderer, or inside gpui.
 
-Many effects started as ports of [pixelfx](https://github.com/patch-gg/pixelfx) (JS) or of
-[Sprite Fusion's pixel art VFX](https://www.spritefusion.com/pixel-art-vfx) (TypeScript); the rest are made here.
-They use the [beanfx](NOTICE.md) sheet layout, and each effect's golden frame hashes pin its pixels.
+An effect here reads the sprite it plays on or the way it moved: an outline, a power-up aura, a body bursting apart,
+a trail (`explosions/body-burst`, `feedback/outline`, `feedback/power-up`, `projectiles/trail`). One that reads
+neither (a fire, an explosion, a shield) is not an engine effect: it is sprite art the game plays. The engine started
+as a port of [pixelfx](https://github.com/patch-gg/pixelfx) (JS); `feedback/power-up` is a port of
+[Sprite Fusion's pixel art VFX](https://www.spritefusion.com/pixel-art-vfx). Sheets use the [beanfx](NOTICE.md)
+layout, and each effect's golden frame hashes pin its pixels.
 
 ## How you use it
 
@@ -52,7 +55,7 @@ Each script's first lines say what it takes and writes.
 | `crates/pixfx-body` | The rig: a figure on the ruler (`Body`) posed by joint angles (`Pose`), seen by any camera (`Camera::side`, `iso`, `topdown`, 4 or 8 directions), animated by clips with easing, root motion and planted feet (`Clip`, `catalog`), and painted as a mannequin: a hull of shapes per body part, the bones inside it, a part map (`sprite`, `clip_sheet`). |
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
 | `crates/pixfx-pixel` | Pixels for agents, not shipped in a game: a picture (an image model's, an artist's, a customer's sprite) cleaned to its pixel grid, read as text and drawn back, viewed, critiqued, split into parts; blank sheets for an image model (`pixfx_pixel::tool`, a script per step in `examples/`, skill `.claude/skills/pixfx-pixel/SKILL.md`). |
-| `crates/pixfx-ref` | Effect references from an image model, not shipped in a game: a spec of an effect's look and moments becomes a labelled template sheet and a prompt, the OpenRouter request is built and read, and the sheet the model drew is cut back into frames as colour and light layers with a review page (a script per step in `examples/`, the xianxia shields as worked specs, skill `.claude/skills/pixfx-ref/SKILL.md`). |
+| `crates/pixfx-ref` | Effect references from an image model, not shipped in a game: a spec of an effect's look and moments becomes a labelled template sheet and a prompt, the OpenRouter request is built and read, and the sheet the model drew is cut back into frames as colour and light layers with a review page (a script per step in `examples/`, the xianxia shields' specs as worked examples, skill `.claude/skills/pixfx-ref/SKILL.md`). |
 | `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF, rendered clips, and the character a script plays an effect on (`Actors`); the scripts that write them in `examples/`. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
 | `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
@@ -60,7 +63,7 @@ Each script's first lines say what it takes and writes.
 | `packages/pixfx-pixi` | Pixi 8 shell: `createPixfx(app).play(id, x, y, opts)` with the same effects, events and feel as Phaser. See its [README](packages/pixfx-pixi/README.md); demo in `packages/pixfx-pixi/demo/`. |
 | `packages/pixfx-web` | The JS runtime both JS shells run on: the wasm, the painting workers, the game-wide frames, a stage per host scene. |
 | `crates/pixfx-gpui` | The gpui shell: `FxScene` plays effects through a `pixfx-scene` `Scene`, paints each at its view's origin and drops images from the atlas at the end of the frame. Frames are painted on the spot (`FxScene::default()`) or on native threads (`FxScene::with_threads(n)`), which turn them into images too. Needs the gpui fork (see [gpui](#gpui)). |
-| `examples/gpui-web` | A gpui web app that plays the candle and campfire. Needs the gpui fork. |
+| `examples/gpui-web` | A gpui web app that plays effects live. Needs the gpui fork. |
 
 Toolchain: `rust-toolchain.toml` pins the nightly and the wasm32 target. The commands below assume you are in
 the repo root.
@@ -77,11 +80,10 @@ fork; see [gpui](#gpui).
 Effects say what an impact should do to the screen, and every host answers the same way.
 
 - **Cues.** An effect fires timed cues on the frame it means them: `shake {trauma}`, `hitstop {dur}`,
-  `ripple {x, y, r0, r1, dur, amp}`, `flash {k, dur}`, `sound {name, gain, pitch}`. The impact effects
-  (explosions, dirt, plasma, implosion, parry, icicle fall, poof, feather burst) fire them by weight through
-  `cue::impact`: each hit adds 0.3 (a light poof) to 0.6 (an explosion) trauma, and an explosion also stops,
-  ripples and flashes. Their `feel`
-  option (0 to 2, default 1) scales the cues, and `feel: 0` silences them.
+  `ripple {x, y, r0, r1, dur, amp}`, `flash {k, dur}`, `sound {name, gain, pitch}`. An impact (the
+  burst of `explosions/body-burst`) fires them by weight through `cue::impact`: a hit adds 0.3 (light) to 0.6
+  (heavy) trauma, and a heavy one also stops, ripples and flashes; `feedback/power-up` shakes and flashes as it
+  bursts. Their `feel` option (0 to 2, default 1) scales the cues, and `feel: 0` silences them.
 - **`Feel`** (core) turns cues and the game's own impacts (`add_trauma`, `freeze`, `slow`) into one answer:
   `advance(dt)` returns the seconds that play (none in a hit-stop, a fraction in slow motion), `shake(strength)`
   gives a whole-pixel offset and `roll(strength)` a tilt in radians (strength is the player's setting, 0 holds
@@ -127,9 +129,6 @@ A ring round the sprite it wraps, drawn behind it, so it reads over busy ground 
 palette's first, by default the engine's dark outline (`#1a1422`). `w` and `h` (default 128) size the box round where
 it plays that the sprite and its ring must fit in. It draws nothing until it has a sprite.
 
-Some effects draw an outline as part of their art (the explosions' rocks and clods, the spinning coin); their
-`palette` and colour options recolour it.
-
 ## Palettes
 
 Every effect takes a `palette`: a list of hex colours from dark to light, or one preset's name. A palette of
@@ -149,11 +148,11 @@ another length is resampled to the effect's own, so any ramp fits any effect.
 | `"gold"` | Dark brown through gold to white. |
 
 ```js
-stage.play("explosions/small-explosion", x, y, { palette: "poison" });
+stage.play("feedback/power-up", x, y, { palette: "poison" });
 ```
 
 ```sh
-cargo run -p pixfx-export --example gif -- fire/campfire --palette ice
+cargo run -p pixfx-export --example gif -- projectiles/trail --palette ice
 ```
 
 In Phaser, `(await loadPixfx()).palettePresets()` lists the names.
@@ -172,8 +171,8 @@ In Phaser, `(await loadPixfx()).palettePresets()` lists the names.
 ## Render a sheet
 
 ```sh
-cargo run -p pixfx-export --example sprite_sheet -- fire/campfire --out out
-cargo run -p pixfx-export --example gif -- fire/campfire --scale 4 --out out
+cargo run -p pixfx-export --example sprite_sheet -- feedback/power-up --out out
+cargo run -p pixfx-export --example gif -- feedback/power-up --scale 4 --out out
 ```
 
 `sprite_sheet` writes the composite, colour and light PNGs and the beanfx-layout JSON into `out/`; `gif` writes a
@@ -182,12 +181,12 @@ looping GIF. For a seed or an effect's own option, change the `Options` in the s
 ## What a frame costs
 
 ```sh
-cargo run --release -p pixfx-effects --example bench -- --ids fire/candle,fire/campfire --n 50 --secs 10 --hz 60
+cargo run --release -p pixfx-effects --example bench -- --ids feedback/outline,projectiles/trail --n 50 --secs 10 --hz 60
 ```
 
 The bench plays `--n` instances of each effect (default: every effect the build has, 50 each) on a `--hz` display for `--secs`
 seconds, drawing an instance only when its clock reaches a new frame, as hosts do. Built with one effect's feature
-(`--no-default-features --features fire-candle`), it measures that effect alone. It prints the milliseconds per
+(`--no-default-features --features feedback-outline`), it measures that effect alone. It prints the milliseconds per
 display frame spent updating every clock, then per effect its frame size (canvas plus glow margin), how many times it
 drew, and the milliseconds spent drawing and turning the lit box into RGBA. Run it on an idle machine; the numbers are
 native, and wasm in a browser is slower. `bun run perf` in `packages/pixfx-phaser` measures the browser.
@@ -199,7 +198,7 @@ in `crates/pixfx-effects/tests/goldens/frame_hashes.json`. Every effect at once 
 default; build one effect alone and it checks that one in a fraction of a second.
 
 ```sh
-cargo test -p pixfx-effects --no-default-features --features fire-candle --test determinism -- --ignored
+cargo test -p pixfx-effects --no-default-features --features feedback-outline --test determinism -- --ignored
 cargo test -p pixfx-effects --test determinism -- --ignored        # every effect
 wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignored
 ```
@@ -211,19 +210,19 @@ Each crate and package tests itself, and there is no repo-wide gate: run the tes
 effect, build it alone, so nothing else compiles or runs:
 
 ```sh
-cargo test -p pixfx-effects --no-default-features --features fire-candle --all-targets
+cargo test -p pixfx-effects --no-default-features --features feedback-outline --all-targets
 ```
 
 ## Ship only the effects you play
 
-Each effect is a cargo feature of `pixfx-effects`, named after its id with the `/` as `-` (`fire/candle` is
-`fire-candle`); each category (`fire`, `explosions`, ...) turns on all of its effects, and `all` turns on every one.
+Each effect is a cargo feature of `pixfx-effects`, named after its id with the `/` as `-` (`feedback/outline` is
+`feedback-outline`); each category (`feedback`, `explosions`, ...) turns on all of its effects, and `all` turns on every one.
 `pixfx-wasm` builds `all` by default. A game that plays a few effects builds only those, so
 effects added to the library later cost it nothing:
 
 ```sh
 wasm-pack build crates/pixfx-wasm --target web -- --no-default-features \
-  --features pixfx-effects/fire-candle,pixfx-effects/explosions
+  --features pixfx-effects/feedback-outline,pixfx-effects/explosions
 ```
 
 The `EffectId` type in the generated `.d.ts` lists only the effects built in, and `new Fx(id)` with any other id

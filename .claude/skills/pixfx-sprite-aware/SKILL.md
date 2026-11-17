@@ -9,12 +9,15 @@ In `tools/pixfx-rs`. An effect that **wraps its actor** is handed the sprite's c
 reads it into cells of its own space, and draws from that: on the body, along its edge, out from it. The same effect
 follows every frame of a walk cycle, and works on any sprite the game hands it.
 
-Two working examples to copy from:
+Every pixfx effect reads the sprite it plays on or the way it moved; one that reads neither (a fire, an explosion, a
+shield) is sprite art the game plays. Working examples to copy from:
 
 | Effect | File | Reads |
 |---|---|---|
 | `feedback/outline` | `crates/pixfx-effects/src/feedback/outline.rs` | `ring`: an outline round the sprite. The smallest one: start here. |
 | `feedback/power-up` | `crates/pixfx-effects/src/feedback/power_up.rs` | `around` (aura by distance), `pick` (motes on the body), `cells` and `Actor::opaque` (the body flashing in its own brightness), a stand-in body when there is no sprite. |
+| `explosions/body-burst` | `crates/pixfx-effects/src/explosions/body_burst.rs` | `Actor::opaque`: the sprite's own pixels broken into chunks that fly and settle; the game removes the sprite. |
+| `projectiles/trail` | `crates/pixfx-effects/src/projectiles/trail.rs` | its motion (`Trace`), and on a character its back edge (`Brush::edge`). |
 
 ## The API (`pixfx_core`)
 

@@ -25,8 +25,8 @@ fn draw_once(frames: &mut Frames<Frame, InlinePainter>, scene: &mut Scene<Frame>
     r
 }
 
-fn candle() -> Result<Clip, Box<dyn Error>> {
-    let fx = effect("fire/candle").ok_or("fire/candle not registered")?;
+fn buff() -> Result<Clip, Box<dyn Error>> {
+    let fx = effect("feedback/power-up").ok_or("feedback/power-up not registered")?;
     Ok(Clip::live(fx, Options::default()))
 }
 
@@ -57,11 +57,11 @@ fn an_effect_outside_the_view_is_neither_drawn_nor_shown() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(one()?);
     scene.set_view(Some(VIEW))?;
-    let inside = scene.play(candle()?, 50.0, 50.0)?;
-    scene.play(candle()?, 1000.0, 1000.0)?;
+    let inside = scene.play(buff()?, 50.0, 50.0)?;
+    scene.play(buff()?, 1000.0, 1000.0)?;
     scene.update(0.1)?;
     let r = draw_once(&mut frames, &mut scene);
-    assert_eq!(r.shown.len(), 2, "only the inside candle, back and front");
+    assert_eq!(r.shown.len(), 2, "only the inside effect, back and front");
     assert!(r.shown.iter().all(|(p, _)| p.handle == inside));
     Ok(())
 }
@@ -70,8 +70,8 @@ fn an_effect_outside_the_view_is_neither_drawn_nor_shown() -> Res {
 fn without_a_view_everything_is_shown() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(one()?);
-    scene.play(candle()?, 50.0, 50.0)?;
-    scene.play(candle()?, 1000.0, 1000.0)?;
+    scene.play(buff()?, 50.0, 50.0)?;
+    scene.play(buff()?, 1000.0, 1000.0)?;
     scene.update(0.1)?;
     assert_eq!(draw_once(&mut frames, &mut scene).shown.len(), 4);
     scene.set_view(Some(VIEW))?;
@@ -85,7 +85,7 @@ fn a_glow_reaching_into_the_view_is_drawn() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(one()?);
     scene.set_view(Some(VIEW))?;
-    let h = scene.play(candle()?, 0.0, 50.0)?;
+    let h = scene.play(buff()?, 0.0, 50.0)?;
     let at_zero = scene.rect(h).ok_or("no rect")?;
     let w = i64::try_from(at_zero.w)?;
     // the frame's right edge one pixel inside the view's left edge: the origin is well outside
@@ -116,8 +116,8 @@ fn back_in_view(stopped: bool, away: f64) -> Result<(Vec<Frame>, Vec<Frame>), Bo
     let mut scene: Scene<Frame> = ours.scene(one()?);
     let mut twin: Scene<Frame> = theirs.scene(one()?);
     scene.set_view(Some(VIEW))?;
-    let h = scene.play(candle()?, 50.0, 50.0)?;
-    let t = twin.play(candle()?, 50.0, 50.0)?;
+    let h = scene.play(buff()?, 50.0, 50.0)?;
+    let t = twin.play(buff()?, 50.0, 50.0)?;
     for (f, s) in [(&mut ours, &mut scene), (&mut theirs, &mut twin)] {
         s.update(0.1)?;
         draw_once(f, s);
@@ -182,7 +182,7 @@ fn a_hit_outside_the_view_still_freezes_and_shakes() -> Res {
 fn a_view_that_is_not_finite_is_refused_and_changes_nothing() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(one()?);
-    scene.play(candle()?, 1000.0, 1000.0)?;
+    scene.play(buff()?, 1000.0, 1000.0)?;
     scene.update(0.1)?;
     let bad = View {
         w: f64::NAN,
@@ -200,8 +200,8 @@ fn a_view_that_is_not_finite_is_refused_and_changes_nothing() -> Res {
     Ok(())
 }
 
-fn seeded_candle(seed: u64) -> Result<Clip, Box<dyn Error>> {
-    let fx = effect("fire/candle").ok_or("fire/candle not registered")?;
+fn seeded_buff(seed: u64) -> Result<Clip, Box<dyn Error>> {
+    let fx = effect("feedback/power-up").ok_or("feedback/power-up not registered")?;
     let opts = Options {
         seed: Some(seed),
         ..Options::default()
@@ -216,9 +216,9 @@ fn under_a_draw_budget_effects_outside_the_view_take_no_turn() -> Res {
     scene.set_view(Some(VIEW))?;
     scene.set_draw_budget(NonZeroU32::new(1));
     // played first, so they have waited longest: without the view they would take the turns
-    scene.play(seeded_candle(1)?, 1000.0, 1000.0)?;
-    scene.play(seeded_candle(2)?, 2000.0, 2000.0)?;
-    let inside = scene.play(seeded_candle(3)?, 50.0, 50.0)?;
+    scene.play(seeded_buff(1)?, 1000.0, 1000.0)?;
+    scene.play(seeded_buff(2)?, 2000.0, 2000.0)?;
+    let inside = scene.play(seeded_buff(3)?, 50.0, 50.0)?;
     scene.update(0.1)?;
     let mut r = Recorder::default();
     scene
@@ -249,8 +249,8 @@ fn an_effect_fixed_to_the_camera_is_seen_wherever_the_camera_scrolls() -> Res {
     let mut scene: Scene<Frame> = frames.scene(one()?);
     scene.set_view(Some(SCROLLED))?;
     // both at (50, 50): in the world, far left of the camera; fixed to the camera, inside it
-    let hud = scene.play(candle()?, 50.0, 50.0)?;
-    scene.play(candle()?, 50.0, 50.0)?;
+    let hud = scene.play(buff()?, 50.0, 50.0)?;
+    scene.play(buff()?, 50.0, 50.0)?;
     assert_eq!(scene.set_scroll_factor(hud, 0.0), Ok(true));
     scene.update(0.1)?;
     assert_eq!(shown_handles(&mut frames, &mut scene), [hud]);
@@ -263,8 +263,8 @@ fn a_parallax_effect_is_seen_where_its_scroll_factor_puts_it() -> Res {
     let mut scene: Scene<Frame> = frames.scene(one()?);
     scene.set_view(Some(SCROLLED))?;
     // at half the camera's scroll, the camera sees x 500 to 600 of this effect's plane
-    let near = scene.play(candle()?, 550.0, 50.0)?;
-    let far = scene.play(candle()?, 1050.0, 50.0)?;
+    let near = scene.play(buff()?, 550.0, 50.0)?;
+    let far = scene.play(buff()?, 1050.0, 50.0)?;
     for h in [near, far] {
         assert_eq!(scene.set_scroll_factor(h, 0.5), Ok(true));
     }
@@ -277,7 +277,7 @@ fn a_parallax_effect_is_seen_where_its_scroll_factor_puts_it() -> Res {
 fn a_scroll_factor_that_is_not_finite_is_refused() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(one()?);
-    let h = scene.play(candle()?, 50.0, 50.0)?;
+    let h = scene.play(buff()?, 50.0, 50.0)?;
     assert_eq!(
         scene.set_scroll_factor(h, f64::INFINITY),
         Err(pixfx_scene::StageError::NotFinite)

@@ -19,10 +19,10 @@ cd /path/to/your-game && bun add ../pixfx-rs/packages/pixfx-phaser
 That builds every effect into the `.wasm`. A game that plays a few builds only those, and pays for no other:
 
 ```sh
-bun run build:wasm --no-default-features --features pixfx-effects/fire-candle,pixfx-effects/explosions   # in pixfx-web
+bun run build:wasm --no-default-features --features pixfx-effects/feedback-outline,pixfx-effects/explosions   # in pixfx-web
 ```
 
-Name an effect by its id with the `/` as `-` (`fire/candle` is `pixfx-effects/fire-candle`), or a whole category
+Name an effect by its id with the `/` as `-` (`feedback/outline` is `pixfx-effects/feedback-outline`), or a whole category
 (`pixfx-effects/explosions`). `EffectId` then lists only those effects; `play` takes a string, so an id left out
 throws when it plays. `--no-default-features` also leaves out `fighter` and `light`; add them back
 (`,fighter,light`) when the game uses fighters or scene light.
@@ -62,7 +62,7 @@ new Phaser.Game({
 class MyScene extends Phaser.Scene {
   declare pixfx: PixfxPlugin;
   create() {
-    this.pixfx.play("fire/campfire", 150, 170);
+    this.pixfx.play("explosions/body-burst", 150, 170);
   }
 }
 ```
@@ -120,7 +120,7 @@ every frame of the effect as the game would paint it, cropped. Load it once a sc
 ```ts
 await loadPixfx();
 // in a scene's create():
-await loadClip("fx/fire_campfire.clip.json"); // pages are fetched from the same folder
+await loadClip("fx/feedback_power-up.clip.json"); // pages are fetched from the same folder
 ```
 
 Effects playing that effect with the same options then show the rendered frames and paint nothing; other options
@@ -170,9 +170,8 @@ frees every effect. `scene.pixfx.stats()` returns `{engines, textures, images}` 
 
 ## Game feel
 
-Effects fire cues on the frame they mean them: `shake`, `hitstop`, `ripple`, `flash` and `sound`. The impact
-effects (explosions, dirt, plasma, implosion, parry, icicle fall, poof, feather burst) fire them by how heavy the
-hit is. Their `feel` option scales the cues (0 to 2, default 1), and `feel: 0` silences them.
+Effects fire cues on the frame they mean them: `shake`, `hitstop`, `ripple`, `flash` and `sound`. `explosions/body-burst`
+fires them by how heavy the burst is. Their `feel` option scales the cues (0 to 2, default 1), and `feel: 0` silences them.
 
 `scene.pixfx.feel` (a `PixfxFeel`) answers the cues for the scene:
 
@@ -236,7 +235,7 @@ bunx vite build demo             # or build to demo/dist and serve that
 ```
 
 `?renderer=webgl` (default) or `?renderer=canvas`. Keys: `P` pause/resume, `S` time scale 1 ↔ 0.25,
-`X` stop the campfire, `D` destroy the walker the candle follows, `R` restart the scene.
+`X` stop the outline, `D` destroy the walker the outline and trail follow, `R` restart the scene, click to burst a body.
 `window.pixfxDemo` exposes `scene`, `game`, `engine`, `stats()` and the `events` log for checks.
 
 ## Develop

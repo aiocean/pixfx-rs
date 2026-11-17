@@ -61,7 +61,7 @@ fn shown(frames: &mut Shared, scene: &mut Scene<Frame>, layer: Layer) -> Vec<Fra
     r.shown.into_iter().map(|(_, f)| f).collect()
 }
 
-/// A one-shot lasting 0.1 s that draws nothing: the registry has no one-shot yet.
+/// A one-shot lasting 0.1 s that draws nothing.
 struct Blip;
 
 static BLIP: Blip = Blip;
@@ -150,13 +150,13 @@ fn finished_one_shot_is_removed() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let shot = scene.play(Clip::live(&BLIP, Options::default()), 0.0, 0.0)?;
-    let fire = scene.play(player("fire/candle")?, 0.0, 0.0)?;
+    let buff = scene.play(player("feedback/power-up")?, 0.0, 0.0)?;
     scene.update(0.05)?;
-    assert_eq!(scene.handles().collect::<Vec<_>>(), vec![shot, fire]);
+    assert_eq!(scene.handles().collect::<Vec<_>>(), vec![shot, buff]);
     scene.update(0.06)?;
     assert_eq!(
         scene.handles().collect::<Vec<_>>(),
-        vec![fire],
+        vec![buff],
         "the one-shot ended at 0.1 s"
     );
     Ok(())
@@ -223,12 +223,12 @@ fn colour_words_become_straight_rgba_bytes() {
 
 #[test]
 fn a_sized_instance_gets_its_own_canvas_and_rect() -> Res {
-    // fireflies 100 x 50: origin mid-width, 10 above the foot; margin still its own canvas's, 160
-    let fx = effect("weather/fireflies").ok_or("fireflies not registered")?;
+    // body-burst 100 x 50: origin mid-width, 16 above the foot; margin still its own canvas's, 96
+    let fx = effect("explosions/body-burst").ok_or("body-burst not registered")?;
     let opts = Options {
         extra: BTreeMap::from([
-            ("width".to_string(), OptValue::Num(100.0)),
-            ("height".to_string(), OptValue::Num(50.0)),
+            ("w".to_string(), OptValue::Num(100.0)),
+            ("h".to_string(), OptValue::Num(50.0)),
         ]),
         ..Options::default()
     };
@@ -237,20 +237,20 @@ fn a_sized_instance_gets_its_own_canvas_and_rect() -> Res {
         live.canvas(),
         Canvas {
             size: (100, 50),
-            origin: (50, 40)
+            origin: (50, 34)
         }
     );
-    assert_eq!(live.size(), (100 + 2 * 160, 50 + 2 * 160));
+    assert_eq!(live.size(), (100 + 2 * 96, 50 + 2 * 96));
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(2)?);
     let h = scene.play(live, 200.0, 120.0)?;
     assert_eq!(
         scene.rect(h),
         Some(Rect {
-            x: (200 - 50 - 160) * 2,
-            y: (120 - 40 - 160) * 2,
-            w: (100 + 2 * 160) * 2,
-            h: (50 + 2 * 160) * 2,
+            x: (200 - 50 - 96) * 2,
+            y: (120 - 34 - 96) * 2,
+            w: (100 + 2 * 96) * 2,
+            h: (50 + 2 * 96) * 2,
         })
     );
     Ok(())
@@ -280,13 +280,13 @@ fn player_matches_render(fx: &'static dyn Effect, opts: &Options, m: u32) {
 
 #[test]
 fn a_sized_player_draws_where_render_frames_does() -> Res {
-    // fireflies 12 x 12: the canvas its options give, not its own 320 x 180
-    let fx = effect("weather/fireflies").ok_or("fireflies not registered")?;
+    // body-burst 40 x 36: the canvas its options give, not its own 192 x 144
+    let fx = effect("explosions/body-burst").ok_or("body-burst not registered")?;
     let opts = Options {
         seed: Some(3),
         extra: BTreeMap::from([
-            ("width".to_string(), OptValue::Num(12.0)),
-            ("height".to_string(), OptValue::Num(12.0)),
+            ("w".to_string(), OptValue::Num(40.0)),
+            ("h".to_string(), OptValue::Num(36.0)),
         ]),
         ..Options::default()
     };
@@ -409,7 +409,7 @@ fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let hitter = scene.play(Clip::live(&HITTER, Options::default()), 0.0, 0.0)?;
-    let candle = scene.play(player("fire/candle")?, 0.0, 0.0)?;
+    let buff = scene.play(player("feedback/power-up")?, 0.0, 0.0)?;
     // play until the hit lands
     let mut played = 0.0;
     while !scene.feel().is_some_and(|f| f.frozen()) {
@@ -420,12 +420,12 @@ fn an_effects_hit_freezes_every_effect_and_tells_the_host_how_long() -> Res {
         played >= 0.1 - 1e-9,
         "froze only once the hit landed: {played}"
     );
-    let (t_hitter, t_candle) = (scene.t(hitter), scene.t(candle));
+    let (t_hitter, t_buff) = (scene.t(hitter), scene.t(buff));
     // the hit-stop holds every effect, and update says no time played
     for _ in 0..5 {
         assert_eq!(scene.update(FRAME)?, 0.0);
     }
-    assert_eq!((scene.t(hitter), scene.t(candle)), (t_hitter, t_candle));
+    assert_eq!((scene.t(hitter), scene.t(buff)), (t_hitter, t_buff));
     let mut thawed = false;
     for _ in 0..3 {
         thawed |= scene.update(FRAME)? > 0.0;
@@ -520,7 +520,7 @@ fn identical_effects_draw_each_frame_once_and_share_it() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     for i in 0..50 {
-        scene.play(player("fire/candle")?, f64::from(i * 3), 40.0)?;
+        scene.play(player("feedback/power-up")?, f64::from(i * 3), 40.0)?;
     }
     scene.update(0.1)?;
     let r = draw_once(&mut frames, &mut scene);
@@ -540,7 +540,7 @@ fn identical_effects_draw_each_frame_once_and_share_it() -> Res {
 fn nothing_is_drawn_again_until_the_frame_changes() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
-    scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    scene.play(player("feedback/power-up")?, 20.0, 40.0)?;
     scene.update(0.1)?;
     assert_eq!(draw_once(&mut frames, &mut scene).made, 2);
     // display refreshes at 120 Hz: a quarter of a 30 fps frame passes, nothing new to draw
@@ -560,7 +560,7 @@ fn nothing_is_drawn_again_until_the_frame_changes() -> Res {
 fn a_fading_effect_redraws_its_own_frame_once_per_clock_frame() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
-    let h = scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    let h = scene.play(player("feedback/power-up")?, 20.0, 40.0)?;
     scene.update(0.1)?;
     scene.stop(h);
     assert_eq!(
@@ -589,7 +589,8 @@ fn a_fading_effect_redraws_its_own_frame_once_per_clock_frame() -> Res {
 fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
-    scene.play(player("fire/candle")?, 20.0, 40.0)?;
+    // a loop, so its first frame comes round again
+    scene.play(Clip::live(&TICKER, Options::default()), 20.0, 40.0)?;
     scene.update(0.1)?;
     let before = draw_once(&mut frames, &mut scene).shown;
     let held = frames.bytes();
@@ -599,8 +600,8 @@ fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
     scene.update(1.0 / 30.0)?;
     draw_once(&mut frames, &mut scene);
     assert!(frames.bytes() <= held, "the older frame went");
-    // come round to the first frame again: one whole loop of the candle
-    let loop_s = effect("fire/candle").ok_or("candle")?.meta().duration;
+    // come round to the first frame again: one whole loop of the ticker
+    let loop_s = TICKER_META.duration;
     let mut left = loop_s - 1.0 / 30.0;
     while left > 1e-9 {
         let dt = left.min(0.2);
@@ -619,7 +620,7 @@ fn frames_dropped_over_the_budget_come_back_the_same() -> Res {
 
 #[test]
 fn a_rendered_clip_is_shown_without_drawing() -> Res {
-    let fx = effect("fire/candle").ok_or("no candle")?;
+    let fx = effect("feedback/power-up").ok_or("no power-up")?;
     let clip = pixfx_export::render_clip(fx, Options::default())?;
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
@@ -635,8 +636,8 @@ fn a_rendered_clip_is_shown_without_drawing() -> Res {
             Ok(())
         );
     }
-    scene.play(player("fire/candle")?, 20.0, 40.0)?;
-    // a whole loop at uneven steps: every frame shown comes from the clip
+    scene.play(player("feedback/power-up")?, 20.0, 40.0)?;
+    // most of the one-shot at uneven steps: every frame shown comes from the clip
     for step in [0.013, 0.021, 0.034, 0.008].iter().cycle().take(100) {
         scene.update(*step)?;
         let r = draw_once(&mut frames, &mut scene);
@@ -677,12 +678,12 @@ fn every_surface_a_scene_drops_is_freed() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let mut shell = Recorder::default();
-    let fading = scene.play(player("fire/candle")?, 20.0, 40.0)?;
-    scene.play(player("fire/candle")?, 60.0, 40.0)?;
+    let fading = scene.play(player("feedback/power-up")?, 20.0, 40.0)?;
+    scene.play(player("feedback/power-up")?, 60.0, 40.0)?;
     scene.update(0.1)?;
     assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
     scene.stop(fading);
-    let other = scene.handles().nth(1).ok_or("second candle")?;
+    let other = scene.handles().nth(1).ok_or("second power-up")?;
     // the fading one draws into its own surfaces; the other keeps sharing frames, then goes
     scene.update(1.0 / 30.0)?;
     assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
@@ -704,8 +705,8 @@ fn clearing_a_scene_frees_everything_it_holds() -> Res {
     let mut frames = Frames::default();
     let mut scene: Scene<Frame> = frames.scene(scale(1)?);
     let mut shell = Recorder::default();
-    let h = scene.play(player("fire/candle")?, 20.0, 40.0)?;
-    scene.play(player("fire/candle")?, 60.0, 40.0)?;
+    let h = scene.play(player("feedback/power-up")?, 20.0, 40.0)?;
+    scene.play(player("feedback/power-up")?, 60.0, 40.0)?;
     scene.update(0.1)?;
     assert_eq!(scene.draw(&mut frames, &mut shell), Ok(()));
     scene.stop(h);

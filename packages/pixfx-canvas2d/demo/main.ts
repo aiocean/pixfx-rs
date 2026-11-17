@@ -1,5 +1,6 @@
-// A campfire and braziers on dark ground, a candle following a walker drawn between the effects' back and front
-// layers, a hero powering up (the aura grips each pose of its sprite), and an explosion where you click. `window.pixfxCanvasDemo` exposes the loop and pixfx for the browser check.
+// A walker on dark ground drawn between the effects' back and front layers, ringed by an outline and smeared by a
+// trail along the way it walks, a hero powering up (the aura grips each pose of its sprite), and a body bursting
+// where you click. `window.pixfxCanvasDemo` exposes the loop and pixfx for the browser check.
 import { createPixfx, imageActor, loadPixfx } from "../src";
 import type { Pixfx, WorldCue } from "../src";
 
@@ -26,18 +27,36 @@ if (!ctx) throw new Error("demo: no 2d context");
 
 const pixfx = createPixfx(ctx, { scale: SCALE });
 const events: string[] = [];
-pixfx.play("fire/campfire", 168, GROUND, { seed: 1 });
-pixfx.play("fire/brazier", 60, GROUND, { seed: 2 });
-pixfx.play("fire/brazier", 280, GROUND, { seed: 3 });
-const walker = { x: 114, y: GROUND - 18, active: true };
-pixfx.play("fire/candle", 0, 0, { seed: 4 }).follow(walker, 0, 0).on("destroy", () => events.push("candle destroy"));
+// the walker: an 8 x 18 block, its feet at (x, y)
+const WALKER = { w: 8, h: 18 };
+const walkerSheet = document.createElement("canvas");
+walkerSheet.width = WALKER.w;
+walkerSheet.height = WALKER.h;
+const wctx = walkerSheet.getContext("2d");
+if (!wctx) throw new Error("demo: no 2d context for the walker");
+wctx.fillStyle = "#4fd1c5";
+wctx.fillRect(0, 0, WALKER.w, WALKER.h);
+const walker = { x: 114, y: GROUND, active: true };
+const walkerDrawn = () => ({
+  image: walkerSheet,
+  cut: { x: 0, y: 0, w: WALKER.w, h: WALKER.h },
+  x: Math.round(walker.x) - WALKER.w / 2,
+  y: walker.y - WALKER.h,
+});
+pixfx.play("projectiles/trail", 0, 0, { seed: 3 }).follow(walker, 0, -WALKER.h / 2).wrap(imageActor(walkerDrawn));
+pixfx
+  .play("feedback/outline", 0, 0, { seed: 4 })
+  .follow(walker, 0, -WALKER.h / 2)
+  .wrap(imageActor(walkerDrawn))
+  .on("destroy", () => events.push("outline destroy"));
 pixfx.feel.on("cue", (c: WorldCue) => events.push(`cue ${c.cue.type}`));
 
 canvas.addEventListener("click", (e) => {
   const r = canvas.getBoundingClientRect();
   const x = ((e.clientX - r.left) / r.width) * GAME.w;
   const y = ((e.clientY - r.top) / r.height) * GAME.h;
-  pixfx.play("explosions/small-explosion", x, y).on("complete", () => events.push("explosion complete"));
+  // no character given: it blows apart a stand-in body standing at the click
+  pixfx.play("explosions/body-burst", x, y).on("complete", () => events.push("burst complete"));
 });
 
 // the hero: two poses of a 12 x 22 sprite, arms down then raised, drawn into one sheet
@@ -97,10 +116,10 @@ const frame = (now: number): void => {
   ctx.fillStyle = "#2a2233";
   ctx.fillRect(0, GROUND * SCALE, GAME.w * SCALE, (GAME.h - GROUND) * SCALE);
   pixfx.drawLayer("back");
-  ctx.fillStyle = "#4fd1c5";
-  ctx.fillRect((Math.round(walker.x) - 4) * SCALE, walker.y * SCALE, 8 * SCALE, 18 * SCALE);
-  const h = hero();
+  const w = walkerDrawn();
   ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(w.image, w.x * SCALE, w.y * SCALE, WALKER.w * SCALE, WALKER.h * SCALE);
+  const h = hero();
   ctx.drawImage(h.image, h.cut.x, h.cut.y, h.cut.w, h.cut.h, h.x * SCALE, h.y * SCALE, h.cut.w * SCALE, h.cut.h * SCALE);
   pixfx.drawLayer("front");
   demo.frames += 1;

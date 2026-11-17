@@ -1,6 +1,6 @@
 ---
 name: pixfx-effect
-description: Use when adding a new pixfx effect, porting one from pixelfx or Sprite Fusion's pixel art VFX, or changing how an existing effect looks, moves, fires cues or takes options - including when its golden frame hashes or feature registration fail.
+description: Use when adding a new pixfx effect (one that reads the sprite it plays on or the way it moved), porting one from pixelfx or Sprite Fusion's pixel art VFX, or changing how an existing effect looks, moves, fires cues or takes options - including when its golden frame hashes or feature registration fail.
 ---
 
 # Write or change a pixfx effect
@@ -9,78 +9,86 @@ An effect is a Rust static in `crates/pixfx-effects/src/<category>/<name>.rs` wi
 returns its state; the state draws a frame from time `t`. Every renderer, script and shell picks it up from the
 registry. Work on it **built alone** behind its own feature, so nothing else compiles or runs.
 
+An effect here reads the sprite it plays on (`Silhouette`, `Actor`; skill `pixfx-sprite-aware`) or the way it moved
+(`Trace`). An effect that reads neither (a fire, an explosion, a shield, weather) is turned away: it is a sprite the
+game plays, drawn and animated as sprite art, not an engine effect. Say so and stop.
+
 ## 1. Write it
 
-Copy the nearest effect of its kind (`fire/candle.rs` for a loop, `explosions/small_explosion.rs` for a one-shot that
-fires cues, `arcane/hex_shield.rs` for a Sprite Fusion port) and change it. The shape:
+Copy the nearest effect of its kind (`feedback/outline.rs` for a loop round the sprite, `explosions/body_burst.rs` for
+a one-shot that fires cues, `feedback/power_up.rs` for a Sprite Fusion port, `projectiles/trail.rs` for one that
+reads its motion) and change it. The shape:
 
 ```rust
-use pixfx_core::{Effect, EffectState, Layer, Meta, NumOpt, Options};
+use std::sync::Arc;
+
+use pixfx_core::{Actor, Area, Effect, EffectState, Layer, Meta, NumOpt, Options, Silhouette};
 use pixfx_draw::Painter;
 use pixfx_draw::color::Rgba;
 
-pub struct Ember;
-pub static EMBER: Ember = Ember;
+pub struct Rim;
+pub static RIM: Rim = Rim;
 
-const SIZE: NumOpt = NumOpt::new("size", 3.0).within(1.0, 8.0); // an option of its own, held to a range
+const WIDTH: NumOpt = NumOpt::new("width", 1.0).within(1.0, 3.0); // an option of its own, held to a range
 const META: Meta = Meta {
-    id: "fire/ember",
-    name: "Ember",
-    desc: "A single coal glowing and dimming.",
-    tags: &["fire", "prop", "light", "loop"],
-    size: (40, 40),   // room for the glow's radius on every side of the origin
-    origin: (20, 24), // the point that lands where the caller plays it
+    id: "feedback/rim",
+    name: "Rim",
+    desc: "A light pulsing round the sprite it wraps.",
+    tags: &["feedback", "outline", "light", "character", "loop"],
+    size: (128, 128), // room for the sprite and its glow on every side of the origin
+    origin: (64, 64), // the point that lands where the caller plays it
     duration: 2.0,    // seconds per loop (or of the one-shot)
     looping: true,
     fps: 30,
     seed: 1,
     state: None,
-    options: &[SIZE.spec()],
+    options: &[WIDTH.spec()],
 };
-const PALETTE: [Rgba; 3] = [
-    Rgba::hex24(0x4a1712),
-    Rgba::hex24(0xf2561d),
-    Rgba::hex24(0xffc23d),
-];
+const PALETTE: [Rgba; 2] = [Rgba::hex24(0x3a62e0), Rgba::hex24(0x7fb4ff)];
 
-impl Effect for Ember {
+impl Effect for Rim {
     fn meta(&self) -> &Meta {
         &META
     }
-    fn spawn(&self, opts: &Options, seed: u64) -> Box<dyn EffectState> {
-        Box::new(State {
-            ramp: opts.palette_or(&PALETTE),
-            size: opts.num(&SIZE),
-            seed: seed as f64,
-        })
+    fn wraps_actor(&self) -> bool {
+        true // the scene hands it the sprite it plays on, every frame
+    }
+    fn spawn(&self, opts: &Options, _seed: u64) -> Box<dyn EffectState> {
+        Box::new(State { ramp: opts.palette_or(&PALETTE), width: opts.num(&WIDTH) as u32, ring: Vec::new() })
     }
 }
 
 struct State {
     ramp: Vec<Rgba>,
-    size: f64,
-    seed: f64,
+    width: u32,
+    /// The cells round the sprite as it is now, read once per pose, never per drawn frame; none without one.
+    ring: Vec<(i32, i32)>,
 }
 
 impl EffectState for State {
+    fn set_actor(&mut self, actor: Option<Arc<Actor>>) {
+        self.ring = actor.map_or_else(Vec::new, |a| {
+            let pad = self.width as i32;
+            let area = Area { x: a.x() - pad, y: a.y() - pad, w: a.w() + 2 * self.width, h: a.h() + 2 * self.width };
+            Silhouette::of(&a, area).ring(self.width, false).collect()
+        });
+    }
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
-        if layer == Layer::Back {
-            return; // nothing behind the character
+        if layer != Layer::Back {
+            return; // off the body: the sprite drawn over it hides none of it
         }
         // 0..1, one period per `duration` (2 s), so the loop closes exactly
-        let k = 0.5 + 0.5 * libm::sin(t * core::f64::consts::PI + self.seed);
-        let last = self.ramp.len().saturating_sub(1);
-        let pick = (k * last as f64) as usize; // dark to bright as it glows
-        let Some(&c) = self.ramp.get(pick.min(last)) else {
+        let k = 0.5 + 0.5 * libm::sin(t * core::f64::consts::PI);
+        let Some(&c) = self.ramp.get(usize::from(k > 0.5)) else {
             return;
         };
-        let s = self.size;
-        p.rect(-s, -s, s * 2.0, s * 2.0, c, 1.0);
-        p.glow(0.0, 0.0, 10.0, c, 0.6 * k); // light is additive, drawn into the light layer
+        for &(x, y) in &self.ring {
+            p.px(f64::from(x), f64::from(y), c);
+            p.glow(f64::from(x), f64::from(y), 3.0, c, 0.3 * k); // light is additive, drawn into the light layer
+        }
     }
 }
 ```
-
 - `size` must hold the light: the canvas reaches past the origin by at least each glow's radius, or the light is
   cut at the canvas edge. Look at the gif.
 - Things beside or on a character keep the ruler (skill `pixfx`, "One scale: the ruler"): size each against a body
@@ -104,12 +112,12 @@ impl EffectState for State {
 
 - **Glow as steps of colour, not a blur.** Pixel artists paint a glow as solid rings round each stroke: white core,
   pale, mid, dark, a dithered edge. Stamp strokes into `pixfx_draw::halo::Halo` with a heat and a kind,
-  `spread(fall)`, and paint each pixel with the ramp colour of its heat's step (`arcane/restriction.rs` `paint`).
+  `spread(fall)`, and paint each pixel with the ramp colour of its heat's step.
   Draw a stroke's own pixel in its own colour (kind) and let its heat only set how far its halo reaches, or thin
   strokes drown in their glow. A flash or a hit raises the heat, so the halo grows. Additive `glow` stays as a faint
   bloom on top; turning it up only blurs.
 - **Opaque solids, light as light.** Stacked translucent pieces wash out to white; draw them opaque and put the glow
-  in the light layer (`holy/lotus`).
+  in the light layer.
 - **Depth.** A ring round the character: its far half on `Layer::Back` (mirrored glyphs, a little dimmer), its near
   half on `Layer::Front`; a glyph seen edge-on shows only its middle stroke.
 - **Counts and motion belong to code.** Writing one rune at a time, a ring's spin, exactly three rings: an image
@@ -117,14 +125,14 @@ impl EffectState for State {
 - **A blow anywhere.** Number options in local pixels from the feet (`hitX`, `hitY`, `.within(...)`), defaulting to
   where the reference drew the blow; from that point derive the struck piece, where the flare starts, the tilt, the
   sparks and the `impact` cue. Render a few with `gif ... --num hitX=-20 --num hitY=-48`.
-- **Cost.** Work only over the box the strokes cover, and only for the layer being drawn: restriction's halo went
-  from 11.75 to 4.06 ms for 50 by both, pixels unchanged. Bench before and after.
+- **Cost.** Work only over the box the strokes cover, and only for the layer being drawn: one halo went from 11.75
+  to 4.06 ms for 50 by both, pixels unchanged. Bench before and after.
 - **Bake what nothing changes; draw live what the game sets.** Choose by what the work depends on:
 
   | The work depends on | Do it | Example |
   |---|---|---|
-  | nothing the game sets: a grown tree, cracks, a layout, a map | once, in a script `examples/bake_<name>.rs` that writes it as data into `src/<category>/<name>_<what>.rs` ("Baked by ...; do not edit, run the script again"); the effect reads it, built into a map once for every instance (`std::sync::OnceLock`) | `shadow/winter-ordeal` (its sky), `shadow/blood-shield` (its veins: starting a shield went from 10.6 ms to 0) |
-  | only where a pixel is, the same on every frame (a shape's reach, a highlight's angle) | a table built once (`OnceLock`), read per pixel; a point off it (moved by a dent, a turned painter) is worked out as before, so the pixels stay the same bit for bit | `blood_shield.rs` `Px`: 3 `pow` and an `atan2` a pixel gone |
+  | nothing the game sets: a grown tree, cracks, a layout, a map | once, in a script `examples/bake_<name>.rs` that writes it as data into `src/<category>/<name>_<what>.rs` ("Baked by ...; do not edit, run the script again"); the effect reads it, built into a map once for every instance (`std::sync::OnceLock`) | veins baked once: starting an effect went from 10.6 ms to 0 |
+  | only where a pixel is, the same on every frame (a shape's reach, a highlight's angle) | a table built once (`OnceLock`), read per pixel; a point off it (moved by a dent, a turned painter) is worked out as before, so the pixels stay the same bit for bit | a per-pixel table: 3 `pow` and an `atan2` a pixel gone |
   | the time, an option (`hitX`), the seed | live, every frame | the blow, the heartbeat |
 
   A whole effect with no options and a costly draw can also ship as a rendered clip of frames (skill `pixfx-render`,
@@ -139,8 +147,8 @@ sword formation, a volley of arrows, a talisman barrage) takes an **order**: it 
 `attack(x, y, aim, caster)`, then answers with pieces, each another registered effect, and the scene flies them
 (`pixfx_core::volley`, `Scene::order`). The point gives the direction, not where they burst: a piece flies its path
 and on past the point, and bursts on the first **body** it meets (the game declares bodies with `setBody` /
-`Scene::set_body`; the caster's is spared), or when the game calls `burst`. `arcane/sword-formation.rs` is the
-worked example.
+`Scene::set_body`; the caster's is spared), or when the game calls `burst`. No effect takes orders today; the sketch
+below and `crates/pixfx-scene/tests/order.rs` show the shape.
 
 ```rust
 // the formation: opens once, then loops while it waits for its order
@@ -174,7 +182,7 @@ static VOLLEY: Volley = Volley {
   returns false.
 - Register the shot and the strike as effects of their own (JS workers find every effect by id), each behind
   `cfg(any(feature = "<its own>", feature = "<the formation's>"))` in `mod.rs` and `EFFECTS`, so the formation
-  built alone brings them; shared drawing goes in a module under the same `any()` (`arcane/sword.rs`).
+  built alone brings them; shared drawing goes in a module under the same `any()`.
 - On the site it plays the `volley` role (`effect-roles.js`: `hold`, `aim`, `blows`, `power`); test the flight in
   `crates/pixfx-scene/tests/order.rs` style: strikes near the point, in turn, and the formation gone after.
 
@@ -187,20 +195,20 @@ for how age colours, thins, waves and breaks it up), never with lines of your ow
 (a slash: a bar turned through an arc; a spark: a point along its flight) or the way it was really moved: ask for it
 with `Effect::traces(opts) -> Option<secs>` and take it in `EffectState::set_trace`; `trace.poses(secs)` feeds the
 sweep. Read motion from the trace with `pixfx_core::motion` (`velocity`, `speed`, `heading`, `turn`, `spin`,
-`acceleration`), never by differencing yourself, so every effect agrees (`fire/lib.rs` `carried`: a fire leans
-back against its velocity). An effect that reads its motion paints its own frames (no sharing), so ask only when an
-option says it is moved (`carried: 1`), and keep a port's pixels when it stands still (`fire/lib.rs` `nudge`).
+`acceleration`), never by differencing yourself, so every effect agrees (`projectiles/trail`). An effect that reads
+its motion paints its own frames (no sharing), so ask only when an option says it is moved, and keep its pixels
+when it stands still.
 
 **The brush is the mover's cross-section: pick it by the mover's shape.**
 
 | Mover | Brush | Example |
 |---|---|---|
-| thin: a sword's point, a drop, a spark, a bolt | `Brush::column(palette, width)`, a few pixels wide, via `projectiles/trail` laid under it | `arcane/sword-formation` tail, `blood_spray` |
-| broad: a mirror, a shield, a disc | `Brush::edge(its pixels, 0)`: its back edge, as tall as itself, in its own colours, swept in its own draw over its own trace | `arcane/bagua-mirror-flying` (its jade rim) |
+| thin: a sword's point, a drop, a spark, a bolt | `Brush::column(palette, width)`, a few pixels wide, via `projectiles/trail` laid under it | `projectiles/trail` (its ribbon) |
+| broad: a mirror, a shield, a disc | `Brush::edge(its pixels, 0)`: its back edge, as tall as itself, in its own colours, swept in its own draw over its own trace | none today |
 | a character (a sprite) | `projectiles/trail` played on it: it wraps the sprite (`set_actor`) and smears its back edge one in from the outline (`Brush::edge(.., 1)`), upright (`Turn::Angle(0)`, poses' angles 0), since a body does not turn round when it walks back | the trail page: fighters gliding |
 | a blade that turns | `Brush::from_column(frame, x, origin_y)` with `Turn::Angle` | a slash smear |
 
-A narrow ribbon behind a broad body reads as a beam stuck on it, not as its motion: the bagua mirror's first
+A narrow ribbon behind a broad body reads as a beam stuck on it, not as its motion: a flying mirror's first
 shared trail was a 7-pixel jade band behind a 30-pixel mirror and looked worse than the hand-drawn lines it
 replaced, and a trail played on a fighter swept one point at palm height. An effect that rides a body must be aware
 of it, as a wrap is: read the sprite, never stand in for it with a point. Take the edge colour from the right pixel
@@ -214,25 +222,25 @@ when it is more general.
 
 ## 2. Register it (all four, or `tests/features.rs` fails)
 
-1. `src/<category>/mod.rs`: `#[cfg(feature = "fire-ember")] mod ember;` and
-   `#[cfg(feature = "fire-ember")] pub use ember::EMBER;`
-2. `Cargo.toml`: `fire-ember = []` (the id with `/` as `-`), added to its category feature (`fire = [...]`); a new
+1. `src/<category>/mod.rs`: `#[cfg(feature = "feedback-rim")] mod rim;` and
+   `#[cfg(feature = "feedback-rim")] pub use rim::RIM;`
+2. `Cargo.toml`: `feedback-rim = []` (the id with `/` as `-`), added to its category feature (`feedback = [...]`); a new
    category also goes into `all`.
-3. `src/lib.rs`: `#[cfg(feature = "fire-ember")] &fire::EMBER,` in `EFFECTS`.
+3. `src/lib.rs`: `#[cfg(feature = "feedback-rim")] &feedback::RIM,` in `EFFECTS`.
 4. Check once with every effect: `cargo test -p pixfx-effects --test features`.
 
-On the site an effect's page stages it by its role: one with a blow at a set time (a shield) gets an entry in
-`site/assets/effect-roles.js` (`role: "ward", blows: [<its HIT>], directional: true`), and its own number options a
-slider each in `site/assets/effect.js` `OWN`. Rebuild with `site/build.sh`.
+On the site an effect's page stages it by its role: one with a blow at a set time gets an entry in
+`site/assets/effect-roles.js` (`role`, and `impact` or `blows` at its cue times, as `feedback/power-up`), and its own
+number options a slider each in `site/assets/effect.js` `OWN`. Rebuild with `site/build.sh`.
 
 ## 3. Test it alone
 
 ```sh
-F="--no-default-features --features fire-ember"
+F="--no-default-features --features feedback-rim"
 cargo fmt -p pixfx-effects
 cargo clippy -p pixfx-effects $F --all-targets -- -D warnings
 cargo test -p pixfx-effects $F --all-targets                                   # its tests only
-cargo run -p pixfx-export --example gif -- fire/ember --scale 4               # look first: target/out/fire_ember.gif
+cargo run -p pixfx-export --example gif -- feedback/rim --scale 4               # look first: target/out/feedback_rim.gif
 PIXFX_BLESS=1 cargo test -p pixfx-effects $F --test determinism -- --ignored  # then record its golden hashes
 cargo test -p pixfx-effects $F --test determinism -- --ignored                 # and check them
 cargo run --release -p pixfx-effects $F --example bench                        # what a frame of 50 costs

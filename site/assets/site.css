@@ -1,5 +1,5 @@
 /* pixfx site: one stylesheet for the landing page and the docs.
-   Colours come from the effects' own ramps: night ground, wax text, flame and ember, the candle's blue root. */
+   Colours come from the effects' own ramps: night ground, wax text, flame and ember, a cool blue. */
 
 :root {
   --night: #13101b;
@@ -248,12 +248,8 @@ input[type="range"] { accent-color: var(--flame); width: 100%; }
 
 /* ---------- fx layer (assets/fx.js) ---------- */
 
-.fx-overlay, .fx-screen { position: fixed; left: 0; top: 0; pointer-events: none; image-rendering: pixelated; }
-.fx-overlay { z-index: 900; }
-/* the burn between pages: its edge and smoke over the leaving page, its light added on top */
-.fx-screen { z-index: 1000; }
-.fx-light { mix-blend-mode: plus-lighter; }
-/* the page being left, kept on top of the new one (scrolled as it was) while the burn takes it away */
+.fx-overlay { position: fixed; left: 0; top: 0; pointer-events: none; image-rendering: pixelated; z-index: 900; }
+/* the page being left, kept on top of the new one (scrolled as it was) while a transition takes it away */
 .page-leaving { position: fixed; inset: 0; z-index: 800; overflow: hidden; background: var(--night); mask-repeat: no-repeat; }
 
 .fx-switch {

@@ -3,21 +3,10 @@
 //! An appear effect is always a one-shot. It plays at the object's position and shows the object
 //! materialising. When it ends, the object is fully present and its own sprite takes over.
 //!
-//! # Two kinds
+//! It always wraps the object's sprite (`Effect::wraps_actor` = true) and reads it: a flourish that does not
+//! read the sprite (a sparkle ring, a puff of smoke) is sprite art the game plays, not an effect here.
 //!
-//! ## Standalone (`Effect::wraps_actor` = false)
-//!
-//! The effect plays a visual flourish — a sparkle ring, a flash, a swirl — without reading the
-//! object's sprite. The game controls when the sprite becomes visible.
-//!
-//! Game contract:
-//! 1. Play the effect at the object's position.
-//! 2. Show the object's own sprite at the moment the effect's `desc` documents (the effect's
-//!    midpoint, its end, or immediately).
-//!
-//! ## Sprite-reading (`Effect::wraps_actor` = true)
-//!
-//! The effect wraps the object's sprite and draws it materialising pixel by pixel (a dissolve-in,
+//! It draws the sprite materialising pixel by pixel (a dissolve-in,
 //! a shimmer, a crystal-build). The game hides the object's sprite while the effect plays so it
 //! does not show twice.
 //!
@@ -37,7 +26,5 @@
 //!
 //! | Category | Description |
 //! |---|---|
-//! | `spawn/` | A cloud or burst that plays *after* a death/despawn; the character is already gone. |
 //! | `disappear/` | The exit counterpart: plays as the object leaves. |
-//! | `transitions/` | Full-screen (16:9) scene wipes; not tied to one object. |
-//! | `feedback/` | Looping effects that persist on a live character (outline, power-up). |
+//! | `feedback/` | Effects that stay on a live character (outline, power-up). |

@@ -60,20 +60,20 @@ fn tick(site: &Rc<RefCell<Site>>, dt: f64) {
 #[gpui::test]
 fn identical_views_share_one_uploaded_frame(cx: &mut TestAppContext) {
     let cx = cx.add_empty_window();
-    let one = paint(cx, &site(&["fire/campfire"]));
-    assert!(one > 0, "the campfire draws something on its first frame");
-    let many = paint(cx, &site(&["fire/campfire"; 20]));
-    assert_eq!(many, one, "twenty campfires hold the bytes of one");
-    let two = paint(cx, &site(&["fire/campfire", "fire/candle"]));
+    let one = paint(cx, &site(&["feedback/power-up"]));
+    assert!(one > 0, "the power-up draws something on its first frame");
+    let many = paint(cx, &site(&["feedback/power-up"; 20]));
+    assert_eq!(many, one, "twenty power-ups hold the bytes of one");
+    let two = paint(cx, &site(&["feedback/power-up", "explosions/body-burst"]));
     assert!(two > one, "another effect holds its own frame");
 }
 
 #[gpui::test]
 fn a_frame_is_uploaded_only_when_the_clock_reaches_a_new_one(cx: &mut TestAppContext) {
     let cx = cx.add_empty_window();
-    let site = site(&["fire/campfire"]);
+    let site = site(&["feedback/power-up"]);
     let first = paint(cx, &site);
-    // well within one frame of 1/30 s: the same frame, nothing new uploaded
+    // well within one frame of 1/60 s: the same frame, nothing new uploaded
     tick(&site, 0.001);
     assert_eq!(paint(cx, &site), first);
     tick(&site, 0.04);
@@ -86,7 +86,7 @@ fn a_frame_is_uploaded_only_when_the_clock_reaches_a_new_one(cx: &mut TestAppCon
 #[gpui::test]
 fn frames_past_the_budget_leave_the_atlas_and_a_fading_view_holds_its_own(cx: &mut TestAppContext) {
     let cx = cx.add_empty_window();
-    let site = site(&["fire/campfire"]);
+    let site = site(&["feedback/power-up"]);
     site.borrow_mut().scene.set_budget(0);
     for _ in 0..5 {
         paint(cx, &site);
@@ -116,7 +116,7 @@ fn a_draw_budget_uploads_that_many_new_frames_per_window_frame(cx: &mut TestAppC
     let mut scene = FxScene::default();
     let effects = (0..3)
         .filter_map(|seed| {
-            let fx = pixfx_effects::effect("fire/campfire")?;
+            let fx = pixfx_effects::effect("feedback/power-up")?;
             let opts = Options {
                 seed: Some(100 + seed),
                 ..Options::default()
@@ -127,7 +127,7 @@ fn a_draw_budget_uploads_that_many_new_frames_per_window_frame(cx: &mut TestAppC
     assert_eq!(effects.len(), 3);
     scene.set_draw_budget(std::num::NonZeroU32::new(1));
     let site = Rc::new(RefCell::new(Site { effects, scene }));
-    // three campfires with their own seeds share nothing: one new frame per window frame until all three show
+    // three power-ups with their own seeds share nothing: one new frame per window frame until all three show
     let bytes: Vec<u64> = (0..4).map(|_| paint(cx, &site)).collect();
     assert!(
         bytes[0] > 0 && bytes[1] > bytes[0] && bytes[2] > bytes[1],

@@ -21,16 +21,18 @@ pixfx-web loads its wasm and its worker through `new URL(..., import.meta.url)`.
 ## Use
 
 ```ts
-import { createPixfx, loadPixfx } from "pixfx-canvas2d";
+import { createPixfx, imageActor, loadPixfx } from "pixfx-canvas2d";
 
 await loadPixfx(); // once, before createPixfx()
 const ctx = canvas.getContext("2d");
 if (!ctx) throw new Error("no 2d context");
 const pixfx = createPixfx(ctx, { scale: 4 }); // one game pixel is 4×4 canvas pixels
 
-pixfx.play("fire/campfire", 168, 160);
-const hero = { x: 100, y: 142, active: true };
-pixfx.play("fire/candle", 0, 0).follow(hero);
+const hero = { x: 100, y: 160, active: true }; // its feet
+// the hero's sprite as you draw it: a 12 x 22 cut of its sheet, its top-left in game pixels
+const heroActor = imageActor(() => ({ image: heroSheet, cut: { x: 0, y: 0, w: 12, h: 22 }, x: hero.x - 6, y: hero.y - 22 }));
+pixfx.play("feedback/outline", 0, 0).follow(hero, 0, -11).wrap(heroActor); // a ring round the hero's sprite
+pixfx.play("projectiles/trail", 0, 0).follow(hero, 0, -11).wrap(heroActor); // its body smeared along the way it moves
 
 function frame(dt: number) {
   pixfx.update(dt);                 // effects play; frames still to paint go to the workers
@@ -74,7 +76,7 @@ effects outside it play on undrawn and cost no painting. `pixfx.clearView()` dra
 ## Demo and checks
 
 ```sh
-bunx vite demo             # campfire, braziers, a candle following a walker; click for an explosion
+bunx vite demo             # a walker ringed and trailed, a hero powering up; click for a body burst
 bun run check              # tsc, eslint, bun test (real wasm)
-bun run check:browser      # Chrome: fires show and animate, a paused loop holds them, shake, destroy frees
+bun run check:browser      # Chrome: effects show and animate, a paused loop holds them, shake, destroy frees
 ```

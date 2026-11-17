@@ -7,7 +7,7 @@
 //!
 //! One effect alone, built with nothing else:
 //!
-//!   cargo run --release -p pixfx-effects --no-default-features --features fire-candle --example bench
+//!   cargo run --release -p pixfx-effects --no-default-features --features feedback-outline --example bench
 //!
 //! `cargo test -p pixfx-effects --example bench` runs its tests.
 
@@ -285,8 +285,8 @@ mod tests {
 
     #[test]
     fn an_unknown_effect_is_an_error_naming_it() {
-        let err = run(&config(&["fire/nope"], 1)).err();
-        assert!(err.is_some_and(|e| e.contains("fire/nope")));
+        let err = run(&config(&["feedback/nope"], 1)).err();
+        assert!(err.is_some_and(|e| e.contains("feedback/nope")));
     }
 
     #[test]
@@ -324,11 +324,11 @@ mod tests {
     #[test]
     fn flags_set_ids_count_time_and_rate() -> Result<(), String> {
         let cfg = parse_args(&words(
-            "--ids fire/candle,ice/frost --n 5 --secs 2 --hz 120",
+            "--ids feedback/outline,projectiles/trail --n 5 --secs 2 --hz 120",
         ))?;
         assert_eq!(
             cfg,
-            config(&["fire/candle", "ice/frost"], 5).with(2.0, 120.0)
+            config(&["feedback/outline", "projectiles/trail"], 5).with(2.0, 120.0)
         );
         Ok(())
     }

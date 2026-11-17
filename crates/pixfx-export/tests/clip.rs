@@ -75,19 +75,19 @@ fn round_trip(id: &str, test: &str) -> Result<(), String> {
 
 #[test]
 fn a_looping_effect_renders_to_the_frames_live_play_shows() -> Result<(), String> {
-    round_trip("fire/campfire", "loop")
+    round_trip("projectiles/trail", "loop")
 }
 
 #[test]
 fn a_one_shot_renders_to_the_frames_live_play_shows() -> Result<(), String> {
-    round_trip("explosions/small-explosion", "shot")
+    round_trip("explosions/body-burst", "shot")
 }
 
 #[test]
 fn a_clip_index_of_another_version_or_missing_pages_is_refused() -> Result<(), String> {
-    let fx = pixfx_effects::effect("fire/candle").ok_or("no candle")?;
+    let fx = pixfx_effects::effect("projectiles/trail").ok_or("no trail")?;
     let clip = render_clip(fx, Options::default())?;
-    let (index, _) = pixfx_export::clip::pack(&clip, "candle");
+    let (index, _) = pixfx_export::clip::pack(&clip, "trail");
     let json = serde_json::to_string(&index).map_err(|e| e.to_string())?;
     assert!(decode(&json, &[]).is_err(), "pages missing");
     let old = serde_json::to_string(&ClipIndex {

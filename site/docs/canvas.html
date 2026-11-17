@@ -44,9 +44,9 @@ const ctx = canvas.getContext("2d");
 if (!ctx) throw new Error("no 2d context");
 const pixfx = createPixfx(ctx, { scale: 4 }); // one game pixel is 4×4 canvas pixels
 
-pixfx.play("fire/campfire", 168, 160);
+pixfx.play("feedback/power-up", 168, 160);
 const hero = { x: 100, y: 142, active: true };
-pixfx.play("fire/candle", 0, 0).follow(hero);
+pixfx.play("projectiles/trail", 0, 0).follow(hero);
 
 let last = performance.now();
 requestAnimationFrame(function frame(now) {
@@ -93,9 +93,9 @@ requestAnimationFrame(function frame(now) {
 <p>Light is drawn as light over transparency: it adds exactly its light to an opaque canvas, and shows as that light's colour on a transparent one.</p>
 
 <h2>Demo and checks</h2>
-<pre><code>bunx vite demo             # campfire, braziers, a candle following a walker; click for an explosion
+<pre><code>bunx vite demo             # a walker with an outline and a trail, a hero powering up; click for a body burst
 bun run check              # tsc, eslint, bun test (real wasm)
-bun run check:browser      # Chrome: fires show and animate, a paused loop holds them, shake, destroy frees</code></pre>
+bun run check:browser      # Chrome: effects show and animate, a paused loop holds them, shake, destroy frees</code></pre>
     </main>
     <aside class="toc" aria-label="On this page"></aside>
   </div>

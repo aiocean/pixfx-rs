@@ -42,19 +42,19 @@
   </tbody>
 </table>
 </div>
-<p>The first lines of each script say what it takes and writes. Output files are named after the id with <code>/</code> replaced by <code>_</code>: <code>fire/candle</code> becomes <code>fire_candle</code>. Each script prints the paths it wrote.</p>
+<p>The first lines of each script say what it takes and writes. Output files are named after the id with <code>/</code> replaced by <code>_</code>: <code>feedback/outline</code> becomes <code>feedback_outline</code>. Each script prints the paths it wrote.</p>
 
 <h2>sprite_sheet</h2>
 <p>Render one loop (or the whole one-shot) at the effect's fps and write a sprite sheet.</p>
-<pre><code>cargo run -p pixfx-export --example sprite_sheet -- fire/candle --out out</code></pre>
+<pre><code>cargo run -p pixfx-export --example sprite_sheet -- feedback/outline --out out</code></pre>
 <div class="table-wrap">
 <table>
   <thead><tr><th>File</th><th>Contents</th></tr></thead>
   <tbody>
-    <tr><td><code>fire_candle.png</code></td><td>RGBA. Colour with light added, over transparency. Use it where you cannot blend additively.</td></tr>
-    <tr><td><code>fire_candle_color.png</code></td><td>RGBA. The colour layer alone.</td></tr>
-    <tr><td><code>fire_candle_light.png</code></td><td>RGB. The light layer alone, to draw additively over the colour sheet.</td></tr>
-    <tr><td><code>fire_candle.json</code></td><td>Aseprite-style "array" JSON with beanfx's fields. See <a href="sheets.html">Sprite sheet format</a>.</td></tr>
+    <tr><td><code>feedback_outline.png</code></td><td>RGBA. Colour with light added, over transparency. Use it where you cannot blend additively.</td></tr>
+    <tr><td><code>feedback_outline_color.png</code></td><td>RGBA. The colour layer alone.</td></tr>
+    <tr><td><code>feedback_outline_light.png</code></td><td>RGB. The light layer alone, to draw additively over the colour sheet.</td></tr>
+    <tr><td><code>feedback_outline.json</code></td><td>Aseprite-style "array" JSON with beanfx's fields. See <a href="sheets.html">Sprite sheet format</a>.</td></tr>
   </tbody>
 </table>
 </div>
@@ -71,7 +71,7 @@
 
 <h2>gif</h2>
 <p>Write a looping GIF, composited over a dark backdrop (<code>rgb(20, 18, 28)</code>), since GIF has no partial transparency. It takes the same flags as <code>sprite_sheet</code>, and:</p>
-<pre><code>cargo run -p pixfx-export --example gif -- fire/campfire --scale 4 --out out</code></pre>
+<pre><code>cargo run -p pixfx-export --example gif -- feedback/power-up --scale 4 --out out</code></pre>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>

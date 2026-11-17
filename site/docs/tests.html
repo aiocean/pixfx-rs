@@ -28,7 +28,7 @@
 
 <h2>Determinism</h2>
 <p>Frame hashes of each effect, for seeds 1, 2 and 7 and frames first, second, a quarter, middle and last, are checked against its own entry in <code>crates/pixfx-effects/tests/goldens/frame_hashes.json</code>, natively and in wasm. A hash is FNV-1a 64 over every colour word then every light word. The test is ignored by default; built with one effect's feature it checks that effect alone.</p>
-<pre><code>cargo test -p pixfx-effects --no-default-features --features fire-candle --test determinism -- --ignored
+<pre><code>cargo test -p pixfx-effects --no-default-features --features feedback-outline --test determinism -- --ignored
 cargo test -p pixfx-effects --test determinism -- --ignored
 wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignored</code></pre>
 <p>Record new goldens on a native target only, after a deliberate change; effects the build leaves out keep theirs:</p>
@@ -41,7 +41,7 @@ wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignor
   <thead><tr><th>Where</th><th>Covers</th></tr></thead>
   <tbody>
     <tr><td><code>crates/pixfx-core/tests</code></td><td>Painter, instances and time steps, compositing, simulation helpers.</td></tr>
-    <tr><td><code>crates/pixfx-effects/tests/fire.rs</code></td><td>Fire effects' behaviour.</td></tr>
+    <tr><td><code>crates/pixfx-effects/tests</code></td><td>Each effect's behaviour (<code>body_burst.rs</code>), cropping, live frames, features.</td></tr>
     <tr><td><code>crates/pixfx-export/tests</code></td><td>Sheets, clips, boards and videos.</td></tr>
     <tr><td><code>crates/pixfx-wasm/tests/web.rs</code></td><td>The JS bindings, under <code>wasm-pack test --node</code>.</td></tr>
     <tr><td><code>crates/pixfx-scene/tests</code></td><td>The scene's decisions: placement, shared frames, the frame budget, the view, hit-stop.</td></tr>
@@ -52,7 +52,7 @@ wasm-pack test --node crates/pixfx-effects --test determinism -- --include-ignor
 
 <h2>Tests</h2>
 <p>Each crate and package tests itself, and there is no repo-wide gate: run the tests of what you changed, as its <code>AGENTS.md</code> lists under "Before you finish" (<code>cargo test -p &lt;crate&gt;</code>, <code>bun run check</code> in a package). Working on one effect, build it alone, so nothing else compiles or runs:</p>
-<pre><code>cargo test -p pixfx-effects --no-default-features --features fire-candle --all-targets</code></pre>
+<pre><code>cargo test -p pixfx-effects --no-default-features --features feedback-outline --all-targets</code></pre>
     </main>
     <aside class="toc" aria-label="On this page"></aside>
   </div>

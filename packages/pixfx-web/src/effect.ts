@@ -77,7 +77,7 @@ export class PixfxEffect<P = null> extends EventEmitter {
 
   /**
    * Order it to attack toward world (`x`, `y`), at any distance: an effect that takes orders
-   * (`arcane/sword-formation`) launches its volley; each piece strikes the bodies it meets (`stage.setBody`),
+   * (`Effect::order` in Rust; none of the effects shipped now does) launches its volley; each piece strikes the bodies it meets (`stage.setBody`),
    * emitting `"strike"`, and the effect ends once the last piece is done. `caster`, the attacker's own body, is
    * never struck. False when it takes no orders, was already ordered, or is gone.
    */

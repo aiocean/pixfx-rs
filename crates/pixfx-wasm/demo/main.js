@@ -1,8 +1,8 @@
-// Plays fire/campfire through the pixfx-wasm engine: JS steps the effect and blits its pixels each frame.
+// Plays projectiles/trail through the pixfx-wasm engine: JS steps the effect and blits its pixels each frame.
 // Build first: wasm-pack build crates/pixfx-wasm --target web --out-dir demo/pkg
 import init, { Fx, effects, meta } from "./pkg/pixfx_wasm.js";
 
-const ID = "fire/campfire";
+const ID = "projectiles/trail";
 
 await init();
 const info = meta(ID);

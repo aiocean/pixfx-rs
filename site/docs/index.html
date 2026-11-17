@@ -31,7 +31,7 @@
   <li><strong>Render.</strong> Run an effect natively and write sprite sheets (composite, colour and light PNGs plus a beanfx-layout JSON), or a looping GIF. See <a href="scripts.html">Scripts</a>.</li>
   <li><strong>Play live.</strong> Run the same effect in a browser through a Canvas 2D renderer that owns its loop, through plain JS bindings, inside a Phaser 4 scene, or inside a gpui window.</li>
 </ul>
-<p>The effects are ports of <a href="https://github.com/patch-gg/pixelfx">pixelfx</a> (JavaScript). The ported effects match pixelfx exactly: <code>fire/candle</code>, <code>fire/campfire</code> and <code>fire/brazier</code> render with 0 differing pixels against pixelfx commit <code>044e12a</code>.</p>
+<p>An effect here reads the sprite it plays on or the way it moved: an outline, a power-up aura, a body bursting apart, a trail. One that reads neither (a fire, an explosion, a shield) is sprite art the game plays. The engine and <code>feedback/power-up</code> are ports of <a href="https://github.com/patch-gg/pixelfx">pixelfx</a> (JavaScript).</p>
 
 <h2>Pick a package</h2>
 <div class="table-wrap">
@@ -64,7 +64,7 @@
     <tr><td><code>packages/pixfx-phaser</code></td><td>Phaser 4 scene plugin, effects drawn on worker threads.</td></tr>
     <tr><td><code>packages/pixfx-pixi</code></td><td>Pixi 8 shell, effects drawn on worker threads.</td></tr>
     <tr><td><code>crates/pixfx-gpui</code></td><td>Live playback inside gpui. Needs a gpui fork; a separate workspace.</td></tr>
-    <tr><td><code>examples/gpui-web</code></td><td>A gpui web app playing the candle and campfire.</td></tr>
+    <tr><td><code>examples/gpui-web</code></td><td>A gpui web app playing effects live.</td></tr>
   </tbody>
 </table>
 </div>

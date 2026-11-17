@@ -27,6 +27,29 @@ const ALL = [...new Set([...sourceIds(), ...BUILT])].sort();
 /** Roles in which the effect (or the blow it gives the caster) strikes the other fighter. */
 const HITTING = new Set(["strike", "projectile", "stream", "buff", "ground-self", "ground-foe", "flight", "blink", "ambient", "death", "volley"]);
 
+/**
+ * Stand-ins for the roles no effect in the engine plays today: an id the engine does not have, staged in that role
+ * with the tuning such an effect would carry, so every role the bout stages stays tested. `cueAt`: the seconds
+ * after it plays at which it would send its cues.
+ */
+const STAND_INS = {
+  "stand-in/pull": { role: "strike", at: "chest", impact: 1.02, power: 25, spell: "collapse", pull: 40, pullUntil: 0.8 },
+  "stand-in/freeze": { role: "strike", at: "ground", impact: 0.944, power: 28, spell: "icicle", freeze: 0.9, cueAt: [0.944] },
+  "stand-in/bolt": { role: "projectile", speed: 230, power: 13, spell: "bolt", directional: true },
+  "stand-in/orb": { role: "projectile", orb: true, speed: 30, power: 14, spell: "orb", life: 5.5, distance: 72, mark: "burn" },
+  "stand-in/jet": { role: "stream", power: 4, every: 0.45, life: 1.8, spell: "bolt", directional: true },
+  "stand-in/shield": { role: "ward", blows: [1.05, 1.38, 1.62, 2.05], spell: "ward", directional: true, cueAt: [1.05, 1.38, 1.62, 2.05] },
+  "stand-in/circle": { role: "ground-self", power: 18, spell: "void", distance: 40 },
+  "stand-in/pool": { role: "ground-foe", life: 2.4, power: 8, spell: "frostfire", chill: true, mark: "chilled" },
+  "stand-in/clash": { role: "clash", spell: "slash" },
+  "stand-in/flight": { role: "flight", power: 11, spell: "dive", life: 1.4, carried: true },
+  "stand-in/prop": { role: "ambient", at: "side" },
+  "stand-in/wipe": { role: "ambient", at: "wipe" },
+  "stand-in/blink": { role: "blink", power: 15, spell: "step" },
+  "stand-in/volley": { role: "volley", hold: 1.2, aim: "converge", blows: [0.55, 0.9, 1.25], power: 10, spell: "seal", directional: true },
+};
+const standIn = (id) => ({ directional: false, loop: false, duration: 2, ...STAND_INS[id] });
+
 const arena = (seed) => createBout({ left: 20, right: 300, ground: 150, Body, seed });
 
 /**
@@ -42,8 +65,10 @@ function run(id, { seed = 3, takes = 1, cues = true, opts = {} } = {}) {
   let frame = 0;
   const bout = arena(seed);
   const m = BUILT.has(id) ? meta(id) : undefined;
-  const role = roleFor(id, m);
+  const role = STAND_INS[id] ? standIn(id) : roleFor(id, m);
   const live = new Map();
+  /** A stand-in's plays, by key: the frame it played in and the cues it has still to send. */
+  const acting = new Map();
   const commands = [];
   const lengths = [];
   for (let n = 0; n < takes; n++) {
@@ -56,6 +81,7 @@ function run(id, { seed = 3, takes = 1, cues = true, opts = {} } = {}) {
       for (const _ of out) at.push(frame);
       for (const c of out) {
         if (c.type === "play" && BUILT.has(c.fx)) live.set(c.key, new Fx(c.fx, c.opts));
+        else if (c.type === "play" && c.fx === id && role.cueAt) acting.set(c.key, { frame, cues: [...role.cueAt] });
         else if (c.type === "stop" && live.has(c.key)) {
           live.get(c.key).free();
           live.delete(c.key);
@@ -72,6 +98,15 @@ function run(id, { seed = 3, takes = 1, cues = true, opts = {} } = {}) {
           live.delete(key);
         }
       }
+      for (const [key, a] of acting) {
+        if (a.cues.length > 0 && (frame - a.frame) / 60 >= a.cues[0] - 1e-9) {
+          a.cues.shift();
+          if (cued.length < pass) {
+            impact(bout, key);
+            cued.push(frame);
+          }
+        }
+      }
     }
     lengths.push(i / 60);
   }
@@ -82,7 +117,7 @@ function run(id, { seed = 3, takes = 1, cues = true, opts = {} } = {}) {
 describe("effect roles", () => {
   test("the engine's source and its wasm build agree on the effects this test knows", () => {
     expect(ALL.length).toBeGreaterThanOrEqual(BUILT.size);
-    expect(ALL).toContain("explosions/plasma-explosion");
+    expect(ALL).toContain("explosions/body-burst");
   });
 
   test.each(ALL)("%s has a known role", (id) => {
@@ -99,7 +134,12 @@ describe("effect roles", () => {
 });
 
 describe("bout", () => {
-  test.each(ALL)("a take of %s plays it, lands its blow and settles back to rest", (id) => {
+  test("the stand-ins cover every role", () => {
+    const staged = new Set([...ALL.map((id) => roleFor(id, BUILT.has(id) ? meta(id) : undefined).role), ...Object.values(STAND_INS).map((t) => t.role)]);
+    for (const role of ROLES) expect(staged).toContain(role);
+  });
+
+  test.each([...ALL, ...Object.keys(STAND_INS)])("a take of %s plays it, lands its blow and settles back to rest", (id) => {
     for (const cues of [true, false]) {
       const { bout, role, commands, lengths } = run(id, { cues });
       const caster = 0;
@@ -127,15 +167,15 @@ describe("bout", () => {
   });
 
   test("a blow with a cue lands the frame after its cue; with no cue, at the effect's own time and a little more", () => {
-    // icicle-fall drops at 0.944 s (duel.js SPELLS.icicle); the bout's fallback lands it 0.15 s after that
+    // the stand-in's icicle drops at 0.944 s; the bout's fallback lands it 0.15 s after that
     const frameOf = (r, is) => r.at[r.commands.findIndex(is)];
-    const play = (c) => c.type === "play" && c.fx === "ice/icicle-fall";
+    const play = (c) => c.type === "play" && c.fx === "stand-in/freeze";
     const hit = (c) => c.type === "hit";
-    const cued = run("ice/icicle-fall");
+    const cued = run("stand-in/freeze");
     expect(cued.cued.length).toBeGreaterThan(0);
     // impact() queues the blow: it comes out of the step after the cue
     expect(frameOf(cued, hit) - cued.cued[0]).toBe(1);
-    const uncued = run("ice/icicle-fall", { cues: false });
+    const uncued = run("stand-in/freeze", { cues: false });
     expect(uncued.cued.length).toBe(0);
     const late = (frameOf(uncued, hit) - frameOf(uncued, play)) / 60;
     expect(late).toBeGreaterThanOrEqual(0.944 + 0.15 - 1 / 60);
@@ -145,8 +185,8 @@ describe("bout", () => {
   });
 
   test("blows whose cues never come still land at their own times", () => {
-    // only the first of hex-shield's four blows is cued; the other three land on the bout's own clock
-    const { commands, cued, at, lengths } = run("arcane/hex-shield", { cues: 1 });
+    // only the first of the shield's four blows is cued; the other three land on the bout's own clock
+    const { commands, cued, at, lengths } = run("stand-in/shield", { cues: 1 });
     expect(cued.length).toBe(1);
     const blocks = commands.map((c, i) => [c, at[i]]).filter(([c]) => c.type === "block");
     expect(blocks.length).toBe(4);
@@ -154,25 +194,25 @@ describe("bout", () => {
     expect(lengths[0]).toBeLessThan(TAKE_MAX - 2);
   });
 
-  test("a hex shield turns aside each of its four blows exactly once, cued or not", () => {
+  test("a shield turns aside each of its four blows exactly once, cued or not", () => {
     for (const cues of [true, false]) {
-      const { commands } = run("arcane/hex-shield", { cues });
+      const { commands } = run("stand-in/shield", { cues });
       expect(commands.filter((c) => c.type === "block").length).toBe(4);
       expect(commands.some((c) => c.type === "hit")).toBe(false);
     }
   });
 
   test("takes alternate casters: Thunder, then Frost", () => {
-    const { commands } = run("projectiles/laser-bolt", { takes: 2 });
+    const { commands } = run("stand-in/bolt", { takes: 2 });
     const hits = commands.filter((c) => c.type === "hit").map((c) => c.by);
     expect(hits).toEqual([0, 1]);
     // Frost on the right shoots leftward: the bolt is flipped
-    const plays = commands.filter((c) => c.type === "play" && c.fx === "projectiles/laser-bolt");
+    const plays = commands.filter((c) => c.type === "play" && c.fx === "stand-in/bolt");
     expect(plays.map((c) => !!c.opts.flip)).toEqual([false, true]);
   });
 
   test("a fighter thrown back by a heavy blow leaves an afterimage that rides it and ends", () => {
-    const { commands } = run("projectiles/laser-bolt");
+    const { commands } = run("stand-in/bolt");
     const hit = commands.find((c) => c.type === "hit");
     const after = commands.find((c) => c.type === "play" && c.fx === "projectiles/trail");
     // the trail plays on the fighter struck, so it wraps that fighter's sprite
@@ -182,18 +222,18 @@ describe("bout", () => {
   });
 
   test("an effect whose role says it is carried plays carried; others are not handed the option", () => {
-    const pack = run("scifi/jetpack").commands.find((c) => c.type === "play" && c.fx === "scifi/jetpack");
+    const pack = run("stand-in/flight").commands.find((c) => c.type === "play" && c.fx === "stand-in/flight");
     expect(pack?.opts.carried).toBe(1);
-    const bolt = run("projectiles/laser-bolt").commands.find((c) => c.type === "play" && c.fx === "projectiles/laser-bolt");
+    const bolt = run("stand-in/bolt").commands.find((c) => c.type === "play" && c.fx === "stand-in/bolt");
     expect(bolt?.opts.carried).toBeUndefined();
   });
 
   test("a take may name its caster; without one, the turns go on from whoever cast last", () => {
-    const laser = roleFor("projectiles/laser-bolt", meta("projectiles/laser-bolt"));
+    const laser = standIn("stand-in/bolt");
     const casters = (picks) => {
       const bout = arena(1);
       return picks.map((caster) => {
-        take(bout, "projectiles/laser-bolt", laser, {}, caster === undefined ? {} : { caster });
+        take(bout, "stand-in/bolt", laser, {}, caster === undefined ? {} : { caster });
         return bout.caster;
       });
     };
@@ -207,11 +247,11 @@ describe("bout", () => {
     const bout = arena(1);
     const hits = [];
     for (let n = 0; n < 2; n++) {
-      take(bout, "projectiles/laser-bolt", laser, {}, { caster: 0 });
+      take(bout, "stand-in/bolt", laser, {}, { caster: 0 });
       for (let i = 0; i < TAKE_MAX * 60 && !bout.done; i++) hits.push(...step(bout, 1 / 60).filter((c) => c.type === "hit"));
     }
     expect(hits.map((c) => c.by)).toEqual([0, 0]);
-    expect(() => take(bout, "projectiles/laser-bolt", laser, {}, { caster: 2 })).toThrow("caster must be 0 or 1");
+    expect(() => take(bout, "stand-in/bolt", laser, {}, { caster: 2 })).toThrow("caster must be 0 or 1");
   });
 
   test("a body burst destroys the fighter the caster strikes down: it is gone where it stood", () => {
@@ -237,44 +277,44 @@ describe("bout", () => {
     expect(roleFor("feedback/outline", meta("feedback/outline")).role).not.toBe("death");
     expect(meta("explosions/body-burst").replacesActor).toBe(true);
     expect(meta("feedback/outline").replacesActor).toBe(false);
-    expect(meta("explosions/plasma-explosion").replacesActor).toBe(false);
+    expect(meta("feedback/power-up").replacesActor).toBe(false);
   });
 
   test("a take says what it shows, the caster first", () => {
     const bout = arena(1);
-    take(bout, "projectiles/laser-bolt", roleFor("projectiles/laser-bolt", meta("projectiles/laser-bolt")));
+    take(bout, "stand-in/bolt", standIn("stand-in/bolt"));
     expect(bout.caption).toBe("Thunder throws it at Frost");
-    take(bout, "projectiles/laser-bolt", roleFor("projectiles/laser-bolt", meta("projectiles/laser-bolt")));
+    take(bout, "stand-in/bolt", standIn("stand-in/bolt"));
     expect(bout.caption).toBe("Frost throws it at Thunder");
   });
 
   test("a screen wipe comes after the spar's blow, ending the scene", () => {
-    const { commands } = run("transitions/crt-off");
+    const { commands } = run("stand-in/wipe");
     const struck = commands.findIndex((c) => c.type === "hit");
-    const wiped = commands.findIndex((c) => c.type === "play" && c.fx === "transitions/crt-off");
+    const wiped = commands.findIndex((c) => c.type === "play" && c.fx === "stand-in/wipe");
     expect(struck).toBeGreaterThanOrEqual(0);
     expect(wiped).toBeGreaterThan(struck);
   });
 
   test("the page's options reach the effect", () => {
-    const { commands } = run("explosions/small-explosion", { opts: { size: 1.5, seed: 9 } });
+    const { commands } = run("feedback/power-up", { opts: { size: 1.5, seed: 9 } });
     const play = commands.find((c) => c.type === "play");
     expect(play.opts).toMatchObject({ size: 1.5, seed: 9 });
   });
 
   test("a new take cuts the one playing short and stops what it played", () => {
     const bout = arena(1);
-    take(bout, "water/water-jet", roleFor("water/water-jet", meta("water/water-jet")));
+    take(bout, "stand-in/jet", standIn("stand-in/jet"));
     const first = [];
     for (let i = 0; i < 90; i++) first.push(...step(bout, 1 / 60));
     const jet = first.find((c) => c.type === "play");
     expect(jet).toBeDefined();
-    take(bout, "spawn/poof", roleFor("spawn/poof", meta("spawn/poof")));
+    take(bout, "stand-in/blink", standIn("stand-in/blink"));
     expect(step(bout, 1 / 60).some((c) => c.type === "stop" && c.key === jet.key)).toBe(true);
   });
 
   test("a seed replays the same takes", () => {
-    for (const id of ["explosions/implosion", "lightning/ball-lightning", "fire/campfire", "scifi/jetpack"]) {
+    for (const id of ["explosions/body-burst", "projectiles/trail", "stand-in/pull", "stand-in/orb", "stand-in/prop", "stand-in/flight"]) {
       const a = JSON.stringify(run(id, { seed: 5, takes: 3 }).commands);
       const b = JSON.stringify(run(id, { seed: 5, takes: 3 }).commands);
       expect(b).toBe(a);

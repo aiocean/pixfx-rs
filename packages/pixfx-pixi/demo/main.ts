@@ -1,6 +1,7 @@
-// A campfire and braziers on dark ground, a candle following a walker, and an explosion with shake where you click.
+// A walker on dark ground ringed by an outline and smeared by a trail along the way it walks, a hero powering up (the
+// aura grips its sprite), and a body bursting with shake where you click.
 // `window.pixfxPixiDemo` exposes the app, pixfx and the events for the browser check.
-import { Application, Container, Graphics } from "pixi.js";
+import { Application, Container, Graphics, Sprite, Texture } from "pixi.js";
 import { createPixfx, loadPixfx } from "../src";
 import type { Pixfx, WorldCue } from "../src";
 
@@ -31,28 +32,54 @@ const pixfx = createPixfx(app, { container: fx, camera: world });
 world.addChild(fx);
 
 const events: string[] = [];
-pixfx.play("fire/campfire", 168, GROUND, { seed: 1 });
-pixfx.play("fire/brazier", 60, GROUND, { seed: 2, depth: { back: 0, front: 2 } });
-pixfx.play("fire/brazier", 280, GROUND, { seed: 3 });
 
-// a walker the candle follows, between the back and front sprites
-const walker = { x: 114, y: GROUND - 18, active: true };
-const figure = new Graphics().rect(-4, 0, 8, 18).fill(0x4fd1c5);
-figure.zIndex = 1;
-fx.addChild(figure);
-const candle = pixfx.play("fire/candle", 0, 0, { seed: 4 }).follow(walker, 0, 0);
-candle.on("destroy", () => events.push("candle destroy"));
+/** A sprite of one `w` x `h` block of `color`, standing on its bottom middle. */
+function block(w: number, h: number, color: string): Sprite {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const c = canvas.getContext("2d");
+  if (!c) throw new Error("demo: no 2d context");
+  c.fillStyle = color;
+  c.fillRect(0, 0, w, h);
+  const texture = Texture.from(canvas);
+  texture.source.scaleMode = "nearest";
+  const sprite = new Sprite(texture);
+  sprite.anchor.set(0.5, 1);
+  return sprite;
+}
+
+// the game's own figures, between the effects' back and front sprites
+const figures = new Container();
+figures.zIndex = 0.5;
+fx.addChild(figures);
+
+// a walker the outline rings and the trail smears
+const walker = { x: 114, y: GROUND, active: true };
+const figure = figures.addChild(block(8, 18, "#4fd1c5"));
+pixfx.play("projectiles/trail", 0, 0, { seed: 3 }).follow(walker, 0, -9).wrap(pixfx.actorOf(figure));
+const outline = pixfx.play("feedback/outline", 0, 0, { seed: 4 }).follow(walker, 0, -9).wrap(pixfx.actorOf(figure));
+outline.on("destroy", () => events.push("outline destroy"));
 app.ticker.add(() => {
   walker.x = 114 + Math.sin(performance.now() / 900) * 22;
-  figure.position.set(walker.x, walker.y);
+  figure.position.set(Math.round(walker.x), walker.y);
 });
+
+// a hero powering up, again and again
+const hero = figures.addChild(block(12, 22, "#d94f5c"));
+hero.position.set(236, GROUND);
+const powerUp = (): void => {
+  pixfx.play("feedback/power-up", 236, GROUND, { seed: 5 }).wrap(pixfx.actorOf(hero)).on("complete", powerUp);
+};
+powerUp();
 
 pixfx.feel.on("cue", (c: WorldCue) => events.push(`cue ${c.cue.type}`));
 app.canvas.addEventListener("click", (e) => {
   const r = app.canvas.getBoundingClientRect();
   const x = ((e.clientX - r.left) / r.width) * GAME.w;
   const y = ((e.clientY - r.top) / r.height) * GAME.h;
-  pixfx.play("explosions/small-explosion", x, y).on("complete", () => events.push("explosion complete"));
+  // no character given: it blows apart a stand-in body standing at the click
+  pixfx.play("explosions/body-burst", x, y).on("complete", () => events.push("burst complete"));
 });
 
 window.pixfxPixiDemo = { app, pixfx, world, events };

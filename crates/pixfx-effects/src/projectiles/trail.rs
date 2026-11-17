@@ -9,8 +9,7 @@
 //! the sprite it plays on) it smears that body instead: the sprite's back edge, away from the way it goes, as tall as
 //! it is and in its own colours (`Brush::edge`, one in from its outline), standing upright as the body does,
 //! dissolving behind it, narrowing to `taper` of its height and turning translucent from `soft` along it (a pointed,
-//! soft tail: `taper` 0, `soft` 0.3); `width`, `wave`, `turn` and the palette shape only the ribbon. A broad
-//! effect of its own (a mirror) smears its own edge in its own draw (`arcane/bagua-mirror-flying`). Lay it under any
+//! soft tail: `taper` 0, `soft` 0.3); `width`, `wave`, `turn` and the palette shape only the ribbon. Lay it under any
 //! projectile
 //! (`pixfx_scene::Scene::trail`), or play it on its own and move it with a character: it draws the way it was
 //! moved. It draws on the back layer, behind a character.

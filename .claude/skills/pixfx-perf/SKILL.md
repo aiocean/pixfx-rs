@@ -18,8 +18,8 @@ message. Each part measures itself. Pick the measurement of the layer you change
 ## Effects bench (the engine)
 
 ```sh
-cargo run --release -p pixfx-effects --no-default-features --features fire-candle --example bench   # one effect
-cargo run --release -p pixfx-effects --example bench -- --ids fire/candle,fire/campfire --n 100      # chosen ids
+cargo run --release -p pixfx-effects --no-default-features --features feedback-outline --example bench   # one effect
+cargo run --release -p pixfx-effects --example bench -- --ids feedback/outline,projectiles/trail --n 100      # chosen ids
 cargo run --release -p pixfx-effects --example bench                                                 # every effect
 ```
 
@@ -61,7 +61,7 @@ Needs the gpui fork in game-factory's `tools/zed-gpui`, beside `pixfx-rs` (not i
   paint and transfer bytes that reach the main thread once, WebGL shells show from one atlas. No layer groups.
   Work with it, not round it.
 - Release builds keep `opt-level = 3` with fat LTO (`Cargo.toml` `[profile.release]`). A game cuts wasm size by
-  building only its effects (`bun run build:wasm --no-default-features --features pixfx-effects/fire-candle`: the id with `/` as `-`), never by
+  building only its effects (`bun run build:wasm --no-default-features --features pixfx-effects/feedback-outline`: the id with `/` as `-`), never by
   `opt-level = "s"`/`"z"`. Trading speed for bytes needs the owner's yes.
 - A game with many effects at once: `setDrawBudget(n)` (JS) / `set_draw_budget` (gpui) caps layers drawn per frame.
 
