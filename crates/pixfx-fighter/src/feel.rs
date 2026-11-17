@@ -72,10 +72,13 @@ pub struct DuskSpec {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FeelSpec {
     pub stop: Stop,
-    /// The one struck shudders through the hit-stop: this many pixels at first, dying away by its end.
+    /// The one struck shudders through the hit-stop: this many pixels at first, dying away by its end, changing
+    /// side `jolt_rate` times a second of real time (so it reads the same at 60 and 120 frames a second).
     pub jolt: f64,
-    /// Trauma, 0 to 1, a blow adds: its share of full life over `share_trauma`, plus `crit_trauma` for a crit and
-    /// again for a counter or a punish.
+    pub jolt_rate: f64,
+    /// Trauma, 0 to 1, a blow adds: `hit_trauma` for any blow (the screen squares trauma, so a jab still moves it),
+    /// its share of full life over `share_trauma`, plus `crit_trauma` for a crit and again for a counter or a punish.
+    pub hit_trauma: f64,
     pub share_trauma: f64,
     pub crit_trauma: f64,
     /// The screen's answer: shake, its drain, the freeze cap, the flash.
@@ -109,8 +112,10 @@ impl Default for FeelSpec {
                 punish: 3.0,
                 medium_power: 9.0,
             },
-            jolt: 2.0,
-            share_trauma: 25.0,
+            jolt: 3.0,
+            jolt_rate: 30.0,
+            hit_trauma: 0.3,
+            share_trauma: 40.0,
             crit_trauma: 0.2,
             // a blow's trauma (its share of life over `share_trauma`) and a knockout's 0.8 run high, and the hero
             // shows each game pixel 2 to 4 times: the engine's 16 px would throw a knockout 50 screen pixels
@@ -381,7 +386,8 @@ pub struct Feel {
     streaks: Vec<Qi>,
     dust: Vec<Puff>,
     jolt: Option<Jolt>,
-    tick: u64,
+    /// Real seconds gone by, for the jolt's side.
+    clock: f64,
 }
 
 fn hit_stop(
@@ -436,7 +442,7 @@ impl Feel {
             streaks: Vec::new(),
             dust: Vec::new(),
             jolt: None,
-            tick: 0,
+            clock: 0.0,
         }
     }
 
@@ -502,7 +508,8 @@ impl Feel {
                     });
                     let caught = how != How::Plain;
                     self.screen.add_trauma(
-                        share / s.share_trauma
+                        s.hit_trauma
+                            + share / s.share_trauma
                             + if crit { s.crit_trauma } else { 0.0 }
                             + if caught { s.crit_trauma } else { 0.0 },
                     );
@@ -632,7 +639,7 @@ impl Feel {
             d.t += dt;
         }
         self.dust.retain(|d| d.t < s.dust.life);
-        self.tick = self.tick.wrapping_add(1);
+        self.clock += dt;
         if let Some(j) = &mut self.jolt {
             j.left -= dt;
             if j.left <= 0.0 {
@@ -655,13 +662,10 @@ impl Feel {
         let Some(j) = self.jolt else {
             return out;
         };
-        // flips side every frame, smaller as the stop runs out
+        // flips side `jolt_rate` times a second, smaller as the stop runs out
+        let side = libm::floor(self.clock * self.spec.jolt_rate) as i64;
         let a = js_round(self.spec.jolt * (j.left / j.full) + 0.4)
-            * if self.tick.is_multiple_of(2) {
-                -1.0
-            } else {
-                1.0
-            };
+            * if side % 2 == 0 { -1.0 } else { 1.0 };
         let a = to_int32(a);
         if let Some(slot) = out.get_mut(j.who) {
             *slot = if j.air { (0, a) } else { (a, 0) };

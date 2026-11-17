@@ -273,3 +273,39 @@ fn the_duel_shakes_by_its_own_screen_spec() {
     );
     assert!(worst >= 3, "a knockout reads clearly: {worst} px");
 }
+
+#[test]
+fn even_a_jab_moves_the_screen() {
+    let mut feel = Feel::new();
+    feel.react(&[hit(0, (3.0, false, false), 2.0, 50.0, (0.0, 0.0))]);
+    let most = (0..60)
+        .map(|_| {
+            feel.advance(1.0 / 60.0);
+            let (x, y) = feel.shake(1.0);
+            x.abs().max(y.abs())
+        })
+        .max()
+        .unwrap_or(0);
+    assert!(most >= 1, "a jab of 2% of life left the screen still");
+}
+
+#[test]
+fn the_struck_shudders_at_the_same_rate_at_any_frame_rate() {
+    // sides the jolt shows over the first 0.1 s of a stop, at 60 and at 120 frames a second
+    let sides = |fps: f64| {
+        let mut feel = Feel::new();
+        feel.react(&[hit(0, (20.0, true, false), 20.0, 50.0, (0.0, 0.0))]);
+        let mut changes = 0;
+        let mut last = feel.jolts()[1].0.signum();
+        for _ in 0..(fps * 0.1) as usize {
+            feel.advance(1.0 / fps);
+            let now = feel.jolts()[1].0.signum();
+            if now != 0 && now != last {
+                changes += 1;
+                last = now;
+            }
+        }
+        changes
+    };
+    assert_eq!(sides(60.0), sides(120.0));
+}

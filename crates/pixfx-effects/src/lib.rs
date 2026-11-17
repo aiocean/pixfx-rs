@@ -36,6 +36,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &fire::BRAZIER,
     #[cfg(feature = "fire-spirit-flame")]
     &fire::SPIRIT_FLAME,
+    #[cfg(feature = "impacts-hit")]
+    &impacts::HIT,
     #[cfg(feature = "impacts-parry")]
     &impacts::PARRY,
     #[cfg(feature = "explosions-dirt-explosion")]

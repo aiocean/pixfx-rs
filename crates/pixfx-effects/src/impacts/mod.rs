@@ -2,6 +2,12 @@
 
 pub mod lib;
 
+#[cfg(feature = "impacts-hit")]
+mod hit;
+
+#[cfg(feature = "impacts-hit")]
+pub use hit::HIT;
+
 #[cfg(feature = "impacts-parry")]
 mod parry;
 
