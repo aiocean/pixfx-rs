@@ -25,6 +25,10 @@
     that spits grit, sets with a pale flash and a dust skirt, then holds as a statue that cracks, glints and sheds
     a pebble. The creep plays once and the statue loops: the first effect to use `Effect::loop_from` (`cracks`,
     `grit`, `mottle`, `creep`: 0 sets the statue from the first frame).
+- `melee/sword-slash` (feature `melee-sword-slash`): the smear a blade leaves through an overhead cut on the character
+  it plays on, swept with `pixfx_draw::sweep` from the effect's own arc; reads the sprite through
+  `pixfx_core::Silhouette::centroid` in `set_actor` for the shoulder it swings from, a stand-in shoulder when played
+  alone; a light `impact` cue as the blade arrives.
 
 ## 0.3.0
 

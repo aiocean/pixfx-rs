@@ -10,7 +10,7 @@ The effects that read the sprite they play on (`pixfx_core::Silhouette`, `Actor`
 `explosions/body-burst`, `feedback/burning`, `feedback/cloak-shimmer`, `feedback/electrified`, `feedback/encase`,
 `feedback/frozen`, `feedback/outline`, `feedback/petrified`, `feedback/poisoned`,
 `feedback/power-up` (a port of Sprite Fusion's pixel art VFX, https://www.spritefusion.com/pixel-art-vfx),
-`feedback/soaked`, `projectiles/trail`. Each
+`feedback/soaked`, `melee/sword-slash`, `projectiles/trail`. Each
 effect lives in its category folder (`src/feedback/outline.rs`), is listed in `EFFECTS` and is looked up with
 `pixfx_effects::effect(id)`.
 
