@@ -36,6 +36,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &feedback::ELECTRIFIED,
     #[cfg(feature = "feedback-encase")]
     &feedback::ENCASE,
+    #[cfg(feature = "feedback-frozen")]
+    &feedback::FROZEN,
     #[cfg(feature = "feedback-outline")]
     &feedback::OUTLINE,
     #[cfg(feature = "feedback-power-up")]

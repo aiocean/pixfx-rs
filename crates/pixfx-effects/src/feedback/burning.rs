@@ -296,7 +296,7 @@ impl State {
                 .unwrap_or((0, -1));
             (if right { r } else { l }, b.y + my)
         };
-        let up: Vec<(i32, i32)> = body.open(0, -1).collect();
+        let up: Vec<(i32, i32)> = body.sil.open(0, -1).collect();
         let hair = up
             .iter()
             .copied()

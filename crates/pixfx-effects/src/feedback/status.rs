@@ -101,14 +101,6 @@ impl Body {
             rows,
         }
     }
-
-    /// The covered cells whose neighbour at (`dx`, `dy`) is uncovered, row by row: pixelfx's `up` (0, -1), `side`
-    /// (-1, 0) and (1, 0), and the cells something hangs from (0, 1).
-    pub(crate) fn open(&self, dx: i32, dy: i32) -> impl Iterator<Item = (i32, i32)> + '_ {
-        self.sil
-            .cells()
-            .filter(move |&(x, y)| !self.sil.covers(x + dx, y + dy))
-    }
 }
 
 /// The stand-in figure to the ruler (`RULER`: 40 rows, head 7): a head disc `size(head, 1.0)` = 7 across, a trunk

@@ -10,13 +10,15 @@ mod cloak_shimmer;
 mod electrified;
 #[cfg(feature = "feedback-encase")]
 mod encase;
+#[cfg(feature = "feedback-frozen")]
+mod frozen;
 #[cfg(feature = "feedback-outline")]
 mod outline;
 #[cfg(feature = "feedback-power-up")]
 mod power_up;
 #[cfg(feature = "feedback-soaked")]
 mod soaked;
-#[cfg(feature = "feedback-burning")]
+#[cfg(any(feature = "feedback-burning", feature = "feedback-frozen"))]
 mod status;
 
 #[cfg(feature = "feedback-burning")]
@@ -27,6 +29,8 @@ pub use cloak_shimmer::CLOAK_SHIMMER;
 pub use electrified::ELECTRIFIED;
 #[cfg(feature = "feedback-encase")]
 pub use encase::ENCASE;
+#[cfg(feature = "feedback-frozen")]
+pub use frozen::FROZEN;
 #[cfg(feature = "feedback-outline")]
 pub use outline::OUTLINE;
 #[cfg(feature = "feedback-power-up")]
