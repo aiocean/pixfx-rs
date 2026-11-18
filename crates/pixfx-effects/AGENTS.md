@@ -6,7 +6,7 @@ anything here; this file only says what this crate holds.
 ## Job
 
 The effects that read the sprite they play on (`pixfx_core::Silhouette`, `Actor`) or the way it moved
-(`pixfx_core::Trace`): `appear/teleport-beam`, `disappear/blink-out`, `disappear/fade`, `disappear/incinerate`,
+(`pixfx_core::Trace`): `appear/dither`, `appear/teleport-beam`, `disappear/blink-out`, `disappear/dither`, `disappear/fade`, `disappear/incinerate`,
 `explosions/body-burst`, `feedback/cloak-shimmer`, `feedback/electrified`, `feedback/encase`, `feedback/outline`,
 `feedback/power-up` (a port of Sprite Fusion's pixel art VFX, https://www.spritefusion.com/pixel-art-vfx),
 `feedback/soaked`, `projectiles/trail`. Each

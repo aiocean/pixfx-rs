@@ -31,6 +31,8 @@
 //! | `explosions/body-burst` | Permanent violent destruction (`replaces_actor = true`). |
 #[cfg(feature = "disappear-blink-out")]
 mod blink_out;
+#[cfg(feature = "disappear-dither")]
+mod dither;
 #[cfg(feature = "disappear-fade")]
 mod fade;
 #[cfg(feature = "disappear-incinerate")]
@@ -38,6 +40,8 @@ mod incinerate;
 
 #[cfg(feature = "disappear-blink-out")]
 pub use blink_out::BLINK_OUT;
+#[cfg(feature = "disappear-dither")]
+pub use dither::DITHER;
 #[cfg(feature = "disappear-fade")]
 pub use fade::FADE;
 #[cfg(feature = "disappear-incinerate")]

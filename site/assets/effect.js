@@ -40,6 +40,11 @@ const OWN = {
     { key: "wave", label: "Wave", min: 0, max: 4, step: 0.1, value: 1.2 },
     { key: "turn", label: "Turn with it", min: 0, max: 1, step: 1, value: 0 },
   ],
+  "appear/dither": [
+    { key: "angle", label: "Sweep angle", min: 0, max: 360, step: 15, value: 90 },
+    { key: "spread", label: "Spread", min: 0, max: 0.9, step: 0.05, value: 0.6 },
+    { key: "whiten", label: "Whiten", min: 0, max: 1, step: 0.05, value: 0.3 },
+  ],
   "appear/teleport-beam": [
     { key: "bits", label: "Bits", min: 0, max: 24, step: 1, value: 12 },
     { key: "tear", label: "Tear", min: 0, max: 2, step: 0.25, value: 1 },
@@ -49,6 +54,11 @@ const OWN = {
     { key: "motes", label: "Rune motes", min: 8, max: 48, step: 1, value: 30 },
     { key: "specks", label: "Specks", min: 0, max: 20, step: 1, value: 12 },
     { key: "glyph", label: "Floor glyph", min: 0.6, max: 1.4, step: 0.05, value: 1 },
+  ],
+  "disappear/dither": [
+    { key: "angle", label: "Sweep angle", min: 0, max: 360, step: 15, value: 90 },
+    { key: "spread", label: "Spread", min: 0, max: 0.9, step: 0.05, value: 0.6 },
+    { key: "whiten", label: "Whiten", min: 0, max: 1, step: 0.05, value: 0.3 },
   ],
   "disappear/fade": [
     { key: "grow", label: "Grow", min: 0, max: 1, step: 0.05, value: 0.25 },

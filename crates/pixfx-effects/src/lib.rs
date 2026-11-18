@@ -6,16 +6,22 @@ use pixfx_core::effect::{Effect, find};
 
 pub mod appear;
 pub mod disappear;
+#[cfg(any(feature = "appear-dither", feature = "disappear-dither"))]
+mod dither;
 pub mod explosions;
 pub mod feedback;
 pub mod projectiles;
 
 /// Every effect in this crate.
 pub static EFFECTS: &[&'static dyn Effect] = &[
+    #[cfg(feature = "appear-dither")]
+    &appear::DITHER,
     #[cfg(feature = "appear-teleport-beam")]
     &appear::TELEPORT_BEAM,
     #[cfg(feature = "disappear-blink-out")]
     &disappear::BLINK_OUT,
+    #[cfg(feature = "disappear-dither")]
+    &disappear::DITHER,
     #[cfg(feature = "disappear-fade")]
     &disappear::FADE,
     #[cfg(feature = "disappear-incinerate")]

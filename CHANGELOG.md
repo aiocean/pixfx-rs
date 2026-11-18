@@ -2,6 +2,11 @@
 
 ## 0.3.0
 
+- Effects: `disappear/dither` and `appear/dither` (features `disappear-dither`, `appear-dither`): the wrapped sprite
+  thins away (or fills in) through the painter's ordered 4x4 dither, an even checker sweeping across it along `angle`
+  (90: head first), `spread` saying how far ahead the first side runs and `whiten` how far a thinning pixel lights.
+  They share `src/dither.rs`, which reads the sprite once in `set_actor`; a frame draws in about half the time of
+  `disappear/fade`'s.
 - Effects: seven sprite-wrapping effects adapted from Pixel VFX Studio (`pvfx.deimos.studio`), each reading the wrapped
   sprite through `pixfx_core::Silhouette` in `set_actor` and falling back to its stand-in footprint when played alone
   (100% pixel parity with the `pvfx` reference across all 122 frames):
