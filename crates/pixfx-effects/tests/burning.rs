@@ -75,11 +75,16 @@ fn b1_the_tick_paints_every_body_cell_in_a_colour_not_the_sprites() -> Result<()
 #[test]
 fn b2_a_flame_stands_on_the_crown_on_the_tick() -> Result<(), String> {
     let (f, o) = front(0)?;
-    let above = (-H - 24..-H)
-        .flat_map(|y| (-W / 2..W / 2).map(move |x| (x, y)))
+    // the hair spot is the top-left up cell (-8, -32): its three tongues stand in the columns round it, at full
+    // flare on the tick at least 5 rows tall, 3 columns wide; a stray spark or ember is 1 px
+    let above = (-H - 6..-H)
+        .flat_map(|y| (-W / 2 - 3..=-W / 2 + 4).map(move |x| (x, y)))
         .filter(|&(x, y)| at(&f, o, x, y).is_some())
         .count();
-    assert!(above > 0, "nothing painted above the sprite's top row");
+    assert!(
+        above >= 6,
+        "{above} painted cells in the 6 rows over the crown round the hair spot: no flame stands there"
+    );
     Ok(())
 }
 
