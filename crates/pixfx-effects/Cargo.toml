@@ -80,6 +80,10 @@ required-features = ["feedback-poisoned"]
 name = "body_burst"
 required-features = ["explosions-body-burst"]
 
+[[test]]
+name = "sword_slash"
+required-features = ["melee-sword-slash"]
+
 [dev-dependencies]
 wasm-bindgen-test = "=0.3.80"
 # preserve_order: the goldens keep their order when blessed
