@@ -80,6 +80,30 @@ const OWN = {
     { key: "runnels", label: "Runnels", min: 0, max: 3, step: 1, value: 3 },
     { key: "splash", label: "Big splash", min: 0, max: 1, step: 1, value: 1 },
   ],
+  "feedback/burning": [
+    { key: "spots", label: "Hot spots", min: 2, max: 4, step: 1, value: 4 },
+    { key: "sparks", label: "Embers", min: 0, max: 2, step: 0.25, value: 1 },
+    { key: "smoke", label: "Smoke", min: 0, max: 1.5, step: 0.1, value: 1 },
+    { key: "beat", label: "Tick flash", min: 0, max: 1, step: 1, value: 1 },
+  ],
+  "feedback/frozen": [
+    { key: "ferns", label: "Frost ferns", min: 0, max: 8, step: 1, value: 6 },
+    { key: "icicles", label: "Icicles", min: 0, max: 6, step: 1, value: 6 },
+    { key: "snow", label: "Snow", min: 0, max: 1.5, step: 0.1, value: 1 },
+    { key: "shiver", label: "Shiver", min: 0, max: 1, step: 1, value: 1 },
+  ],
+  "feedback/poisoned": [
+    { key: "veins", label: "Veins", min: 0, max: 6, step: 1, value: 4 },
+    { key: "blisters", label: "Blisters", min: 0, max: 3, step: 1, value: 3 },
+    { key: "sweat", label: "Sweat", min: 0, max: 4, step: 1, value: 3 },
+    { key: "ring", label: "Floor ring", min: 0, max: 1, step: 1, value: 1 },
+  ],
+  "feedback/petrified": [
+    { key: "cracks", label: "Cracks", min: 0, max: 10, step: 1, value: 7 },
+    { key: "grit", label: "Grit", min: 0, max: 2, step: 0.25, value: 1 },
+    { key: "mottle", label: "Stone grain", min: 0, max: 1.5, step: 0.1, value: 1 },
+    { key: "creep", label: "Creep up first", min: 0, max: 1, step: 1, value: 1 },
+  ],
   "feedback/encase": [
     { key: "cracks", label: "Cracks", min: 1, max: 3, step: 1, value: 2 },
     { key: "dust", label: "Dust", min: 0.7, max: 1.25, step: 0.05, value: 1 },

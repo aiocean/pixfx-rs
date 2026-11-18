@@ -7,7 +7,8 @@ anything here; this file only says what this crate holds.
 
 The effects that read the sprite they play on (`pixfx_core::Silhouette`, `Actor`) or the way it moved
 (`pixfx_core::Trace`): `appear/dither`, `appear/teleport-beam`, `disappear/blink-out`, `disappear/dither`, `disappear/fade`, `disappear/incinerate`,
-`explosions/body-burst`, `feedback/cloak-shimmer`, `feedback/electrified`, `feedback/encase`, `feedback/outline`,
+`explosions/body-burst`, `feedback/burning`, `feedback/cloak-shimmer`, `feedback/electrified`, `feedback/encase`,
+`feedback/frozen`, `feedback/outline`, `feedback/petrified`, `feedback/poisoned`,
 `feedback/power-up` (a port of Sprite Fusion's pixel art VFX, https://www.spritefusion.com/pixel-art-vfx),
 `feedback/soaked`, `projectiles/trail`. Each
 effect lives in its category folder (`src/feedback/outline.rs`), is listed in `EFFECTS` and is looked up with

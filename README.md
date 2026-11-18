@@ -11,9 +11,9 @@ It has two modes:
 
 An effect here reads the sprite it plays on or the way it moved: an outline, a power-up aura, a body bursting apart,
 a trail, a teleport scan, a fade, a dither, an incineration, a blink-out, or a status wrap (`appear/dither`, `appear/teleport-beam`,
-`disappear/blink-out`, `disappear/dither`, `disappear/fade`, `disappear/incinerate`, `explosions/body-burst`, `feedback/cloak-shimmer`,
-`feedback/electrified`, `feedback/encase`, `feedback/outline`, `feedback/power-up`, `feedback/soaked`,
-`projectiles/trail`). One that reads
+`disappear/blink-out`, `disappear/dither`, `disappear/fade`, `disappear/incinerate`, `explosions/body-burst`, `feedback/burning`,
+`feedback/cloak-shimmer`, `feedback/electrified`, `feedback/encase`, `feedback/frozen`, `feedback/outline`, `feedback/petrified`,
+`feedback/poisoned`, `feedback/power-up`, `feedback/soaked`, `projectiles/trail`). One that reads
 neither (a fire, an explosion, a shield) is not an engine effect: it is sprite art the game plays. The engine started
 as a port of [pixelfx](https://github.com/patch-gg/pixelfx) (JS); `feedback/power-up` is a port of
 [Sprite Fusion's pixel art VFX](https://www.spritefusion.com/pixel-art-vfx). Sheets use the [beanfx](NOTICE.md)

@@ -58,6 +58,14 @@ const TABLE = {
   "disappear/incinerate": { role: "strike", at: "ground", impact: 0.267, power: 22, spell: "seal" },
   // electrified snap arc at frame 8 (8 / 16 s = 0.5 s)
   "feedback/electrified": { role: "buff", impact: 0.5, power: 16, spell: "ward" },
+  // burning tick flash at frame 8 (8 / 16 s = 0.5 s)
+  "feedback/burning": { role: "buff", impact: 0.5, power: 16, spell: "ward" },
+  // frozen second shiver at frame 16 (16 / 16 s = 1.0 s)
+  "feedback/frozen": { role: "buff", impact: 1.0, power: 16, spell: "ward" },
+  // poisoned tick at frame 12 (12 / 16 s = 0.75 s)
+  "feedback/poisoned": { role: "buff", impact: 0.75, power: 16, spell: "ward" },
+  // petrified stone sets at frame 8 (8 / 16 s = 0.5 s)
+  "feedback/petrified": { role: "buff", impact: 0.5, power: 16, spell: "ward" },
   // soaked big drop crown splash at frame 9 (9 / 16 s = 0.5625 s)
   "feedback/soaked": { role: "buff", impact: 0.5625, power: 14, spell: "ward" },
   // encase stone collars crack at frame 6 (6 / 16 s = 0.375 s)
