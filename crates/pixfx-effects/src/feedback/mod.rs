@@ -14,6 +14,8 @@ mod encase;
 mod frozen;
 #[cfg(feature = "feedback-outline")]
 mod outline;
+#[cfg(feature = "feedback-petrified")]
+mod petrified;
 #[cfg(feature = "feedback-poisoned")]
 mod poisoned;
 #[cfg(feature = "feedback-power-up")]
@@ -23,6 +25,7 @@ mod soaked;
 #[cfg(any(
     feature = "feedback-burning",
     feature = "feedback-frozen",
+    feature = "feedback-petrified",
     feature = "feedback-poisoned"
 ))]
 mod status;
@@ -39,6 +42,8 @@ pub use encase::ENCASE;
 pub use frozen::FROZEN;
 #[cfg(feature = "feedback-outline")]
 pub use outline::OUTLINE;
+#[cfg(feature = "feedback-petrified")]
+pub use petrified::PETRIFIED;
 #[cfg(feature = "feedback-poisoned")]
 pub use poisoned::POISONED;
 #[cfg(feature = "feedback-power-up")]

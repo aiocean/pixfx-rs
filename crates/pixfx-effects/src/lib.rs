@@ -40,6 +40,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &feedback::FROZEN,
     #[cfg(feature = "feedback-outline")]
     &feedback::OUTLINE,
+    #[cfg(feature = "feedback-petrified")]
+    &feedback::PETRIFIED,
     #[cfg(feature = "feedback-poisoned")]
     &feedback::POISONED,
     #[cfg(feature = "feedback-power-up")]

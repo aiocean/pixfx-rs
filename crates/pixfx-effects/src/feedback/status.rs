@@ -4,7 +4,6 @@
 //! Nothing here belongs to one ailment.
 
 use pixfx_core::{Actor, Area, Silhouette};
-use pixfx_draw::Painter;
 use pixfx_draw::color::{Rgba, luma};
 
 /// The whole canvas of a status (64 x 64, origin (32, 55)): the box the body is read in.
@@ -34,7 +33,12 @@ pub(crate) struct Body {
     pub cells: Vec<Cell>,
     /// The smallest box round the body.
     pub bounds: Area,
-    /// `rows[j]` is `(left, right)` of row `bounds.y + j`; `(0, -1)` for an empty row.
+    /// `rows[j]` is `(left, right)` of row `bounds.y + j`; `(0, -1)` for an empty row. Petrified reads no row.
+    #[cfg(any(
+        feature = "feedback-burning",
+        feature = "feedback-frozen",
+        feature = "feedback-poisoned"
+    ))]
     pub rows: Vec<(i32, i32)>,
 }
 
@@ -79,6 +83,11 @@ impl Body {
             w: 0,
             h: 0,
         });
+        #[cfg(any(
+            feature = "feedback-burning",
+            feature = "feedback-frozen",
+            feature = "feedback-poisoned"
+        ))]
         let rows = (0..bounds.h as i32)
             .map(|j| {
                 let y = bounds.y + j;
@@ -98,6 +107,11 @@ impl Body {
             sil,
             cells,
             bounds,
+            #[cfg(any(
+                feature = "feedback-burning",
+                feature = "feedback-frozen",
+                feature = "feedback-poisoned"
+            ))]
             rows,
         }
     }
@@ -120,8 +134,13 @@ fn stand_in(area: Area) -> Silhouette {
 
 /// The ellipse of light under the feet, `rx` by `ry` with its middle half a pixel under the origin, colour `c` at
 /// strength `k` in the middle falling to nothing at the rim (the floor flicker, cold floor light or sick glow the
-/// sources draw with `shade`). Light only: it paints no colour.
-pub(crate) fn floor_light(p: &mut Painter, rx: f64, ry: f64, c: Rgba, k: f64) {
+/// sources draw with `shade`). Light only: it paints no colour. Petrified's floor is dust, not light.
+#[cfg(any(
+    feature = "feedback-burning",
+    feature = "feedback-frozen",
+    feature = "feedback-poisoned"
+))]
+pub(crate) fn floor_light(p: &mut pixfx_draw::Painter, rx: f64, ry: f64, c: Rgba, k: f64) {
     p.shade(-rx - 1.0, -3.0, rx + 1.0, 7.0, |x, y, out| {
         let d = libm::hypot(x / rx, (y - 0.5) / ry);
         if d < 1.0 {
