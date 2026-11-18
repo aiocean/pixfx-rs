@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.0
+
+- Effects: seven sprite-wrapping effects adapted from Pixel VFX Studio (`pvfx.deimos.studio`), each reading the wrapped
+  sprite through `pixfx_core::Silhouette` in `set_actor` and falling back to its stand-in footprint when played alone
+  (100% pixel parity with the `pvfx` reference across all 122 frames):
+  - `appear/teleport-beam` (feature `appear-teleport-beam`): an emitter ring opens overhead and drops a scanline column
+    onto bracketed floor marks; the column widens into a striped scan field that prints the wrapped sprite from the head
+    down in horizontal bands, flashes white with a horizontal flare (`Cue::Flash`), then tears into sideways-glitching
+    slices while square bits lift off, hollow and fade.
+  - `disappear/incinerate` (feature `disappear-incinerate`): flames catch at the feet and climb the sprite, flare white
+    at the peak (`Cue::Flash`), and collapse to reveal the charred silhouette crumbling from the crown down into 3x3
+    tumbling black ash flakes with dying ember edges that drift up and away in the breeze.
+  - `disappear/blink-out` (feature `disappear-blink-out`): the wrapped sprite folds inward into vertical streaks that
+    stretch upward and pinch into a bright lens and line, flash white with a cross (`Cue::Flash`), and snap upward off
+    the top, leaving a collapsing implosion ring, drifting rune motes and a fading floor glyph.
+  - `feedback/electrified` (feature `feedback-electrified`): three jagged 2 px-cored lightning arcs crawl and flicker
+    around the wrapped sprite's outline (`Silhouette::ring`), one forked arc snaps across the body per loop leaving a
+    dashed afterimage, and sparks spit off and skid along the floor.
+  - `feedback/soaked` (feature `feedback-soaked`): beads gather at the wrapped sprite's extremities (hands, hem, hair
+    and shoulders), swell and fall as stretching teardrops that splat with ripples into a pool at the feet while runnels
+    slide down the flanks (recolours to bleeding with `palette: "blood"` or acid with `palette: "poison"`).
+  - `feedback/encase` (feature `feedback-encase`): collars of stone (or ice with `palette: "ice"`) close round the
+    wrapped sprite from the feet up in seamed plates sized to its silhouette, set with a white flash of cracks
+    (`Cue::Shake` + `Cue::Flash`), snapping chips and a rolling dust skirt at the feet, hold, then crumble from the top
+    down into falling chunks and grit.
+  - `feedback/cloak-shimmer` (feature `feedback-cloak-shimmer`): a stealth cloak loop on the wrapped sprite shown by a
+    broken refractive 1 px outline whose bright runs crawl up the body, torn sideways by two scanline distortion bands
+    travelling down per loop, and faltering once per loop into a pale full outline with a faint body hatch.
+- Drawing (`pixfx-draw`): `Painter::get` reads the packed colour word under a local point; `Painter::clean_flecks`
+  removes enclosed 1 px colour islands after hard-edged drawing; `shapes::{tempo, flash_star, wedge, Lobe, LobesOpt,
+  lobes}` add shared hard-edged craft primitives.
+
 ## 0.2.0
 
 - Effects: pixfx keeps only effects that read the sprite they play on (`Silhouette`, `Actor`) or the way it moved

@@ -319,6 +319,73 @@ impl<'a> Painter<'a> {
         self.blend_px(sx, sy, c, a);
     }
 
+    /// Read back the packed colour word under a local point (0 if empty or out of bounds).
+    pub fn get(&self, x: f64, y: f64) -> u32 {
+        let (sx, sy) = (self.cell_x(x, y), self.cell_y(x, y));
+        self.index(sx, sy)
+            .and_then(|i| self.frame.color.get(i).copied())
+            .unwrap_or(0)
+    }
+
+    /// Cluster cleanup on the frame's colour buffer: any opaque pixel whose 4-neighbours are all opaque and none
+    /// matches its own colour (plus, when `diagonals` is true, all 4 diagonal neighbours are also non-empty) takes
+    /// its 4-neighbours' most common colour. Reads from a copy per pass so scan order never matters.
+    pub fn clean_flecks(&mut self, passes: u32, diagonals: bool) {
+        let (w, h) = (self.frame.w as usize, self.frame.h as usize);
+        if w < 3 || h < 3 {
+            return;
+        }
+        for _ in 0..passes {
+            let src = self.frame.color.clone();
+            let mut changed = false;
+            for y in 1..h - 1 {
+                for x in 1..w - 1 {
+                    let i = y * w + x;
+                    let c = src.get(i).copied().unwrap_or(0);
+                    if c >> 24 != 255 {
+                        continue;
+                    }
+                    let n4 = [
+                        src.get(i - 1).copied().unwrap_or(0),
+                        src.get(i + 1).copied().unwrap_or(0),
+                        src.get(i - w).copied().unwrap_or(0),
+                        src.get(i + w).copied().unwrap_or(0),
+                    ];
+                    if n4.iter().any(|&v| v >> 24 != 255 || v == c) {
+                        continue;
+                    }
+                    if diagonals {
+                        let d4 = [
+                            src.get(i - w - 1).copied().unwrap_or(0),
+                            src.get(i - w + 1).copied().unwrap_or(0),
+                            src.get(i + w - 1).copied().unwrap_or(0),
+                            src.get(i + w + 1).copied().unwrap_or(0),
+                        ];
+                        if d4.contains(&0) {
+                            continue;
+                        }
+                    }
+                    let mut best = n4[0];
+                    let mut best_n = 0u32;
+                    for &a in &n4 {
+                        let count = n4.iter().filter(|&&b| b == a).count() as u32;
+                        if count > best_n || (!diagonals && count == best_n && a < best) {
+                            best = a;
+                            best_n = count;
+                        }
+                    }
+                    if let Some(dst) = self.frame.color.get_mut(i) {
+                        *dst = best;
+                        changed = true;
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+    }
+
     // ---- pixels
     /// One opaque pixel.
     pub fn px(&mut self, x: f64, y: f64, c: Rgba) {

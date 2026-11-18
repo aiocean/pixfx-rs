@@ -40,6 +40,44 @@ const OWN = {
     { key: "wave", label: "Wave", min: 0, max: 4, step: 0.1, value: 1.2 },
     { key: "turn", label: "Turn with it", min: 0, max: 1, step: 1, value: 0 },
   ],
+  "appear/teleport-beam": [
+    { key: "bits", label: "Bits", min: 0, max: 24, step: 1, value: 12 },
+    { key: "tear", label: "Tear", min: 0, max: 2, step: 0.25, value: 1 },
+    { key: "flare", label: "Flare", min: 14, max: 23, step: 1, value: 21 },
+  ],
+  "disappear/blink-out": [
+    { key: "motes", label: "Rune motes", min: 8, max: 48, step: 1, value: 30 },
+    { key: "specks", label: "Specks", min: 0, max: 20, step: 1, value: 12 },
+    { key: "glyph", label: "Floor glyph", min: 0.6, max: 1.4, step: 0.05, value: 1 },
+  ],
+  "disappear/fade": [
+    { key: "grow", label: "Grow", min: 0, max: 1, step: 0.05, value: 0.25 },
+    { key: "whiten", label: "Whiten", min: 0, max: 1, step: 0.05, value: 0.5 },
+  ],
+  "disappear/incinerate": [
+    { key: "flakes", label: "Loose ash", min: 8, max: 28, step: 1, value: 14 },
+    { key: "breeze", label: "Breeze", min: 0, max: 1.2, step: 0.1, value: 1 },
+  ],
+  "feedback/electrified": [
+    { key: "jag", label: "Jaggedness", min: 0.4, max: 1.8, step: 0.1, value: 1 },
+    { key: "length", label: "Arc length", min: 0.6, max: 1.5, step: 0.05, value: 1 },
+    { key: "sparks", label: "Sparks", min: 0, max: 2, step: 0.25, value: 1 },
+    { key: "beat", label: "Snap arc", min: 0, max: 1, step: 1, value: 1 },
+  ],
+  "feedback/soaked": [
+    { key: "pool", label: "Puddle", min: 12, max: 18, step: 1, value: 15 },
+    { key: "drips", label: "Drips", min: 2, max: 8, step: 1, value: 8 },
+    { key: "runnels", label: "Runnels", min: 0, max: 3, step: 1, value: 3 },
+    { key: "splash", label: "Big splash", min: 0, max: 1, step: 1, value: 1 },
+  ],
+  "feedback/encase": [
+    { key: "cracks", label: "Cracks", min: 1, max: 3, step: 1, value: 2 },
+    { key: "dust", label: "Dust", min: 0.7, max: 1.25, step: 0.05, value: 1 },
+  ],
+  "feedback/cloak-shimmer": [
+    { key: "tear", label: "Tear", min: 1, max: 3, step: 0.1, value: 2 },
+    { key: "broken", label: "Broken edge", min: 0.15, max: 0.5, step: 0.01, value: 0.35 },
+  ],
 };
 
 /** Seconds a one-shot or a take rests before it plays again. */

@@ -48,6 +48,22 @@ const TABLE = {
   "feedback/power-up": { role: "buff", impact: 0.32, power: 16, spell: "ward" },
   // the ring marks the caster as it gathers, and stays on it through the blow
   "feedback/outline": { role: "buff", impact: 0.3, power: 16, spell: "ward" },
+  // teleport arrival flash at frame 6 (6 / 16 s = 0.375 s)
+  "appear/teleport-beam": { role: "blink", impact: 0.375, power: 15, spell: "step" },
+  // blink-out peak flare at frame 4 (4 / 15 s = 0.267 s)
+  "disappear/blink-out": { role: "blink", impact: 0.267, power: 15, spell: "step" },
+  // fade soft exit over 0.45 s
+  "disappear/fade": { role: "blink", impact: 0.225, power: 15, spell: "step" },
+  // incinerate peak flare at frame 4 (4 / 15 s = 0.267 s)
+  "disappear/incinerate": { role: "strike", at: "ground", impact: 0.267, power: 22, spell: "seal" },
+  // electrified snap arc at frame 8 (8 / 16 s = 0.5 s)
+  "feedback/electrified": { role: "buff", impact: 0.5, power: 16, spell: "ward" },
+  // soaked big drop crown splash at frame 9 (9 / 16 s = 0.5625 s)
+  "feedback/soaked": { role: "buff", impact: 0.5625, power: 14, spell: "ward" },
+  // encase stone collars crack at frame 6 (6 / 16 s = 0.375 s)
+  "feedback/encase": { role: "strike", at: "ground", impact: 0.375, power: 18, spell: "seal" },
+  // cloak-shimmer falter beat at frame 15 (15 / 15 s = 1.0 s)
+  "feedback/cloak-shimmer": { role: "buff", impact: 1.0, power: 14, spell: "ward" },
 };
 
 /** For an effect the table does not know yet: the first of its tags that names a role. */

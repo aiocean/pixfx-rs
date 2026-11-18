@@ -6,10 +6,12 @@ anything here; this file only says what this crate holds.
 ## Job
 
 The effects that read the sprite they play on (`pixfx_core::Silhouette`, `Actor`) or the way it moved
-(`pixfx_core::Trace`): `explosions/body-burst`, `feedback/outline`, `feedback/power-up` (a port of Sprite Fusion's
-pixel art VFX, https://www.spritefusion.com/pixel-art-vfx), `projectiles/trail`. `appear` and `disappear` are empty
-categories, kept for effects that read the sprite as it enters or leaves. Each effect lives in its category folder
-(`src/feedback/outline.rs`), is listed in `EFFECTS` and is looked up with `pixfx_effects::effect(id)`.
+(`pixfx_core::Trace`): `appear/teleport-beam`, `disappear/blink-out`, `disappear/fade`, `disappear/incinerate`,
+`explosions/body-burst`, `feedback/cloak-shimmer`, `feedback/electrified`, `feedback/encase`, `feedback/outline`,
+`feedback/power-up` (a port of Sprite Fusion's pixel art VFX, https://www.spritefusion.com/pixel-art-vfx),
+`feedback/soaked`, `projectiles/trail`. Each
+effect lives in its category folder (`src/feedback/outline.rs`), is listed in `EFFECTS` and is looked up with
+`pixfx_effects::effect(id)`.
 
 ## Belongs here
 

@@ -28,3 +28,9 @@
 //! |---|---|
 //! | `disappear/` | The exit counterpart: plays as the object leaves. |
 //! | `feedback/` | Effects that stay on a live character (outline, power-up). |
+
+#[cfg(feature = "appear-teleport-beam")]
+mod teleport_beam;
+
+#[cfg(feature = "appear-teleport-beam")]
+pub use teleport_beam::TELEPORT_BEAM;
