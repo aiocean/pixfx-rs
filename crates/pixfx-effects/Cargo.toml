@@ -18,7 +18,7 @@ all = ["appear", "disappear", "explosions", "feedback", "projectiles"]
 appear = ["appear-dither", "appear-teleport-beam"]
 disappear = ["disappear-blink-out", "disappear-dither", "disappear-fade", "disappear-incinerate"]
 explosions = ["explosions-body-burst"]
-feedback = ["feedback-burning", "feedback-cloak-shimmer", "feedback-electrified", "feedback-encase", "feedback-frozen", "feedback-outline", "feedback-power-up", "feedback-soaked"]
+feedback = ["feedback-burning", "feedback-cloak-shimmer", "feedback-electrified", "feedback-encase", "feedback-frozen", "feedback-outline", "feedback-poisoned", "feedback-power-up", "feedback-soaked"]
 projectiles = ["projectiles-trail"]
 # one effect each, named after its id with the / as - (feedback/outline is feedback-outline)
 appear-dither = []
@@ -34,6 +34,7 @@ feedback-electrified = []
 feedback-encase = []
 feedback-frozen = []
 feedback-outline = []
+feedback-poisoned = []
 feedback-power-up = []
 feedback-soaked = []
 projectiles-trail = []
@@ -63,6 +64,10 @@ required-features = ["feedback-burning"]
 [[test]]
 name = "frozen"
 required-features = ["feedback-frozen"]
+
+[[test]]
+name = "poisoned"
+required-features = ["feedback-poisoned"]
 
 [[test]]
 name = "body_burst"
