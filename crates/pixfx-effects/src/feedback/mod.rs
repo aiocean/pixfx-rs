@@ -2,6 +2,8 @@
 //! Fusion's pixel art VFX, https://www.spritefusion.com/pixel-art-vfx, whose category they keep) and an outline round a
 //! sprite (made here).
 
+#[cfg(feature = "feedback-burning")]
+mod burning;
 #[cfg(feature = "feedback-cloak-shimmer")]
 mod cloak_shimmer;
 #[cfg(feature = "feedback-electrified")]
@@ -14,7 +16,11 @@ mod outline;
 mod power_up;
 #[cfg(feature = "feedback-soaked")]
 mod soaked;
+#[cfg(feature = "feedback-burning")]
+mod status;
 
+#[cfg(feature = "feedback-burning")]
+pub use burning::BURNING;
 #[cfg(feature = "feedback-cloak-shimmer")]
 pub use cloak_shimmer::CLOAK_SHIMMER;
 #[cfg(feature = "feedback-electrified")]
