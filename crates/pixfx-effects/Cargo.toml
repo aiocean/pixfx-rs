@@ -51,6 +51,10 @@ name = "features"
 required-features = ["all"]
 
 [[test]]
+name = "status"
+required-features = ["all"]
+
+[[test]]
 name = "body_burst"
 required-features = ["explosions-body-burst"]
 
