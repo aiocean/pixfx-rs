@@ -72,6 +72,8 @@ const TABLE = {
   "feedback/encase": { role: "strike", at: "ground", impact: 0.375, power: 18, spell: "seal" },
   // cloak-shimmer falter beat at frame 15 (15 / 15 s = 1.0 s)
   "feedback/cloak-shimmer": { role: "buff", impact: 1.0, power: 14, spell: "ward" },
+  // the caster's own cut: played on the caster as it swings, the blow lands when the blade arrives (sword_slash.rs SWING)
+  "melee/sword-slash": { role: "strike", at: "palm", impact: 0.1, power: 16, spell: "slash", directional: true },
 };
 
 /** For an effect the table does not know yet: the first of its tags that names a role. */

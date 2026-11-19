@@ -10,6 +10,7 @@ pub mod disappear;
 mod dither;
 pub mod explosions;
 pub mod feedback;
+pub mod melee;
 pub mod projectiles;
 
 /// Every effect in this crate.
@@ -48,6 +49,8 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &feedback::POWER_UP,
     #[cfg(feature = "feedback-soaked")]
     &feedback::SOAKED,
+    #[cfg(feature = "melee-sword-slash")]
+    &melee::SWORD_SLASH,
     #[cfg(feature = "projectiles-trail")]
     &projectiles::TRAIL,
 ];

@@ -13,12 +13,13 @@ pixfx-draw = { path = "../pixfx-draw" }
 [features]
 default = ["all"]
 # every effect; a game that needs a few builds with default-features = false and names them
-all = ["appear", "disappear", "explosions", "feedback", "projectiles"]
+all = ["appear", "disappear", "explosions", "feedback", "melee", "projectiles"]
 # a category: every effect in it
 appear = ["appear-dither", "appear-teleport-beam"]
 disappear = ["disappear-blink-out", "disappear-dither", "disappear-fade", "disappear-incinerate"]
 explosions = ["explosions-body-burst"]
 feedback = ["feedback-burning", "feedback-cloak-shimmer", "feedback-electrified", "feedback-encase", "feedback-frozen", "feedback-outline", "feedback-petrified", "feedback-poisoned", "feedback-power-up", "feedback-soaked"]
+melee = ["melee-sword-slash"]
 projectiles = ["projectiles-trail"]
 # one effect each, named after its id with the / as - (feedback/outline is feedback-outline)
 appear-dither = []
@@ -38,6 +39,7 @@ feedback-petrified = []
 feedback-poisoned = []
 feedback-power-up = []
 feedback-soaked = []
+melee-sword-slash = []
 projectiles-trail = []
 
 [lints]
@@ -77,6 +79,10 @@ required-features = ["feedback-poisoned"]
 [[test]]
 name = "body_burst"
 required-features = ["explosions-body-burst"]
+
+[[test]]
+name = "sword_slash"
+required-features = ["melee-sword-slash"]
 
 [dev-dependencies]
 wasm-bindgen-test = "=0.3.80"
