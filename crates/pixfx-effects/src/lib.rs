@@ -28,14 +28,22 @@ pub static EFFECTS: &[&'static dyn Effect] = &[
     &disappear::INCINERATE,
     #[cfg(feature = "explosions-body-burst")]
     &explosions::BODY_BURST,
+    #[cfg(feature = "feedback-burning")]
+    &feedback::BURNING,
     #[cfg(feature = "feedback-cloak-shimmer")]
     &feedback::CLOAK_SHIMMER,
     #[cfg(feature = "feedback-electrified")]
     &feedback::ELECTRIFIED,
     #[cfg(feature = "feedback-encase")]
     &feedback::ENCASE,
+    #[cfg(feature = "feedback-frozen")]
+    &feedback::FROZEN,
     #[cfg(feature = "feedback-outline")]
     &feedback::OUTLINE,
+    #[cfg(feature = "feedback-petrified")]
+    &feedback::PETRIFIED,
+    #[cfg(feature = "feedback-poisoned")]
+    &feedback::POISONED,
     #[cfg(feature = "feedback-power-up")]
     &feedback::POWER_UP,
     #[cfg(feature = "feedback-soaked")]
