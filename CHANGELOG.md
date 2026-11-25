@@ -20,6 +20,33 @@
 - Ruler: the duel's fighter is painted bigger, 63 rows standing in a 104 cell (face 11, eye 2 x 4, hand 3, limb 5,
   blade 26). The mannequin (`pixfx_core::body`) paints in the ruler's cell with its soles on the feet row, and the
   reference guide figure and prompts of `pixfx-pixel` are drawn to it; the body goldens are re-pinned.
+- Effects: four looping status ailments a game plays on a character for as long as it lasts and ends with `stop()`,
+  each adapted from Pixel VFX Studio's `status/*` (MIT) and reading the wrapped sprite once per pose through the
+  new `feedback/status.rs` (`Body`: silhouette, colour and brightness per cell, bounds, rows; a stand-in figure to
+  the ruler when played alone) and `Silhouette::open(dx, dy)` in `pixfx-core` (the covered cells with nothing on
+  one side). All four draw on the ruler's cell (`pixfx_draw::RULER`, the feet on its feet row), at 16 fps with every beat on a whole
+  frame, keep no state and fire no cues (a loop's cues would repeat every loop: the game times its own). Their
+  pixels are not pixel-identical to pixelfx's (the noise hash and the clocks differ); the goldens pin them.
+  - `feedback/burning` (feature `feedback-burning`): small flames lick from the hair, a shoulder and the flanks and
+    lean into the wind, embers stream up, thin smoke drifts behind; twice a second a tick flares the flames,
+    flashes the body white then orange and chars two scorch patches on the clothes (`spots`, `sparks`, `smoke`,
+    `beat`; palette `fire`).
+  - `feedback/frozen` (feature `feedback-frozen`): the body goes blue-grey with a lit rim, frost ferns creep in
+    from the flanks, icicles hang from the chin, hair and hands and drip, snow caps the head, breath steams, frost
+    spreads underfoot; every second a shiver jolts the overlay (never the sprite) and cracks the ferns off
+    (`ferns`, `icicles`, `snow`, `shiver`; palette `ice`).
+  - `feedback/poisoned` (feature `feedback-poisoned`): green rolls up the body in waves, dark veins creep out of a
+    wound on the forearm and draw back, blisters swell and pop on each tick, toxic sweat beads, falls and hisses
+    on the floor, a ring pulses out across the floor (`veins`, `blisters`, `sweat`, `ring`, the colour
+    `veins_color`; palette `poison`).
+  - `feedback/petrified` (feature `feedback-petrified`): grey creeps up from the feet behind a crackling white edge
+    that spits grit, sets with a pale flash and a dust skirt, then holds as a statue that cracks, glints and sheds
+    a pebble. The creep plays once and the statue loops: the first effect to use `Effect::loop_from` (`cracks`,
+    `grit`, `mottle`, `creep`: 0 sets the statue from the first frame).
+- `melee/sword-slash` (feature `melee-sword-slash`): the smear a blade leaves through an overhead cut on the character
+  it plays on, swept with `pixfx_draw::sweep` from the effect's own arc; reads the sprite through
+  `pixfx_core::Silhouette::centroid` in `set_actor` for the shoulder it swings from, a stand-in shoulder when played
+  alone; a light `impact` cue as the blade arrives.
 - Added three procedural blade slashes, including a trail that can follow the blade tip.
 
 - Added `impacts/thunderstrike` (`impacts-thunderstrike`). A gold bolt wrapped in teal lightning
