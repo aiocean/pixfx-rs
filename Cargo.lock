@@ -242,24 +242,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
-name = "pixfx-body"
-version = "0.3.0"
-dependencies = [
- "libm",
- "pixfx-core",
- "pixfx-draw",
- "pixfx-export",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "pixfx-core"
 version = "0.3.0"
 dependencies = [
  "libm",
  "pixfx-draw",
+ "pixfx-export",
  "serde",
+ "serde_json",
  "tsify",
  "wasm-bindgen",
 ]
@@ -315,17 +305,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pixfx-light"
-version = "0.3.0"
-dependencies = [
- "libm",
- "pixfx-draw",
- "serde",
- "tsify",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "pixfx-mind"
 version = "0.3.0"
 dependencies = [
@@ -340,37 +319,13 @@ dependencies = [
 name = "pixfx-pixel"
 version = "0.3.0"
 dependencies = [
- "libm",
- "pixfx-draw",
- "pixfx-export",
- "pixfx-fighter",
-]
-
-[[package]]
-name = "pixfx-pose"
-version = "0.3.0"
-dependencies = [
- "libm",
- "pixfx-body",
- "pixfx-draw",
- "pixfx-export",
- "pixfx-pixel",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "pixfx-ref"
-version = "0.3.0"
-dependencies = [
  "gif",
  "libm",
  "pixfx-core",
  "pixfx-draw",
  "pixfx-effects",
  "pixfx-export",
- "pixfx-pixel",
- "pixfx-pose",
+ "pixfx-fighter",
  "serde",
  "serde_json",
 ]
@@ -384,7 +339,9 @@ dependencies = [
  "pixfx-draw",
  "pixfx-effects",
  "pixfx-export",
+ "png",
  "serde",
+ "serde_json",
  "tsify",
  "wasm-bindgen",
 ]
@@ -397,9 +354,7 @@ dependencies = [
  "pixfx-core",
  "pixfx-draw",
  "pixfx-effects",
- "pixfx-export",
  "pixfx-fighter",
- "pixfx-light",
  "pixfx-mind",
  "pixfx-scene",
  "serde",

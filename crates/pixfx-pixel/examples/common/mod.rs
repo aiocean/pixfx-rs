@@ -9,6 +9,7 @@ use std::str::FromStr;
 use pixfx_draw::RgbaImage;
 use pixfx_export::{decode_png_rgba, write_png_rgba};
 use pixfx_fighter::look::Look;
+use pixfx_pixel::reference::Spec;
 use pixfx_pixel::tool::Palette;
 
 /// A script's arguments, taken flag by flag; what is left are its files.
@@ -121,6 +122,17 @@ impl Args {
         <[PathBuf; N]>::try_from(self.files()?).map_err(|_| usage.to_string())
     }
 
+    /// The positional words left, failing on a leftover `--flag` or a count other than `n`.
+    pub fn rest(self, n: std::ops::RangeInclusive<usize>) -> Result<Vec<String>, String> {
+        if let Some(w) = self.words.iter().find(|w| w.starts_with("--")) {
+            return Err(format!("unknown flag {w}\n{}", self.usage));
+        }
+        if !n.contains(&self.words.len()) {
+            return Err(self.usage.to_string());
+        }
+        Ok(self.words)
+    }
+
     fn error(&self, what: &str) -> String {
         format!("{what}\n{}", self.usage)
     }
@@ -167,4 +179,59 @@ pub fn write_text(path: &Path, text: &str) -> Result<(), String> {
 pub fn stem(path: &Path) -> String {
     path.file_stem()
         .map_or("picture".into(), |s| s.to_string_lossy().into_owned())
+}
+
+/// Where a spec's files go by default: `target/ref/<slug>`.
+pub fn home(spec: &Spec) -> PathBuf {
+    PathBuf::from("target/ref").join(spec.slug())
+}
+
+/// The sheet a script works on and its folder: the parts sheet (`target/ref/<slug>/parts`), one moment's sheet
+/// (`target/ref/<slug>/<moment>`), or the whole spec on one sheet (`target/ref/<slug>`). A spec with layers is drawn
+/// as a parts sheet, then a sheet per moment built from it.
+pub fn sheet_of(spec: Spec, parts: bool, moment: Option<&str>) -> Result<(Spec, PathBuf), String> {
+    match (parts, moment) {
+        (true, Some(_)) => Err("give --parts-sheet or --moment, not both".into()),
+        (true, None) => Ok((spec.parts_sheet(), home(&spec).join("parts"))),
+        (false, Some(m)) => Ok((spec.moment(m)?, home(&spec).join(m.to_lowercase()))),
+        (false, None) => {
+            let dir = home(&spec);
+            Ok((spec, dir))
+        }
+    }
+}
+
+/// The id's last part, a page anchor: `shield/golden-bell` is `golden-bell`.
+pub fn key(spec: &Spec) -> String {
+    spec.id.rsplit('/').next().unwrap_or(&spec.id).to_string()
+}
+
+pub fn read_spec(path: &Path) -> Result<Spec, String> {
+    Spec::parse(&read_text(path)?).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+pub fn write_png(path: &Path, img: &RgbaImage) -> Result<(), String> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
+    }
+    write_png_rgba(path, img.w, img.h, &img.rgba)
+        .map_err(|e| format!("writing {}: {e}", path.display()))
+}
+
+/// `run`'s error printed with the script's name, as the exit code.
+pub fn exit_reference(name: &str, r: Result<(), String>) -> ExitCode {
+    match r {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("{name}: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+pub fn write_reference_text(path: &Path, text: &str) -> Result<(), String> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
+    }
+    std::fs::write(path, text).map_err(|e| format!("writing {}: {e}", path.display()))
 }

@@ -1,15 +1,16 @@
-//! pixfx export: a rendered effect as sprite sheets plus beanfx's Aseprite-style JSON ([`write_sheet`]), as
-//! a gif ([`write_gif`]), a still beside the character for checking scale ([`board`], the character read by [`Actors`]), a video through ffmpeg ([`write_video`]), or as a rendered clip for hosts to play without drawing ([`render_clip`], [`write_clip`], [`decode`]). Layout and JSON values are pure functions ([`Grid`], [`beanfx_json`]); only
+//! pixfx export: a rendered effect as sprite sheets plus Aseprite-style JSON ([`write_sheet`]), as
+//! a gif ([`write_gif`]), a still beside the character for checking scale ([`board`], the character read by [`Actors`]), a video through ffmpeg ([`write_video`]), or as a rendered clip for hosts to play without drawing ([`render_clip`], [`write_clip`], [`decode`]). Layout and JSON values are pure functions ([`Grid`], [`sheet_json`]); only
 //! the `write_*` functions touch files.
 #![forbid(unsafe_code)]
 
 mod actor;
-pub mod clip;
 pub mod board;
+pub mod clip;
 mod gif;
 mod json;
 mod sheet;
 mod video;
+mod webp;
 
 use std::fmt;
 use std::io;
@@ -17,10 +18,12 @@ use std::io;
 pub use actor::Actors;
 pub use clip::{decode, render_clip, write_clip};
 pub use gif::write_gif;
-pub use json::{FileNames, beanfx_json};
+pub use json::{FileNames, sheet_json};
 pub use pixfx_draw::RgbaImage;
-pub use sheet::{Grid, SheetFiles, decode_png_rgba, pack_cells, write_png_rgba, write_sheet};
+pub use pixfx_scene::clip::decode_png_rgba;
+pub use sheet::{Grid, SheetFiles, pack_cells, write_png_rgba, write_sheet};
 pub use video::{video_size, write_video};
+pub use webp::write_webp_from_gif;
 
 /// Why an export failed.
 #[derive(Debug)]

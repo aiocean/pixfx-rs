@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>pixfx: pixel-art effects in Rust, native and in the browser</title>
-  <meta name="description" content="Pixel-art effects written once in Rust. Render sprite sheets and GIFs natively, or play the same effects live in the browser, Phaser 4 or gpui, pixel for pixel.">
+  <title>pixfx · Pixel-art effects in Rust</title>
+  <meta name="description" content="Pixel-art effects that follow the shape and motion of your sprites. Play them live in Canvas 2D, Phaser 4, Pixi 8 and gpui, or export sprite sheets and GIFs.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
@@ -22,36 +22,39 @@
 
   <main>
     <section class="hero" aria-labelledby="hero-title">
-      <h1 id="hero-title" class="sr-only">pixfx</h1>
-      <canvas id="scene" aria-label="A live duel on a mountain dais at night: two cultivators, one of thunder and one of frost, fight with spells, drawn by pixfx, and a small AI chooses each move."></canvas>
-    </section>
-
-    <section class="intro-strip" aria-label="What pixfx is">
-      <div class="pitch">
-        <p class="lede">Pixel-art effects that read the sprite they play on, written once in Rust. Render them to sprite sheets, or play the same effects live in the browser, Phaser and gpui.</p>
-        <p class="proof" id="proof">The duel above is drawn live by the engine, every frame.</p>
+      <div class="hero-copy">
+        <h1 id="hero-title">Pixel-art effects in Rust</h1>
+        <p>Make auras hug your sprites and trails follow their motion. Play the same effects live or export them to sprite sheets and GIFs.</p>
+        <div class="hero-actions">
+          <a class="button" href="effects/">Explore effects</a>
+          <a class="button quiet" href="docs/getting-started.html">Get started</a>
+        </div>
       </div>
-      <div class="actions">
-        <a class="button" href="docs/getting-started.html">Get started</a>
-        <a class="button quiet" href="docs/">Read the docs</a>
-      </div>
+      <figure class="hero-demo">
+        <canvas id="scene" width="496" height="288" role="img" aria-label="Thunder and Frost, two pixel-art fighters demonstrating pixfx effects."></canvas>
+        <figcaption>
+          <span id="demo-caption">Live Canvas 2D demo</span>
+          <button id="demo-toggle" class="demo-toggle" type="button" hidden>Pause demo</button>
+        </figcaption>
+      </figure>
     </section>
 
     <section class="section" aria-labelledby="targets-title">
       <h2 id="targets-title">Where it runs</h2>
-      <p class="intro">Pick the layer that fits your project. All of them share one engine and one effect registry.</p>
+      <p class="intro">Use the Rust crates or JavaScript bindings from source. The same engine paints the pixels for every host.</p>
       <div class="tabs" id="targets">
         <div role="tablist" aria-label="Targets">
           <button role="tab" id="tab-files" aria-controls="panel-files" aria-selected="true">Files</button>
           <button role="tab" id="tab-canvas" aria-controls="panel-canvas" aria-selected="false" tabindex="-1">Canvas 2D</button>
           <button role="tab" id="tab-phaser" aria-controls="panel-phaser" aria-selected="false" tabindex="-1">Phaser 4</button>
+          <button role="tab" id="tab-pixi" aria-controls="panel-pixi" aria-selected="false" tabindex="-1">Pixi 8</button>
           <button role="tab" id="tab-js" aria-controls="panel-js" aria-selected="false" tabindex="-1">JS engine</button>
           <button role="tab" id="tab-rust" aria-controls="panel-rust" aria-selected="false" tabindex="-1">Rust</button>
           <button role="tab" id="tab-gpui" aria-controls="panel-gpui" aria-selected="false" tabindex="-1">gpui</button>
         </div>
 
         <div role="tabpanel" id="panel-files" aria-labelledby="tab-files">
-          <p>Write a sprite sheet (composite, colour and light PNGs plus beanfx-layout JSON), or a looping GIF.</p>
+          <p>Export composite, colour and light PNGs with Aseprite-style JSON, or write a looping GIF.</p>
 <pre><code>cargo run -p pixfx-export --example sprite_sheet -- feedback/power-up --out out
 cargo run -p pixfx-export --example gif -- feedback/power-up --scale 4 --out out</code></pre>
           <p><a href="docs/scripts.html">Scripts</a> · <a href="docs/sheets.html">Sprite sheet format</a></p>
@@ -63,7 +66,7 @@ cargo run -p pixfx-export --example gif -- feedback/power-up --scale 4 --out out
 
 await loadPixfx();
 const pixfx = createPixfx(canvas.getContext("2d"), { scale: 4 });
-pixfx.play("feedback/power-up", 64, 112, { seed: 3 });
+pixfx.play("impacts/parry", 64, 112, { seed: 3 });
 // each frame: pixfx.update(dt), then pixfx.draw()</code></pre>
           <p><a href="docs/canvas.html">Canvas 2D shell reference</a></p>
         </div>
@@ -79,12 +82,22 @@ trail.follow(player);</code></pre>
           <p><a href="docs/phaser.html">Phaser plugin reference</a></p>
         </div>
 
+        <div role="tabpanel" id="panel-pixi" aria-labelledby="tab-pixi" hidden>
+          <p>Attach effects to Pixi sprites. Pixi’s ticker drives playback and workers paint the frames.</p>
+<pre><code>import { createPixfx, loadPixfx } from "pixfx-pixi";
+
+await loadPixfx();
+const pixfx = createPixfx(app);
+pixfx.play("projectiles/trail", 0, 0).follow(player);</code></pre>
+          <p><a href="docs/pixi.html">Pixi 8 shell reference</a></p>
+        </div>
+
         <div role="tabpanel" id="panel-js" aria-labelledby="tab-js" hidden>
           <p>Drive an effect yourself and read its pixels: RGBA bytes, or the colour and light layers separately.</p>
 <pre><code>import init, { Fx } from "./pkg/pixfx_wasm.js";
 
 await init();
-const fx = new Fx("projectiles/trail", { seed: 1 });
+const fx = new Fx("impacts/parry", { seed: 1 });
 fx.update(1 / 60);
 fx.draw("both");
 ctx.putImageData(new ImageData(fx.rgba(), fx.width(), fx.height()), 0, 0);</code></pre>
@@ -93,7 +106,8 @@ ctx.putImageData(new ImageData(fx.rgba(), fx.width(), fx.height()), 0, 0);</code
 
         <div role="tabpanel" id="panel-rust" aria-labelledby="tab-rust" hidden>
           <p>Render frames in Rust, hash them, composite them or export them.</p>
-<pre><code>use pixfx_core::{Options, render_frames};
+<pre><code>use std::path::Path;
+use pixfx_core::{Options, render_frames};
 
 let fx = pixfx_effects::effect("feedback/power-up").ok_or("not registered")?;
 let rendered = render_frames(fx, &amp;Options::default(), 0);
@@ -103,10 +117,17 @@ pixfx_export::write_gif(Path::new("power-up.gif"), &amp;rendered, 4)?;</code></p
 
         <div role="tabpanel" id="panel-gpui" aria-labelledby="tab-gpui" hidden>
           <p>Paint effects inside a gpui window, light blended additively on the GPU with nearest sampling.</p>
-<pre><code>let mut view = FxView::new(power_up, Options::default());
-view.tick(dt);
-paint_fx(&amp;mut view, &amp;mut frames, Layer::Both, origin, 4, window)?;
-frames.end_frame(window)?;</code></pre>
+<pre><code>use pixfx_core::{Layer, Options};
+use pixfx_gpui::FxScene;
+
+let mut fx = FxScene::default();
+let parry = pixfx_effects::effect("impacts/parry").ok_or("missing effect")?;
+let spark = fx.play(parry, Options::default())?;
+
+fx.tick(dt)?;
+// Inside gpui's paint callback
+fx.paint(spark, Layer::Both, origin, 4, window)?;
+fx.end_frame(window)?;</code></pre>
           <p><a href="docs/gpui.html">gpui reference</a></p>
         </div>
       </div>
@@ -133,7 +154,7 @@ cd ../pixfx-canvas2d &amp;&amp; bun install &amp;&amp; bunx vite demo</code></pr
   </main>
 
   <footer class="footer">
-    <p>MIT licensed. The engine is a port of <a href="https://github.com/patch-gg/pixelfx">pixelfx</a> by Patch and Hugo Duprez (Sprite Fusion), and sheets use the <a href="https://github.com/baenv/beanfx">beanfx</a> layout by bien. See <a href="docs/credits.html">credits</a>.</p>
+    <p>MIT licensed. <a href="docs/credits.html">Project credits</a></p>
   </footer>
 
   <script type="module" src="assets/site.js"></script>

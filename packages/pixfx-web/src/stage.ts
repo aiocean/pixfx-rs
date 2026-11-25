@@ -200,9 +200,9 @@ export class Stage<P> implements EffectHost<P>, Delivering {
       const place = effect ? effect.place : this.place;
       const pair = this.pair(used++);
       const t = held.pooled.texture;
-      if (held.sides & SIDE_COLOR) pair.color.show(t.key, t.color, x, y, w, h, depth, place);
+      if (held.sides & SIDE_COLOR) pair.color.show(t.key, t.color, x, y, w, h, depth, place, held.w, held.h);
       else pair.color.hide();
-      if (held.sides & SIDE_LIGHT) pair.light.show(t.key, t.light, x, y, w, h, depth, place);
+      if (held.sides & SIDE_LIGHT) pair.light.show(t.key, t.light, x, y, w, h, depth, place, held.w, held.h);
       else pair.light.hide();
     }
     for (let i = used; i < this.pairs.length; i++) {

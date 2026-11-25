@@ -303,7 +303,11 @@ fn an_effect_that_takes_no_orders_refuses_one() -> Res {
 #[test]
 fn a_thrown_piece_lands_once_and_bursts_on_a_far_target() -> Res {
     let mut s = scene();
-    let h = s.play(Clip::live(&formation::THROW, Options::default()), 100.0, 200.0)?;
+    let h = s.play(
+        Clip::live(&formation::THROW, Options::default()),
+        100.0,
+        200.0,
+    )?;
     run(&mut s, 0.0, 1.5)?;
     let target = (420.0, 178.0);
     assert!(s.order(h, order(target.0, target.1, Aim::Converge))?);

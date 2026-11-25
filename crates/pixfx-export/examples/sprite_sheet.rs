@@ -1,4 +1,4 @@
-//! Render an effect as sprite sheets plus beanfx's Aseprite-style JSON: `<name>.png`, `<name>_color.png`,
+//! Render an effect as sprite sheets plus Aseprite-style JSON: `<name>.png`, `<name>_color.png`,
 //! `<name>_light.png` and `<name>.json`, `<name>` being the id with `/` as `_`.
 //!
 //!   cargo run -p pixfx-export --example sprite_sheet -- <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]

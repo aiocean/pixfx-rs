@@ -5,19 +5,19 @@ description: Use when starting any work in pixfx-rs, the Rust pixel-effects engi
 
 # pixfx
 
-pixfx is a pixel render engine in Rust: effects that read the sprite they play on or the way it moved (an outline,
-an aura, a body bursting apart, a trail), game feel (shake, hit-stop, flash, ripples, squash) and fighters, the same pixels natively, in wasm and on every shell. It ships as **source**: there
-is no binary and no package to install. You work inside this repo, import the crates or JS packages, build the wasm
-yourself, and run or edit scripts. A fire, an explosion or a shield reads neither the sprite nor its motion: it is
-sprite art the game plays, not a pixfx effect.
+pixfx is a Rust pixel render engine for effects, game feel and fighters. The catalog ships procedural paint,
+authored sprite frames and hybrid effects together. Rust renders the same pixels natively and in Wasm. Work from
+source in this repo, import the crates or JS packages, build the Wasm, and run or edit the example scripts.
 
 ## Which skill
 
 | You want to | Skill |
 |---|---|
 | Add, port or change an effect | `pixfx-effect` |
+| Analyze an effect reference and decide between paint, sprite and hybrid | `pixfx-analyze` |
 | An effect that reads the sprite it plays on (outline, glow round it, bleed from it) | `pixfx-sprite-aware` |
 | A new effect from an idea: storyboard, sketch, questions, then the whole way to the library | `pixfx-new-effect` |
+| Design or build playable use cases on an effect's website page | `pixfx-demo` |
 | Reference sheets from an image model: spec, template, draw, extract, compare | `pixfx-ref` |
 | Play effects in a game (Phaser, Canvas 2D, Pixi, Rust/gpui) | `pixfx-play` |
 | Make files: sprite sheet, gif, rendered clip, pose sheet, a new output | `pixfx-render` |
@@ -44,9 +44,9 @@ Rust decides, a shell draws. Dependencies point down this table only.
 | JS runtime | `packages/pixfx-web` | wasm loading, painting workers, shared frames, a stage per host scene |
 | JS binding | `crates/pixfx-wasm` | wasm-bindgen translation only |
 | Scene | `crates/pixfx-scene` | what plays where, layers, which frame shows, shared frames |
-| Engine | `pixfx-core`, `pixfx-effects`, `pixfx-light`, `pixfx-fighter`, `pixfx-body` | effects, particles, cues, `Feel`, bodies. Pure: no clock, no I/O |
+| Engine | `pixfx-core`, `pixfx-effects`, `pixfx-fighter` | effects, particles, cues, `Feel`, bodies. Pure: no clock, no I/O |
 | Drawing | `crates/pixfx-draw` | frames (colour + additive light), painter, palette, `Ruler` |
-| Agent tools | `pixfx-pixel`, `pixfx-pose`, `pixfx-ref` | read pictures for an agent; never painted from |
+| Agent tools | `pixfx-pixel` | read pictures for an agent; never painted from |
 
 - A new output (a file, a video, a report): logic in the library crate that owns it, plus a short script in that
   crate's `examples/` (shared helpers only in that crate's `examples/common/mod.rs`). Never a CLI or binary crate.
@@ -71,13 +71,13 @@ is `pixfx_draw::RULER`, the duel's fighter, in the lowest layer so effects, figh
 
 | Part | Pixels |
 |---|---|
-| Cell | 64 x 64, feet at (32, 60) |
-| Standing, outline included | 40 rows x 20 columns (38 painted, 1 of outline above and below) |
-| Head (face) | 7 x 7, about 5.4 heads to the body |
-| Eye, open | 1 x 2 |
-| Hand | 2 x 2 |
-| Arm or leg | 3 thick |
-| Blade | 16 |
+| Cell | 104 x 104, feet at (52, 96) |
+| Standing, outline included | 63 rows x 31 columns (61 painted, 1 of outline above and below) |
+| Head (face) | 11 x 11, about 5.5 heads to the body |
+| Eye, open | 2 x 4 |
+| Hand | 3 x 3 |
+| Arm or leg | 5 thick |
+| Blade | 26 |
 
 - Rust paints at one game pixel per pixel and a shell scales the whole picture by a whole number, so every sprite
   and effect has the same pixel size. Never paint one thing at another pixel size (a "mixel"): no half-scale
@@ -91,8 +91,8 @@ is `pixfx_draw::RULER`, the duel's fighter, in the lowest layer so effects, figh
   ruler.
 - Every effect keeps the ruler.
 - Check it by eye: `scale_board` (skill `pixfx-render`) lays every effect's busiest frame on the fighter's sprite.
-- The tools take the ruler: `pixfx-pose`'s default figure, `pixfx-ref`'s guide figure and the sizes its prompt
-  asks for (`pixfx_ref::compare::art_ruler`), and `pixfx-pixel`'s `critique --standing` and
+- The tools take the ruler: the default pose figure and the reference template's guide figure and the sizes its prompt
+  asks for (`pixfx_pixel::reference::compare::art_ruler`), and `pixfx-pixel`'s `critique --standing` and
   `--against PART*RATIO`.
 - A game with another character fills in its own `Ruler`, measured off its painted sprite, with a test like
   `tests/ruler.rs` that keeps the two equal.

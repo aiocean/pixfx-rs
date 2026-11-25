@@ -74,8 +74,13 @@ impl Args {
     /// The options of a sheet, gif or clip: `--seed N` (a whole number; left out, the effect's own seed),
     /// `--palette` (a preset: fire, ice, poison, holy, shadow, arcane, blood, electric, nature, gold) and `--num NAME=V`
     /// for each of the effect's own number options to set (`--num hitX=-20 --num hitY=-48`). Left out, the effect
-    /// looks as designed.
+    /// looks as designed. `--pixel-density 2` renders at twice the native raster resolution.
     pub fn look(&mut self) -> Result<Options, String> {
+        let pixel_density = match self.count("--pixel-density", 2)? {
+            1 => pixfx_draw::PixelDensity::One,
+            2 => pixfx_draw::PixelDensity::Two,
+            _ => return Err("--pixel-density must be 1 or 2".into()),
+        };
         let seed = match self.value("--seed")? {
             Some(v) => Some(
                 v.parse::<u64>()
@@ -100,6 +105,7 @@ impl Args {
         Ok(Options {
             seed,
             palette,
+            pixel_density,
             extra,
             ..Options::default()
         })

@@ -28,10 +28,10 @@
 
 <h2>What you can do with it</h2>
 <ul>
-  <li><strong>Render.</strong> Run an effect natively and write sprite sheets (composite, colour and light PNGs plus a beanfx-layout JSON), or a looping GIF. See <a href="scripts.html">Scripts</a>.</li>
+  <li><strong>Render.</strong> Run an effect natively and write sprite sheets (composite, colour and light PNGs plus an Aseprite-style JSON), or a looping GIF. See <a href="scripts.html">Scripts</a>.</li>
   <li><strong>Play live.</strong> Run the same effect in a browser through a Canvas 2D renderer that owns its loop, through plain JS bindings, inside a Phaser 4 scene, or inside a gpui window.</li>
 </ul>
-<p>An effect here reads the sprite it plays on or the way it moved: an outline, a power-up aura, a body bursting apart, a trail. One that reads neither (a fire, an explosion, a shield) is sprite art the game plays. The engine and <code>feedback/power-up</code> are ports of <a href="https://github.com/patch-gg/pixelfx">pixelfx</a> (JavaScript).</p>
+<p>Procedural paint, authored sprite frames and hybrid effects share the same catalog. Effects can use the sprite they play on, follow its motion or play on their own.</p>
 
 <h2>Pick a package</h2>
 <div class="table-wrap">
@@ -57,7 +57,7 @@
     <tr><td><code>crates/pixfx-core</code></td><td>The engine: frame with colour and additive light, painter, <code>Effect</code>/<code>Instance</code>, <code>render_frames</code>, <code>composite</code>, <code>frame_hash</code>.</td></tr>
     <tr><td><code>crates/pixfx-effects</code></td><td>The effects and their registry, <code>EFFECTS</code> and <code>effect(id)</code>.</td></tr>
     <tr><td><code>crates/*/examples</code></td><td>Scripts over the library: <code>sprite_sheet</code>, <code>gif</code>, <code>render_clip</code>, <code>bench</code>, <code>poses</code>, the pixel steps.</td></tr>
-    <tr><td><code>crates/pixfx-export</code></td><td>Sprite sheets, beanfx-layout JSON and GIFs.</td></tr>
+    <tr><td><code>crates/pixfx-export</code></td><td>Sprite sheets, Aseprite-style JSON and GIFs.</td></tr>
     <tr><td><code>crates/pixfx-wasm</code></td><td>The engine for JavaScript: <code>effects()</code>, <code>meta(id)</code>, <code>new Fx(id, opts)</code>.</td></tr>
     <tr><td><code>packages/pixfx-web</code></td><td>The JS runtime every JS shell shares: the wasm, painting workers, shared frames, a stage per scene.</td></tr>
     <tr><td><code>packages/pixfx-canvas2d</code></td><td>Canvas 2D shell: effects painted on workers, drawn among your own drawing.</td></tr>

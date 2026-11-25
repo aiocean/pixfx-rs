@@ -1,5 +1,4 @@
-//! The beanfx JSON of a sheet: Aseprite "array" layout with beanfx's fields under `meta.beanfx`
-//! (beanfx `docs/output-json.md`). Pure: values in, [`serde_json::Value`] out.
+//! Aseprite array JSON for the composite atlas, extended with playback and layer metadata for pixfx.
 
 use pixfx_core::{Meta, Rendered};
 use pixfx_draw::math::js_round;
@@ -33,7 +32,7 @@ fn frame_ms(fps: u32) -> u32 {
 }
 
 /// The sheet's JSON. `pivot` is `r.origin + r.margin`, y down from the cell's top-left.
-pub fn beanfx_json(r: &Rendered, meta: &Meta, grid: &Grid, name: &str, files: &FileNames) -> Value {
+pub fn sheet_json(r: &Rendered, meta: &Meta, grid: &Grid, name: &str, files: &FileNames) -> Value {
     let ms = frame_ms(r.fps);
     let frames: Vec<Value> = (0..grid.frames)
         .map(|i| {
@@ -56,27 +55,20 @@ pub fn beanfx_json(r: &Rendered, meta: &Meta, grid: &Grid, name: &str, files: &F
         "frames": frames,
         "meta": {
             "app": "pixfx",
-            "version": "1",
+            "version": "2",
             "image": files.sheet,
             "format": "RGBA8888",
             "size": { "w": grid.width(), "h": grid.height() },
             "scale": "1",
             "frameTags": [{ "name": name, "from": 0, "to": last, "direction": "forward" }],
-            "beanfx": {
-                "name": name,
-                "fps": r.fps,
-                "frames": grid.frames,
-                "rows": 1,
-                "frameSize": [grid.cell_w, grid.cell_h],
-                "columns": grid.columns,
+            "pixfx": {
                 "pivot": [r.origin.0 + margin, r.origin.1 + margin],
+                "fps": r.fps,
                 "loop": meta.looping,
-                "end": if meta.looping { "loop" } else { "remove" },
-                "sheet": files.sheet,
-                "color": files.color,
-                "light": files.light,
-                "blend_light": "add",
-                "light_gain": 1.0,
+                "layers": [
+                    { "image": files.color, "blend": "normal" },
+                    { "image": files.light, "blend": "add" },
+                ],
             },
         },
     })
@@ -112,14 +104,29 @@ mod tests {
             margin: 2,
             frames: vec![Frame::new(16, 16, 0, 0)],
         };
-        let json = beanfx_json(
+        let json = sheet_json(
             &r,
             &meta,
             &Grid::new(1, 16, 16),
             "sized",
             &FileNames::new("sized"),
         );
-        assert_eq!(json["meta"]["beanfx"]["frameSize"], json!([16, 16]));
-        assert_eq!(json["meta"]["beanfx"]["pivot"], json!([8, 4]));
+        assert_eq!(json["frames"][0]["sourceSize"], json!({ "w": 16, "h": 16 }));
+        assert_eq!(json["frames"][0]["duration"], json!(33));
+        assert_eq!(json["meta"]["image"], json!("sized.png"));
+        assert_eq!(json["meta"]["version"], json!("2"));
+        assert_eq!(
+            json["meta"]["pixfx"],
+            json!({
+                "pivot": [8, 4],
+                "fps": 30,
+                "loop": true,
+                "layers": [
+                    { "image": "sized_color.png", "blend": "normal" },
+                    { "image": "sized_light.png", "blend": "add" },
+                ],
+            }),
+        );
+        assert!(json["meta"].get("beanfx").is_none());
     }
 }

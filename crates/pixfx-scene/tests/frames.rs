@@ -475,7 +475,8 @@ fn a_flipped_effect_sees_its_actor_mirrored() -> Res {
     let lit = |gx: i64| {
         (40..58)
             .filter(|&gy| {
-                let (fx, fy) = (gx - rect.x, gy - rect.y);
+                let density = i64::from(front.density().factor());
+                let (fx, fy) = ((gx - rect.x) * density, (gy - rect.y) * density);
                 front
                     .color
                     .get((fy * i64::from(front.w) + fx) as usize)

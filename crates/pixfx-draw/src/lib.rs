@@ -6,10 +6,12 @@
 pub mod blend;
 pub mod blob;
 pub mod color;
+pub mod font;
 pub mod frame;
 pub mod growth;
 pub mod halo;
 pub mod image;
+pub mod mask;
 pub mod math;
 pub mod painter;
 pub mod palette;
@@ -20,8 +22,10 @@ pub mod shatter;
 pub mod sweep;
 
 pub use color::{ColorError, Rgba, hex};
-pub use frame::{Frame, composite, composite_px, frame_hash};
+pub use font::{BIG, Font, Glyph, MINI};
+pub use frame::{Frame, PixelDensity, composite, composite_px, frame_hash};
 pub use image::RgbaImage;
+pub use mask::{Cells, Mask};
 pub use math::{Rng, rand};
-pub use painter::Painter;
+pub use painter::{Align, Painter, Saved, SpriteOpts, TextOpts};
 pub use ruler::{RULER, Ruler};

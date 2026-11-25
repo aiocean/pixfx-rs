@@ -92,6 +92,11 @@ that paint elsewhere, including one that falls behind
 `a_frame_that_comes_back_after_its_clock_moved_on_still_shows`). Follow-then-stop and `setScale` have no test yet (Task 3 of
 `docs/superpowers/plans/2026-11-14-render-engine-boundary.md`); a change that touches them adds the test first.
 
+## Rendered clips
+
+The optional `clip` feature decodes the JSON index and PNG pages into frame layers.
+File export writes the same format using the shared index types.
+
 ## Before you finish
 
 ```

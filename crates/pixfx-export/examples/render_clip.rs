@@ -10,7 +10,8 @@ mod common;
 use common::{Args, effect, exit, file_name};
 use pixfx_export::{render_clip, write_clip};
 
-const USAGE: &str = "usage: render_clip <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]";
+const USAGE: &str =
+    "usage: render_clip <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]";
 
 fn main() -> std::process::ExitCode {
     exit(run())

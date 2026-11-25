@@ -36,20 +36,20 @@ pub struct Ruler {
     pub blade: u32,
 }
 
-/// The duel's fighter standing, as `pixfx_fighter::paint` paints it: a 64x64 cell with the feet at (32, 60), 40 rows
-/// by 20 on screen (38 painted, a 1-pixel outline round it), the face 7 x 7 (`head`), the open eye 1 x 2, a hand
-/// 2 x 2 (`hand`), a sleeve 3 thick (`arm`), the blade 16 long (`sword`).
+/// The duel's fighter standing, as `pixfx_fighter::paint` paints it: a 104x104 cell with the feet at (52, 96), 63 rows
+/// by 31 on screen (61 painted, a 1-pixel outline round it), the face 11 x 11 (`head`), the open eye 2 x 4, a hand
+/// 3 x 3 (`hand`), a sleeve 5 thick (`arm`), the blade 26 long (`sword`).
 pub const RULER: Ruler = Ruler {
-    cell: 64,
-    feet: (32, 60),
-    height: 40,
-    width: 20,
+    cell: 104,
+    feet: (52, 96),
+    height: 63,
+    width: 31,
     outline: 1,
-    head: 7,
-    eye: (1, 2),
-    hand: 2,
-    limb: 3,
-    blade: 16,
+    head: 11,
+    eye: (2, 4),
+    hand: 3,
+    limb: 5,
+    blade: 26,
 };
 
 impl Ruler {

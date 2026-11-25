@@ -62,7 +62,7 @@ test("an effect shows its colour normally and its light added over it, at its li
   expect(shown.length).toBeGreaterThan(0);
   expect(new Set(shown.map((s) => s.blend))).toEqual(new Set(["normal", "add"]));
   for (const s of shown) {
-    expect(s.bytes.length).toBe(s.at.w * s.at.h * 4);
+    expect(s.bytes.length).toBe(s.at.w * 2 * s.at.h * 2 * 4);
     expect(s.bytes.some((b) => b !== 0)).toBe(true);
     // the body about to burst stands on its origin
     expect(s.at.x).toBeLessThanOrEqual(30);

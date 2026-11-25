@@ -67,8 +67,9 @@ pub const SIDE_LIGHT: i32 = 2;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, tsify::Tsify)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Shape {
-    /// The whole frame's width: a pass's rect spans it.
+    /// The whole frame's dimensions: a pass's rect spans it.
     pub frame_w: u32,
+    pub frame_h: u32,
     /// The cut's top-left on the frame, and its size: the surface is `w` × `h`.
     pub x: u32,
     pub y: u32,
@@ -100,7 +101,16 @@ pub struct Cut {
 
 impl Cut {
     pub fn of(frame: &Frame) -> Self {
-        let crop = PixelBox::lit(frame).unwrap_or_default();
+        let mut crop = PixelBox::lit(frame).unwrap_or_default();
+        // Keep the texture's phase when a camera zooms a dense raster in world space.
+        if frame.density() == pixfx_draw::PixelDensity::Two && crop.w != 0 {
+            let right = (crop.x + crop.w).next_multiple_of(2);
+            let bottom = (crop.y + crop.h).next_multiple_of(2);
+            crop.x &= !1;
+            crop.y &= !1;
+            crop.w = right - crop.x;
+            crop.h = bottom - crop.y;
+        }
         let n = crop.w as usize * crop.h as usize * 4;
         let (mut color, mut light) = (vec![0; n], vec![0; n]);
         color_rgba_in(frame, crop, &mut color);
@@ -115,6 +125,7 @@ impl Cut {
         Self {
             shape: Shape {
                 frame_w: frame.w,
+                frame_h: frame.h,
                 x: crop.x,
                 y: crop.y,
                 w: crop.w,
@@ -210,15 +221,26 @@ impl Shell for Recorder {
             return Ok(());
         }
         // the rect spans the whole frame in canvas pixels; the surface holds the crop
-        let unit = (pass.rect.w / u64::from(shape.frame_w.max(1))) as i64;
         let c = shape.crop();
+        let edge = |at: u32, target: u64, raster: u32| {
+            if target.is_multiple_of(u64::from(raster.max(1))) {
+                return i64::from(at).saturating_mul((target / u64::from(raster.max(1))) as i64);
+            }
+            let raster = u128::from(raster.max(1));
+            i64::try_from((u128::from(at) * u128::from(target) + raster / 2) / raster)
+                .unwrap_or(i64::MAX)
+        };
+        let x = edge(c.x, pass.rect.w, shape.frame_w);
+        let y = edge(c.y, pass.rect.h, shape.frame_h);
+        let w = edge(c.x + c.w, pass.rect.w, shape.frame_w) - x;
+        let h = edge(c.y + c.h, pass.rect.h, shape.frame_h) - y;
         self.push([
             OP_SHOW,
             *surface as i32,
-            clamp_i32(pass.rect.x + i64::from(c.x) * unit),
-            clamp_i32(pass.rect.y + i64::from(c.y) * unit),
-            clamp_i32(i64::from(c.w) * unit),
-            clamp_i32(i64::from(c.h) * unit),
+            clamp_i32(pass.rect.x.saturating_add(x)),
+            clamp_i32(pass.rect.y.saturating_add(y)),
+            clamp_i32(w),
+            clamp_i32(h),
             pass.handle as i32,
             i32::from(pass.layer != Layer::Back),
         ]);
@@ -380,7 +402,7 @@ impl Painter for Paint {
                 });
                 let n = w.next_job;
                 w.next_job = w.next_job.wrapping_add(1);
-                let (fw, fh) = job.clip.size();
+                let (fw, fh) = job.clip.raster_size();
                 let version = job.actor.map_or(0, |a| a.version);
                 let sent = w.sent_actor.insert(job.effect, version);
                 let actor = job
@@ -482,7 +504,7 @@ impl Frames {
         json: &str,
         pages: &[&[u8]],
     ) -> Result<(u32, Vec<i32>), String> {
-        let layers = pixfx_export::decode(json, pages)?;
+        let layers = pixfx_scene::clip::decode(json, pages)?;
         for l in &layers {
             self.inner
                 .deliver(&l.id, l.layer, &l.frame, &mut self.rec)
@@ -547,7 +569,11 @@ impl Scene {
         };
         let fits =
             |at: u32, len: u32, room: u32| at.checked_add(len).is_some_and(|end| end <= room);
-        if shape.frame_w != a.w || !fits(shape.x, shape.w, a.w) || !fits(shape.y, shape.h, a.h) {
+        if shape.frame_w != a.w
+            || shape.frame_h != a.h
+            || !fits(shape.x, shape.w, a.w)
+            || !fits(shape.y, shape.h, a.h)
+        {
             return Err(StageError::BadFrame);
         }
         let frame = shape;
@@ -737,11 +763,7 @@ impl JsFrames {
     /// PNG pages: effects playing that effect with the same options show them instead of painting them. Returns a draw list (makes; read their pixels
     /// with `colorPtr` / `lightPtr`). How many frames loaded is the number of makes.
     #[wasm_bindgen(js_name = loadClip)]
-    pub fn load_clip(
-        &mut self,
-        json: &str,
-        pages: Vec<Uint8Array>,
-    ) -> Result<Int32Array, JsError> {
+    pub fn load_clip(&mut self, json: &str, pages: Vec<Uint8Array>) -> Result<Int32Array, JsError> {
         let pages: Vec<Vec<u8>> = pages.iter().map(Uint8Array::to_vec).collect();
         let refs: Vec<&[u8]> = pages.iter().map(Vec::as_slice).collect();
         let (_, ops) = self
@@ -770,6 +792,22 @@ pub struct JsScene {
 
 #[wasm_bindgen(js_class = Scene)]
 impl JsScene {
+    /// Choose the raster for new effects. Omit the density to use each effect's option.
+    #[wasm_bindgen(js_name = setPixelDensity)]
+    pub fn set_pixel_density(
+        &mut self,
+        #[wasm_bindgen(unchecked_optional_param_type = "1 | 2")] density: Option<u32>,
+    ) -> Result<(), JsError> {
+        let density = match density {
+            None => None,
+            Some(1) => Some(pixfx_draw::PixelDensity::One),
+            Some(2) => Some(pixfx_draw::PixelDensity::Two),
+            _ => return Err(JsError::new("pixel density must be 1 or 2")),
+        };
+        self.inner.scene().set_pixel_density(density);
+        Ok(())
+    }
+
     /// Which scene of its frames this is (a job's `scene`).
     pub fn id(&mut self) -> u32 {
         self.inner.scene().id()

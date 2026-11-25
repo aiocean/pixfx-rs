@@ -14,6 +14,8 @@ const DEPTH: Record<Layer, number> = { back: 0, front: 1 };
 export interface PixfxOptions {
   /** Canvas pixels per game pixel, a whole number. Default 1. */
   scale?: number;
+  /** Raster texels per game pixel. Overrides the density of effects on this stage. */
+  pixelDensity?: 1 | 2;
   /** Where a surface's pixels are held. Default: an `OffscreenCanvas` each. Tests pass their own. */
   holder?: MakeHolder;
 }
@@ -61,6 +63,7 @@ export class Pixfx {
     let stage: Stage<null> | null = null;
     this.feel = new PixfxFeel(() => stage?.live ?? null);
     stage = new Stage<null>(game, this.images.images, (cue, effect) => this.feel.take(cue, effect), null);
+    if (options.pixelDensity !== undefined) stage.scene.setPixelDensity(options.pixelDensity);
     this.stage = stage;
   }
 

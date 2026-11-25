@@ -56,6 +56,11 @@ impl Clip {
         &self.opts
     }
 
+    pub fn with_pixel_density(mut self, density: pixfx_draw::PixelDensity) -> Self {
+        self.opts.pixel_density = density;
+        self
+    }
+
     /// Whether its effect grips the character it plays on ([`Effect::wraps_actor`]).
     pub fn wraps_actor(&self) -> bool {
         self.effect.wraps_actor()
@@ -71,7 +76,7 @@ impl Clip {
         self.margin
     }
 
-    /// The frame's size: the canvas plus the margin on every side.
+    /// Logical bounds in game pixels: the canvas plus the margin on every side.
     pub fn size(&self) -> (u32, u32) {
         (
             self.canvas.size.0 + 2 * self.margin,
@@ -79,12 +84,19 @@ impl Clip {
         )
     }
 
+    /// The frame's dimensions in raster texels.
+    pub fn raster_size(&self) -> (u32, u32) {
+        let (w, h) = self.size();
+        let density = self.opts.pixel_density.factor();
+        (w * density, h * density)
+    }
+
     /// An empty frame of the clip's size, its top-left `margin` up and left of the effect canvas's (as in
     /// [`crate::render_frames`]).
     pub fn blank(&self) -> Frame {
         let (w, h) = self.size();
         let corner = -(self.margin as i32);
-        Frame::new(w, h, corner, corner)
+        Frame::with_density(w, h, corner, corner, self.opts.pixel_density)
     }
 
     /// Where its options place it on the clip's frame ([`Instance::placement`]).
@@ -153,7 +165,7 @@ impl Player {
 
     /// A new instance of `clip`.
     pub fn of(clip: Clip) -> Self {
-        let (w, h) = clip.size();
+        let (w, h) = clip.raster_size();
         Self {
             inst: Instance::new(clip.effect, clip.opts.clone()),
             frame: clip.blank(),

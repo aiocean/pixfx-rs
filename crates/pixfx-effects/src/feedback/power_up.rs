@@ -143,9 +143,13 @@ fn pulse(t: f64, p: f64, w: f64) -> f64 {
 /// The source's `dot`: a pixel at alpha `a`, faded by ordered dither.
 fn dot(p: &mut Painter, x: f64, y: f64, c: Rgba, a: f64) {
     let (px, py) = (libm::floor(x), libm::floor(y));
-    if a >= 1.0 || a > bayer(px, py) {
+    if dot_visible(px, py, a) {
         p.px(px, py, c);
     }
+}
+
+fn dot_visible(x: f64, y: f64, alpha: f64) -> bool {
+    alpha >= 1.0 || alpha > bayer(x, y)
 }
 
 /// The source's `disc`: a filled disc, one pixel when it is small.
@@ -739,7 +743,9 @@ impl State {
             sx += x;
             top = js_min(top, y);
             bot = y;
-            dot(p, x, y, colour(l), e * 1.5);
+            if dot_visible(x, y, e * 1.5) {
+                p.paint_cell(x, y, colour(l), 1.0);
+            }
         };
         match &self.actor {
             Some(s) => {

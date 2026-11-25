@@ -5,7 +5,7 @@ changing anything here; this file only says what this crate holds.
 
 ## Job
 
-An effect written out as files: sprite sheets (composite, colour and light PNG) with beanfx's Aseprite-style JSON
+An effect written out as files: sprite sheets (composite, colour and light PNG) with Aseprite-style JSON
 (`write_sheet`), a GIF (`write_gif`), a video through ffmpeg on `PATH` (`write_video`), rendered clips that hosts play without drawing (`render_clip`, `write_clip`,
 `decode`), a still of an effect beside the character it plays on for checking scale (`board`: `busiest`, `still`), and the character a script plays an effect on (`Actors`: sprite
 frames read from PNGs, shown in turn; `gif --actor`, `stage` and `scale_board` read it).

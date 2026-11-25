@@ -2,14 +2,14 @@
 //! writes any RGBA image, and [`write_sheet`] an effect's sheets.
 
 use std::fs;
-use std::io::{BufWriter, Cursor};
+use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 
 use pixfx_core::{Meta, Rendered};
-use pixfx_draw::{Frame, RgbaImage, composite};
+use pixfx_draw::{Frame, composite};
 
 use crate::ExportError;
-use crate::json::{FileNames, beanfx_json};
+use crate::json::{FileNames, sheet_json};
 
 /// Frames per sheet row, at most.
 const MAX_COLUMNS: u32 = 8;
@@ -102,39 +102,6 @@ fn composite_rgba(f: &Frame) -> Vec<u8> {
     out
 }
 
-/// Decode a PNG of any 8-bit colour type (grey, grey and alpha, RGB, RGBA; palettes expanded) as RGBA.
-pub fn decode_png_rgba(bytes: &[u8]) -> Result<RgbaImage, String> {
-    let bad = |e: png::DecodingError| format!("png: {e}");
-    let mut decoder = png::Decoder::new(Cursor::new(bytes));
-    decoder.set_transformations(png::Transformations::normalize_to_color8());
-    let mut reader = decoder.read_info().map_err(bad)?;
-    let mut data = vec![0; reader.output_buffer_size().ok_or("png too big")?];
-    let info = reader.next_frame(&mut data).map_err(bad)?;
-    data.truncate(info.buffer_size());
-    let rgba = match info.color_type {
-        png::ColorType::Rgba => data,
-        png::ColorType::Rgb => data
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .flat_map(|&[r, g, b]| [r, g, b, 255])
-            .collect(),
-        png::ColorType::GrayscaleAlpha => data
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .flat_map(|&[g, a]| [g, g, g, a])
-            .collect(),
-        png::ColorType::Grayscale => data.iter().flat_map(|&g| [g, g, g, 255]).collect(),
-        png::ColorType::Indexed => return Err("png: palette not expanded".to_string()),
-    };
-    Ok(RgbaImage {
-        w: info.width,
-        h: info.height,
-        rgba,
-    })
-}
-
 /// Write a `w` x `h` image of `color` pixels (8 bits a channel, rows top to bottom) to `path` as a PNG: the
 /// one PNG encoder every export goes through.
 fn write_png(
@@ -188,7 +155,7 @@ pub fn write_sheet(
         &layers(light_rgb, 3),
         png::ColorType::Rgb,
     )?;
-    let json = beanfx_json(r, meta, &grid, name, &names);
+    let json = sheet_json(r, meta, &grid, name, &names);
     fs::write(&files.json, serde_json::to_string_pretty(&json)?)?;
     Ok(files)
 }

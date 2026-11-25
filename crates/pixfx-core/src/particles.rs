@@ -13,6 +13,16 @@ pub fn fly(x: f64, y: f64, vx: f64, vy: f64, t: f64, g: f64, drag: f64) -> (f64,
     (x + vx * f, y + vt * t + (vy - vt) * f)
 }
 
+/// A particle's velocity after `t` seconds of [`fly`], for streaks that point along the motion (pixelfx `flyV`).
+pub fn fly_v(vx: f64, vy: f64, t: f64, g: f64, drag: f64) -> (f64, f64) {
+    if drag <= 0.0 {
+        return (vx, vy + g * t);
+    }
+    let e = libm::exp(-drag * t);
+    let vt = g / drag;
+    (vx * e, vt + (vy - vt) * e)
+}
+
 /// Particles that repeat every `period` seconds, for loops with no seam. Particle `i` is born at its own phase and
 /// lives `life(g)` seconds (`g` is its `rng(seed, i, 911)` after the birth draw; a fixed life ignores it). For every
 /// live copy, `f(age, life, r, i)` is called with `r` a fresh `rng(seed, i)`.

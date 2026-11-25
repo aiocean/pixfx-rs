@@ -1,8 +1,19 @@
 //! Painter behaviour against pixelfx `src/core/painter.js`.
 
 use pixfx_draw::color::{Rgba, WHITE};
-use pixfx_draw::frame::Frame;
+use pixfx_draw::frame::{Frame, PixelDensity};
 use pixfx_draw::painter::Painter;
+
+#[test]
+fn smooth_sprites_keep_partial_coverage_and_do_not_leak_transparent_rgb() {
+    let mut frame = Frame::with_density(2, 1, 0, 0, PixelDensity::Two);
+    let mut p = Painter::new(&mut frame);
+    p.sprite_smooth(0.0, 0.0, 2, 1, 1.0, &[255, 0, 0, 255, 0, 0, 255, 0]);
+    let edge = Rgba::unpack(frame.color[2]);
+    assert!(edge.3 > 0 && edge.3 < 255);
+    assert_eq!((edge.0, edge.1, edge.2), (255, 0, 0));
+    assert_eq!(frame.color[3], 0);
+}
 
 fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> u64 {
     bytes.into_iter().fold(0xcbf2_9ce4_8422_2325, |h, b| {
@@ -113,4 +124,17 @@ fn clip_box_keeps_the_canvas_around_the_origin() {
             "({x}, {y})"
         );
     }
+}
+
+#[test]
+fn sprite_uses_local_transform_and_skips_transparent_texels() {
+    let red = Rgba(255, 0, 0, 255);
+    let green = Rgba(0, 255, 0, 255);
+    let mut frame = Frame::new(3, 1, 0, 0);
+    let mut painter = Painter::new(&mut frame);
+    painter.px(1.0, 0.0, green);
+    painter.place(3.0, 0.0, true, 0.0);
+    painter.sprite(0.0, 0.0, 2, 1, &[255, 0, 0, 255, 255, 255, 255, 0]);
+    painter.sprite(2.0, 0.0, 2, 1, &[255, 0, 0, 255]);
+    assert_eq!(frame.color, [0, green.pack(), red.pack()]);
 }

@@ -8,7 +8,7 @@
 
 use crate::effect::Layer;
 use core::ops::BitOr;
-use pixfx_draw::color::{Rgba, WHITE, mix, scale, step_at};
+use pixfx_draw::color::{Rgba, WHITE, at, mix, scale, step_at};
 use pixfx_draw::math::{Rng, TAU, clamp, js_max, js_min, js_round, or_one};
 use pixfx_draw::painter::Painter;
 
@@ -45,12 +45,6 @@ pub const SMOKE_RAMP: [Rgba; 5] = [
     Rgba(0x2b, 0x26, 0x30, 255),
     Rgba(0x1a, 0x17, 0x1e, 255),
 ];
-
-/// pixelfx `rampAt`: the ramp step for t in 0..1.
-fn ramp_at(r: &[Rgba], t: f64) -> Rgba {
-    let n = r.len() as f64;
-    step_at(r, js_min(n - 1.0, js_max(0.0, libm::floor(t * n))))
-}
 
 /// Particle kinds (pixelfx `P`, in its numeric order).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -540,9 +534,9 @@ impl Particles {
                 let a =
                     js_min(1.0, age * 12.0) * js_min(1.0, k * 2.4) * if big { 0.7 } else { 0.58 };
                 let c = if q.col != Rgba::NONE {
-                    mix(q.col, ramp_at(&SMOKE_RAMP, age), age)
+                    mix(q.col, at(&SMOKE_RAMP, age), age)
                 } else {
-                    ramp_at(&SMOKE_RAMP, age * 1.05)
+                    at(&SMOKE_RAMP, age * 1.05)
                 };
                 p.disc(x, y, r, c, a * 0.45);
                 p.disc(x + r * 0.05, y + r * 0.06, r * 0.74, c, a * 0.62);

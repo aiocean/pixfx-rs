@@ -51,14 +51,10 @@ The test: if a gpui game would need the same behaviour, it is not translation, a
 
 `pixfx-core` (with `ts`), `pixfx-draw`, `pixfx-scene` (with `ts`), `pixfx-effects` (`default-features = false`; the `all` feature turns every
 effect on), `js-sys`, `wasm-bindgen`, `serde`, `serde-wasm-bindgen`, `serde_json`, `serde_path_to_error`, `tsify`;
-optional behind their features: `pixfx-fighter`, `pixfx-light` and `pixfx-mind`. Never a game's crate: the arena's duel
+optional behind their features: `pixfx-fighter`, `pixfx-core::light` and `pixfx-mind`. Never a game's crate: the arena's duel
 has its own wasm (`projects/arena/crates/arena-wasm`), which a page loads beside this one.
 
-## Known drift
-
-- It depends on `pixfx-export` (a file shell) for `pixfx_export::decode` in `src/lib.rs`: a binding reaching up into
-  a shell. Decoding a clip is a format every host reads; it belongs lower. Do not add more uses of `pixfx-export`
-  here.
+Rendered clips are decoded by `pixfx_scene::clip`.
 
 ## Before you finish
 

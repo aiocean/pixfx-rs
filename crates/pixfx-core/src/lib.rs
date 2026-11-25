@@ -3,6 +3,9 @@
 #![forbid(unsafe_code)]
 
 pub mod actor;
+#[cfg(feature = "body")]
+pub mod body;
+pub mod chain;
 pub mod cue;
 pub mod effect;
 pub mod feel;
@@ -10,6 +13,8 @@ pub mod fluid;
 pub mod frames;
 pub mod hit_flash;
 pub mod key;
+#[cfg(feature = "light")]
+pub mod light;
 pub mod light_color;
 pub mod motion;
 pub mod particles;
@@ -24,10 +29,12 @@ pub mod trace;
 pub mod volley;
 
 pub use actor::{Actor, ActorError};
+pub use chain::{Chain, Link, Pos, chain_cues};
 pub use cue::{Cue, FEEL, TimedCue, cues_between, cues_of, impact};
 pub use effect::{
     Canvas, Clock, ColorOpt, Effect, EffectState, Instance, Layer, Meta, NumOpt, OptKind, OptSpec,
-    OptValue, OptionError, Options, Placement, RampOpt, Sim, check_options, find, valid_dt,
+    OptValue, OptionError, Options, Placement, RampOpt, RenderKind, Sim, check_options, find,
+    valid_dt,
 };
 pub use feel::{Feel, FeelSpec};
 pub use frames::{FRAME_BUDGET, FrameStore};

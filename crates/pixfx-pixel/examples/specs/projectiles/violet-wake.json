@@ -1,0 +1,32 @@
+{
+  "id": "projectiles/violet-wake",
+  "name": "Violet Wake",
+  "look": "Three staggered violet ribbons in the wake of a fast dash. Each twists around the path in a shallow S. Deep indigo edges frame a short magenta crest, and the staggered ends break into slivers.",
+  "subject": "three ribbons following a rightward dash, with the figure as a scale guide",
+  "grid": true,
+  "cell": 104,
+  "scale": 4,
+  "gap": 10,
+  "frames": 4,
+  "parts": [
+    { "name": "MAIN", "text": "Three ribbons around one shallow S curve at peak brightness, with a clean silhouette and no detached fragments or halo" },
+    { "name": "RIBBON", "text": "One narrow ribbon in profile, tapering to a point at both ends", "pivot": "the forward tip on the movement path", "forms": ["short rising hook", "open S-curve with a wide crest", "edge-on sliver with a broken tail"] },
+    { "name": "FX", "text": "Small detached indigo and violet slivers with the same curvature as the ribbon tail" },
+    { "name": "LIGHT", "text": "A compact stepped violet halo around the hottest magenta crest" }
+  ],
+  "layers": [
+    { "name": "SOLID", "text": "Ribbon silhouettes and their solid colour bands" },
+    { "name": "FX", "text": "Detached tail slivers" },
+    { "name": "LIGHT", "text": "Stepped halo around the crest", "light": true }
+  ],
+  "rows": [
+    { "name": "GATHER", "caption": "staggered onset", "text": "The start of the dash leaves thin hooked marks before the full stroke appears.", "notes": ["One dim indigo hook", "A lower hook emerges", "A third strand appears behind the others", "A violet streak runs through the longest strand"] },
+    { "name": "SWEEP", "caption": "crest crosses the trace", "text": "The bands open into a long S as the dash accelerates, with a compact flash at the crest.", "notes": ["Three bands open out", "A magenta core lights the middle band", "The bright crest travels right", "The crest dims as the rear tips start to snap"] },
+    { "name": "FADE", "caption": "tail breaks up", "text": "The dash ends and the remaining ribbons collapse along the recorded path.", "notes": ["The older ends break into three slivers", "The hot crest falls back to violet", "Two thin indigo cuts remain", "A final one-pixel fleck disappears"] }
+  ],
+  "rules": [
+    "Use an indigo edge, electric violet body and a short magenta crest.",
+    "Keep the three leading tips staggered and close to the same movement path.",
+    "Use the guide figure for scale and keep it out of the painted layers."
+  ]
+}

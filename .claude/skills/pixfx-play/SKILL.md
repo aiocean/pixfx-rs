@@ -5,8 +5,7 @@ description: Use when putting pixfx effects into a game - a Phaser 4, Canvas 2D 
 
 # Play pixfx effects in a game
 
-The engine's effects read the sprite they play on or the way it moved (`explosions/body-burst`, `feedback/outline`,
-`feedback/power-up`, `projectiles/trail`). A fire, an explosion or a shield is sprite art the game plays itself.
+Painted, sprite-based and hybrid effects share the same playback API. Effects such as `feedback/outline` can also read the actor they wrap.
 
 A JS game reaches the engine through the wasm (`crates/pixfx-wasm`), the runtime `packages/pixfx-web`, and one shell
 package. A Rust game uses `crates/pixfx-gpui`. Nothing is on npm or crates.io: you build and link from this repo.

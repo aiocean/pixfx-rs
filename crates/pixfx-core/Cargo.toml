@@ -13,6 +13,8 @@ tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 [features]
+body = ["dep:serde"]
+light = []
 # serde for the value types (colours as "#rrggbb"), for hosts that pass them as data
 serde = ["dep:serde", "pixfx-draw/serde"]
 # TypeScript declarations for the value types, for the wasm bindings
@@ -20,3 +22,16 @@ ts = ["serde", "dep:tsify", "dep:wasm-bindgen", "pixfx-draw/ts"]
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# File output for the body examples.
+pixfx-export = { path = "../pixfx-export" }
+serde_json.workspace = true
+
+[[example]]
+name = "clip_sheet"
+required-features = ["body"]
+
+[[example]]
+name = "catalog"
+required-features = ["body"]

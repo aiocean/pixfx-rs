@@ -2,8 +2,9 @@
 //! or handing it to an artist (or an image model) as reference (`cargo run -p pixfx-fighter --example poses`).
 
 use crate::look::Look;
-use crate::paint::{Appearance, SPRITE, outline, paint};
+use crate::paint::{Appearance, SPRITE, outline, paint_at_density};
 use crate::pose::Pose;
+use pixfx_draw::PixelDensity;
 
 /// Every pose, in the order a sheet lays them out, with its name in lower case.
 pub const POSES: [(&str, Pose); 24] = [
@@ -108,6 +109,15 @@ pub fn states() -> Vec<State> {
 /// `pose` of `look` in each of `states`, a row of [`MOMENTS`] per state, as [`SPRITE`]-square RGBA cells row by
 /// row, painted and outlined as the duel draws them.
 pub fn state_cells(look: &Look, pose: Pose, states: &[State]) -> Vec<Vec<u8>> {
+    state_cells_at_density(look, pose, states, PixelDensity::One)
+}
+
+pub fn state_cells_at_density(
+    look: &Look,
+    pose: Pose,
+    states: &[State],
+    density: PixelDensity,
+) -> Vec<Vec<u8>> {
     let mut cells = Vec::new();
     for s in states {
         for &t in &MOMENTS {
@@ -120,7 +130,7 @@ pub fn state_cells(look: &Look, pose: Pose, states: &[State]) -> Vec<Vec<u8>> {
                 shocked: s.tint == Tint::Shock,
                 ..appearance(pose)
             };
-            let mut sprite = paint(look, &a);
+            let mut sprite = paint_at_density(look, &a, density);
             outline(&mut sprite, look.outline);
             cells.push(sprite.to_image().rgba);
         }
@@ -131,13 +141,18 @@ pub fn state_cells(look: &Look, pose: Pose, states: &[State]) -> Vec<Vec<u8>> {
 /// Each pose of `look` in [`POSES`] order as a [`SPRITE`]-square RGBA cell (straight alpha), painted and outlined
 /// as the duel draws it. The poses in `blank` come out empty (transparent).
 pub fn pose_cells(look: &Look, blank: &[Pose]) -> Vec<Vec<u8>> {
+    pose_cells_at_density(look, blank, PixelDensity::One)
+}
+
+pub fn pose_cells_at_density(look: &Look, blank: &[Pose], density: PixelDensity) -> Vec<Vec<u8>> {
+    let side = SPRITE * density.factor() as usize;
     POSES
         .iter()
         .map(|&(_, pose)| {
             if blank.contains(&pose) {
-                return vec![0; SPRITE * SPRITE * 4];
+                return vec![0; side * side * 4];
             }
-            let mut sprite = paint(look, &appearance(pose));
+            let mut sprite = paint_at_density(look, &appearance(pose), density);
             outline(&mut sprite, look.outline);
             sprite.to_image().rgba
         })

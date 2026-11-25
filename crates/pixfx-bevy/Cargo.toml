@@ -1,0 +1,40 @@
+# Its own workspace: Bevy is large, and the root workspace's every `cargo` command would build it. Check it with
+# `cargo test --manifest-path crates/pixfx-bevy/Cargo.toml`.
+[workspace]
+
+[package]
+name = "pixfx-bevy"
+description = "Live pixfx effects in Bevy: colour drawn normally, light additively"
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+bevy = { version = "=0.20.1", default-features = false, features = ["2d_bevy_render", "bevy_asset"] }
+pixfx-core = { path = "../pixfx-core" }
+pixfx-draw = { path = "../pixfx-draw" }
+pixfx-scene = { path = "../pixfx-scene" }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+disallowed_methods = "deny"
+
+[dev-dependencies]
+# the example opens a window
+bevy = { version = "=0.20.1", default-features = false, features = ["2d"] }
+pixfx-effects = { path = "../pixfx-effects" }
+
+# Bevy's debug info runs to gigabytes: keep line tables for this crate and none for dependencies, which build with
+# some optimisation so the example runs at speed.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 1

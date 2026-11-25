@@ -17,6 +17,8 @@ const OWN = { depth: z.object({ back: z.number(), front: z.number() }).optional(
 const STEP_PRIORITY = (UPDATE_PRIORITY.NORMAL + UPDATE_PRIORITY.LOW) / 2;
 
 export interface PixfxOptions {
+  /** Raster texels per game pixel for effects on this stage. */
+  pixelDensity?: 1 | 2;
   /** Where the effects' sprites go; it sorts its children by `zIndex`. Default: a new container on `app.stage`. */
   container?: Container;
   /** What the shake moves and tilts. Default: `app.stage`. */
@@ -69,6 +71,7 @@ export class Pixfx {
     let stage: Stage<null> | null = null;
     this.feel = new PixfxFeel(() => stage?.live ?? null);
     stage = new Stage<null>(game, pixiImages(this.container, textureOf), (cue, effect) => this.feel.take(cue, effect), null);
+    if (options.pixelDensity !== undefined) stage.scene.setPixelDensity(options.pixelDensity);
     this.stage = stage;
     app.ticker.add(this.step, undefined, STEP_PRIORITY);
     app.ticker.add(this.after, undefined, UPDATE_PRIORITY.UTILITY);

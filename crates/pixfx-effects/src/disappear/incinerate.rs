@@ -3,15 +3,17 @@
 //!
 //! Adapted from Pixel VFX Studio's `fire/incinerate` (MIT License, Copyright (c) 2026 Patch, Copyright (c) 2026 Hugo
 //! Duprez). Wraps its actor ([`Effect::wraps_actor`]): when handed a sprite via [`EffectState::set_actor`], it reads
-//! [`Silhouette`] once per pose so the charred body and its crumbling 3x3 ash chunks come from the sprite's own cells;
-//! with no sprite it uses the stand-in silhouette.
+//! [`Silhouette`] and its pixels once per pose: until the flare the sprite burns in its own colours, charring from the
+//! feet up behind an ember line, and the charred body and its crumbling 3x3 ash chunks come from the sprite's own
+//! cells, crown included. Flame roots climb the silhouette's edge, loose ash starts on that edge, and the glow
+//! and floor char follow the sprite's centre and footprint. With no sprite it uses the stand-in silhouette.
 
 use std::sync::Arc;
 
 use pixfx_core::cue::{Cue, FEEL, TimedCue};
 use pixfx_core::{Actor, Area, Effect, EffectState, Layer, Meta, NumOpt, Options, Silhouette};
 use pixfx_draw::Painter;
-use pixfx_draw::color::Rgba;
+use pixfx_draw::color::{Rgba, mix};
 use pixfx_draw::math::{Rng, TAU, clamp, js_max, js_min, js_round, lerp, rng, to_int32};
 
 pub struct Incinerate;
@@ -27,11 +29,20 @@ const K_A: f64 = 0xa5 as f64;
 const K_C: f64 = 0xc4 as f64;
 /// 3x3 pixel ash chunks (`Ruler::size(RULER.hand, 1.0)`).
 const CH: i32 = 3;
+/// Reference dimensions for sizing flames and glow.
+const STAND_IN_HALF_W: f64 = 6.2;
+const STAND_IN_H: f64 = 31.1;
+/// The stand-in's ash grid: chunk columns and rows, and its top row (the crown that crumbles first).
+const STAND_IN_COLS: (i32, i32) = (-3, 3);
+const STAND_IN_ROWS: i32 = 11;
+const STAND_IN_TOP: i32 = 10;
+/// How far toward char a pixel below the burn front is.
+const CHAR: f64 = 0.8;
 const BOX: Area = Area {
-    x: -18,
-    y: -54,
-    w: 36,
-    h: 56,
+    x: -22,
+    y: -60,
+    w: 64,
+    h: 64,
 };
 
 const FLAKES: NumOpt = NumOpt::new("flakes", 14.0).within(8.0, 28.0);
@@ -50,8 +61,8 @@ const META: Meta = Meta {
         "character",
         "one-shot",
     ],
-    size: (64, 64),
-    origin: (22, 60),
+    size: (BOX.w, BOX.h),
+    origin: (-BOX.x, -BOX.y),
     duration: 1.2,
     looping: false,
     fps: FPS,
@@ -116,7 +127,8 @@ impl Effect for Incinerate {
             flakes: js_round(opts.num(&FLAKES)) as usize,
             breeze: opts.num(&BREEZE),
             seed: to_int32(seed as f64) as f64,
-            sil: None,
+            body: None,
+            actor_set: false,
         })
     }
 }
@@ -126,7 +138,97 @@ struct State {
     flakes: usize,
     breeze: f64,
     seed: f64,
-    sil: Option<Silhouette>,
+    body: Option<Body>,
+    actor_set: bool,
+}
+
+/// The sprite it burns, read once per pose: the cells it covers, its colours over `BOX`, and how it is sized.
+struct Body {
+    sil: Silhouette,
+    px: Vec<Option<Rgba>>,
+    /// Its flames, glow, floor and loose ash against the stand-in's: across and up.
+    sx: f64,
+    sy: f64,
+    bounds: Area,
+    centre: (f64, f64),
+    edge: Vec<(i32, i32)>,
+    footprint: (f64, f64),
+    chunks: Vec<Chunk>,
+}
+
+impl Body {
+    fn of(actor: &Actor, seed: f64) -> Option<Body> {
+        let sil = Silhouette::of(actor, BOX);
+        let b = sil.bounds()?;
+        let (x0, x1) = (b.x, b.x + b.w as i32);
+        let floor = b.y + b.h as i32;
+        let centre = sil.centroid()?;
+        let edge = sil.edge().collect();
+        let (left, right) = sil
+            .cells()
+            .filter(|&(_, y)| y == floor - 1)
+            .fold((x1, x0), |(left, right), (x, _)| {
+                (left.min(x), right.max(x + 1))
+            });
+        let cols = (x0.div_euclid(CH), (x1 - 1).div_euclid(CH) + 1);
+        let top = (b.h as i32 - 1).div_euclid(CH);
+        let chunks = chunks(seed, cols, top + 1, top.max(1), floor, |x, y| {
+            sil.covers(x, y)
+        });
+        let mut px = vec![None; (BOX.w * BOX.h) as usize];
+        for (x, y, c) in actor.opaque() {
+            if let Some(i) = box_index(x, y) {
+                px[i] = Some(c);
+            }
+        }
+        Some(Body {
+            sil,
+            px,
+            sx: f64::from(b.w) / (2.0 * STAND_IN_HALF_W),
+            sy: f64::from(b.h) / STAND_IN_H,
+            bounds: b,
+            centre,
+            edge,
+            footprint: (f64::from(left + right) / 2.0, f64::from(right - left)),
+            chunks,
+        })
+    }
+
+    fn floor(&self) -> i32 {
+        self.bounds.y + self.bounds.h as i32
+    }
+
+    fn front(&self, k: i32) -> f64 {
+        f64::from(self.bounds.h) * f64::from((k + 1).min(PEAK + 1)) / f64::from(PEAK + 1)
+    }
+
+    fn flame_root(&self, x: f64, k: i32) -> Option<(f64, f64)> {
+        let target_x = f64::from(self.bounds.x) + f64::from(self.bounds.w) / 2.0 + x;
+        let target_y = f64::from(self.floor()) - self.front(k) * 0.8;
+        self.edge
+            .iter()
+            .map(|&(x, y)| (f64::from(x) + 0.5, f64::from(y) + 0.5))
+            .filter(|&(_, y)| y >= f64::from(self.floor()) - self.front(k).max(0.5))
+            .min_by(|&(ax, ay), &(bx, by)| {
+                let distance = |x: f64, y: f64| {
+                    let dx = x - target_x;
+                    let dy = y - target_y;
+                    dx * dx + 2.0 * dy * dy
+                };
+                distance(ax, ay).total_cmp(&distance(bx, by))
+            })
+    }
+
+    fn color(&self, x: i32, y: i32) -> Option<Rgba> {
+        box_index(x, y).and_then(|i| self.px.get(i).copied().flatten())
+    }
+}
+
+/// Where pixel (`x`, `y`) of the effect's space is in `BOX`, none outside it.
+fn box_index(x: i32, y: i32) -> Option<usize> {
+    let (i, j) = (x - BOX.x, y - BOX.y);
+    (i >= 0 && j >= 0 && i < BOX.w as i32 && j < BOX.h as i32)
+        .then(|| (j * BOX.w as i32 + i) as usize)
 }
 
 struct Tongue {
@@ -143,7 +245,6 @@ struct Tongue {
     hollow: f64,
 }
 
-#[derive(Clone)]
 struct Chunk {
     cx: i32,
     cy: i32,
@@ -151,6 +252,7 @@ struct Chunk {
     y: f64,
     at: f64,
     r: Rng,
+    mask: u16,
 }
 
 fn stand_in_body(x: f64, y: f64) -> bool {
@@ -231,7 +333,7 @@ fn shell(m: f64, w: f64, q: f64) -> i32 {
     }
 }
 
-fn tongues(seed: f64, k: i32, t: f64) -> Vec<Tongue> {
+fn tongues(seed: f64, k: i32, t: f64, (sx, sy): (f64, f64), body: Option<&Body>) -> Vec<Tongue> {
     if k < 0 || (k as usize) >= COLH.len() {
         return Vec::new();
     }
@@ -263,13 +365,21 @@ fn tongues(seed: f64, k: i32, t: f64) -> Vec<Tongue> {
         if hollow >= 1.0 {
             continue;
         }
-        let hh = h * h_scale * grow * r.range(0.88, 1.12);
+        let mut hh = h * sy * h_scale * grow * r.range(0.88, 1.12);
+        if body.is_some() {
+            hh = (hh * 0.52).max(2.0);
+        }
         if hh < 2.0 {
             continue;
         }
-        let x_val = x + r.range(-1.0, 1.0);
-        let w_val = w * js_min(1.0, grow + 0.3) * if i == 0 && k == 4 { 1.25 } else { 1.0 };
-        let lean_val = lean + r.range(-1.0, 1.0);
+        let x_val = x * sx + r.range(-1.0, 1.0);
+        let mut w_val =
+            w * sx * js_min(1.0, grow + 0.3) * if i == 0 && k == 4 { 1.25 } else { 1.0 };
+        if body.is_some() {
+            w_val = w_val.clamp(1.0, 6.0);
+        }
+        let lean_scale = if body.is_some() { sx.min(1.4) } else { sx };
+        let lean_val = lean * lean_scale + r.range(-1.0, 1.0);
         let lick_amp = r.range(0.8, 1.6);
         let lick_freq = r.range(2.2, 3.2);
         let lick_ph = r.next();
@@ -283,9 +393,25 @@ fn tongues(seed: f64, k: i32, t: f64) -> Vec<Tongue> {
         } else {
             (if i == 0 { heat } else { heat.min(0) }) + if i >= 5 { -1 } else { 0 }
         };
+        let (x, y) = match body {
+            Some(body) => {
+                let Some(root) = body.flame_root(x_val, k) else {
+                    continue;
+                };
+                root
+            }
+            None => (x_val, 0.0),
+        };
+        if body.is_some() {
+            // Let the tip taper inside the canvas when the crown is near its top edge.
+            hh = hh.min(y - f64::from(BOX.y) - 1.0);
+            if hh < 2.0 {
+                continue;
+            }
+        }
         out.push(Tongue {
-            x: x_val,
-            y: 0.0,
+            x,
+            y,
             h: hh,
             w: w_val,
             lean: lean_val,
@@ -301,10 +427,6 @@ fn tongues(seed: f64, k: i32, t: f64) -> Vec<Tongue> {
 }
 
 fn paint_flames(p: &mut Painter, tongues: &[Tongue], cols: &[Rgba; 6], k: i32) {
-    const X0: i32 = -22;
-    const Y0: i32 = -60;
-    const X1: i32 = 42;
-    const Y1: i32 = 4;
     struct Live<'a> {
         t: &'a Tongue,
         pts: Vec<(f64, f64)>,
@@ -342,10 +464,10 @@ fn paint_flames(p: &mut Painter, tongues: &[Tongue], cols: &[Rgba; 6], k: i32) {
         })
         .collect();
 
-    for j in 0..(Y1 - Y0) {
-        let y = f64::from(Y0 + j) + 0.5;
-        for i in 0..(X1 - X0) {
-            let x = f64::from(X0 + i) + 0.5;
+    for j in 0..BOX.h as i32 {
+        let y = f64::from(BOX.y + j) + 0.5;
+        for i in 0..BOX.w as i32 {
+            let x = f64::from(BOX.x + i) + 0.5;
             let mut b1 = f64::NEG_INFINITY;
             let mut m1 = 0.0;
             let mut s1 = 0.0;
@@ -415,65 +537,112 @@ fn paint_flames(p: &mut Painter, tongues: &[Tongue], cols: &[Rgba; 6], k: i32) {
     }
 }
 
-impl State {
-    fn in_body(&self, x: f64, y: f64) -> bool {
-        if let Some(sil) = &self.sil {
-            sil.covers(libm::floor(x) as i32, libm::floor(y) as i32)
-        } else {
-            stand_in_body(x, y)
-        }
-    }
-
-    fn chunks(&self) -> Vec<Chunk> {
-        let mut out = Vec::new();
-        for cy in 0..11 {
-            for cx in -3..3 {
-                let mut any = false;
-                for y in 0..CH {
-                    for x in 0..CH {
-                        let px = f64::from(cx * CH + x) + 0.5;
-                        let py = f64::from(-(cy * CH + y)) - 0.5;
-                        if self.in_body(px, py) {
-                            any = true;
-                        }
+fn chunks(
+    seed: f64,
+    (c0, c1): (i32, i32),
+    rows: i32,
+    top: i32,
+    floor: i32,
+    covers: impl Fn(i32, i32) -> bool,
+) -> Vec<Chunk> {
+    let mut out = Vec::new();
+    for cy in 0..rows {
+        for cx in c0..c1 {
+            let left = cx * CH;
+            let bottom = floor - cy * CH;
+            let mut mask = 0;
+            for y in 0..CH {
+                for x in 0..CH {
+                    let cell = (left + x, bottom - y - 1);
+                    if covers(cell.0, cell.1) {
+                        mask |= 1u16 << (y * CH + x);
                     }
                 }
-                if !any {
-                    continue;
-                }
-                let mut r = rng(&[self.seed, K_A, f64::from(1000 + cy * 8 + cx)]);
-                let at = 5.6 + (1.0 - f64::from(cy) / 10.0) * 3.2 + r.range(-0.5, 0.6);
-                out.push(Chunk {
-                    cx,
-                    cy,
-                    x: f64::from(cx * CH) + 1.5,
-                    y: f64::from(-(cy * CH)) - 1.5,
-                    at,
-                    r,
-                });
             }
+            if mask == 0 {
+                continue;
+            }
+            let anchor = mask.trailing_zeros() as i32;
+            let (x, y) = (left + anchor % CH, bottom - anchor / CH - 1);
+            let stand_in_cell =
+                (STAND_IN_COLS.0..STAND_IN_COLS.1).contains(&cx) && cy < STAND_IN_ROWS;
+            let key = if stand_in_cell {
+                1000 + cy * 8 + cx
+            } else {
+                100_000 + cy * 64 + cx
+            };
+            let mut r = rng(&[seed, K_A, f64::from(key)]);
+            let at = 5.6 + (1.0 - f64::from(cy) / f64::from(top)) * 3.2 + r.range(-0.5, 0.6);
+            out.push(Chunk {
+                cx,
+                cy,
+                x: f64::from(x) + 0.5,
+                y: f64::from(y) + 0.5,
+                at,
+                r,
+                mask,
+            });
         }
-        out
+    }
+    out
+}
+
+impl State {
+    /// Across and up against the stand-in: 1 with no sprite.
+    fn scale(&self) -> (f64, f64) {
+        self.body.as_ref().map_or((1.0, 1.0), |b| (b.sx, b.sy))
     }
 
-    fn draw_body(&self, p: &mut Painter, k: i32, chunks: &mut [Chunk]) {
+    /// Until the flare the sprite burns in its own colours: charred below a front climbing from the feet, an ember
+    /// line along the front, and white-hot at the flare. With no sprite nothing is drawn here.
+    fn draw_sprite(&self, p: &mut Painter, k: i32) {
+        let Some(b) = &self.body else { return };
+        if k > PEAK {
+            return;
+        }
+        let c = &self.c;
+        let front = b.front(k);
+        for (x, y) in b.sil.cells() {
+            let Some(own) = b.color(x, y) else { continue };
+            let up = f64::from(b.floor() - y) - 0.5;
+            let col = if k == PEAK {
+                if (x + y).rem_euclid(3) == 0 {
+                    c[6]
+                } else {
+                    c[7]
+                }
+            } else if up < front - 2.0 {
+                mix(own, c[0], CHAR)
+            } else if up < front {
+                let r = rng(&[self.seed, K_C, f64::from(x * 97 + y), f64::from(k)]).next();
+                if r < 0.5 { c[4] } else { c[5] }
+            } else {
+                own
+            };
+            p.paint_cell(f64::from(x) + 0.5, f64::from(y) + 0.5, col, 1.0);
+        }
+    }
+
+    fn draw_body(&self, p: &mut Painter, k: i32, chunks: &[Chunk]) {
         if k < 5 {
             return;
         }
         let c = &self.c;
         let kf = f64::from(k);
+        let floor = self.body.as_ref().map_or(0, Body::floor);
         for ck in chunks {
             if kf >= ck.at {
                 continue;
             }
+            let mut r = ck.r.clone();
             for y in 0..CH {
                 for x in 0..CH {
                     let px = f64::from(ck.cx * CH + x) + 0.5;
-                    let py = f64::from(-(ck.cy * CH + y)) - 0.5;
-                    if !self.in_body(px, py) {
+                    let py = f64::from(floor - (ck.cy * CH + y)) - 0.5;
+                    if ck.mask & (1 << (y * CH + x)) == 0 {
                         continue;
                     }
-                    let crack = (x == 0 || y == 0) && ck.r.next() < 0.5;
+                    let crack = (x == 0 || y == 0) && r.next() < 0.5;
                     let col = if crack && k < 7 {
                         if k == 5 { c[4] } else { c[3] }
                     } else if (x + y + ck.cy) % 5 == 0 && k >= 6 {
@@ -481,27 +650,24 @@ impl State {
                     } else {
                         c[0]
                     };
-                    p.px(px, py, col);
+                    p.paint_cell(px, py, col, 1.0);
                 }
             }
         }
     }
 
-    fn draw_ash(&self, p: &mut Painter, t: f64, chunks: &mut [Chunk]) {
+    fn draw_ash(&self, p: &mut Painter, t: f64, chunks: &[Chunk]) {
         let c = &self.c;
         let ck_len = chunks.len();
         let n = ck_len + self.flakes;
         for i in 0..n {
-            let mut local_r;
-            let (ck_info, r): (Option<(f64, f64, f64, i32)>, &mut Rng) =
-                if let Some(ck) = chunks.get_mut(i) {
-                    (Some((ck.at, ck.x, ck.y, ck.cy)), &mut ck.r)
-                } else {
-                    local_r = rng(&[self.seed, K_A, f64::from(i as u32)]);
-                    (None, &mut local_r)
-                };
-            let t0 = match ck_info {
-                Some((at, _, _, _)) => at * MS,
+            let chunk = chunks.get(i);
+            let mut r = chunk.map_or_else(
+                || rng(&[self.seed, K_A, f64::from(i as u32)]),
+                |ck| ck.r.clone(),
+            );
+            let t0 = match chunk {
+                Some(ck) => ck.at * MS,
                 None => r.range(4.5, 7.0) * MS,
             };
             let life = r.range(0.5, 0.82);
@@ -510,8 +676,12 @@ impl State {
                 continue;
             }
             let u = age / life;
-            let (x0, y0) = match ck_info {
-                Some((_, cx0, cy0, _)) => (cx0, cy0),
+            let (x0, y0) = match chunk {
+                Some(ck) => (ck.x, ck.y),
+                None if let Some(body) = &self.body => {
+                    let (x, y) = body.edge[(r.next() * body.edge.len() as f64) as usize];
+                    (f64::from(x) + 0.5, f64::from(y) + 0.5)
+                }
                 None => {
                     let rx0 = r.range(-10.0, 10.0);
                     let ry0 = -r.range(4.0, 30.0) * (0.4 + 0.6 * (1.0 - libm::fabs(rx0) / 12.0));
@@ -519,20 +689,26 @@ impl State {
                 }
             };
             let up = r.range(18.0, 30.0);
-            let shear = match ck_info {
-                Some((_, _, _, cy)) => 0.55 + f64::from(cy) / 14.0,
+            let shear = match chunk {
+                Some(ck) => 0.55 + f64::from(ck.cy) / 14.0,
                 None => 1.0,
             };
             let wind = r.range(10.0, 22.0) * self.breeze * shear;
             let freq = r.range(5.0, 9.0);
             let ph = r.range(0.0, 6.0);
             let amp = r.range(1.0, 2.5);
-            let x = x0 + wind * age * (0.4 + age) + libm::sin(age * freq + ph) * amp;
+            let sway = libm::sin(age * freq + ph)
+                - if self.body.is_some() {
+                    libm::sin(ph)
+                } else {
+                    0.0
+                };
+            let x = x0 + wind * age * (0.4 + age) + sway * amp;
             let y = y0 - up * age - 16.0 * age * age;
-            if y < -57.0 {
+            if self.body.is_none() && y < -57.0 {
                 continue;
             }
-            let big = if ck_info.is_some() {
+            let big = if chunk.is_some() {
                 true
             } else {
                 r.next() < 0.45
@@ -540,7 +716,29 @@ impl State {
             let spin = r.int(0.0, 5.0) as usize;
             let rate = r.range(0.6, 1.4);
             let sh_idx = (spin + libm::floor((age / MS) * rate).max(0.0) as usize) % SHAPES.len();
-            let sh = SHAPES[sh_idx];
+            let mut ash_cells = [(0, 0); (CH * CH) as usize];
+            let sh = if let Some(ck) = chunk.filter(|_| self.body.is_some()) {
+                let quarter_turns = libm::floor(age / MS * rate) as i32 % 4;
+                let anchor = ck.mask.trailing_zeros() as i32;
+                let mut count = 0;
+                for cell in 0..CH * CH {
+                    if ck.mask & (1 << cell) == 0 {
+                        continue;
+                    }
+                    let dx = cell % CH - anchor % CH;
+                    let dy = anchor / CH - cell / CH;
+                    ash_cells[count] = match quarter_turns {
+                        1 => (-dy, dx),
+                        2 => (-dx, -dy),
+                        3 => (dy, -dx),
+                        _ => (dx, dy),
+                    };
+                    count += 1;
+                }
+                &ash_cells[..count]
+            } else {
+                SHAPES[sh_idx]
+            };
             let scale_u = if u < 0.4 {
                 1.0
             } else if u < 0.7 {
@@ -575,13 +773,22 @@ impl State {
             return;
         }
         let c = &self.c;
-        let w = if k < 2 {
-            f64::from(5 + k * 3)
-        } else if k < 9 {
-            12.0
-        } else {
-            lerp(12.0, 4.0, f64::from(k - 9) / 6.0)
-        };
+        let (centre, span, floor) = self.body.as_ref().map_or((0.0, 1.0, 0.0), |body| {
+            let (centre, width) = body.footprint;
+            (
+                centre,
+                width / (2.0 * STAND_IN_HALF_W),
+                f64::from(body.floor()),
+            )
+        });
+        let w = span
+            * if k < 2 {
+                f64::from(5 + k * 3)
+            } else if k < 9 {
+                12.0
+            } else {
+                lerp(12.0, 4.0, f64::from(k - 9) / 6.0)
+            };
         let mut x = -w;
         while x <= w {
             let mut r = rng(&[self.seed, K_C, x + 40.0]);
@@ -589,12 +796,12 @@ impl State {
                 x += 1.0;
                 continue;
             }
-            p.px(x, 0.5, if k < 8 { c[3] } else { c[0] });
+            p.px(centre + x, floor + 0.5, if k < 8 { c[3] } else { c[0] });
             if libm::fabs(x) < w - 2.0 {
-                p.px(x, 1.5, c[0]);
+                p.px(centre + x, floor + 1.5, c[0]);
             }
             if (6..13).contains(&k) && r.next() < 0.18 {
-                p.px(x, 0.5, if k < 10 { c[4] } else { c[3] });
+                p.px(centre + x, floor + 0.5, if k < 10 { c[4] } else { c[3] });
             }
             x += 1.0;
         }
@@ -603,14 +810,12 @@ impl State {
 
 impl EffectState for State {
     fn set_actor(&mut self, actor: Option<Arc<Actor>>) {
-        self.sil = actor.and_then(|a| {
-            let sil = Silhouette::of(&a, BOX);
-            (!sil.is_empty()).then_some(sil)
-        });
+        self.actor_set = actor.is_some();
+        self.body = actor.and_then(|a| Body::of(&a, self.seed));
     }
 
     fn draw(&self, p: &mut Painter, t: f64, layer: Layer) {
-        if layer != Layer::Front {
+        if layer != Layer::Front || (self.actor_set && self.body.is_none()) {
             return;
         }
         let k = js_round(t * f64::from(FPS)) as i32;
@@ -619,29 +824,50 @@ impl EffectState for State {
         }
         let t_ms = f64::from(k) * MS;
         let c = &self.c;
+        let (sx, sy) = self.scale();
+        let (glow_x, glow_y) = self.body.as_ref().map_or((0.0, -14.0), |b| b.centre);
         if k < 9 {
             let ch = COLH.get(k as usize).copied().unwrap_or(0.0);
             p.glow(
-                0.0,
-                -14.0,
-                if k == 4 { 26.0 } else { 18.0 },
+                glow_x,
+                glow_y,
+                if k == 4 { 26.0 } else { 18.0 } * sy,
                 c[4],
                 if k == 4 { 0.55 } else { 0.3 * ch },
             );
         }
         self.draw_floor(p, k);
-        let t_list = tongues(self.seed, k, t_ms);
+        let t_list = tongues(self.seed, k, t_ms, (sx, sy), self.body.as_ref());
         if !t_list.is_empty() {
             let flame_cols = [c[2], c[3], c[4], c[5], c[6], c[7]];
             paint_flames(p, &t_list, &flame_cols, k);
         }
-        let mut body_chunks = self.chunks();
-        let mut ash_chunks = self.chunks();
-        self.draw_body(p, k, &mut body_chunks);
-        self.draw_ash(p, t_ms, &mut ash_chunks);
-        p.clean_flecks(3, false);
-        if k == 4 {
-            p.glow(0.0, -18.0, 12.0, c[6], 0.4);
+        if let Some(body) = &self.body {
+            self.draw_ash(p, t_ms, &body.chunks);
+            p.clean_flecks(3, false);
+            // Preserve fine sprite details and let the ember line read against the flames.
+            self.draw_sprite(p, k);
+            self.draw_body(p, k, &body.chunks);
+        } else {
+            let mut chunks = chunks(
+                self.seed,
+                STAND_IN_COLS,
+                STAND_IN_ROWS,
+                STAND_IN_TOP,
+                0,
+                |x, y| stand_in_body(f64::from(x) + 0.5, f64::from(y) + 0.5),
+            );
+            for chunk in &mut chunks {
+                chunk.x = f64::from(chunk.cx * CH) + 1.5;
+                chunk.y = f64::from(-(chunk.cy * CH)) - 1.5;
+            }
+            self.draw_body(p, k, &chunks);
+            self.draw_ash(p, t_ms, &chunks);
+            p.clean_flecks(3, false);
+        }
+        if k == PEAK {
+            let flare_y = self.body.as_ref().map_or(-18.0, |b| b.centre.1);
+            p.glow(glow_x, flare_y, 12.0 * sy, c[6], 0.4);
         }
     }
 }

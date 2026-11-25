@@ -284,3 +284,27 @@ fn a_soft_streak_turns_translucent_toward_its_end_and_stays_whole() {
         "no pixel dithered away: a blend, not a dither"
     );
 }
+
+#[test]
+fn filtering_a_wake_keeps_its_wave_across_the_join() {
+    use pixfx_draw::sweep::sweep_filtered;
+
+    let poses = [
+        pose(26.0, 0.0, 0.0, 0.0),
+        pose(17.0, -4.0, 0.0, 0.25),
+        pose(7.0, 1.0, 0.0, 0.50),
+        pose(0.0, 0.0, 0.0, 0.75),
+    ];
+    let brush = point(RED);
+    let look = Look { wave: 2.0, ..PLAIN };
+    let mut whole = Frame::new(64, 64, 0, 0);
+    let mut split = Frame::new(64, 64, 0, 0);
+    let mut p = Painter::new(&mut whole);
+    p.place(32.0, 32.0, false, 0.0);
+    sweep(&mut p, &poses, &brush, &[], &look);
+    let mut p = Painter::new(&mut split);
+    p.place(32.0, 32.0, false, 0.0);
+    sweep_filtered(&mut p, &poses, &brush, &[], &look, |age| age > 0.32);
+    sweep_filtered(&mut p, &poses, &brush, &[], &look, |age| age <= 0.32);
+    assert_eq!(whole, split);
+}

@@ -5,18 +5,13 @@ anything here; this file only says what this crate holds.
 
 ## Job
 
-The effects that read the sprite they play on (`pixfx_core::Silhouette`, `Actor`) or the way it moved
-(`pixfx_core::Trace`): `appear/teleport-beam`, `disappear/blink-out`, `disappear/fade`, `disappear/incinerate`,
-`explosions/body-burst`, `feedback/cloak-shimmer`, `feedback/electrified`, `feedback/encase`, `feedback/outline`,
-`feedback/power-up` (a port of Sprite Fusion's pixel art VFX, https://www.spritefusion.com/pixel-art-vfx),
-`feedback/soaked`, `projectiles/trail`. Each
-effect lives in its category folder (`src/feedback/outline.rs`), is listed in `EFFECTS` and is looked up with
-`pixfx_effects::effect(id)`.
+Procedural, sprite-based and hybrid effects live in category folders and share the `EFFECTS` registry.
+Use `pixfx_effects::effect(id)` to look them up.
 
 ## Belongs here
 
-An effect that reads the sprite it plays on or the way it moved: what it draws on each frame, its options and their
-defaults, its meta, and the cues it fires (through `pixfx_core::cue::impact`).
+Effect drawing, assets, option defaults, metadata and cues. Override `Effect::render_kind()` with `Sprite` for
+authored frames or `Hybrid` when the effect also generates visual content procedurally.
 
 ## Adding an effect
 
@@ -35,7 +30,6 @@ defaults, its meta, and the cues it fires (through `pixfx_core::cue::impact`).
 | is shared by several effects as particles, physics, cues or feel | `pixfx-core` |
 | decides where an effect plays, follows a sprite, fades after stop or picks the frame to show | `pixfx-scene` |
 | reads a clock, a file or a host | a shell |
-| reads neither the sprite nor its motion (a fire, an explosion, a shield, weather) | nowhere in the engine: it is sprite art the game plays |
 
 An effect never knows which shell shows it.
 

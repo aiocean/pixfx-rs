@@ -5,23 +5,23 @@
 //! output; each cell is also written alone, `<out>/<look>-<P>/r<row>-m<moment>.png`.
 //!
 //!   cargo run -p pixfx-fighter --example poses -- <thunder|frost|alchemist> [--blank POSE,...] [--pose POSE [--states]]
-//!       [--out DIR]
+//!       [--pixel-density 1|2] [--out DIR]
 //!
 //! `--out` defaults to `out`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use pixfx_draw::PixelDensity;
 use pixfx_export::{Grid, pack_cells, write_png_rgba};
 use pixfx_fighter::look::Look;
 use pixfx_fighter::paint::SPRITE;
 use pixfx_fighter::pose::Pose;
 use pixfx_fighter::poses::{
-    MOMENTS, POSES, State, Tint, pose_cells, pose_named, state_cells, states,
+    MOMENTS, POSES, State, Tint, pose_cells_at_density, pose_named, state_cells_at_density, states,
 };
 
-const USAGE: &str =
-    "usage: poses <thunder|frost|alchemist> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]";
+const USAGE: &str = "usage: poses <thunder|frost|alchemist> [--blank POSE,...] [--pose POSE [--states]] [--pixel-density 1|2] [--out DIR]";
 
 fn main() -> ExitCode {
     match run(std::env::args().skip(1).collect()) {
@@ -43,6 +43,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     let mut blank = Vec::new();
     let (mut one, mut with_states) = (None, false);
     let mut out = PathBuf::from("out");
+    let mut density = PixelDensity::Two;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -56,6 +57,13 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 one = Some((name.clone(), named(name)?));
             }
             "--states" => with_states = true,
+            "--pixel-density" => {
+                density = match it.next().map(String::as_str) {
+                    Some("1") => PixelDensity::One,
+                    Some("2") => PixelDensity::Two,
+                    _ => return Err("--pixel-density must be 1 or 2".into()),
+                };
+            }
             "--out" => out = it.next().ok_or(USAGE)?.into(),
             flag if flag.starts_with("--") => return Err(format!("unknown flag {flag}\n{USAGE}")),
             _ if look.is_none() => look = Some(a.clone()),
@@ -63,9 +71,11 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
     }
     let name = look.ok_or(USAGE)?;
-    let look =
-        Look::preset(&name).ok_or(format!("no fighter look {name}: thunder, frost or alchemist"))?;
+    let look = Look::preset(&name).ok_or(format!(
+        "no fighter look {name}: thunder, frost or alchemist"
+    ))?;
     std::fs::create_dir_all(&out).map_err(|e| format!("creating {}: {e}", out.display()))?;
+    let side = SPRITE as u32 * density.factor();
     let (cells, grid, path) = match &one {
         Some((pose_name, pose)) => {
             let rows = if with_states {
@@ -80,20 +90,20 @@ fn run(args: Vec<String>) -> Result<(), String> {
             for (i, s) in rows.iter().enumerate() {
                 println!("row {i}: {}", s.label());
             }
-            let cells = state_cells(&look, *pose, &rows);
+            let cells = state_cells_at_density(&look, *pose, &rows, density);
             let grid = Grid {
                 frames: cells.len() as u32,
                 columns: MOMENTS.len() as u32,
                 rows: rows.len() as u32,
-                cell_w: SPRITE as u32,
-                cell_h: SPRITE as u32,
+                cell_w: side,
+                cell_h: side,
             };
             (cells, grid, out.join(format!("{name}-{pose_name}.png")))
         }
         None if with_states => return Err(format!("--states needs --pose\n{USAGE}")),
         None => {
-            let cells = pose_cells(&look, &blank);
-            let grid = Grid::new(cells.len() as u32, SPRITE as u32, SPRITE as u32);
+            let cells = pose_cells_at_density(&look, &blank, density);
+            let grid = Grid::new(cells.len() as u32, side, side);
             (cells, grid, out.join(format!("{name}-poses.png")))
         }
     };
@@ -112,7 +122,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         for (i, cell) in cells.iter().enumerate() {
             let (row, moment) = (i / MOMENTS.len(), i % MOMENTS.len());
             let cell_path = dir.join(format!("r{row}-m{moment}.png"));
-            write_png_rgba(&cell_path, SPRITE as u32, SPRITE as u32, cell)
+            write_png_rgba(&cell_path, side, side, cell)
                 .map_err(|e| format!("writing {}: {e}", cell_path.display()))?;
         }
         println!("cells: {}/r<row>-m<moment>.png", dir.display());

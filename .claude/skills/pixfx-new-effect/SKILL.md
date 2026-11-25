@@ -5,18 +5,16 @@ description: Use when the user asks for a new pixfx effect from an idea, often o
 
 # A new pixfx effect, from an idea to the library
 
-The user gives an idea; **you do the design thinking**. You research, draft the whole storyboard with your own
-picks, sketch it, and bring the user only the few real forks, as choices with your recommendation. Then you take it
-through the reference sheets (skill `pixfx-ref`) and the painter code (skill `pixfx-effect`), stopping at the
-checkpoints below. Run from `tools/pixfx-rs`.
+The user gives an idea; **you do the design thinking**. Research, draft the storyboard, and model the effect's
+geometry and motion before sketching its pixels. Bring the user only the few real forks, as choices with your
+recommendation. Pick the reference workflow below, then write the painter with `pixfx-effect`.
+Run from `tools/pixfx-rs`.
 
-## 0. Does it read the sprite or its motion?
+## 0. Choose the visual source
 
-An engine effect reads the sprite it plays on (its outline, its pixels, its colours: skill `pixfx-sprite-aware`) or
-the way it moved (its trace). An idea that reads neither (a fire, an explosion, a shield, a phoenix, a sword
-formation, weather) is turned away before any research: it is a sprite the game plays, drawn and animated as sprite
-art, not a pixfx effect. Say that in one line, and offer the version that reads the sprite if there is one (not "a
-shield" but "a rim of light that grips the character's outline when it blocks").
+Decide whether the effect uses procedural drawing, authored sprite frames or both. Use actor pixels for
+effects that conform to a body and a trace for effects shaped by movement. Standalone effects can play at a
+point. Choose `Paint`, `Sprite` or `Hybrid` for the effect's render kind.
 
 ## The questions: propose, never interrogate
 
@@ -34,18 +32,31 @@ storyboard ("Category: `feedback`, next to `feedback/power-up`").
 
 ## 1. Research (no questions yet)
 
-- `rg -n -i '<idea words>' crates/pixfx-effects/src crates/pixfx-ref/examples/specs` and `target/ref/*/`: an effect
+- `rg -n -i '<idea words>' crates/pixfx-effects/src crates/pixfx-pixel/examples/specs` and `target/ref/*/`: an effect
   or a drawn sheet may already exist. Reuse what exists; say so.
 - The closest existing effects (`explosions/body-burst`, `feedback/outline`, `feedback/power-up`,
   `projectiles/trail`): their duration, size, origin, how their moments run, how they read the sprite or the trace.
   Read their files.
-- How the game will use it: the role table in `site/assets/effect-roles.js` (buff, death, trail, ...).
+- How the game will use it. Start with the roles below and check the closest game's usage when available.
+
+### Choose the reference
+
+- **User-approved GIF or other reference.** Use it directly as the target. Inspect key frames locally and
+  record their elapsed times using the GIF's frame delays, including variable delays and the loop seam when
+  relevant. Use the observed shapes and motion to fit the model in 2a. Put the original and selected frames on
+  the review page, skip reference generation (stops 2 and 3), and compare the Rust render with the supplied
+  reference at stop 4. This route requires no AI redraw, spec, template or `pixfx-ref` call.
+- **Enough information to draw directly.** When the model and existing art or primitives give the painter a
+  clear target, review the wireframe and plots, then go straight to stop 4.
+- **New art would resolve a specific gap.** Use `pixfx-ref` when a missing look, part or beat warrants a drawn
+  reference and the user wants one. Generate only the material needed to fill the gap, after the user approves
+  any paid generation. Keep the supplied reference as the target for everything it already shows.
 
 ## 2. Storyboard: draft it whole
 
-Pick the role, then build the moments from its beats. Each moment gets 4 to 6 drawn frames, a caption per frame, a
-duration, and what makes it read: anticipation before the action, an impact frame with a cue (hit-stop, shake),
-follow-through, a settle.
+Pick the role, then build the moments from its beats. Use key frames from the supplied reference when available.
+When designing a sheet for generation, plan 4 to 6 drawn frames per moment. Give each moment a duration, caption
+its key frames, and identify what makes it read, such as anticipation, impact, follow-through or settle.
 
 | Role | Moments (beats) | Usual length |
 |---|---|---|
@@ -61,20 +72,52 @@ The storyboard has these parts, in order, in your reply:
 2. **Moments**: a table: moment, frames, seconds, a caption per frame.
 3. **Parts**: the main object, its pieces with the `forms` each takes (a wing folded, half open, spread, swept), the
    small effects, the light; a `pivot` for each piece that turns.
-4. **Exact in code**: counts, order, paths, spin ("12 shards, the head's first"). The image model will not keep
-   these across sheets; the code will.
-5. **What the game sets**: the sprite it wraps, size, colour as options.
+4. **Math model**. Show the anchors, geometry, paths and timing curves that drive each beat, using the workflow below.
+5. **Parameters and composition**. Show what the game sets, which parts play independently, and how they fit together.
 6. **Look**: palette (from a `pixfx_draw::palette` preset or the nearest effect), glow painted in steps
    (`pixfx_draw::halo`), category and id.
 7. **Scale**: each object's size against the ruler, as a body part and a ratio (skill `pixfx`, "One scale: the
    ruler"): "the aura reaches a head above the head: 7 px", "each shard 2 hands: 4 px", "the smear as tall as the
    body: 40 px".
    Nothing under 1 px.
-8. **Cost**: sheets to draw (a parts sheet and one per moment, about $0.07 each).
+8. **Reference and cost**. State which reference will drive the painter and list any proposed paid sheets.
+9. **Demo use cases**. Use [pixfx-demo](../pixfx-demo/SKILL.md) to identify distinct ways to use the effect.
+   Carry the selected scenarios into stop 5 when building the website demo.
 
-Then **sketch it**: write the spec (`crates/pixfx-ref/examples/specs/<category>/<name>.json`, from
+### 2a. Model the effect before drawing pixels
+
+- **Find the structure.** Break each beat into visible parts and say what drives each one: an actor anchor,
+  silhouette edge, trace sample, or UI point or region. Define the local origin, axes, pivots and units. Sketch the
+  underlying points, bones, centerlines, contours or masks that the painter will turn into pixels. Use the geometry
+  the effect needs. A dissolve can start with a silhouette and a moving mask boundary.
+- **Write the motion.** Use the simplest equations that explain what changes. Define the time variable and its
+  domain, how beats join or loop, and the formulas for the paths and envelopes that matter (position, rotation,
+  radius, width, opacity or emission). Spell out counts and spawn order where they affect the read. For example,
+  an orbit can use `u = clamp(t / duration, 0, 1)`, `a(u) = a0 + 2π × turns × u`, and
+  `p(u) = anchor(u) + r(u) × (cos(a(u)), sin(a(u)))`. Here `t` and `duration` are seconds, `a0` is radians,
+  `r` is in game pixels, and the anchor comes from the sprite.
+- **Plot it.** Sample the same equations for a wireframe or mask sketch with paths and marked beat times, and plot
+  the governing values against time with units. Use a few samples for a simple effect. Check the start, peak and
+  end, joins and loop seams where applicable, and whether paths and thin features still read on the ruler's
+  whole-pixel grid. Adjust the model before adding palette, pixel clusters and additive light.
+- **Name the parameters.** Give each meaningful parameter a unit (or type), default, valid range and visible
+  influence. Distinguish game options from internal constants and values derived from the actor or trace. Check
+  the default and representative extremes in the plots. Document a seed when randomness matters. The Rust model
+  owns these rules and uses the project's deterministic math and rounding.
+- **Try composing the parts.** For each candidate part, check whether it has an independent role and can reuse
+  an existing effect or primitive. Specify the shared anchor or event, start offset, lifetime and layer order.
+  Compose independently playable effects in the game or scene. Within one painter, reuse atomic drawing or
+  simulation primitives at the lowest layer the callers share. Extract a new shared primitive only with at least
+  two actual callers and no benchmark regression. Keep tightly coupled parts local and say what state they share.
+
+Use the model to drive the Rust painter. Reference art guides the pixel treatment. Carry the formulas and
+parameter choices into the painter review so the rendered motion can be checked against the storyboard.
+
+### 2b. Sketch the reference sheets when generating art
+
+For the sheets you plan to generate, write the spec (`crates/pixfx-pixel/examples/specs/<category>/<name>.json`, from
 `TEMPLATE.json`; the moments' captions are the rows' `notes`) and run
-`cargo run -q -p pixfx-ref --example template -- <spec> --parts-sheet` and one `--moment` (it needs `--parts`: pass
+`cargo run -q -p pixfx-pixel --example template -- <spec> --parts-sheet` and one `--moment` (it needs `--parts`: pass
 any PNG until the parts sheet is drawn, and run that `template --moment` again with the drawn parts sheet before its
 `generate`, or the placeholder is sent as the parts). Open the `template.png` files in Chrome: labelled cells with
 the figure, the layout the model will draw into. Free, nothing sent anywhere.
@@ -84,8 +127,8 @@ Then ask the forks (at most 3), with the storyboard and the sketch in front of t
 
 ## 3. Then the pipeline: one step, one review page, one answer
 
-The work runs one step at a time. A step ends at its stop, and the user's answer starts the next step; this holds
-even when the user's request names only some stops, or none. Every stop is the same three things, in this order:
+Use only the stops that apply to the chosen reference and requested work. With a supplied GIF or a direct
+painter, go from stop 1 to stop 4. Each applicable review stop has three parts:
 
 1. **A review page**: write `target/ref/<slug>/review-<n>-<step>.html` (`<slug>` is the id with `/` as `_`). It is
    the step's whole result on one page: a heading, a few lines saying what changed since the last page and every
@@ -97,11 +140,11 @@ even when the user's request names only some stops, or none. Every stop is the s
 
 | n | Step | Skill | Its review page shows |
 |---|---|---|---|
-| 1 | Storyboard and sketch | this one | the moments table, parts, exact-in-code list, cost, and every `template.png`. **Nothing is spent before this answer** |
-| 2 | Parts sheet: template, `generate --dry-run`, draw, extract | `pixfx-ref` | the drawn sheet beside its template, and a link to `parts/review/index.html` (the cut cells, colour and light) |
-| 3 | Moment sheets, in parallel; extract; `whole` | `pixfx-ref` | `whole.gif`, `whole.png`, a link to each `<moment>/review/index.html`, and every drift from MAIN named (count, size, a cracked form too early) |
-| 4 | Painter code, a function per part; a held frame beside the sheet, a round per difference | `pixfx-effect` | the effect's gif beside `whole.gif`, and held frames beside the sheet frames they copy |
-| 5 | Options, site role and sliders, bench | `pixfx-effect` | the gif at a few option values (`gif ... --num width=2 --out target/ref/<slug>/opt-a`), the bench numbers |
+| 1 | Storyboard and model | this one | the moments, parts, formulas, wireframe or mask sketch, plots, parameters and composition decision. Include the supplied reference and key frames or any proposed templates and generation cost |
+| 2 | Optional parts sheet: template, `generate --dry-run`, draw, extract | `pixfx-ref` | the drawn sheet beside its template, and a link to `parts/review/index.html` (the cut cells, colour and light) |
+| 3 | Optional moment sheets, extract and assemble | `pixfx-ref` | the generated frames, links to their reviews, and any differences from the design. Show `whole.gif` and `whole.png` when assembling a full reference |
+| 4 | Painter code from the model | `pixfx-effect` | the effect's GIF beside the chosen reference and key frames at corresponding beats, when available. Check the paths and timing against the model on every route |
+| 5 | Website demos, options, site sliders and bench | `pixfx-demo` for demos, `pixfx-effect` for options and bench | the playable use cases, the options or composition behind each, and the bench numbers |
 | 6 | Goldens, CHANGELOG | `pixfx-effect` | what was blessed and the test output; bless only after the user said the look is right at stop 4 or 5 |
 | 7 | Commit | | only when asked; own hunks through a temporary index |
 
@@ -120,7 +163,6 @@ finished step now, open it, and stop there.
 | Running several steps in one turn, with one question at the end | One step per turn: its review page, opened, then the question |
 | Paths to PNGs and gifs listed in chat as the review | A `review-<n>-<step>.html` page that holds them all, opened in Chrome |
 | Ten questions at once | At most 3; the rest are your calls, stated in the storyboard |
-| Taking a count or a motion from the sheets | Write it in code; say so in "Exact in code" |
+| Redrawing a supplied GIF that already shows the desired effect | Sample the GIF locally, fit and plot the model, and use that GIF for the render comparison |
 | Sizing an object by eye, or copying the sheet's size at 64 squares as engine pixels | Size it against the ruler (a part and a ratio, `Ruler::size`); a 64-square sheet draws 2/3 of engine size |
 | A new spec for something already drawn | Search `target/ref` and the specs first |
-| Designing a fire, an explosion or a shield as an engine effect | Turn it away: it reads neither the sprite nor its motion, so it is sprite art the game plays (step 0) |

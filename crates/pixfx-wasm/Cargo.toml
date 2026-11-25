@@ -13,14 +13,12 @@ js-sys = "=0.3.107"
 pixfx-core = { path = "../pixfx-core", features = ["ts"] }
 pixfx-draw = { path = "../pixfx-draw" }
 pixfx-effects = { path = "../pixfx-effects", default-features = false }
-pixfx-export = { path = "../pixfx-export" }
 pixfx-fighter = { path = "../pixfx-fighter", features = ["ts"], optional = true }
-pixfx-light = { path = "../pixfx-light", features = ["ts"], optional = true }
 pixfx-mind = { path = "../pixfx-mind", features = ["ts"], optional = true }
-pixfx-scene = { path = "../pixfx-scene", features = ["ts"] }
+pixfx-scene = { path = "../pixfx-scene", features = ["ts", "clip"] }
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
 serde_path_to_error.workspace = true
 tsify.workspace = true
 wasm-bindgen.workspace = true
@@ -36,8 +34,8 @@ default = ["all", "fighter", "light", "mind"]
 all = ["pixfx-effects/all"]
 # pixfx-fighter for JS: `Body`, `FightFeel`, `Sprites`, `lookColors`. A game without fighters builds without it.
 fighter = ["dep:pixfx-fighter"]
-# pixfx-light for JS: `stepLights`, `putOutLight`, `Lighting`. A game without scene light builds without it.
-light = ["dep:pixfx-light"]
+# Scene light for JS: `stepLights`, `putOutLight`, `Lighting`. A game without scene light builds without it.
+light = ["pixfx-core/light"]
 # pixfx-mind for JS: `Mind`, a fighter's brain. A game whose fighters a player alone drives builds without it.
 mind = ["dep:pixfx-mind"]
 

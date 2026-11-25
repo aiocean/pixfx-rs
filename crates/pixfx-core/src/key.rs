@@ -9,10 +9,12 @@
 use std::fmt;
 
 use crate::effect::{OptValue, Options, Placement};
+use pixfx_draw::PixelDensity;
 use pixfx_draw::color::Rgba;
 
 /// Bumped whenever the encoding changes, so keys written by an older build (rendered clips) never match.
 const VERSION: u8 = 2;
+const DENSE_VERSION: u8 = 3;
 
 /// One effect with one set of options and margin, placed one way: its frames are the same wherever it plays.
 /// Shown as lowercase hex, the form hosts pass to JS and write into rendered clips.
@@ -22,12 +24,24 @@ pub struct ClipKey(Vec<u8>);
 impl ClipKey {
     /// The key of effect `id` with `opts`, `margin` empty pixels round its canvas, drawn as `place` says.
     pub fn new(id: &str, opts: &Options, margin: u32, place: Placement) -> Self {
-        let mut w = Writer(vec![VERSION]);
+        let version = match opts.pixel_density {
+            PixelDensity::One => VERSION,
+            PixelDensity::Two => DENSE_VERSION,
+        };
+        let mut w = Writer(vec![version]);
         w.str(id);
         w.u32(margin);
         w.options(opts);
         w.placement(place);
         Self(w.0)
+    }
+
+    pub fn pixel_density(&self) -> PixelDensity {
+        if self.0.first() == Some(&DENSE_VERSION) {
+            PixelDensity::Two
+        } else {
+            PixelDensity::One
+        }
     }
 }
 
@@ -55,9 +69,9 @@ impl std::str::FromStr for ClipKey {
             })
             .collect::<Result<Vec<u8>, String>>()?;
         match bytes.first() {
-            Some(&VERSION) => Ok(Self(bytes)),
+            Some(&VERSION | &DENSE_VERSION) => Ok(Self(bytes)),
             Some(v) => Err(format!(
-                "frame key of version {v}, this build reads {VERSION}"
+                "frame key of version {v}, this build reads {VERSION} and {DENSE_VERSION}"
             )),
             None => Err(bad()),
         }
@@ -115,6 +129,7 @@ impl Writer {
             seed,
             light,
             palette,
+            pixel_density: _,
             extra,
         } = o;
         self.f64(*x);

@@ -19,7 +19,7 @@ pub const MAX_MARGIN: u32 = 4096;
 #[derive(Default, tsify::Tsify)]
 #[tsify(
     rename = "FxOptions",
-    type = "{ margin?: number; seed?: number; flip?: boolean; angle?: number; light?: number; palette?: PaletteOption; [option: string]: number | string | string[] | boolean | undefined }"
+    type = "{ margin?: number; seed?: number; flip?: boolean; angle?: number; light?: number; palette?: PaletteOption; pixelDensity?: 1 | 2; [option: string]: number | string | string[] | boolean | undefined }"
 )]
 struct Wire {
     margin: Option<u32>,
@@ -28,6 +28,7 @@ struct Wire {
     angle: Option<f64>,
     light: Option<f64>,
     palette: Option<PaletteIn>,
+    pixel_density: Option<u32>,
     extra: BTreeMap<String, Extra>,
 }
 
@@ -57,6 +58,7 @@ impl<'de> Visitor<'de> for WireVisitor {
                 "angle" => w.angle = map.next_value()?,
                 "light" => w.light = map.next_value()?,
                 "palette" => w.palette = map.next_value()?,
+                "pixelDensity" => w.pixel_density = map.next_value()?,
                 _ => {
                     let v: Extra = map.next_value()?;
                     w.extra.insert(key, v);
@@ -173,12 +175,18 @@ pub fn parse_options(meta: &Meta, v: &JsValue) -> Result<(Options, Option<u32>),
         )));
     }
     let base = Options::default();
+    let pixel_density = match w.pixel_density {
+        Some(1) => pixfx_draw::PixelDensity::One,
+        None | Some(2) => pixfx_draw::PixelDensity::Two,
+        Some(_) => return Err(JsError::new("options.pixelDensity must be 1 or 2")),
+    };
     let opts = Options {
         seed: w.seed,
         flip: w.flip.unwrap_or(base.flip),
         angle: w.angle.unwrap_or(base.angle),
         light: w.light.unwrap_or(base.light),
         palette: w.palette.map(|PaletteIn(p)| p),
+        pixel_density,
         extra: w.extra.into_iter().map(|(k, Extra(v))| (k, v)).collect(),
         ..base
     };
@@ -199,6 +207,7 @@ pub fn options_json(opts: &Options) -> String {
     m.insert("flip".into(), opts.flip.into());
     m.insert("angle".into(), opts.angle.into());
     m.insert("light".into(), opts.light.into());
+    m.insert("pixelDensity".into(), opts.pixel_density.factor().into());
     if let Some(p) = &opts.palette {
         m.insert("palette".into(), ramp(p));
     }

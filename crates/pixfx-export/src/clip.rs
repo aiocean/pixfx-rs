@@ -10,20 +10,17 @@ use std::fs;
 
 use std::path::{Path, PathBuf};
 
-use pixfx_core::{ClipKey, Effect, FrameId, Layer, Options, Player};
+use pixfx_core::{ClipKey, Effect, Layer, Options, Player};
 use pixfx_draw::Frame;
-use serde::{Deserialize, Serialize};
+use pixfx_scene::clip::LAYERS;
+pub use pixfx_scene::clip::{
+    CLIP_VERSION, ClipIndex, ClipLayer, ClipPage, ClipSprite, PageImage, decode,
+};
 
 use crate::ExportError;
 
-/// The JSON layout version [`decode`] reads.
-pub const CLIP_VERSION: u32 = 1;
-
 /// Widest a page grows, unless one sprite is wider; also how tall before the next page starts.
 const PAGE: u32 = 2048;
-
-/// The layers a host shows, in the order rendered: back, then front.
-const LAYERS: [(Layer, &str); 2] = [(Layer::Back, "back"), (Layer::Front, "front")];
 
 /// Every frame of one effect with one set of options, drawn by layer.
 pub struct Clip {
@@ -72,47 +69,6 @@ pub fn render_clip(effect: &'static dyn Effect, opts: Options) -> Result<Clip, S
         frames,
     })
 }
-
-/// The JSON index of a rendered clip.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct ClipIndex {
-    pub version: u32,
-    pub id: String,
-    /// The [`ClipKey`] the frames are shown under, as hex.
-    pub key: String,
-    pub fps: u32,
-    #[serde(rename = "loop")]
-    pub looping: bool,
-    /// Frame size, `[w, h]`, and where the frame's top-left sits in effect space, `[x, y]`.
-    pub size: (u32, u32),
-    pub corner: (i32, i32),
-    pub frames: u64,
-    pub pages: Vec<ClipPage>,
-    pub sprites: Vec<ClipSprite>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct ClipPage {
-    pub file: String,
-    pub size: (u32, u32),
-}
-
-/// One cropped layer half on a page: `rect` (`[x, y, w, h]` on page `page`) goes at `at` on the frame. A layer
-/// half without a sprite shows nothing.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ClipSprite {
-    pub frame: u64,
-    /// `"back"` or `"front"`.
-    pub layer: String,
-    /// `"color"` or `"light"`.
-    pub kind: String,
-    pub page: usize,
-    pub rect: (u32, u32, u32, u32),
-    pub at: (u32, u32),
-}
-
-/// A page's pixels, RGBA8.
-pub type PageImage = crate::RgbaImage;
 
 /// A frame layer half as RGBA bytes, and whether a pixel shows.
 type Half = (&'static str, fn(&Frame, usize) -> [u8; 4]);
@@ -254,92 +210,4 @@ pub fn write_clip(clip: &Clip, out_dir: &Path, name: &str) -> Result<ClipFiles, 
     }
     fs::write(&files.json, serde_json::to_vec(&index)?)?;
     Ok(files)
-}
-
-/// A decoded frame layer: show `frame` as `layer` of frame `id`.
-pub struct ClipLayer {
-    pub id: FrameId,
-    pub layer: Layer,
-    pub frame: Frame,
-}
-
-/// The frames of a rendered clip from its JSON index and its pages' PNG bytes, in the index's page order.
-pub fn decode(json: &str, pages: &[&[u8]]) -> Result<Vec<ClipLayer>, String> {
-    let index: ClipIndex = serde_json::from_str(json).map_err(|e| format!("clip index: {e}"))?;
-    if index.version != CLIP_VERSION {
-        return Err(format!(
-            "clip index version {}, this build reads {CLIP_VERSION}",
-            index.version
-        ));
-    }
-    if pages.len() != index.pages.len() {
-        return Err(format!(
-            "the clip index names {} pages, {} were given",
-            index.pages.len(),
-            pages.len()
-        ));
-    }
-    let key: ClipKey = index.key.parse()?;
-    let images = pages
-        .iter()
-        .map(|bytes| read_png(bytes))
-        .collect::<Result<Vec<_>, _>>()?;
-    let (w, h) = index.size;
-    let (ox, oy) = index.corner;
-    let mut layers: Vec<ClipLayer> = (0..index.frames)
-        .flat_map(|k| {
-            LAYERS.map(|(layer, _)| ClipLayer {
-                id: FrameId {
-                    key: key.clone(),
-                    index: k,
-                },
-                layer,
-                frame: Frame::new(w, h, ox, oy),
-            })
-        })
-        .collect();
-    for s in &index.sprites {
-        let side = LAYERS
-            .iter()
-            .position(|(_, name)| *name == s.layer)
-            .ok_or_else(|| format!("sprite layer {:?}", s.layer))?;
-        let target = usize::try_from(s.frame)
-            .ok()
-            .and_then(|k| layers.get_mut(k * 2 + side))
-            .ok_or_else(|| format!("sprite of frame {} past the clip", s.frame))?;
-        let page = images
-            .get(s.page)
-            .ok_or_else(|| format!("sprite on page {} past the pages", s.page))?;
-        let (px0, py0, rw, rh) = s.rect;
-        if px0 + rw > page.w || py0 + rh > page.h || s.at.0 + rw > w || s.at.1 + rh > h {
-            return Err(format!("sprite {:?} out of bounds", s.rect));
-        }
-        let words = match s.kind.as_str() {
-            "color" => &mut target.frame.color,
-            "light" => &mut target.frame.light,
-            other => return Err(format!("sprite kind {other:?}")),
-        };
-        let light = s.kind == "light";
-        for y in 0..rh {
-            for x in 0..rw {
-                let src = (((py0 + y) * page.w + px0 + x) * 4) as usize;
-                let Some(&[r, g, b, a]) = page.rgba.get(src..src + 4) else {
-                    continue;
-                };
-                let word = if light {
-                    u32::from_le_bytes([r, g, b, 0])
-                } else {
-                    u32::from_le_bytes([r, g, b, a])
-                };
-                if let Some(dst) = words.get_mut(((s.at.1 + y) * w + s.at.0 + x) as usize) {
-                    *dst = word;
-                }
-            }
-        }
-    }
-    Ok(layers)
-}
-
-fn read_png(bytes: &[u8]) -> Result<PageImage, String> {
-    crate::decode_png_rgba(bytes).map_err(|e| format!("clip page: {e}"))
 }

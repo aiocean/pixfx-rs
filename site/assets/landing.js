@@ -1,115 +1,83 @@
-// The landing page: a live duel in the hero, drawn by pixfx-canvas2d (workers paint the effects). The duel is the
-// arena's (projects/arena), embedded by `site/build.sh` into site/arena: its page kit and its wasm, beside the engine's.
-// The page owns the animation-frame loop.
+// The landing page plays a live effect showcase through the Canvas 2D shell.
 import { loadPixfx } from "../pkg/pixfx-canvas2d.js";
-import loadRules, * as rules from "../arena/wasm/arena_wasm.js";
-import { useBots, useRules } from "../arena/duel.js";
-import { createHero, loadBots, loadIcons } from "../arena/duel-hero.js";
+import { createShow, loadFighters, showable } from "./sprite-show.js";
 
-/** Each corner's bot, `[left, right]`: the arena's house bot module (`site/arena/bots/`), one instance a corner. */
-const BOT_FILES = ["policy.wasm", "policy.wasm"];
-const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-/** Mount the landing page: the tabs and the hero. Returns how to unmount it. */
 export async function mount() {
-  const off = new AbortController();
   setupTabs(document.getElementById("targets"));
+  const canvas = document.getElementById("scene");
+  const caption = document.getElementById("demo-caption");
+  const toggle = document.getElementById("demo-toggle");
 
-  // the engine, the arena's rules and its skill icon atlases, by icon size; the hero waits for all three
-  const [engine, icons] = await Promise.all([loadPixfx(), loadIcons([32, 24]), loadRules()]);
-  useRules(rules);
-  // each corner's bot is a module of its own, heavier than the engine: fetched only once the engine is in, so it never
-  // holds back the first frame, and seated from the next duel on. A file named twice is fetched once. Until both
-  // arrive, or if one never does, the duel seats the brain.
-  loadBots(BOT_FILES)
-    .then(useBots)
-    .catch((e) => console.warn("landing: the duel seats the brain, a bot did not load:", e));
+  let sheets;
+  try {
+    [, sheets] = await Promise.all([loadPixfx(), loadFighters()]);
+  } catch (error) {
+    caption.textContent = "The live demo could not load.";
+    console.error(error);
+    return;
+  }
 
-  const hero = createHero(document.getElementById("scene"), off.signal, icons, engine);
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const featured = "feedback/power-up";
+  const ids = showable();
+  if (ids.includes(featured)) {
+    ids.splice(ids.indexOf(featured), 1);
+    ids.unshift(featured);
+  }
+
+  let paused = reduceMotion;
+  let visible = false;
+  let pending = null;
   let last = null;
-  let running = true;
-  // the hero plays only while it is on screen; scrolled away, it waits where it was
-  let visible = true;
-  const seen = new IntersectionObserver(([e]) => {
-    visible = e.isIntersecting;
+
+  const hero = createShow(canvas, {
+    sheets,
+    ids,
+    still: reduceMotion,
+    told: (take) => { caption.textContent = take; },
   });
-  seen.observe(hero.canvas);
-  const proof = createProof(document.getElementById("proof"), () => (visible ? [hero] : []));
+  if (reduceMotion) hero.draw();
+  else hero.step(0);
+
+  const seen = new IntersectionObserver(([entry]) => {
+    visible = entry.isIntersecting;
+    schedule();
+  });
+  seen.observe(canvas);
+
+  function schedule() {
+    if (!paused && visible && hero) {
+      pending ??= requestAnimationFrame(frame);
+    } else {
+      cancelAnimationFrame(pending);
+      pending = last = null;
+    }
+  }
 
   function frame(now) {
-    if (!running) return;
-    const dt = last === null ? 0 : Math.max(0, now - last) / 1000;
+    pending = null;
+    const dt = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
     last = now;
-    if (visible) hero.step(dt);
-    proof.frame(now);
-    requestAnimationFrame(frame);
+    hero.step(dt);
+    schedule();
   }
 
-  if (reduceMotion) {
-    hero.step(1);
-    proof.frame(performance.now(), true);
-  } else {
-    requestAnimationFrame(frame);
+  function updateToggle() {
+    toggle.textContent = paused ? "Play demo" : "Pause demo";
   }
+  updateToggle();
+  toggle.hidden = false;
+  toggle.addEventListener("click", () => {
+    paused = !paused;
+    updateToggle();
+    schedule();
+  });
 
   return () => {
-    running = false;
-    off.abort();
+    cancelAnimationFrame(pending);
     seen.disconnect();
     hero.free();
   };
-}
-
-// ---------- proof ----------
-
-/** Seconds between updates of the proof line, so its numbers can be read. */
-const PROOF_EVERY = 0.5;
-/** A frame further apart than this from the last one came from a hidden or throttled page. */
-const SLOW_FRAME_MS = 50;
-
-/**
- * The line under the hero that measures this page as it runs: how many effects are playing on screen, the frame
- * rate the page holds while it plays them, and how big the engine's download was.
- */
-function createProof(el, onScreen) {
-  let since = null;
-  let prev = null;
-  let frames = 0;
-  const download = engineDownload();
-  const write = (fps) => {
-    const playing = onScreen().reduce((n, v) => n + v.playing(), 0);
-    el.innerHTML =
-      `On your screen, <b>${playing} effects</b> are playing` +
-      (fps ? ` at <b>${fps} frames a second</b>` : "") +
-      (download ? `, all from a <b>${download} KB</b> engine.` : ".");
-  };
-  return {
-    frame(now, still = false) {
-      if (!el) return;
-      if (still) return write(null);
-      // a hidden or throttled page sends frames seconds apart: count only frames that come at a display's pace
-      const steady = prev !== null && now - prev < SLOW_FRAME_MS;
-      prev = now;
-      if (!steady) since = null;
-      if (since === null) {
-        since = now;
-        frames = 0;
-        return;
-      }
-      frames++;
-      if (now - since < PROOF_EVERY * 1000) return;
-      write(Math.round((frames * 1000) / (now - since)));
-      since = now;
-      frames = 0;
-    },
-  };
-}
-
-/** The engine's wasm as it came over the network, in KB, or null when the browser does not say. */
-function engineDownload() {
-  const entry = performance.getEntriesByType("resource").find((e) => e.name.endsWith(".wasm"));
-  const bytes = entry?.encodedBodySize || entry?.transferSize;
-  return bytes ? Math.round(bytes / 1024) : null;
 }
 
 // ---------- tabs (WAI-ARIA tabs pattern) ----------
@@ -129,9 +97,10 @@ function setupTabs(root) {
     tab.addEventListener("click", () => select(tab));
     tab.addEventListener("keydown", (e) => {
       const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
-      if (step) select(tabs[(i + step + tabs.length) % tabs.length]);
-      if (e.key === "Home") select(tabs[0]);
-      if (e.key === "End") select(tabs.at(-1));
+      const next = step ? tabs[(i + step + tabs.length) % tabs.length] : { Home: tabs[0], End: tabs.at(-1) }[e.key];
+      if (!next) return;
+      e.preventDefault();
+      select(next);
     });
   }
 }

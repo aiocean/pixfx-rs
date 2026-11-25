@@ -4,6 +4,9 @@
 //! A shell (Canvas 2D, Phaser, Pixi, gpui) only makes, refills, shows and frees surfaces as [`Shell`] says.
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "clip")]
+pub mod clip;
+
 use std::fmt;
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -111,6 +114,7 @@ impl View {
 }
 
 /// One blit: `layer` of the instance `handle`, drawn into `rect`.
+/// The source may have a different texel count. Fit the texture into these destination bounds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pass {
     pub handle: u32,
@@ -323,6 +327,7 @@ pub struct Scene<S> {
     /// Which of the scenes sharing a [`Frames`] this is.
     id: u32,
     scale: NonZeroU32,
+    pixel_density: Option<pixfx_draw::PixelDensity>,
     /// The next handle to give out; handles start at 1 and are never reused.
     next: Option<u32>,
     entries: Vec<Entry<S>>,
@@ -456,6 +461,7 @@ impl<S> Scene<S> {
         Self {
             id,
             scale,
+            pixel_density: None,
             next: Some(1),
             entries: Vec::new(),
             draws: 0,
@@ -523,11 +529,21 @@ impl<S> Scene<S> {
         self.scale = scale;
     }
 
+    /// Choose a common raster for new effects, including pieces launched by the scene.
+    /// With `None`, each clip supplies its own density.
+    pub fn set_pixel_density(&mut self, density: Option<pixfx_draw::PixelDensity>) {
+        self.pixel_density = density;
+    }
+
     /// Play `clip` from its start with its origin at game pixel (`x`, `y`), rounded as JS `Math.round` does;
     /// returns its handle. An effect that draws the way a mover came ([`pixfx_core::Effect::traces`]) played on its
     /// own trails itself: moved with [`Scene::move_to`] (with a fighter, a cursor), it draws the way it went, and
     /// once stopped it shrinks to where it was last and ends.
     pub fn play(&mut self, clip: Clip, x: f64, y: f64) -> Result<u32, StageError> {
+        let clip = match self.pixel_density {
+            Some(density) => clip.with_pixel_density(density),
+            None => clip,
+        };
         let at = game_pixel(x, y)?;
         let handle = self.next.ok_or(StageError::OutOfHandles)?;
         self.next = handle.checked_add(1);

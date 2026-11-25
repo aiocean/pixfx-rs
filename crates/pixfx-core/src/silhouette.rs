@@ -141,6 +141,15 @@ impl Silhouette {
         })
     }
 
+    /// The covered cells whose neighbour at (`dx`, `dy`) is uncovered or past the area's border, row by row: the
+    /// cells with nothing above them (`open(0, -1)`, where snow settles and flames stand), nothing to one side
+    /// (`open(-1, 0)`, `open(1, 0)`: where frost creeps in and rime hangs) or nothing below (`open(0, 1)`: where
+    /// icicles and drips hang). [`Silhouette::edge`] is the union of the four.
+    pub fn open(&self, dx: i32, dy: i32) -> impl Iterator<Item = (i32, i32)> + '_ {
+        self.cells()
+            .filter(move |&(x, y)| !self.covers(x + dx, y + dy))
+    }
+
     /// The cells off the body at most `max` pixels from it, row by row, each with its distance in pixels (over 0):
     /// where an aura, a glow or a halo goes, fading with the distance. Distances past 85 pixels read as 85.
     pub fn around(&self, max: f64) -> impl Iterator<Item = (i32, i32, f64)> + '_ {
@@ -276,4 +285,60 @@ fn chamfer(area: Area, mask: &[bool]) -> Vec<u8> {
         }
     }
     dist
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A 3 x 3 body in a 5 x 5 area, its top-left cell at (1, 1).
+    fn block() -> Silhouette {
+        let area = Area {
+            x: 0,
+            y: 0,
+            w: 5,
+            h: 5,
+        };
+        Silhouette::from_fn(area, |x, y| {
+            (1.0..4.0).contains(&x) && (1.0..4.0).contains(&y)
+        })
+    }
+
+    #[test]
+    fn open_gives_the_cells_with_nothing_on_that_side() {
+        let s = block();
+        let up: Vec<_> = s.open(0, -1).collect();
+        assert_eq!(up, vec![(1, 1), (2, 1), (3, 1)]);
+        let left: Vec<_> = s.open(-1, 0).collect();
+        assert_eq!(left, vec![(1, 1), (1, 2), (1, 3)]);
+        let right: Vec<_> = s.open(1, 0).collect();
+        assert_eq!(right, vec![(3, 1), (3, 2), (3, 3)]);
+        let down: Vec<_> = s.open(0, 1).collect();
+        assert_eq!(down, vec![(1, 3), (2, 3), (3, 3)]);
+    }
+
+    #[test]
+    fn a_cell_at_the_areas_border_is_open_to_it_and_edge_is_the_union() {
+        let area = Area {
+            x: 0,
+            y: 0,
+            w: 3,
+            h: 3,
+        };
+        let s = Silhouette::from_fn(area, |_, _| true);
+        assert_eq!(
+            s.open(0, -1).collect::<Vec<_>>(),
+            vec![(0, 0), (1, 0), (2, 0)]
+        );
+        let mut union: Vec<_> = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            .iter()
+            .flat_map(|&(dx, dy)| s.open(dx, dy).collect::<Vec<_>>())
+            .collect();
+        union.sort_unstable();
+        union.dedup();
+        let mut edge: Vec<_> = s.edge().collect();
+        edge.sort_unstable();
+        assert_eq!(union, edge);
+        assert_eq!(block().open(0, 1).count(), 3);
+    }
 }

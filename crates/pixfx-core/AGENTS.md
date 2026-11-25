@@ -39,7 +39,6 @@ The effect model and game feel, painted with `pixfx-draw`:
 | paints pixels in a way an effect does not need to know about (a primitive, blend, palette) | `pixfx-draw` |
 | is one effect | `pixfx-effects`, behind its own feature |
 | is a fighter's body, pose or look | `pixfx-fighter` |
-| is scene light (glows thrown on the world) | `pixfx-light` |
 | decides which effects play, where, on which layer, in what order, or frees frames for a shell | `pixfx-scene` |
 | is a `wasm-bindgen` type, a JS option parser, or reads a clock, a file or the DOM | `pixfx-wasm` or a shell |
 
@@ -57,9 +56,22 @@ The effect model and game feel, painted with `pixfx-draw`:
 - A hit-stop is `dt = 0`: nothing may advance and no velocity may spike from dividing by it.
 - Float maths through `libm` (`clippy.toml`); rounding through `pixfx_draw::math::js_round`.
 
+## Character rig
+
+The `body` feature provides poses, cameras, animation clips and mannequin painting. See [body instructions](src/body/AGENTS.md).
+
+## Scene light
+
+Scene light: the glow a spell, a blow or a lamp throws on the world. A `Light` is a value that ages (`step`), shows
+as a `Glow` at any instant (`Light::glow`), and `draw` adds glows to a frame's light layer in hard-edged rings. How
+a light swells, fades and rings is data (`Style`). Enable the `light` feature.
+
+The caller keeps the live lights and passes time in. The game chooses which events cast light.
+The ring blend matches Canvas 2D `lighter` with 8-bit channels. Preserve its rounding.
+
 ## Before you finish
 
 ```
-cargo test -p pixfx-core
+cargo test -p pixfx-core --features body,light
 cargo test -p pixfx-effects --test determinism -- --ignored   # when a change can move pixels: every effect's hashes
 ```

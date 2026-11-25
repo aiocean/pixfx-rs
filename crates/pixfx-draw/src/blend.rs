@@ -17,6 +17,8 @@ pub fn fill(frame: &mut Frame, x: i32, y: i32, w: i32, h: i32, c: Rgba, a: f64) 
     if a <= 0.0 {
         return;
     }
+    let density = frame.density().factor() as i32;
+    let (x, y, w, h) = (x * density, y * density, w * density, h * density);
     for yy in y..y + h {
         for xx in x..x + w {
             if let Some(px) = pixel(frame, xx, yy) {

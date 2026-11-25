@@ -92,12 +92,15 @@ fn run() -> Result<bool, String> {
     );
     let target = (caster.0 + dx, caster.1 + dy);
 
+    let density = opts.pixel_density;
+    let raster = density.factor();
     let mut frames: Frames<Frame, InlinePainter> = Frames::default();
-    let mut scene = frames.scene(NonZeroU32::MIN);
+    let mut scene = frames.scene(NonZeroU32::new(raster).unwrap_or(NonZeroU32::MIN));
+    scene.set_pixel_density(Some(density));
     if felt {
         scene.set_feel(Some(Feel::new()));
     }
-    let mut stage = Stage(Frame::new(w, h, 0, 0));
+    let mut stage = Stage(Frame::with_density(w, h, 0, 0, density));
     let held = scene
         .play(Clip::live(fx, opts), caster.0, caster.1)
         .map_err(|e| e.to_string())?;
@@ -153,7 +156,7 @@ fn run() -> Result<bool, String> {
             .map_err(|e| e.to_string())?;
         frames.end_frame(&mut stage).map_err(|e| e.to_string())?;
         let (sx, sy) = scene.feel().map_or((0, 0), |f| f.shake(1.0));
-        shown.push(shifted(&stage.0, sx, sy));
+        shown.push(shifted(&stage.0, sx * raster as i32, sy * raster as i32));
         drop(scene.drain_events());
         if ended_at.is_none() && scene.handles().next().is_none() {
             ended_at = Some(t);
@@ -162,8 +165,8 @@ fn run() -> Result<bool, String> {
     }
 
     let rendered = Rendered {
-        w,
-        h,
+        w: stage.0.w,
+        h: stage.0.h,
         fps: FPS,
         origin: (0, 0),
         margin: 0,
@@ -180,7 +183,8 @@ fn shifted(f: &Frame, dx: i32, dy: i32) -> Frame {
     if (dx, dy) == (0, 0) {
         return f.clone();
     }
-    let mut out = Frame::new(f.w, f.h, 0, 0);
+    let mut out = f.clone();
+    out.clear();
     let (w, h) = (i64::from(f.w), i64::from(f.h));
     for y in 0..h {
         for x in 0..w {
@@ -205,11 +209,18 @@ impl Stage {
     /// The sprite standing with its feet at `at`, mirrored when `flip`.
     fn sprite(&mut self, a: &Arc<Actor>, at: (f64, f64), flip: bool) {
         let w = a.w() as usize;
+        let density = i64::from(self.0.density().factor());
         for (i, &c) in a.pixels().iter().enumerate() {
             let x = a.x() + (i % w) as i32;
             let y = a.y() + (i / w) as i32;
             let x = if flip { -x - 1 } else { x };
-            self.put(at.0 as i64 + i64::from(x), at.1 as i64 + i64::from(y), c, 0);
+            let dx = (at.0 as i64 + i64::from(x)) * density;
+            let dy = (at.1 as i64 + i64::from(y)) * density;
+            for y in dy..dy + density {
+                for x in dx..dx + density {
+                    self.put(x, y, c, 0);
+                }
+            }
         }
     }
 

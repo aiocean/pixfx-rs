@@ -1,6 +1,6 @@
 use pixfx_core::Rendered;
 use pixfx_draw::{Frame, Rgba};
-use pixfx_export::board::{busiest, still};
+use pixfx_export::board::{PreviewCanvas, busiest, still};
 
 fn render(painted: &[usize]) -> Rendered {
     let frames = painted
@@ -46,4 +46,27 @@ fn a_still_is_the_frame_over_the_backdrop_each_pixel_blown_up() -> Result<(), St
     );
     assert!(still(&r, 1, 3).is_none());
     Ok(())
+}
+
+#[test]
+fn preview_padding_aligns_origins_and_preserves_colour_and_light() {
+    let canvas = PreviewCanvas::for_effects(pixfx_effects::EFFECTS);
+    let mut first = render(&[0]);
+    first.origin = (1, 1);
+    first.frames[0].color[5] = Rgba(255, 0, 0, 255).pack();
+    first.frames[0].light[5] = 0x80;
+
+    let mut second = render(&[0]);
+    second.origin = (2, 0);
+    second.frames[0].color[2] = first.frames[0].color[5];
+    second.frames[0].light[2] = first.frames[0].light[5];
+
+    canvas.pad(&mut first);
+    canvas.pad(&mut second);
+
+    assert_eq!(first, second);
+    let (x, y) = first.origin;
+    let origin = y as usize * first.w as usize + x as usize;
+    assert_eq!(first.frames[0].color[origin], Rgba(255, 0, 0, 255).pack());
+    assert_eq!(first.frames[0].light[origin], 0x80);
 }

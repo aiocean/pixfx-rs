@@ -1,8 +1,10 @@
 //! `pixfx_draw::RULER` is what the painter paints: the idle fighter measured pixel by pixel.
 
-use pixfx_draw::{RULER, Rgba};
+use pixfx_draw::{PixelDensity, RULER, Rgba};
 use pixfx_fighter::look::Look;
-use pixfx_fighter::paint::{Appearance, CX, FEET, SPRITE, Sprite, outline, paint};
+use pixfx_fighter::paint::{
+    Appearance, CX, FEET, SPRITE, Sprite, outline, paint, paint_at_density,
+};
 use pixfx_fighter::pose::Pose;
 
 fn standing(pose: Pose) -> Appearance {
@@ -56,6 +58,21 @@ fn same(a: Rgba, b: Rgba) -> bool {
 }
 
 #[test]
+fn dense_fighter_has_twice_as_many_visible_rows() {
+    let look = Look::thunder();
+    let mut sprite = paint_at_density(&look, &standing(Pose::Idle), PixelDensity::Two);
+    outline(&mut sprite, look.outline);
+    let image = sprite.to_image();
+    assert_eq!(image.w, RULER.cell * 2);
+    let rows = image
+        .rgba
+        .chunks_exact(image.w as usize * 4)
+        .filter(|row| row.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0))
+        .count();
+    assert_eq!(rows, RULER.height as usize * 2);
+}
+
+#[test]
 fn the_standing_fighter_on_screen_is_as_tall_and_wide_as_the_ruler_and_stands_on_its_feet() {
     let look = Look::thunder();
     let mut s = paint(&look, &standing(Pose::Idle));
@@ -71,7 +88,7 @@ fn the_standing_fighter_on_screen_is_as_tall_and_wide_as_the_ruler_and_stands_on
     );
     let middle = i64::from(x) + i64::from(w / 2);
     assert!(
-        (middle - i64::from(RULER.feet.0)).abs() <= 2,
+        (middle - i64::from(RULER.feet.0)).abs() <= 4,
         "centred on the feet: {middle}"
     );
 }
@@ -81,7 +98,7 @@ fn the_face_the_eye_the_hand_and_the_blade_are_the_rulers_parts() {
     let look = Look::thunder();
     let idle = paint(&look, &standing(Pose::Idle));
     let skin = |p: Rgba| same(p, look.skin[0]) || same(p, look.skin[1]);
-    let (_, fy, fw, fh) = bounds(&idle, 0..37, skin);
+    let (_, fy, fw, fh) = bounds(&idle, 0..59, skin);
     // the face is painted head x head; the hair covers its top row
     assert_eq!(
         (fw, fh),
@@ -105,6 +122,6 @@ fn the_face_the_eye_the_hand_and_the_blade_are_the_rulers_parts() {
 
 #[test]
 fn the_painted_body_is_the_rulers_figure_about_five_and_a_half_heads_tall() {
-    assert_eq!(RULER.figure(), 38);
-    assert!((RULER.heads() - 38.0 / 7.0).abs() < 1e-9);
+    assert_eq!(RULER.figure(), 61);
+    assert!((RULER.heads() - 61.0 / 11.0).abs() < 1e-9);
 }

@@ -2,6 +2,21 @@
 
 use crate::math::{js_max, js_min};
 
+/// Raster texels per game pixel on each axis.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u32)]
+pub enum PixelDensity {
+    One = 1,
+    #[default]
+    Two = 2,
+}
+
+impl PixelDensity {
+    pub const fn factor(self) -> u32 {
+        self as u32
+    }
+}
+
 /// A frame: w x h pixels whose top-left sits at (ox, oy) in world space. `color` holds pixels (ABGR words,
 /// see [`crate::color::Rgba::pack`]), `light` additive glow (xBGR words, top byte ignored);
 /// [`composite`] puts them together.
@@ -13,10 +28,19 @@ pub struct Frame {
     pub oy: i32,
     pub color: Vec<u32>,
     pub light: Vec<u32>,
+    density: PixelDensity,
 }
 
 impl Frame {
     pub fn new(w: u32, h: u32, ox: i32, oy: i32) -> Self {
+        Self::with_density(w, h, ox, oy, PixelDensity::One)
+    }
+
+    /// Allocate a raster for logical bounds in game pixels. The stored bounds are in texels.
+    pub fn with_density(w: u32, h: u32, ox: i32, oy: i32, density: PixelDensity) -> Self {
+        let factor = density.factor();
+        let (w, h) = (w * factor, h * factor);
+        let (ox, oy) = (ox * factor as i32, oy * factor as i32);
         let n = w as usize * h as usize;
         Self {
             w,
@@ -25,7 +49,12 @@ impl Frame {
             oy,
             color: vec![0; n],
             light: vec![0; n],
+            density,
         }
+    }
+
+    pub fn density(&self) -> PixelDensity {
+        self.density
     }
 
     /// Empty both buffers (pixelfx `clearFrame`).

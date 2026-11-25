@@ -508,10 +508,11 @@ impl State {
             1.0
         } * swell;
         for &(x, y, c) in &self.body {
-            p.px(
+            p.paint_cell(
                 f64::from(x) + libm::floor(shake),
                 f64::from(y),
                 mix(c, WHITE, swell * 0.6),
+                1.0,
             );
         }
         let (mx, my) = self.mid;
@@ -613,7 +614,7 @@ impl EffectState for State {
                 if heat > 0.0 {
                     p.light(x, y, HOT, 0.4 * heat);
                 }
-                p.px(x, y, tint(c));
+                p.paint_cell(x, y, tint(c), 1.0);
             }
         }
         for b in &self.bits {

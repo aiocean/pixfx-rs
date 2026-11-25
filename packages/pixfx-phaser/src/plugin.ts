@@ -51,6 +51,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
   private stageHeld: Stage<number> | null = null;
   /** Layers drawn at most per frame, for the stage made after `loadPixfx()`; 0 draws every changed one. */
   private drawBudget = 0;
+  private pixelDensity: 1 | 2 | undefined;
   private destroyed = false;
   /** The scene's answer to impacts: camera shake, hit-stop, slow motion, flash, and every effect's cues. */
   readonly feel: PixfxFeel;
@@ -121,6 +122,12 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     this.stageHeld?.setDrawBudget(this.drawBudget);
   }
 
+  /** Set the raster density for subsequently played effects. */
+  setPixelDensity(density?: 1 | 2): void {
+    this.stageHeld?.scene.setPixelDensity(density);
+    this.pixelDensity = density;
+  }
+
   /**
    * Body `id` (a fighter, a wall) is the box (`x`, `y`, `w`, `h`) in world pixels: the pieces of a volley an effect
    * was ordered to launch (`effect.attack`) strike it when they meet it. Set it as the thing moves. Throws before
@@ -164,6 +171,7 @@ export class PixfxPlugin extends Phaser.Plugins.ScenePlugin {
     if (!game || this.destroyed) return null;
     game.useTextures(phaserTextures(this.host));
     this.stageHeld = new Stage(game, phaserImages(this.host), (cue, effect) => this.feel.take(cue, effect), 1);
+    if (this.pixelDensity !== undefined) this.stageHeld.scene.setPixelDensity(this.pixelDensity);
     this.stageHeld.scene.setFeel(this.feel.enabled);
     this.stageHeld.setDrawBudget(this.drawBudget);
     return this.stageHeld;

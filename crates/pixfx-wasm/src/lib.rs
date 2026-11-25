@@ -65,6 +65,8 @@ struct MetaJs {
     name: &'static str,
     desc: &'static str,
     tags: &'static [&'static str],
+    #[tsify(type = "\"paint\" | \"sprite\" | \"hybrid\"")]
+    render_kind: &'static str,
     /// Canvas size in pixels, `[w, h]`.
     size: (u32, u32),
     /// Where the effect's local (0, 0) sits on its canvas, `[x, y]`.
@@ -109,7 +111,7 @@ enum OptionJs {
     },
 }
 
-/// `{id, name, desc, tags, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed, wrapsActor, replacesActor, options}` for one
+/// `{id, name, desc, tags, renderKind, size: [w, h], origin: [x, y], glowMargin, duration, loop, fps, seed, wrapsActor, replacesActor, options}` for one
 /// effect; `options` lists its own options as `{name, kind: "num" | "color" | "ramp", default, range?}`.
 #[wasm_bindgen(unchecked_return_type = "EffectMeta")]
 pub fn meta(
@@ -142,6 +144,7 @@ fn meta_object(fx: &dyn Effect) -> Result<JsValue, JsError> {
         name: m.name,
         desc: m.desc,
         tags: m.tags,
+        render_kind: fx.render_kind().as_str(),
         size: m.size,
         origin: m.origin,
         glow_margin: m.glow_margin(),
@@ -281,12 +284,14 @@ impl Fx {
     /// Where the effect's origin sits on the canvas.
     #[wasm_bindgen(js_name = originX)]
     pub fn origin_x(&self) -> i32 {
-        self.player.canvas().origin.0 + self.player.margin() as i32
+        (self.player.canvas().origin.0 + self.player.margin() as i32)
+            * self.player.frame().density().factor() as i32
     }
 
     #[wasm_bindgen(js_name = originY)]
     pub fn origin_y(&self) -> i32 {
-        self.player.canvas().origin.1 + self.player.margin() as i32
+        (self.player.canvas().origin.1 + self.player.margin() as i32)
+            * self.player.frame().density().factor() as i32
     }
 
     /// Clear the canvas and draw `"back"`, `"front"` or `"both"` at the current time.

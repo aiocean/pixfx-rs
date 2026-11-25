@@ -5,7 +5,7 @@ import { z } from "zod";
 const n = z.number().int().nonnegative();
 
 /** Where a painted frame's bytes sit on the frame, and which halves hold any (`Shape` of `pixfx-wasm`). */
-export const shapeSchema = z.strictObject({ frameW: n, x: n, y: n, w: n, h: n, sides: n });
+export const shapeSchema = z.strictObject({ frameW: n, frameH: n, x: n, y: n, w: n, h: n, sides: n });
 export type Shape = z.infer<typeof shapeSchema>;
 
 export const toWorkerSchema = z.discriminatedUnion("type", [

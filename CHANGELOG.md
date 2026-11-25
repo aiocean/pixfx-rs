@@ -2,6 +2,38 @@
 
 ## 0.3.0
 
+- Effects: four categories ported from pixelfx, 45 effects, each behind its own feature and listed in its category
+  feature and in `all`: `fire` (12: brazier, campfire, candle, fire-breath, fire-ring, fire-tornado, fireball,
+  flame-pillar, flamethrower, meteor, spirit-flame, torch), `ice` (10: blizzard-vortex, freeze, frost-breath,
+  frost-nova, ice-crystal, ice-lance, ice-shatter, ice-spikes, icicle-fall, snowflake-burst), `water` (12: bubbles,
+  drip, fountain, geyser, rain-splash, ripples, splash, water-jet, water-orb, waterfall, wave-crash, whirlpool) and
+  `lightning` (11: ball-lightning, chain-lightning, charge-up, electrified, lightning-strike, plasma-ball, spark-arc,
+  storm-cloud, tesla-coil, thunderclap, zap-hit). Every frame was compared with pixelfx's own render at pixel density 1
+  on several seeds: 37 are identical; meteor, lightning-strike and six water effects differ by one step in one colour
+  channel on a few blended pixels, where `libm::pow` and V8's `Math.pow` part in the last bit (kept: `libm` gives the
+  same frames on every target). The acted-out character of pixelfx's gallery is left out; effects that land a blow
+  (thunderclap, charge-up, lightning-strike, zap-hit, chain-lightning) fire impact cues. `lightning/electrified` is
+  pixelfx's, beside `feedback/electrified` from Pixel VFX Studio.
+- Drawing (`pixfx-draw`): the rest of pixelfx's painter for those ports: `Painter::arc`, `beam`, `polyline`, `text`
+  and `measure` (fonts `font::{MINI, BIG}`), `sprite_rows`, and `mask` and `outline` over the `Mask` trait
+  (`Cells`).
+- Ruler: the duel's fighter is painted bigger, 63 rows standing in a 104 cell (face 11, eye 2 x 4, hand 3, limb 5,
+  blade 26). The mannequin (`pixfx_core::body`) paints in the ruler's cell with its soles on the feet row, and the
+  reference guide figure and prompts of `pixfx-pixel` are drawn to it; the body goldens are re-pinned.
+- Added three procedural blade slashes, including a trail that can follow the blade tip.
+
+- Added `impacts/thunderstrike` (`impacts-thunderstrike`). A gold bolt wrapped in teal lightning
+  strikes the UI play point, then fans into sparks and fading arcs. Impact cues fire when the flash starts.
+
+- Sprite sheet exports now use version 2. The composite atlas keeps its Aseprite-style layout. Custom readers
+  can migrate from `meta.beanfx` to `meta.pixfx` for pivot, playback and ordered render layers.
+  The Rust JSON helper is now `pixfx_export::sheet_json`.
+
+- Effects: `disappear/dither` and `appear/dither` (features `disappear-dither`, `appear-dither`): the wrapped sprite
+  thins away (or fills in) through the painter's ordered 4x4 dither, an even checker sweeping across it along `angle`
+  (90: head first), `spread` saying how far ahead the first side runs and `whiten` how far a thinning pixel lights.
+  They share `src/dither.rs`, which reads the sprite once in `set_actor`; a frame draws in about half the time of the
+  fade pair's.
 - Effects: seven sprite-wrapping effects adapted from Pixel VFX Studio (`pvfx.deimos.studio`), each reading the wrapped
   sprite through `pixfx_core::Silhouette` in `set_actor` and falling back to its stand-in footprint when played alone
   (100% pixel parity with the `pvfx` reference across all 122 frames):
@@ -31,6 +63,25 @@
 - Drawing (`pixfx-draw`): `Painter::get` reads the packed colour word under a local point; `Painter::clean_flecks`
   removes enclosed 1 px colour islands after hard-edged drawing; `shapes::{tempo, flash_star, wedge, Lobe, LobesOpt,
   lobes}` add shared hard-edged craft primitives.
+- Effects: interface fx are engine effects, the ones a page or a game's UI plays over itself: `transitions/burn-away`
+  (the page change), `critters/wisp` (a companion at the cursor), `impacts/parry` (a burst where you click) and
+  `spawn/poof` (a pressed button), each behind its own feature. The rule is in `AGENTS.md` and the `pixfx-effect` and
+  `pixfx-new-effect` skills.
+- Site: the old page burns open from where you click over the new one, a wisp follows the pointer, a click bursts and a
+  pressed button puffs. The landing hero and the effect pages play the effects on two sprite fighters, Thunder and
+  Frost (`site/assets/sprite-show.js`): sprite sheets from `pixfx-fighter`'s `poses` script, drawn by the page, with
+  each effect that reads a sprite handed the fighter's frame through `imageActor`. The site no longer embeds the
+  arena's duel.
+- Effects: `disappear/fade` goes pixel by pixel: each pixel stays solid, lights toward white and is gone at its own
+  seeded moment, the edge's in the first half of the fade and the heart's in the second. It lasts 0.8 s, and its swell
+  (`grow`) is off by default because stretching a sprite smears its pixels. Its golden hashes are re-pinned for this.
+- Site: an effect that takes a fighter's body over still reads the fighter's sprite while the page hides it, so the
+  fade, teleport-beam, blink-out and incinerate play on the fighter instead of their stand-ins.
+- Effects: `appear/fade` (feature `appear-fade`), the fade in: the sprite arrives pixel by pixel, its heart first and
+  its edges last, each pixel landing white and settling to its colour, `disappear/fade`'s frames backward. Both draw
+  through one dissolve module (`src/dissolve.rs`); `disappear/fade`'s golden hashes are unchanged by the move. On the
+  site a fighter that fades out comes back fading in, and the trail page's controls take the tail's width, where it
+  fades and where it breaks up (`taper`, `soft`, `breakup`).
 
 ## 0.2.0
 

@@ -12,9 +12,10 @@ is to Zed: the games are the product, and the engine grows only what a real game
 
 - **Strong.** Effects look hand-made and land with weight: light, cues for shake, hit-stop, ripple, flash and sound,
   and bodies that react to a hit. Sprites and UI share the same look.
-- **Effects read the sprite.** An engine effect reads the sprite it plays on (`Silhouette`, `Actor`) or the way it
-  moved (`Trace`): an outline, an aura gripping a body, a body bursting apart, a trail. One that reads neither (a
-  fire, an explosion, a shield) is a sprite the game plays, drawn and animated as sprite art, not an engine effect.
+- **Effects ship together.** The catalog includes procedural paint, authored sprite frames and effects that combine
+  them. Rust declares their `RenderKind` (`paint`, `sprite`, `hybrid`) and renders all three through the same frame
+  pipeline. Effects can read an actor (`Silhouette`, `Actor`) or its motion (`Trace`), or play on their own as
+  reusable fires, shields, impacts or interface fx.
 - **Convenient.** A game draws with a few calls and plain-data options, from TypeScript or from Rust.
 - **Composable.** Every new building block is generic and atomic: it does one thing, works for any effect, sprite or object — not just the one that first needed it — and composes at the right layer. Reuse happens by pulling shared code down to the lowest layer every caller can reach (`pixfx-draw`, `pixfx-core`, a category's `lib.rs`), never by coupling one effect to another. The Unix principle applies: small pieces that each do one thing well; the game and scene compose them. Performance is non-negotiable: a change that claims better reuse must not regress any benchmark.
 - **Fast.** Many sprites and effects at once on a mid-range phone at 60 fps. Play speed comes before download size: a
@@ -58,7 +59,7 @@ Every shell is equal. None is the main one:
 | Canvas 2D | `packages/pixfx-canvas2d` | shipped |
 | Phaser 4 | `packages/pixfx-phaser` | shipped |
 | gpui | `crates/pixfx-gpui` | shipped (own workspace, needs the gpui fork) |
-| Files (PNG sheets, beanfx JSON, GIF, rendered clips) | `crates/pixfx-export` and its `examples/` scripts | shipped |
+| Files (PNG sheets, Aseprite-style JSON, GIF, rendered clips) | `crates/pixfx-export` and its `examples/` scripts | shipped |
 | Pixi 8 | `packages/pixfx-pixi` | shipped |
 | CSS and DOM | `packages/pixfx-dom` | possible |
 | WebGL | a shell of its own | possible |
@@ -118,27 +119,25 @@ one: its rules, trainer and its own wasm; this site's landing and effect pages e
 | JS runtime | `packages/pixfx-web` (TypeScript) | Loading the wasm, painting workers, the game-wide frames and their surfaces, a stage per host scene following the draw list, effect handles, the feel's JS face | Host-neutral: no Phaser, no Pixi. A JS shell adds only its host objects and its loop. |
 | JS binding | `pixfx-wasm` | `wasm-bindgen` types and option parsing for JS | Translates only. Every JS shell loads the engine through it, by way of `pixfx-web`. |
 | Scene | `pixfx-scene` (`Scene`, `Frames`, `Painter`, `Shell`, `Pass`, `Rect`, `StageEvent`) | What plays, where, on which layer, which frame, the game-wide shared frames and who paints them, events | Host-neutral: no `wasm-bindgen`, no `js-sys`. gpui and every JS shell use the same one. |
-| Engine | `pixfx-core` (effect model, game feel), `pixfx-effects`, `pixfx-light`, `pixfx-fighter`, `pixfx-body` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies; the rig every pose, direction and clip is made with, and its mannequin | Pure and deterministic: no clock, no I/O, no host types. |
+| Engine | `pixfx-core` (effect model, game feel, scene light), `pixfx-effects`, `pixfx-fighter` | Effects, particles, cues, `Feel`, `Squash`, acts, bodies; the rig every pose, direction and clip is made with, and its mannequin | Pure and deterministic: no clock, no I/O, no host types. |
 | Drawing | `pixfx-draw` (`frame`, `painter`, `shapes`, `halo`, `blend`, `color`, `palette`, `math`, `ruler`) | Frames with colour and light, painting, painted glow, compositing, the ruler every sprite and effect is drawn to (`RULER`) | Pure. `libm` is the one required dependency. Sprites, text and UI layout join here when a game needs them. |
 
 Where a new piece of code goes:
 
-- A new effect, one that reads the sprite it plays on or the way it moved: `pixfx-effects`, behind its own cargo
-  feature (for example `feedback-outline`) listed in its category feature (`feedback`) and in `all` in `crates/pixfx-effects/Cargo.toml`, with `#[cfg(feature = "...")]` on its `mod`,
-  `pub use` and `EFFECTS` entry; `crates/pixfx-effects/tests/features.rs` fails otherwise. A new feel rule or body
-  behaviour: `pixfx-core` or `pixfx-fighter`.
-- A fire, an explosion, a shield or anything else that reads neither the sprite nor its motion: not here. It is
-  sprite art the game plays (a sheet, frames), made outside the engine.
-- A pose, a camera, an animation clip or the mannequin painted from them (hull, bones, part map): `pixfx-body`.
+- A new procedural, sprite-based or hybrid effect: `pixfx-effects`, behind its own Cargo feature, listed
+  in its category feature and in `all`. Put sprite assets beside the effect and compile them in under the same
+  feature. Apply its `#[cfg]` to the module, re-export and `EFFECTS` entry. `crates/pixfx-effects/tests/features.rs`
+  checks the registration. A new feel rule or body behaviour belongs in `pixfx-core` or `pixfx-fighter`.
+- A pose, a camera, an animation clip or the mannequin painted from them (hull, bones, part map): `pixfx_core::body`.
 - A new way to paint pixels (sprite, text, nine-slice, UI box): the drawing layer, driven by the first game that
   needs it; that game decides its API.
-- A tool an agent uses to read a picture as pixels (an image model's drawing, a customer's sprite): `pixfx-pixel`,
-  a pure function per step in `pixfx_pixel::tool`, run by a script per step in its `examples/`. It feeds the agent, never the game: the agent writes painter code from what it
-  reads, and nothing in the engine paints from its output.
-- Getting reference art for a new effect from an image model (template sheet, prompt, the call, the effect's pixels
-  cut back out as colour and light): `pixfx-ref`, a script per step in its `examples/`. Like `pixfx-pixel` it feeds the
-  agent: the effect is written by hand in `pixfx-effects` from what it shows.
+- Preparing sprite art or reading a picture as pixels: `pixfx-pixel`, with one pure function per step in
+  `pixfx_pixel::tool` and a script per step in `examples/`. Curated output can become an embedded asset in
+  `pixfx-effects` or guide the procedural painter.
+- Image-model references for a new effect (template sheet, prompt, generation, colour and light extraction):
+  `pixfx_pixel::reference` and the scripts in `crates/pixfx-pixel/examples/`.
 - Placement, layering, lifetimes, follow, fading after stop, which frame to show: `Scene`.
+- Reading a rendered clip for playback: `pixfx_scene::clip`. Packing and writing clip files: `pixfx-export`.
 - A JS-facing type or option: `pixfx-wasm`, as a translation of a Rust type.
 - A new host or output: a new shell.
 - A new file to make (a sheet, a video, a report): its logic in the library crate that owns it, and a short script
@@ -161,7 +160,7 @@ until its refactor lands.
 ## Rules
 
 - Scale: every sprite, effect and reference sheet made here is drawn to one ruler, `pixfx_draw::RULER` (the duel's
-  fighter: 40 rows on screen, face 7, eye 1 x 2, blade 16), one game pixel per pixel; a new thing is sized against a
+  fighter: 63 rows on screen, face 11, eye 2 x 4, blade 26), one game pixel per pixel; a new thing is sized against a
   body part (`Ruler::size(part, ratio)`, never under 1 pixel). `pixfx-fighter`'s `tests/ruler.rs` keeps the ruler
   equal to the painted fighter. The skill `pixfx` ("One scale: the ruler") says how.
 - Determinism: the same scene, options and time give the same `frame_hash` on every target; each effect's golden

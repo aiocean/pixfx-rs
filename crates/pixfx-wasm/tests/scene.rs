@@ -6,6 +6,7 @@ use std::error::Error;
 use std::num::NonZeroU32;
 
 use pixfx_core::{Clip, Options};
+use pixfx_draw::PixelDensity;
 use pixfx_effects::effect;
 use pixfx_wasm::scene::{
     Cut, Frames, OP_FREE, OP_MAKE, OP_REFILL, OP_SHOW, OP_STRIDE, Painting, Scene, Shape,
@@ -55,7 +56,7 @@ fn the_first_draw_makes_each_surface_before_showing_it() -> Res {
 fn a_surface_is_shown_where_its_lit_pixels_land() -> Res {
     let mut frames = Frames::with(false);
     let mut scene = Scene::new(&mut frames, scale(3)?);
-    let clip = buff()?;
+    let clip = buff()?.with_pixel_density(PixelDensity::One);
     let h = scene.play_clip(clip, 30.0, 40.0)?;
     scene.scene().update(0.1)?;
     let rect = scene.scene().rect(h).ok_or("no rect")?;
@@ -70,6 +71,32 @@ fn a_surface_is_shown_where_its_lit_pixels_land() -> Res {
         assert!(i64::from(op[2]) >= rect.x && i64::from(op[3]) >= rect.y);
         assert!(i64::from(op[2] + op[4]) <= rect.x + rect.w as i64);
         assert_eq!(op[6], h as i32);
+    }
+    Ok(())
+}
+
+#[test]
+fn a_dense_surface_keeps_its_game_size_at_odd_canvas_scales() -> Res {
+    let mut frames = Frames::with(false);
+    let mut scene = Scene::new(&mut frames, scale(3)?);
+    let normal = scene.play_clip(buff()?.with_pixel_density(PixelDensity::One), 30.0, 40.0)?;
+    scene.scene().set_pixel_density(Some(PixelDensity::Two));
+    let dense = scene.play_clip(buff()?, 30.0, 40.0)?;
+    assert_eq!(scene.scene().rect(normal), scene.scene().rect(dense));
+    scene.scene().update(0.1)?;
+    let list = scene.draw_ops(&mut frames)?;
+    let ops = ops(&list);
+    let shows: Vec<_> = ops
+        .iter()
+        .filter(|op| op[0] == OP_SHOW && op[6] == dense as i32)
+        .collect();
+    assert!(!shows.is_empty());
+    for show in shows {
+        let made = ops
+            .iter()
+            .find(|m| m[0] == OP_MAKE && m[1] == show[1])
+            .ok_or("no make")?;
+        assert_eq!((2 * show[4], 2 * show[5]), (3 * made[2], 3 * made[3]));
     }
     Ok(())
 }
@@ -178,6 +205,7 @@ fn a_shape_that_does_not_fit_the_frame_asked_for_is_refused() -> Res {
     let job = jobs.first().ok_or("no job")?;
     let shape = Shape {
         frame_w: 1,
+        frame_h: 1,
         x: 0,
         y: 0,
         w: 1,

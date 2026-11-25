@@ -85,7 +85,7 @@ const DEPTHS = { back: 0, front: 1 };
 
 test("an effect draws near where it plays, scaled, its colour normally then its light added", () => {
   const { stage, frame, draw } = setup(3);
-  stage.play("explosions/body-burst", 30, 40, {}, null, DEPTHS);
+  stage.play("explosions/body-burst", 30, 40, { pixelDensity: 1 }, null, DEPTHS);
   frame();
   const drawn = draw(null);
   expect(drawn.length).toBeGreaterThan(0);
@@ -98,6 +98,19 @@ test("an effect draws near where it plays, scaled, its colour normally then its 
     expect(d.dw).toBe(d.sw * 3);
     // colour from the holder's left half, light from its right
     expect(d.sx).toBe(d.op === "lighter" ? d.holder.width / 2 : 0);
+  }
+});
+
+test("a 2× effect uses the whole source texture at the same game scale", () => {
+  const { stage, frame, draw } = setup(3);
+  stage.play("explosions/body-burst", 30, 40, {}, null, DEPTHS);
+  frame();
+  const drawn = draw(null);
+  expect(drawn.length).toBeGreaterThan(0);
+  for (const image of drawn) {
+    expect(image.dw * 2).toBe(image.sw * 3);
+    expect(image.dx).toBeLessThanOrEqual(30 * 3);
+    expect(image.dx + image.dw).toBeGreaterThan(30 * 3);
   }
 });
 
@@ -152,7 +165,7 @@ function pictures() {
 }
 
 test("fighters Rust painted draw at their place, scaled, colour normally then light added", () => {
-  const sprites = new wasm.Sprites(120, 80);
+  const sprites = new wasm.Sprites(120, 80, 1);
   sprites.begin();
   const body = new wasm.Body(60);
   const a: Appearance = { x: body.x, air: 0, pose: "idle", poseT: 0, face: 1, vx: 0, vy: 0, out: false, flash: false, untouchable: false,

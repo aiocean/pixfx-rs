@@ -10,16 +10,19 @@ run with `cargo run -p <crate> --example <script> -- <args>`. A script reads arg
 writes files. Need something the flags don't cover? Edit or copy the script; logic worth testing moves into the
 library.
 
+Painted, sprite-based and hybrid effects export by id through the same scripts. To prepare source sprite frames
+for an effect, see `pixfx-effect`.
+
 ## The scripts
 
 | Output | Command | Writes (`<name>` = id with `/` as `_`) |
 |---|---|---|
-| Sprite sheets + beanfx JSON | `cargo run -p pixfx-export --example sprite_sheet -- <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]` | `<name>.png`, `_color.png`, `_light.png`, `.json` |
+| Sprite sheets + Aseprite-style JSON | `cargo run -p pixfx-export --example sprite_sheet -- <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]` | `<name>.png`, `_color.png`, `_light.png`, `.json` |
 | Looping gif | `cargo run -p pixfx-export --example gif -- <id> [--scale N] [--seed N] [--palette WORD] [--num NAME=V] [--actor PNG,PNG... [--actor-every N] [--show-actor]] [--out DIR]` | `<name>.gif` (over a dark backdrop); `--actor` plays an effect that reads its sprite on these sprite frames, feet on the origin; `--show-actor` draws the sprite too, between the back and front layers |
 | An effect in play, on a stage | `cargo run -p pixfx-export --example stage -- <id> [--actor PNG] [--target DX,DY] [--order-at SECS] [--aim converge\|pierce] [--feel] [--secs N] [--scale N] [--out DIR]` | `<name>.stage.gif`: the effect on a caster with a target facing them, through `pixfx-scene`; `--order-at` orders a volley at the target, `--feel` shows the hit-stop and screen shake its cues ask for |
 | Video (ffmpeg on `PATH`) | `cargo run -p pixfx-export --example mp4 -- <id> [--scale N] [--loops N] [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]` | `<name>.mp4`; `write_video` takes `.webm` and others by extension |
 | Rendered clip for `loadClip` | `cargo run -p pixfx-export --example render_clip -- <id> [--seed N] [--palette WORD] [--num NAME=V] [--out DIR]` | `<name>.clip.json`, `<name>.clip.<n>.png` |
-| Mannequin clip sheet | `cargo run -p pixfx-body --example clip_sheet -- <clip> [--camera side\|iso\|topdown] [--out DIR]`; `--example catalog [--camera ...]` for every clip | `target/body/<clip>/`: `composite.png`, `hull.png`, `bones.png`, `parts.png`, `<clip>.gif`, `<clip>.json` (skill `pixfx-body`) |
+| Mannequin clip sheet | `cargo run -p pixfx-core --features body --example clip_sheet -- <clip> [--camera side\|iso\|topdown] [--out DIR]`; `--example catalog [--camera ...]` for every clip | `target/body/<clip>/`: `composite.png`, `hull.png`, `bones.png`, `parts.png`, `<clip>.gif`, `<clip>.json` (skill `pixfx-body`) |
 | Fighter pose sheet | `cargo run -p pixfx-fighter --example poses -- <thunder\|frost\|alchemist> [--blank POSE,...] [--pose POSE [--states]] [--out DIR]` | `<look>-poses.png`, or `<look>-<POSE>.png` and its cells |
 | Every effect beside the fighter, to check scale | `cargo run -p pixfx-fighter --example poses -- thunder --pose idle --states --out target/pixel`, then `cargo run --release -p pixfx-export --example scale_board -- --actor target/pixel/thunder-idle/r0-m0.png [--scale N] [--screens] [--id ID]... [--out DIR]` | `target/scale/<name>.png` (the busiest frame on the sprite; the sprite shows only inside the effect's canvas) and `index.html` |
 - `--palette` takes a preset: `fire`, `ice`, `poison`, `holy`, `shadow`, `arcane`, `blood`, `electric`, `nature`,

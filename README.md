@@ -4,20 +4,19 @@ Pixel-art effects in Rust. An effect is written once and produces the same pixel
 
 It has two modes:
 
-- **Render.** Run an effect natively and write sprite sheets (composite, colour and light PNGs), a
-  beanfx-layout JSON, or a GIF.
+- **Render.** Run an effect natively and write sprite sheets (composite, colour and light PNGs), an
+  Aseprite-style JSON, or a GIF.
 - **Play live.** Run the same effect in a browser, through plain JS bindings, a self-driving Canvas 2D
   renderer, or inside gpui.
 
-An effect here reads the sprite it plays on or the way it moved: an outline, a power-up aura, a body bursting apart,
-a trail, a teleport scan, a fade, an incineration, a blink-out, or a status wrap (`appear/teleport-beam`,
-`disappear/blink-out`, `disappear/fade`, `disappear/incinerate`, `explosions/body-burst`, `feedback/cloak-shimmer`,
-`feedback/electrified`, `feedback/encase`, `feedback/outline`, `feedback/power-up`, `feedback/soaked`,
-`projectiles/trail`). One that reads
-neither (a fire, an explosion, a shield) is not an engine effect: it is sprite art the game plays. The engine started
+The catalog ships procedural paint, authored sprite frames and hybrids together. `Effect::render_kind()` in Rust
+and `meta(id).renderKind` in JS identify them as `paint`, `sprite` or `hybrid`. An effect can read an actor or its
+motion, or play on its own. For example, `impacts/rune-flash` combines three embedded sprite frames with a
+procedural ring of additive light.
+
+The engine started
 as a port of [pixelfx](https://github.com/patch-gg/pixelfx) (JS); `feedback/power-up` is a port of
-[Sprite Fusion's pixel art VFX](https://www.spritefusion.com/pixel-art-vfx). Sheets use the [beanfx](NOTICE.md)
-layout, and each effect's golden frame hashes pin its pixels.
+[Sprite Fusion's pixel art VFX](https://www.spritefusion.com/pixel-art-vfx). Each effect's golden frame hashes pin its pixels.
 
 ## How you use it
 
@@ -36,15 +35,16 @@ test), `pixfx-effect`, `pixfx-play`, `pixfx-render`, `pixfx-perf`, `pixfx-pixel`
 
 | Script | Makes |
 |---|---|
-| `cargo run -p pixfx-export --example sprite_sheet -- <id>` | Composite, colour and light PNGs and the beanfx-layout JSON |
+| `cargo run -p pixfx-export --example sprite_sheet -- <id>` | Composite, colour and light PNGs and the Aseprite-style JSON |
 | `cargo run -p pixfx-export --example gif -- <id>` | A looping gif |
 | `cargo run -p pixfx-export --example mp4 -- <id>` | A video (needs ffmpeg) |
 | `cargo run -p pixfx-export --example render_clip -- <id>` | A rendered clip hosts play without drawing (`loadClip`) |
 | `cargo run --release -p pixfx-effects --example bench` | What a frame of effects costs natively |
 | `cargo run -p pixfx-fighter --example poses -- <look>` | Every pose of a fighter look on one sheet |
-| `cargo run -p pixfx-body --example clip_sheet -- <clip> [--camera side\|iso\|topdown]` | A catalog clip (walk, run, crouch...) as a mannequin sheet, a row per direction: composite, hull, bones and part map PNGs, a GIF and the frames' joints as JSON (skill `.claude/skills/pixfx-body/SKILL.md`); `--example catalog` writes every clip |
+| `cargo run -p pixfx-core --features body --example clip_sheet -- <clip> [--camera side\|iso\|topdown]` | A catalog clip (walk, run, crouch...) as a mannequin sheet, a row per direction: composite, hull, bones and part map PNGs, a GIF and the frames' joints as JSON (skill `.claude/skills/pixfx-body/SKILL.md`); `--example catalog` writes every clip |
 | `cargo run -p pixfx-pixel --example <step> -- ...` | The agent's pixel steps: `clean`, `read`, `draw`, `view`, `critique`, `ramp`, `sheet`, `cut`, `parts`, `diff` (skill `.claude/skills/pixfx-pixel/SKILL.md`) |
-| `cargo run -p pixfx-ref --example <step> -- ...` | A new effect's reference from an image model: `template` (sheet and prompt from a spec), `generate` (the OpenRouter call), `extract` (colour and light layers per frame, a review page), `gallery` (skill `.claude/skills/pixfx-ref/SKILL.md`) |
+| `cargo run -p pixfx-pixel --example pose_sheet -- <spec>` | A captioned skeleton sheet for an image model |
+| `cargo run -p pixfx-pixel --example <step> -- ...` | A new effect's reference from an image model: `template` (sheet and prompt from a spec), `generate` (the OpenRouter call), `extract` (colour and light layers per frame, a review page), `gallery` (skill `.claude/skills/pixfx-ref/SKILL.md`) |
 
 Each script's first lines say what it takes and writes.
 
@@ -53,13 +53,11 @@ Each script's first lines say what it takes and writes.
 | Crate | What it is |
 |---|---|
 | `crates/pixfx-draw` | Drawing, the lowest layer: frame with colour and additive light, painter, shapes, blending, `composite`, `frame_hash`, palette presets, the JS-number maths (`math`), and `RULER`, the duel's fighter in pixels that every sprite, effect and reference sheet is drawn to (`ruler`). Knows nothing of effects or hosts. |
-| `crates/pixfx-core` | The engine on top of `pixfx-draw`: `Effect`/`Instance`, particles, `render_frames`, `Player`, the frame key and store; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`; sprite awareness: `Actor`, `Silhouette` (skill `.claude/skills/pixfx-sprite-aware/SKILL.md`). |
+| `crates/pixfx-core` | The engine on top of `pixfx-draw`: `Effect`/`Instance`, particles, `render_frames`, `Player`, the frame key and store; game feel: `Feel` (shake, hit-stop, slow motion, flash, ripples), `cue::impact`, `Squash`/`Blink`; scene light (`light` feature), a character rig with cameras, animation clips and mannequin painting (`body` feature), and sprite awareness: `Actor`, `Silhouette` (skill `.claude/skills/pixfx-sprite-aware/SKILL.md`). |
 | `crates/pixfx-scene` | What a stage shows and where, for every shell: `Scene` (effects playing, placement, layers, the view outside which nothing is drawn, the answer to their cues, events), `Frames` (the frames every scene of a game shares, and the `Painter` that paints them, on the spot or on another thread) and the `Shell` contract (`make`, `refill`, `show`, `free`). No browser or gpui types. |
-| `crates/pixfx-body` | The rig: a figure on the ruler (`Body`) posed by joint angles (`Pose`), seen by any camera (`Camera::side`, `iso`, `topdown`, 4 or 8 directions), animated by clips with easing, root motion and planted feet (`Clip`, `catalog`), and painted as a mannequin: a hull of shapes per body part, the bones inside it, a part map (`sprite`, `clip_sheet`). |
 | `crates/pixfx-effects` | The effects, listed in `pixfx_effects::EFFECTS` and looked up with `pixfx_effects::effect(id)`. |
-| `crates/pixfx-pixel` | Pixels for agents, not shipped in a game: a picture (an image model's, an artist's, a customer's sprite) cleaned to its pixel grid, read as text and drawn back, viewed, critiqued, split into parts; blank sheets for an image model (`pixfx_pixel::tool`, a script per step in `examples/`, skill `.claude/skills/pixfx-pixel/SKILL.md`). |
-| `crates/pixfx-ref` | Effect references from an image model, not shipped in a game: a spec of an effect's look and moments becomes a labelled template sheet and a prompt, the OpenRouter request is built and read, and the sheet the model drew is cut back into frames as colour and light layers with a review page (a script per step in `examples/`, the xianxia shields' specs as worked examples, skill `.claude/skills/pixfx-ref/SKILL.md`). |
-| `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), beanfx-layout JSON, GIF, rendered clips, and the character a script plays an effect on (`Actors`); the scripts that write them in `examples/`. |
+| `crates/pixfx-pixel` | Pixels for agents, not shipped in a game: a picture (an image model's, an artist's, a customer's sprite) cleaned to its pixel grid, read as text and drawn back, viewed, critiqued, split into parts; blank sheets, pose guides and effect reference sheets for an image model (`pixfx_pixel::tool`, a script per step in `examples/`, skill `.claude/skills/pixfx-pixel/SKILL.md`). |
+| `crates/pixfx-export` | Sprite sheets (composite, colour, light PNG), Aseprite-style JSON, GIF, rendered clips, and the character a script plays an effect on (`Actors`); the scripts that write them in `examples/`. |
 | `crates/pixfx-wasm` | The engine for JS: `effects()`, `meta(id)`, `new Fx(id, opts)`, `update(dt)`, `draw(layer)`, `color()`, `light()`, `rgba()`, `takeCues()`; `new Feel(spec?)`, `new Squash(spec?)`, `new Blink(spec?)`. Demo in `crates/pixfx-wasm/demo/`. |
 | `packages/pixfx-phaser` | Phaser 4 scene plugin: `scene.pixfx.play(id, x, y, opts)` with follow, stop, `complete`/`destroy` events, scene time, game feel (`scene.pixfx.feel`) and `scene.pixfx.squash(sprite)`. See its [README](packages/pixfx-phaser/README.md); demo in `packages/pixfx-phaser/demo/`. |
 | `packages/pixfx-canvas2d` | Canvas 2D shell over `pixfx-web`: `createPixfx(ctx, { scale }).play(id, x, y, opts)`, then each frame `update(dt)` and `drawLayer("back")` / `drawLayer("front")` among your own drawing, `warp()` for a heavy blow's ring, `drawPicture()` for fighters and scene light Rust painted; workers paint. See its [README](packages/pixfx-canvas2d/README.md); demo in `packages/pixfx-canvas2d/demo/`. |
@@ -74,8 +72,7 @@ the repo root.
 Optional: cargo's intermediate build files can go in one shared directory with
 `export CARGO_BUILD_BUILD_DIR=$PWD/target/build-dir`. Nothing needs it.
 
-The root workspace holds every crate except `crates/pixfx-gpui`, so a fresh clone builds and tests without
-anything else. `crates/pixfx-gpui` and `examples/gpui-web` are separate workspaces that need a local gpui
+The root workspace excludes the gpui and Bevy shells, which each have a separate workspace. `crates/pixfx-gpui` and `examples/gpui-web` are separate workspaces that need a local gpui
 fork; see [gpui](#gpui).
 
 ## Game feel
@@ -128,13 +125,45 @@ To write one, read the sprite through `pixfx_core::Silhouette` (see `.claude/ski
 
 A ring round the sprite it wraps, drawn behind it, so it reads over busy ground or marks what is picked:
 `play("feedback/outline", x, y, { width: 2, palette: ["#ffffff"] }).wrap(actorOf(hero))`. `width` is 1 to 3,
-`corners: 1` fills the corners (square ring), 0 leaves them cut (rounded, the default); the colour is the
-palette's first, by default the engine's dark outline (`#1a1422`). `w` and `h` (default 128) size the box round where
+`corners: 1` fills the corners (square ring), 0 leaves them cut (rounded, the default). The ring takes the middle
+swatch of a palette, choosing the second of the two middle swatches for an even-length ramp. Pass a single hex
+colour to set it exactly. The default is the engine's dark outline (`#1a1422`). `w` and `h` (default 128) size the box round where
 it plays that the sprite and its ring must fit in. It draws nothing until it has a sprite.
+
+### `feedback/volt-orbit`
+
+Two forked arcs circle the visible bounds of the sprite, charge from cobalt to white-gold, and shed blue sparks.
+The loop is 12 frames at 30 fps. Wrap it with `actorOf(hero)` to fit each pose. Without an actor it uses the
+fighter ruler for its preview.
+
+```js
+scene.pixfx.play("feedback/volt-orbit", hero.x, hero.y, { gap: 1, jag: 1, sparks: 4 })
+  .follow(hero).wrap(scene.pixfx.actorOf(hero));
+```
+
+`gap` scales the space around the sprite, `jag` controls the bends, and `sparks` sets the number per arc.
+Use `palette` for a custom ramp. For larger sprites, increase the `w` and `h` canvas options (144 × 168 by default,
+with the origin halfway across and two-thirds down).
+
+## Blade slashes
+
+The catalog includes three procedural one-shot effects:
+
+- `slashes/slash-1` is a diagonal Ember Cleave.
+- `slashes/slash-2` is a rising Frost Hook.
+- `slashes/slash-3` is a Violet Blade Trail. Play it at a point for an overhead sweep, or attach it to a blade-tip
+  mover using the scene's trail API to paint its actual motion.
+
+Each accepts the engine's `palette` option.
+
+```js
+stage.play("slashes/slash-1", x, y, { palette: "fire" });
+bladeTip.trail("slashes/slash-3", { palette: "arcane" });
+```
 
 ## Palettes
 
-Every effect takes a `palette`: a list of hex colours from dark to light, or one preset's name. A palette of
+Painted effects take a `palette`: a list of hex colours from dark to light, or one preset's name. A palette of
 another length is resampled to the effect's own, so any ramp fits any effect.
 
 | Preset | Ramp |
@@ -178,7 +207,21 @@ cargo run -p pixfx-export --example sprite_sheet -- feedback/power-up --out out
 cargo run -p pixfx-export --example gif -- feedback/power-up --scale 4 --out out
 ```
 
-`sprite_sheet` writes the composite, colour and light PNGs and the beanfx-layout JSON into `out/`; `gif` writes a
+### Pixel density
+
+Effects, fighter sheets and the site use a 2× raster by default. Positions, sizes and timing stay in game units.
+The 63-pixel fighter is painted across 126 texel rows. Use at least two display pixels per game pixel to see the
+extra detail. Smooth sprite art is sampled in Rust with its own texel pitch and alpha coverage.
+
+- Canvas 2D and Pixi accept `pixelDensity` when creating a stage. Phaser uses
+  `this.pixfx.setPixelDensity(2)`. Set a single effect with `play(id, x, y, { pixelDensity: 2 })`.
+- In Rust, set `Options::pixel_density` or call `Scene::set_pixel_density(Some(PixelDensity::Two))`
+  for new effects. Paint fighters into a frame created with `Frame::with_density` or use
+  `new Sprites(width, height, 2)` from JS.
+- GIF, sprite sheet, clip and fighter-pose examples accept `--pixel-density 1` for legacy artwork. The export's `--scale`
+  still controls how many output pixels each raster texel takes.
+
+`sprite_sheet` writes the composite, colour and light PNGs and the Aseprite-style JSON into `out/`; `gif` writes a
 looping GIF. For a seed or an effect's own option, change the `Options` in the script.
 
 ## What a frame costs
@@ -275,7 +318,8 @@ The first build takes about 5 minutes; later builds take seconds.
 
 ## Site
 
-The landing page and docs are static HTML in `site/`, live at https://pixfx.aiocean.io.
+The landing page and docs are static HTML in `site/`, live at https://pixfx.aiocean.io. The site build
+uses FFmpeg and libwebp's `img2webp` on `PATH` to bake the live demos into GIF, WebP and PNG previews.
 
 ```sh
 site/build.sh --serve        # build site/dist (pages + the pixfx-canvas2d bundle), serve on http://127.0.0.1:8770/

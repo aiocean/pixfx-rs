@@ -8,8 +8,8 @@ pixfx-rs builds on three MIT-licensed projects:
 - **Sprite Fusion pixel art VFX**, Copyright (c) 2026 Hugo Duprez, MIT License
   (https://www.spritefusion.com/pixel-art-vfx). pixfx-rs ports the effects pixelfx does not have to Rust; their
   sources are vendored verbatim under `tools/spritefusion/`, each keeping its own license header.
-- **beanfx**, Copyright (c) 2026 bien, MIT License (https://github.com/baenv/beanfx). pixfx-rs sprite sheets use
-  the beanfx layout and its rule for compositing light over transparency.
+- **beanfx**, Copyright (c) 2026 bien, MIT License (https://github.com/baenv/beanfx). pixfx-rs sprite sheets originally used
+  the beanfx layout and retain its rule for compositing light over transparency.
 
 ## pixelfx notices (verbatim)
 

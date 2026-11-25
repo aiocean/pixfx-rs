@@ -1,0 +1,12 @@
+# Cloudflare Pages response headers (https://developers.cloudflare.com/pages/configuration/headers/).
+#
+# Every file keeps its name across deploys except the bundler's output in /pkg/assets/, whose names carry a hash of
+# their content. A file that keeps its name must be asked for again on every load (a cheap 304 when unchanged), or a
+# browser runs yesterday's pixfx-canvas2d.js against today's pages and a new effect is "No such effect".
+/*
+  Cache-Control: no-cache
+
+# A hashed file never changes under its name: keep it for a year.
+/pkg/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable

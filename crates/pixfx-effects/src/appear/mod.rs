@@ -29,8 +29,16 @@
 //! | `disappear/` | The exit counterpart: plays as the object leaves. |
 //! | `feedback/` | Effects that stay on a live character (outline, power-up). |
 
+#[cfg(feature = "appear-dither")]
+mod dither;
+#[cfg(feature = "appear-fade")]
+mod fade;
 #[cfg(feature = "appear-teleport-beam")]
 mod teleport_beam;
 
+#[cfg(feature = "appear-dither")]
+pub use dither::DITHER;
+#[cfg(feature = "appear-fade")]
+pub use fade::FADE;
 #[cfg(feature = "appear-teleport-beam")]
 pub use teleport_beam::TELEPORT_BEAM;

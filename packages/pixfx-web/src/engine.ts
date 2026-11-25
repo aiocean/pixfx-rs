@@ -28,6 +28,7 @@ const pair = z.tuple([z.number(), z.number()]);
 const effectMetaSchema = z.object({
   id: z.string(),
   name: z.string(),
+  renderKind: z.enum(["paint", "sprite", "hybrid"]),
   size: pair,
   origin: pair,
   duration: z.number(),

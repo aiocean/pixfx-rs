@@ -1,10 +1,10 @@
-//! `pixfx-light` for JS: the light a game's spells, blows and lamps throw on its scene. The game owns its lights as
+//! Scene light for JS: the light a game's spells, blows and lamps throw on its scene. The game owns its lights as
 //! plain values (`{key?, x, y, reach, color, strength, life?, age?}`); these age them, put them out and paint them.
 //! Objects are read strictly: a missing, misspelt or mistyped field throws, naming it.
 
+use pixfx_core::light::{self, Glow, Light, Style};
 use pixfx_core::valid_dt;
 use pixfx_draw::Frame;
-use pixfx_light::{Glow, Light, Style};
 use wasm_bindgen::prelude::*;
 
 use crate::js::{parse, to_js};
@@ -22,7 +22,7 @@ pub fn step_lights(
         ));
     }
     let lights: Vec<Light> = parse("lights", lights)?;
-    to_js(&pixfx_light::step(lights, dt))
+    to_js(&light::step(lights, dt))
 }
 
 /// `light` set to go out at most `within` seconds from now.
@@ -35,7 +35,7 @@ pub fn put_out_light(
     to_js(&light.put_out(within))
 }
 
-/// The light on a `w` x `h` game-pixel scene, in the duel's style (`pixfx_light::Style::default()`), painted
+/// The light on a `w` x `h` game-pixel scene, in the duel's style (`light::Style::default()`), painted
 /// into a frame kept from one call to the next.
 #[wasm_bindgen]
 pub struct Lighting {
@@ -67,7 +67,7 @@ impl Lighting {
         let mut all: Vec<Glow> = parse("glows", glows)?;
         all.extend(lights.iter().map(|l| l.glow(&self.style)));
         self.frame.clear();
-        pixfx_light::draw(&mut self.frame, &all, &self.style);
+        light::draw(&mut self.frame, &all, &self.style);
         Ok(Picture::of(&self.frame, false))
     }
 }

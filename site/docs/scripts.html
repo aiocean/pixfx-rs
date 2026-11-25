@@ -33,7 +33,7 @@
 <table>
   <thead><tr><th>Script</th><th>Writes</th></tr></thead>
   <tbody>
-    <tr><td><code>pixfx-export</code> <code>sprite_sheet &lt;id&gt;</code></td><td>Composite, colour and light PNGs and the beanfx-layout JSON.</td></tr>
+    <tr><td><code>pixfx-export</code> <code>sprite_sheet &lt;id&gt;</code></td><td>Composite, colour and light PNGs and the Aseprite-style JSON.</td></tr>
     <tr><td><code>pixfx-export</code> <code>gif &lt;id&gt;</code></td><td>A looping GIF.</td></tr>
     <tr><td><code>pixfx-export</code> <code>render_clip &lt;id&gt;</code></td><td>A rendered clip that the JS shells play without drawing (<code>loadClip</code>).</td></tr>
     <tr><td><code>pixfx-effects</code> <code>bench</code></td><td>What a frame of effects costs natively (run with <code>--release</code>).</td></tr>
@@ -54,7 +54,7 @@
     <tr><td><code>feedback_outline.png</code></td><td>RGBA. Colour with light added, over transparency. Use it where you cannot blend additively.</td></tr>
     <tr><td><code>feedback_outline_color.png</code></td><td>RGBA. The colour layer alone.</td></tr>
     <tr><td><code>feedback_outline_light.png</code></td><td>RGB. The light layer alone, to draw additively over the colour sheet.</td></tr>
-    <tr><td><code>feedback_outline.json</code></td><td>Aseprite-style "array" JSON with beanfx's fields. See <a href="sheets.html">Sprite sheet format</a>.</td></tr>
+    <tr><td><code>feedback_outline.json</code></td><td>Aseprite-style "array" JSON with pixfx layer and playback metadata. See <a href="sheets.html">Sprite sheet format</a>.</td></tr>
   </tbody>
 </table>
 </div>

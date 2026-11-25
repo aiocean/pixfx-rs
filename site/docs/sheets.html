@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sprite sheet format · pixfx docs</title>
-  <meta name="description" content="What the sprite_sheet script writes: three PNGs laid out on one grid, and a JSON file that Aseprite-style loaders and beanfx both read.">
+  <meta name="description" content="What the sprite_sheet script writes: three PNGs laid out on one grid, and an Aseprite-style JSON atlas with pixfx layer metadata.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Pixelify+Sans:wght@500&display=swap">
@@ -24,7 +24,7 @@
     <nav class="sidebar" id="sidebar" aria-label="Docs"></nav>
     <main class="doc">
 <h1>Sprite sheet format</h1>
-<p class="lead">What the <code>sprite_sheet</code> script writes: three PNGs laid out on one grid, and a JSON file that Aseprite-style loaders and beanfx both read.</p>
+<p class="lead">What the <code>sprite_sheet</code> script writes: three PNGs laid out on one grid, and an Aseprite-style JSON atlas with pixfx layer metadata.</p>
 
 <h2>Layout</h2>
 <p>Every frame is one cell of the same size, the effect's canvas (<code>meta.size</code>, or the size its options give, as outline's <code>w</code> and <code>h</code>, plus twice the margin; the scripts use margin 0). Cells go left to right, at most 8 per row, then down.</p>
@@ -48,43 +48,36 @@
 <p>Drawing <code>_color</code> then <code>_light</code> additively gives the effect exactly as the live renderers show it, lighting whatever is under it.</p>
 
 <h2>JSON</h2>
-<p>The JSON follows Aseprite's "array" export, so Aseprite loaders (Phaser's <code>load.aseprite</code>, many others) read it, with beanfx's own fields under <code>meta.beanfx</code>. Abridged output for <code>projectiles/trail</code>:</p>
+<p>The <code>frames</code> array and standard <code>meta</code> fields describe the composite atlas for tools such as Phaser's <code>load.aseprite</code>. All layers share those frame rectangles. <code>meta.pixfx</code> describes how to play the effect and draw its layers. This is an abridged export for <code>impacts/parry</code>.</p>
 <pre><code>{
   "frames": [
     {
-      "filename": "projectiles_trail 0",
-      "frame": { "x": 0, "y": 0, "w": 160, "h": 160 },
+      "filename": "impacts_parry 0",
+      "frame": { "x": 0, "y": 0, "w": 200, "h": 112 },
       "rotated": false,
       "trimmed": false,
-      "spriteSourceSize": { "x": 0, "y": 0, "w": 160, "h": 160 },
-      "sourceSize": { "w": 160, "h": 160 },
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 200, "h": 112 },
+      "sourceSize": { "w": 200, "h": 112 },
       "duration": 33
     }
     // ... one entry per frame
   ],
   "meta": {
     "app": "pixfx",
-    "version": "1",
-    "image": "projectiles_trail.png",
+    "version": "2",
+    "image": "impacts_parry.png",
     "format": "RGBA8888",
-    "size": { "w": 1280, "h": 160 },
+    "size": { "w": 1600, "h": 448 },
     "scale": "1",
-    "frameTags": [{ "name": "projectiles_trail", "from": 0, "to": 7, "direction": "forward" }],
-    "beanfx": {
-      "name": "projectiles_trail",
+    "frameTags": [{ "name": "impacts_parry", "from": 0, "to": 30, "direction": "forward" }],
+    "pixfx": {
+      "pivot": [100, 96],
       "fps": 30,
-      "frames": 8,
-      "rows": 1,
-      "frameSize": [160, 160],
-      "columns": 8,
-      "pivot": [80, 80],
-      "loop": true,
-      "end": "loop",
-      "sheet": "projectiles_trail.png",
-      "color": "projectiles_trail_color.png",
-      "light": "projectiles_trail_light.png",
-      "blend_light": "add",
-      "light_gain": 1.0
+      "loop": false,
+      "layers": [
+        { "image": "impacts_parry_color.png", "blend": "normal" },
+        { "image": "impacts_parry_light.png", "blend": "add" }
+      ]
     }
   }
 }</code></pre>
@@ -97,11 +90,10 @@
     <tr><td><code>frames[].duration</code></td><td>Milliseconds per frame, <code>round(1000 / fps)</code>.</td></tr>
     <tr><td><code>frames[].frame</code></td><td>The cell on the sheet. Cells are never trimmed or rotated.</td></tr>
     <tr><td><code>meta.frameTags</code></td><td>One tag spanning every frame, named after the effect.</td></tr>
-    <tr><td><code>beanfx.pivot</code></td><td>The effect's origin within a cell, y down from the cell's top-left: the origin on its canvas plus the margin (<code>meta.origin + margin</code> unless its options size the canvas). Place this point where the effect should stand.</td></tr>
-    <tr><td><code>beanfx.loop</code>, <code>beanfx.end</code></td><td><code>true</code> and <code>"loop"</code> for loops; <code>false</code> and <code>"remove"</code> for one-shots, which should be removed after the last frame.</td></tr>
-    <tr><td><code>beanfx.sheet</code>, <code>color</code>, <code>light</code></td><td>File names of the three images, relative to the JSON.</td></tr>
-    <tr><td><code>beanfx.blend_light</code>, <code>light_gain</code></td><td>Draw <code>light</code> with additive blending at gain 1.</td></tr>
-    <tr><td><code>beanfx.rows</code></td><td>Always <code>1</code>: pixfx writes one animation per sheet. The grid's own row count is <code>ceil(frames / columns)</code>.</td></tr>
+    <tr><td><code>meta.pixfx.pivot</code></td><td>The effect's origin within a cell, y down from the cell's top-left: the origin on its canvas plus the margin (<code>meta.origin + margin</code> unless its options size the canvas). Place this point where the effect should stand.</td></tr>
+    <tr><td><code>meta.pixfx.fps</code></td><td>Exact frames per second. Use this when the rounded millisecond durations would introduce drift.</td></tr>
+    <tr><td><code>meta.pixfx.loop</code></td><td>Whether playback repeats after the last frame.</td></tr>
+    <tr><td><code>meta.pixfx.layers</code></td><td>Draw these layers in array order using the shared frame rectangles. Image paths are relative to the JSON. Normal means source-over, and add means additive at full strength.</td></tr>
   </tbody>
 </table>
 </div>

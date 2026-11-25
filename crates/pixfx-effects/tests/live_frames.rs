@@ -55,7 +55,13 @@ fn live_play_draws_the_rendered_frame_for_its_clock() -> Result<(), String> {
                 continue;
             }
             let k = inst.frame();
-            let mut live = Frame::new(rendered.w, rendered.h, 0, 0);
+            let mut live = Frame::with_density(
+                canvas.size.0,
+                canvas.size.1,
+                0,
+                0,
+                pixfx_draw::PixelDensity::Two,
+            );
             inst.draw(&mut live, Layer::Both, inst.placement());
             if !meta.is_screen() {
                 edge_fade(&mut live);

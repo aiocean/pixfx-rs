@@ -392,3 +392,112 @@ pub fn parse_layout(json: &str) -> Result<Layout, String> {
     };
     check(&layout).map(|()| layout)
 }
+
+/// Caption ink.
+const INK: [u8; 4] = [20, 20, 20, 255];
+
+/// Write each cell's caption into the gap above it, cells in reading order (`texts[i]` over cell `i`, left to right,
+/// top to bottom; an empty text draws nothing), all at one font size: the biggest that fits the longest. Fails
+/// naming the first caption too long for the gap.
+pub fn captions(img: &mut RgbaImage, layout: &Layout, texts: &[&str]) -> Result<(), String> {
+    let k = caption_size(layout, texts)?;
+    for (i, text) in texts.iter().enumerate() {
+        let i = u32::try_from(i).unwrap_or(u32::MAX);
+        let (col, row) = (i % layout.cols.max(1), i / layout.cols.max(1));
+        if !text.trim().is_empty() && row < layout.rows {
+            caption(img, layout, cell_rect(layout, col, row), text, k);
+        }
+    }
+    Ok(())
+}
+
+/// The one font size every caption of a sheet is drawn at: the biggest that fits the longest.
+pub(crate) fn caption_size(layout: &Layout, texts: &[&str]) -> Result<u32, String> {
+    let band = layout.gap * layout.scale;
+    let mut k = 4;
+    for (i, text) in texts.iter().enumerate() {
+        if text.trim().is_empty() {
+            continue;
+        }
+        let fits = fit(text, layout.cell_w * layout.scale, band).ok_or_else(|| {
+            let i = u32::try_from(i).unwrap_or(u32::MAX);
+            format!(
+                "cell {} ({},{}): caption \"{}\" does not fit the gap above the cell: shorten it, or raise the gap or the scale",
+                i + 1,
+                i % layout.cols.max(1),
+                i / layout.cols.max(1),
+                text
+            )
+        })?;
+        k = k.min(fits);
+    }
+    Ok(k)
+}
+
+/// Words wrapped to lines of at most `width` characters; a word longer than a line is split.
+fn wrap(text: &str, width: usize) -> Vec<String> {
+    let width = width.max(1);
+    let mut lines: Vec<String> = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        let mut word: Vec<char> = word.chars().collect();
+        while word.len() > width {
+            if !line.is_empty() {
+                lines.push(std::mem::take(&mut line));
+            }
+            let rest = word.split_off(width);
+            lines.push(word.into_iter().collect());
+            word = rest;
+        }
+        let n = line.chars().count();
+        if n > 0 && n + 1 + word.len() > width {
+            lines.push(std::mem::take(&mut line));
+        }
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.extend(word);
+    }
+    if !line.is_empty() {
+        lines.push(line);
+    }
+    lines
+}
+
+/// Font pixels a caption line takes: 7 of glyph, 3 of space.
+const LINE: u32 = 10;
+
+/// The biggest font size (1 to 4) at which `text` wraps into a band `band` pixels high over a cell `w` wide.
+fn fit(text: &str, w: u32, band: u32) -> Option<u32> {
+    (1..=4u32).rev().find(|&k| {
+        let per_line = (w / (6 * k)) as usize;
+        let n = u32::try_from(wrap(text, per_line).len()).unwrap_or(u32::MAX);
+        per_line > 0 && n.saturating_mul(LINE * k).saturating_add(2) <= band
+    })
+}
+
+/// Write `text` at font size `k` into the gap above the cell at `rect`.
+pub(crate) fn caption(img: &mut RgbaImage, layout: &Layout, rect: [u32; 4], text: &str, k: u32) {
+    let band = layout.gap * layout.scale;
+    let [x0, y0, w, _] = rect;
+    let lines = wrap(text, (w / (6 * k)) as usize);
+    let need = u32::try_from(lines.len()).unwrap_or(0) * LINE * k;
+    let top = y0 - band + band.saturating_sub(need) / 2 + k;
+    for (li, line) in lines.iter().enumerate() {
+        let ly = top + u32::try_from(li).unwrap_or(0) * LINE * k;
+        for (ci, c) in line.chars().enumerate() {
+            let cx = x0 + u32::try_from(ci).unwrap_or(0) * 6 * k;
+            for gy in 0..crate::font::H {
+                for gx in 0..crate::font::W {
+                    if crate::font::ink(c, gx, gy) {
+                        for dy in 0..k {
+                            for dx in 0..k {
+                                img.set(cx + gx * k + dx, ly + gy * k + dy, INK);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

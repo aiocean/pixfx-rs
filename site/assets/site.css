@@ -93,27 +93,37 @@ th { font-weight: 600; color: var(--ash); }
 .topbar nav { display: flex; gap: 1.25rem; margin-left: auto; }
 .topbar nav a { color: var(--ash); text-decoration: none; }
 .topbar nav a:hover, .topbar nav a[aria-current] { color: var(--wax); }
-.landing .topbar { position: absolute; inset: 0 0 auto; z-index: 2; border-bottom: 0; padding-left: var(--edge); padding-right: var(--edge); }
-/* the left edge of the centred sections, so full-bleed parts line up with them */
-.landing { --edge: max(clamp(1rem, 4vw, 2.5rem), calc((100vw - 76rem) / 2 + clamp(1rem, 4vw, 2.5rem))); }
+.landing .topbar { max-width: 76rem; margin-inline: auto; }
 
 /* ---------- landing ---------- */
 
-.hero { position: relative; min-height: min(78vh, 640px); overflow: hidden; }
-.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: crosshair; }
-.intro-strip {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 2rem;
-  max-width: 76rem; margin: 0 auto; padding: 2rem clamp(1rem, 4vw, 2.5rem) 0;
+.hero {
+  padding: clamp(2.25rem, 6vw, 4.5rem) clamp(1rem, 4vw, 2.5rem) 0;
+  max-width: 76rem; margin-inline: auto;
+  display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+  align-items: center; gap: clamp(1.5rem, 4vw, 3.5rem);
 }
-.intro-strip .pitch { flex: 1 1 28rem; max-width: 40rem; }
-.intro-strip .lede { font-size: 1.15rem; line-height: 1.5; margin: 0; }
-.intro-strip .proof { margin: 0.6rem 0 0; color: var(--ash); font-size: 0.95rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
-.intro-strip .proof b { color: var(--flame); font-weight: 600; }
-.intro-strip .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+.hero-copy h1 { font-size: clamp(2.65rem, 5.7vw, 5rem); margin-bottom: 0.75rem; }
+.hero-copy p { max-width: 38ch; margin-bottom: 1.4rem; color: var(--ash); font-size: 1.125rem; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.hero-demo { margin: 0; }
+.hero-demo canvas, .card img, .effect-stage canvas {
+  display: block; width: 100%; height: auto; background: #121126;
 }
+.hero-demo, .effect-stage canvas { border: 1px solid var(--soot); }
+@media (max-width: 46rem) {
+  .hero { grid-template-columns: minmax(0, 1fr); }
+}
+.hero-demo figcaption {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  min-height: 3.25rem; padding: 0.45rem 0.8rem; border-top: 1px solid var(--soot);
+  background: var(--ground); color: var(--ash); font-size: 0.95rem;
+}
+.demo-toggle {
+  flex-shrink: 0; padding: 0.35rem 0.6rem; background: var(--night); border: 1px solid var(--soot);
+  color: var(--wax); font: inherit; cursor: pointer;
+}
+.demo-toggle:hover { border-color: var(--wax); }
 
 .section { padding: 4rem clamp(1rem, 4vw, 2.5rem); max-width: 76rem; margin: 0 auto; }
 .section > h2 { margin-top: 0; }
@@ -137,9 +147,9 @@ input[type="range"] { accent-color: var(--flame); width: 100%; }
 .page { padding: 2.5rem clamp(1rem, 4vw, 2.5rem) 4rem; max-width: 76rem; margin: 0 auto; }
 .page > .lead { max-width: 60ch; color: var(--ash); font-size: 1.1rem; }
 .cards { list-style: none; padding: 0; margin: 2rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1.25rem; }
-.cards li { margin: 0; }
-.card { display: flex; flex-direction: column; gap: 0.2rem; text-decoration: none; color: var(--wax); background: var(--ground); padding: 0 0 0.9rem; border: 1px solid transparent; }
-.card canvas { width: 100%; height: auto; aspect-ratio: 4 / 3; image-rendering: pixelated; display: block; margin-bottom: 0.6rem; }
+.cards li { margin: 0; min-width: 0; }
+.card { display: flex; flex-direction: column; height: 100%; gap: 0.2rem; text-decoration: none; color: var(--wax); background: var(--ground); padding: 0 0 0.9rem; border: 1px solid var(--soot); }
+.card img { aspect-ratio: 31 / 18; object-fit: contain; margin-bottom: 0.6rem; }
 .card-name { font-weight: 600; padding: 0 1rem; }
 .card .card-id { background: none; padding: 0 1rem; font-size: 0.8rem; color: var(--ash); }
 .card:hover, .card:focus-visible { border-color: var(--flame); color: var(--wax); }
@@ -149,17 +159,12 @@ input[type="range"] { accent-color: var(--flame); width: 100%; }
 .effect-page .page > .lead { max-width: 70ch; }
 .effect-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr); gap: 2rem; align-items: start; margin-top: 1.5rem; }
 .effect-stage { margin: 0; }
-.effect-mode { display: flex; gap: 0.25rem; margin-bottom: 0.6rem; font-size: 0.9rem; }
-.effect-mode label {
-  position: relative; color: var(--ash); background: var(--night); border: 1px solid var(--soot);
-  padding: 0.3rem 0.75rem; cursor: pointer;
-}
-.effect-mode input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-.effect-mode label:hover { color: var(--wax); border-color: var(--wax); }
-.effect-mode label:has(:checked) { color: var(--wax); border-color: var(--flame); }
-.effect-mode label:has(:focus-visible) { outline: 2px solid var(--flame); outline-offset: 2px; }
+.effect-demos { display: grid; gap: 1.5rem; min-width: 0; }
+.demo-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.6rem; }
+.demo-head h2 { font-size: 1.05rem; margin: 0; }
+.demo-head button { font: inherit; color: var(--wax); background: var(--night); border: 1px solid var(--soot); padding: 0.3rem 0.75rem; cursor: pointer; }
+.demo-head button:hover, .demo-head button:focus-visible { border-color: var(--flame); }
 .effect-caption { margin: 0.6rem 0 0; color: var(--ash); font-size: 0.95rem; }
-.effect-stage canvas { width: 100%; height: auto; image-rendering: pixelated; display: block; background: var(--ground); border: 1px solid var(--soot); }
 .effect-side { display: flex; flex-direction: column; gap: 1.25rem; }
 .effect-side pre { margin: 0; font-size: 0.85rem; border-left-color: var(--soot); }
 .effect-side table { margin: 0; }
@@ -239,7 +244,8 @@ input[type="range"] { accent-color: var(--flame); width: 100%; }
     color: var(--wax); background: none; border: 1px solid var(--soot); padding: 0.3rem 0.7rem;
   }
   .docs-page .topbar nav { display: none; }
-  .hero { min-height: 62vh; }
+  .landing .topbar { gap: 0.65rem; flex-wrap: wrap; }
+  .landing .topbar nav { gap: 0.85rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -248,8 +254,12 @@ input[type="range"] { accent-color: var(--flame); width: 100%; }
 
 /* ---------- fx layer (assets/fx.js) ---------- */
 
-.fx-overlay { position: fixed; left: 0; top: 0; pointer-events: none; image-rendering: pixelated; z-index: 900; }
-/* the page being left, kept on top of the new one (scrolled as it was) while a transition takes it away */
+.fx-overlay, .fx-screen { position: fixed; left: 0; top: 0; pointer-events: none; image-rendering: pixelated; }
+.fx-overlay { z-index: 900; }
+/* the burn between pages: its edge and smoke over the leaving page, its light added on top */
+.fx-screen { z-index: 1000; }
+.fx-light { mix-blend-mode: plus-lighter; }
+/* the page being left, kept on top of the new one (scrolled as it was) while the burn takes it away */
 .page-leaving { position: fixed; inset: 0; z-index: 800; overflow: hidden; background: var(--night); mask-repeat: no-repeat; }
 
 .fx-switch {
@@ -265,57 +275,3 @@ html[aria-busy="true"], html[aria-busy="true"] * { cursor: progress; }
 @media (prefers-reduced-motion: no-preference) {
   @view-transition { navigation: auto; }
 }
-
-/* the duel's tooltips: what a skill or a buff under the pointer is */
-/* The duel's tooltip, in the duel's own pixels (--px is one of them): a stepped bronze frame like the bars', a header
-   band in the tier's or buff's colour, flat fills and dotted rules. */
-.duel-tip {
-  --px: 3px; --tone: #c8c8c8; --deep: #2a1c0e; --bronze: #b8893c;
-  position: fixed; z-index: 30; min-width: 200px; max-width: 290px; margin: calc(var(--px) * 2);
-  background: #120d18; color: #c8c0d4; text-align: center; pointer-events: none;
-  font: 500 0.85rem/1.4 var(--display); letter-spacing: 0.02em;
-  /* a bronze ring with its corners cut, then a dark outline stepped round them */
-  box-shadow:
-    calc(var(--px) * -1) 0 0 0 var(--bronze), var(--px) 0 0 0 var(--bronze),
-    0 calc(var(--px) * -1) 0 0 var(--bronze), 0 var(--px) 0 0 var(--bronze),
-    calc(var(--px) * -2) 0 0 0 var(--deep), calc(var(--px) * 2) 0 0 0 var(--deep),
-    0 calc(var(--px) * -2) 0 0 var(--deep), 0 calc(var(--px) * 2) 0 0 var(--deep),
-    calc(var(--px) * -1) calc(var(--px) * -1) 0 0 var(--deep), var(--px) calc(var(--px) * -1) 0 0 var(--deep),
-    calc(var(--px) * -1) var(--px) 0 0 var(--deep), var(--px) var(--px) 0 0 var(--deep),
-    inset 0 var(--px) 0 0 #f0cf7a40;
-}
-.duel-tip[data-tone="common"] { --tone: #f0cf7a; }
-.duel-tip[data-tone="rare"] { --tone: #6fb3ff; }
-.duel-tip[data-tone="epic"] { --tone: #c88bff; }
-.duel-tip[data-tone="legendary"] { --tone: #ff9a1a; }
-.duel-tip[data-tone="ultimate"] { --tone: #3fd1c6; }
-.duel-tip[data-tone="good"] { --tone: #6fd77a; --bronze: #3fae5a; }
-.duel-tip[data-tone="bad"] { --tone: #ee5a4c; --bronze: #c8322a; }
-.duel-tip .tip-head {
-  position: relative; padding: calc(var(--px) * 2) calc(var(--px) * 9); color: var(--tone);
-  background: color-mix(in srgb, var(--tone) 18%, #120d18);
-  border-bottom: var(--px) solid color-mix(in srgb, var(--tone) 55%, #120d18);
-}
-/* the header's end pieces: a pixel diamond either side */
-.duel-tip .tip-head::before, .duel-tip .tip-head::after {
-  --p: var(--px); --n: calc(var(--px) * -1); --p2: calc(var(--px) * 2); --n2: calc(var(--px) * -2);
-  content: ""; position: absolute; top: calc(50% - var(--px) / 2); width: var(--px); height: var(--px); background: var(--tone);
-  box-shadow:
-    var(--p) 0 var(--tone), var(--n) 0 var(--tone), 0 var(--p) var(--tone), 0 var(--n) var(--tone),
-    var(--p2) 0 var(--tone), var(--n2) 0 var(--tone), 0 var(--p2) var(--tone), 0 var(--n2) var(--tone),
-    var(--p) var(--p) var(--tone), var(--n) var(--p) var(--tone), var(--p) var(--n) var(--tone), var(--n) var(--n) var(--tone);
-}
-.duel-tip .tip-head::before { left: calc(var(--px) * 4); }
-.duel-tip .tip-head::after { right: calc(var(--px) * 4); }
-.duel-tip h3 { margin: 0; font: inherit; font-size: 1.05rem; line-height: 1.2; color: inherit; text-shadow: 0 2px 0 #000; }
-.duel-tip .tip-type { margin: 0; font-size: 0.75rem; color: color-mix(in srgb, var(--tone) 70%, #c8c0d4); }
-.duel-tip .tip-body { padding: calc(var(--px) * 2) calc(var(--px) * 4) calc(var(--px) * 3); }
-.duel-tip p { margin: 0; }
-.duel-tip hr {
-  height: var(--px); width: 60%; margin: calc(var(--px) * 2) auto; border: 0;
-  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--tone) 60%, #120d18) 0 var(--px), transparent var(--px) calc(var(--px) * 2));
-}
-.duel-tip .tip-prop { color: #7f7890; }
-.duel-tip .tip-prop span { color: #fff; }
-.duel-tip .tip-text { color: #c8c0d4; }
-.duel-tip .tip-mod { color: #8a8cff; }

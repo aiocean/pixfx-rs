@@ -1,6 +1,6 @@
 [package]
 name = "pixfx-export"
-description = "Export rendered pixfx effects: sprite sheets, beanfx JSON, gif"
+description = "Export rendered pixfx effects: sprite sheets, Aseprite-style JSON, gif"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,6 +10,7 @@ gif = "=0.14.2"
 png = "=0.18.1"
 pixfx-core = { path = "../pixfx-core" }
 pixfx-draw = { path = "../pixfx-draw" }
+pixfx-scene = { path = "../pixfx-scene", features = ["clip"] }
 serde.workspace = true
 serde_json = { version = "=1.0.154", features = ["preserve_order"] }
 
@@ -19,5 +20,4 @@ workspace = true
 [dev-dependencies]
 libm.workspace = true
 pixfx-effects = { path = "../pixfx-effects" }
-pixfx-scene = { path = "../pixfx-scene" }
 serde_json = "=1.0.154"

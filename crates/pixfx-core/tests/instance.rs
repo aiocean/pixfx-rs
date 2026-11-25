@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use pixfx_core::effect::{Canvas, Effect, EffectState, Layer, Meta, NumOpt, OptValue, Options};
 use pixfx_core::render::render_frames;
+use pixfx_draw::PixelDensity;
 use pixfx_draw::color::{Rgba, WHITE};
 use pixfx_draw::painter::Painter;
 
@@ -63,7 +64,11 @@ const FULL: u32 = 0xff3264c8;
 
 #[test]
 fn render_fades_light_at_the_edges() {
-    let r = render_frames(&GLOW, &Options::default(), 0);
+    let options = Options {
+        pixel_density: PixelDensity::One,
+        ..Options::default()
+    };
+    let r = render_frames(&GLOW, &options, 0);
     let f = &r.frames[0];
     // (x, y, light) from pixelfx edgeFade (E = 8) on a 24 x 20 frame of light 0xff3264c8
     let expected = [
@@ -84,13 +89,13 @@ fn render_fades_light_at_the_edges() {
     }
     // no fade with a margin or for a full-screen effect
     assert!(
-        render_frames(&GLOW, &Options::default(), 1).frames[0]
+        render_frames(&GLOW, &options, 1).frames[0]
             .light
             .iter()
             .all(|&l| l == FULL)
     );
     assert!(
-        render_frames(&GLOW_SCREEN, &Options::default(), 0).frames[0]
+        render_frames(&GLOW_SCREEN, &options, 0).frames[0]
             .light
             .iter()
             .all(|&l| l == FULL)
@@ -149,18 +154,18 @@ fn render_sizes_frames_from_the_instances_canvas() {
     let r = render_frames(&Wide, &opts, 2);
     assert_eq!(
         (r.w, r.h),
-        (24, 8),
+        (48, 16),
         "the canvas its options give, plus the margin"
     );
-    // its origin (10, 3) sits 2 px in from the frame's corner
+    // Its origin (10, 3) sits two game pixels in from the frame's corner.
     let lit = r
         .frames
         .first()
-        .and_then(|f| (0..f.w).find(|&x| f.color[(5 * f.w + x) as usize] != 0));
-    assert_eq!(lit, Some(12));
+        .and_then(|f| (0..f.w).find(|&x| f.color[(10 * f.w + x) as usize] != 0));
+    assert_eq!(lit, Some(24));
     assert_eq!(
         r.origin,
-        (10, 3),
+        (20, 6),
         "the origin on the canvas its options give"
     );
 }

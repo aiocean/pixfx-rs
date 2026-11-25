@@ -162,3 +162,17 @@ impl Actor {
         }
     }
 }
+
+/// The sprite as a mask: a cell is solid where its alpha is above 0 (pixelfx `o.actor.mask`), for
+/// [`pixfx_draw::Painter::mask`] and [`pixfx_draw::Painter::outline`] at (`x()`, `y()`).
+impl pixfx_draw::Mask for Actor {
+    fn w(&self) -> u32 {
+        self.w
+    }
+    fn h(&self) -> u32 {
+        self.h
+    }
+    fn solid(&self, mx: u32, my: u32) -> bool {
+        self.at(mx, my) >> 24 != 0
+    }
+}

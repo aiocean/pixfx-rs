@@ -22,7 +22,8 @@ made of lines, quadratic curves and turns round a centre (circle arcs, spirals),
 
 ## Belongs here
 
-- A new way to put pixels in a frame: a primitive, a blend, a palette.
+- A new way to put pixels in a frame: a primitive, a blend, a palette. `Painter::sprite` stamps straight-alpha
+  RGBA8 frames in local coordinates with nearest-neighbour sampling and ordered dithering.
 - Sprites, text, nine-slice and UI layout when a real game needs them. That game decides the API; do not add one
   ahead of it.
 - Number helpers that must give identical bits natively and in wasm.

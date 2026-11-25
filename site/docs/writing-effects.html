@@ -27,7 +27,7 @@
 <p class="lead">An effect is a Rust static with metadata and a <code>spawn</code> function. This page shows its parts, the drawing API, the rules that keep it deterministic, and how to register and test it.</p>
 
 <h2>Anatomy</h2>
-<p>An effect here reads the sprite it plays on (<code>pixfx_core::Silhouette</code> and <code>Actor</code>) or the way it moved (<code>pixfx_core::Trace</code>). One that reads neither, such as a fire, an explosion or a shield, is sprite art the game plays, not an engine effect.</p>
+<p>Effects may use procedural paint, authored sprite frames or both. Use <code>Painter::sprite</code> for straight-alpha RGBA8 frames in local coordinates. Embed the frames with <code>include_bytes!</code> and select them in Rust at the effect's frame rate. Set <code>Effect::render_kind()</code> to <code>Sprite</code> or <code>Hybrid</code> when the effect ships authored frames. See <a href="../effects/effect.html?id=impacts/rune-flash">Rune Flash</a> for a hybrid.</p>
 <p>Effects live in <code>crates/pixfx-effects/src/&lt;category&gt;/&lt;name&gt;.rs</code>. The skeleton below follows <code>feedback/outline.rs</code>:</p>
 <pre><code>use std::sync::Arc;
 

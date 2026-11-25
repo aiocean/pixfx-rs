@@ -9,8 +9,7 @@ In `tools/pixfx-rs`. An effect that **wraps its actor** is handed the sprite's c
 reads it into cells of its own space, and draws from that: on the body, along its edge, out from it. The same effect
 follows every frame of a walk cycle, and works on any sprite the game hands it.
 
-Every pixfx effect reads the sprite it plays on or the way it moved; one that reads neither (a fire, an explosion, a
-shield) is sprite art the game plays. Working examples to copy from:
+Effects that read an actor or trace can adapt to moving sprites. Working examples to copy from:
 
 | Effect | File | Reads |
 |---|---|---|

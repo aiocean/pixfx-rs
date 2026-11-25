@@ -51,7 +51,6 @@ const H: NumOpt = NumOpt::new("h", 128.0).within(8.0, 512.0);
 /// The engine's dark outline (as the rocks' and the fighter's), the ring's colour unless `palette` gives one: a
 /// near-black violet that reads over light and dark ground alike.
 const DARK: Rgba = Rgba::hex24(0x1a1422);
-const PALETTE: [Rgba; 1] = [DARK];
 
 impl Effect for Outline {
     fn meta(&self) -> &Meta {
@@ -71,8 +70,15 @@ impl Effect for Outline {
     }
 
     fn spawn(&self, opts: &Options, _seed: u64) -> Box<dyn EffectState> {
+        // A single-colour outline uses the middle swatch of a ramp, away from its darkest and lightest ends.
+        let color = opts
+            .palette
+            .as_deref()
+            .and_then(|ramp| ramp.get(ramp.len() / 2))
+            .copied()
+            .unwrap_or(DARK);
         Box::new(State {
-            color: opts.palette_or(&PALETTE).first().copied().unwrap_or(DARK),
+            color,
             width: opts.num(&WIDTH) as u32,
             corners: opts.num(&CORNERS) >= 0.5,
             ring: Vec::new(),
@@ -113,7 +119,7 @@ impl EffectState for State {
             return;
         }
         for &(x, y) in &self.ring {
-            p.px(f64::from(x), f64::from(y), self.color);
+            p.paint_cell(f64::from(x), f64::from(y), self.color, 1.0);
         }
     }
 }

@@ -13,9 +13,11 @@ crates/pixfx-canvas/demo/pkg/
 # built static site
 site/dist/
 .wrangler/
-site/arena/
 
 # agent sessions: worktrees and locks of Claude Code
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 node_modules/
+
+# Licensed Frostwindz sprites imported from a local copy of the pack
+/crates/pixfx-effects/src/slashes/art/

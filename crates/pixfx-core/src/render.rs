@@ -9,8 +9,7 @@ use pixfx_draw::Painter;
 use pixfx_draw::frame::Frame;
 use pixfx_draw::math::js_round;
 
-/// An effect's frames, each `w` x `h` (its canvas, [`Effect::canvas`], plus the margin) with its top-left at
-/// (-margin, -margin) in effect canvas space.
+/// An effect's frames, each `w` x `h` raster texels. Size, origin and margin use the requested raster density.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rendered {
     pub w: u32,
@@ -46,6 +45,7 @@ pub fn render_frames_with_actor(
     let meta = effect.meta();
     let canvas = effect.canvas(opts);
     let (w, h) = (canvas.size.0 + margin * 2, canvas.size.1 + margin * 2);
+    let density = opts.pixel_density.factor();
     let n = meta.frames();
     let at_origin = Options {
         x: f64::from(canvas.origin.0),
@@ -60,7 +60,7 @@ pub fn render_frames_with_actor(
         // unclamped by MAX_DT: renders step exactly as pixelfx, whatever the fps
         inst.set_actor(actor(k));
         inst.seek(k);
-        let mut frame = Frame::new(w, h, corner, corner);
+        let mut frame = Frame::with_density(w, h, corner, corner, opts.pixel_density);
         inst.draw(&mut frame, Layer::Both, inst.placement());
         if fade {
             edge_fade(&mut frame);
@@ -68,11 +68,14 @@ pub fn render_frames_with_actor(
         frames.push(frame);
     }
     Rendered {
-        w,
-        h,
+        w: w * density,
+        h: h * density,
         fps: meta.fps,
-        origin: canvas.origin,
-        margin,
+        origin: (
+            canvas.origin.0 * density as i32,
+            canvas.origin.1 * density as i32,
+        ),
+        margin: margin * density,
         frames,
     }
 }
@@ -86,9 +89,24 @@ pub fn render_frames_on_actor(
     opts: &Options,
     actor: impl Fn(u64) -> Option<Arc<Actor>>,
 ) -> Rendered {
+    render_frames_on_actor_with(effect, opts, actor, |p, a| {
+        for (x, y, c) in a.opaque() {
+            p.paint_cell(f64::from(x), f64::from(y), c, 1.0);
+        }
+    })
+}
+
+/// Render around an actor with a separate visual raster. The effect still reads the actor in game pixels.
+pub fn render_frames_on_actor_with(
+    effect: &'static dyn Effect,
+    opts: &Options,
+    actor: impl Fn(u64) -> Option<Arc<Actor>>,
+    draw_actor: impl Fn(&mut Painter<'_>, &Actor),
+) -> Rendered {
     let meta = effect.meta();
     let canvas = effect.canvas(opts);
     let (w, h) = canvas.size;
+    let density = opts.pixel_density.factor();
     let (ox, oy) = (f64::from(canvas.origin.0), f64::from(canvas.origin.1));
     let at_origin = Options {
         x: ox,
@@ -103,14 +121,12 @@ pub fn render_frames_on_actor(
         let sprite = actor(k);
         inst.set_actor(sprite.clone());
         inst.seek(k);
-        let mut frame = Frame::new(w, h, 0, 0);
+        let mut frame = Frame::with_density(w, h, 0, 0, opts.pixel_density);
         inst.draw(&mut frame, Layer::Back, inst.placement());
         if let Some(a) = &sprite {
             let mut p = Painter::new(&mut frame);
             p.place(ox, oy, false, 0.0);
-            for (x, y, c) in a.opaque() {
-                p.px(f64::from(x), f64::from(y), c);
-            }
+            draw_actor(&mut p, a);
         }
         inst.draw(&mut frame, Layer::Front, inst.placement());
         if fade {
@@ -119,10 +135,13 @@ pub fn render_frames_on_actor(
         frames.push(frame);
     }
     Rendered {
-        w,
-        h,
+        w: w * density,
+        h: h * density,
         fps: meta.fps,
-        origin: canvas.origin,
+        origin: (
+            canvas.origin.0 * density as i32,
+            canvas.origin.1 * density as i32,
+        ),
         margin: 0,
         frames,
     }
@@ -132,7 +151,8 @@ pub fn render_frames_on_actor(
 /// (pixelfx `edgeFade`). [`render_frames`] applies it to margin-0 renders of effects that are not full-screen;
 /// a live host showing an effect on its own canvas applies it the same way to match them.
 pub fn edge_fade(f: &mut Frame) {
-    let (w, h, e_max) = (i64::from(f.w), i64::from(f.h), i64::from(EDGE));
+    let (w, h) = (i64::from(f.w), i64::from(f.h));
+    let e_max = i64::from(EDGE * f.density().factor());
     for y in 0..h {
         let ey = y.min(h - 1 - y);
         let mut x = 0;

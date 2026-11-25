@@ -25,8 +25,9 @@ export interface GfxTexture {
  * images beyond their depth (Phaser: the scroll factor; a shell with nothing more uses `null`).
  */
 export interface GfxImage<P> {
-  /** Show frame `frame` of texture `key` at `(x, y)`, `w × h` pixels, at `depth`, placed by `place`. */
-  show(key: string, frame: string, x: number, y: number, w: number, h: number, depth: number, place: P): void;
+  /** Show the texture's frame at the destination `(x, y, w, h)`. Source dimensions are in raster texels. */
+  show(key: string, frame: string, x: number, y: number, w: number, h: number, depth: number, place: P,
+    sourceWidth?: number, sourceHeight?: number): void;
   hide(): void;
   destroy(): void;
 }

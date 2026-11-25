@@ -1,5 +1,5 @@
-//! The painter: port of pixelfx `src/core/painter.js` (the methods the fire effects use; the rest arrive
-//! with the effects that need them).
+//! The painter: port of pixelfx `src/core/painter.js`, every method, plus [`Painter::save`], [`Painter::restore`]
+//! and [`Painter::nest`] for an effect that draws other effects inside its own space (`pixfx_core::chain`).
 //!
 //! The painter draws into a frame's two buffers: `color` (opaque pixels, faded with ordered dither, never
 //! blended) and `light` (additive glow, composited on top). Effects draw in local coordinates around their
@@ -9,7 +9,9 @@
 //! (in bounds and a whole index), so NaN or fractional coordinates draw nothing, as there.
 
 use crate::color::Rgba;
+use crate::font::{Font, MINI};
 use crate::frame::Frame;
+use crate::mask::Mask;
 use crate::math::{clamp, js_max, js_min, js_round, to_int32};
 
 /// 4x4 ordered (Bayer) thresholds: a pixel at alpha a is drawn when a is above its cell's threshold.
@@ -81,7 +83,7 @@ pub struct ShadeOut {
 }
 
 /// A local box `[x0, x1) x [y0, y1)` and how a write is tested against it.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Clip {
     /// The write's cell centre, in local space, is inside the box (pixelfx transitions `clipTo`).
     Cells([f64; 4]),
@@ -90,12 +92,85 @@ enum Clip {
     Canvas([f64; 4]),
 }
 
+/// Everything [`Painter::place`], [`Painter::nest`], the fade, the light strength and the clip set: what
+/// [`Painter::save`] keeps and [`Painter::restore`] puts back.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Saved {
+    tx: f64,
+    ty: f64,
+    fx: f64,
+    cs: f64,
+    sn: f64,
+    fade: f64,
+    light_k: f64,
+    clip: Option<Clip>,
+}
+
+/// Where [`Painter::text`] puts `x`: the left edge, the centre or the right edge of the text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Align {
+    #[default]
+    Left,
+    Center,
+    Right,
+}
+
+/// pixelfx `text` options: the font, font pixels drawn `scale` px square, the alignment, a 1 px `outline` and a
+/// `shadow` 1 px down-right (none by default), alpha `a`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TextOpts {
+    pub font: Font,
+    pub scale: f64,
+    pub align: Align,
+    pub outline: Option<Rgba>,
+    pub shadow: Option<Rgba>,
+    pub a: f64,
+}
+
+impl Default for TextOpts {
+    fn default() -> Self {
+        Self {
+            font: MINI,
+            scale: 1.0,
+            align: Align::Left,
+            outline: None,
+            shadow: None,
+            a: 1.0,
+        }
+    }
+}
+
+/// pixelfx `sprite` options for a sprite drawn from strings ([`Painter::sprite_rows`]): each character `scale` px
+/// square, alpha `a`, mirrored left-right (`flip`) or upside down (`flip_y`), every pixel in one colour (`tint`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SpriteOpts {
+    pub scale: f64,
+    pub a: f64,
+    pub flip: bool,
+    pub flip_y: bool,
+    pub tint: Option<Rgba>,
+}
+
+impl Default for SpriteOpts {
+    fn default() -> Self {
+        Self {
+            scale: 1.0,
+            a: 1.0,
+            flip: false,
+            flip_y: false,
+            tint: None,
+        }
+    }
+}
+
 pub struct Painter<'a> {
     frame: &'a mut Frame,
     w: f64,
     h: f64,
     ox: f64,
     oy: f64,
+    density: f64,
+    texel: f64,
     tx: f64,
     ty: f64,
     fx: f64,
@@ -117,6 +192,8 @@ impl<'a> Painter<'a> {
             h: 0.0,
             ox: 0.0,
             oy: 0.0,
+            density: 1.0,
+            texel: 1.0,
             tx: 0.0,
             ty: 0.0,
             fx: 1.0,
@@ -136,6 +213,8 @@ impl<'a> Painter<'a> {
         self.h = f64::from(self.frame.h);
         self.ox = f64::from(self.frame.ox);
         self.oy = f64::from(self.frame.oy);
+        self.density = f64::from(self.frame.density().factor());
+        self.texel = 1.0 / self.density;
         (self.tx, self.ty, self.fx, self.cs, self.sn) = (0.0, 0.0, 1.0, 1.0, 0.0);
         self.fade = 1.0;
         self.light_k = 1.0;
@@ -145,11 +224,47 @@ impl<'a> Painter<'a> {
 
     /// Put the effect's origin at (x, y) in frame space, mirrored if flip, rotated by angle (radians).
     pub fn place(&mut self, x: f64, y: f64, flip: bool, angle: f64) -> &mut Self {
-        self.tx = x;
-        self.ty = y;
+        self.tx = x * self.density;
+        self.ty = y * self.density;
         self.fx = if flip { -1.0 } else { 1.0 };
         self.cs = libm::cos(angle);
         self.sn = libm::sin(angle);
+        self
+    }
+
+    /// The placement, fade, light strength and clip as they are now, for [`Painter::restore`].
+    pub fn save(&self) -> Saved {
+        Saved {
+            tx: self.tx,
+            ty: self.ty,
+            fx: self.fx,
+            cs: self.cs,
+            sn: self.sn,
+            fade: self.fade,
+            light_k: self.light_k,
+            clip: self.clip,
+        }
+    }
+
+    /// Put back what [`Painter::save`] kept (pixelfx chain's `Object.assign(p, { tx, ty, fx, cs, sn, fade, lightK })`).
+    pub fn restore(&mut self, s: Saved) -> &mut Self {
+        (self.tx, self.ty, self.fx, self.cs, self.sn) = (s.tx, s.ty, s.fx, s.cs, s.sn);
+        self.fade = s.fade;
+        self.light_k = s.light_k;
+        self.clip = s.clip;
+        self
+    }
+
+    /// Move the origin to the local point (`x`, `y`), mirrored once more if `flip`, keeping the rotation: what is
+    /// drawn next sits inside the current effect's space. Unrotated, this is pixelfx chain's placement of a cue
+    /// (`x = tx + fx * x`, `y = ty + y`, `flip = fx < 0 !== flip`), bit for bit.
+    pub fn nest(&mut self, x: f64, y: f64, flip: bool) -> &mut Self {
+        let (tx, ty) = (self.to_x(x, y), self.to_y(x, y));
+        self.tx = tx;
+        self.ty = ty;
+        if flip {
+            self.fx = -self.fx;
+        }
         self
     }
 
@@ -196,18 +311,18 @@ impl<'a> Painter<'a> {
 
     // ---- transforms: local (effect) space <-> screen (frame) space
     pub fn to_x(&self, x: f64, y: f64) -> f64 {
-        self.tx + x * self.fx * self.cs - y * self.sn
+        self.tx + (x * self.density) * self.fx * self.cs - (y * self.density) * self.sn
     }
     pub fn to_y(&self, x: f64, y: f64) -> f64 {
-        self.ty + x * self.fx * self.sn + y * self.cs
+        self.ty + (x * self.density) * self.fx * self.sn + (y * self.density) * self.cs
     }
     pub fn from_x(&self, sx: f64, sy: f64) -> f64 {
         let (dx, dy) = (sx - self.tx, sy - self.ty);
-        (dx * self.cs + dy * self.sn) * self.fx
+        (dx * self.cs + dy * self.sn) * self.fx * self.texel
     }
     pub fn from_y(&self, sx: f64, sy: f64) -> f64 {
         let (dx, dy) = (sx - self.tx, sy - self.ty);
-        -dx * self.sn + dy * self.cs
+        (-dx * self.sn + dy * self.cs) * self.texel
     }
     /// The farthest a local point can be from the effect's origin and still land on the frame: the distance
     /// from the placed origin to the frame's farthest corner. Placement only mirrors and rotates, which keep
@@ -215,15 +330,42 @@ impl<'a> Painter<'a> {
     /// it (a tall flame's rows past the frame) without changing a pixel. NaN when the placement is NaN.
     pub fn reach(&self) -> f64 {
         let far = |lo: f64, size: f64, at: f64| js_max((at - lo).abs(), (lo + size - at).abs());
-        libm::hypot(far(self.ox, self.w, self.tx), far(self.oy, self.h, self.ty))
+        libm::hypot(far(self.ox, self.w, self.tx), far(self.oy, self.h, self.ty)) * self.texel
     }
 
     /// The screen pixel of the local pixel cell holding (x, y): mirrors and rotations land on whole cells.
     pub fn cell_x(&self, x: f64, y: f64) -> f64 {
-        libm::floor(self.to_x(libm::floor(x) + 0.5, libm::floor(y) + 0.5))
+        libm::floor(
+            self.tx + self.cell_center(x) * self.fx * self.cs - self.cell_center(y) * self.sn,
+        )
     }
     pub fn cell_y(&self, x: f64, y: f64) -> f64 {
-        libm::floor(self.to_y(libm::floor(x) + 0.5, libm::floor(y) + 0.5))
+        libm::floor(
+            self.ty + self.cell_center(x) * self.fx * self.sn + self.cell_center(y) * self.cs,
+        )
+    }
+
+    fn cell_center(&self, value: f64) -> f64 {
+        libm::floor(value * self.density) + 0.5
+    }
+
+    /// Visit the raster texels in the game cell containing `(x, y)`.
+    pub fn each_game_cell(&mut self, x: f64, y: f64, mut f: impl FnMut(&mut Self, f64, f64)) {
+        if self.density == 1.0 {
+            f(self, self.cell_x(x, y), self.cell_y(x, y));
+            return;
+        }
+        let (x, y) = (libm::floor(x), libm::floor(y));
+        self.each(x, y, x + 1.0, y + 1.0, |p, lx, ly, sx, sy| {
+            if (x..x + 1.0).contains(&lx) && (y..y + 1.0).contains(&ly) {
+                f(p, sx, sy);
+            }
+        });
+    }
+
+    /// Draw one whole game cell from a pre-existing pixel mask.
+    pub fn paint_cell(&mut self, x: f64, y: f64, c: Rgba, a: f64) {
+        self.each_game_cell(x, y, |p, sx, sy| p.put(sx, sy, c, a));
     }
 
     /// The buffer index JS would write for screen pixel (sx, sy), if any.
@@ -448,6 +590,79 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Stamp a straight-alpha RGBA8 sprite at its local top-left corner.
+    /// Samples nearest neighbours and applies the painter's transform, clip and ordered-dither fade.
+    /// A buffer whose length does not match the dimensions is ignored.
+    pub fn sprite(&mut self, x: f64, y: f64, w: u32, h: u32, rgba: &[u8]) {
+        let pixels = rgba.as_chunks::<4>();
+        if !pixels.1.is_empty() || (w as usize).checked_mul(h as usize) != Some(pixels.0.len()) {
+            return;
+        }
+        let (width, height) = (f64::from(w), f64::from(h));
+        self.each(x, y, x + width, y + height, |p, lx, ly, sx, sy| {
+            let (dx, dy) = (lx - x, ly - y);
+            if (0.0..width).contains(&dx)
+                && (0.0..height).contains(&dy)
+                && let Some(&[r, g, b, a]) = pixels.0.get(dy as usize * w as usize + dx as usize)
+                && a != 0
+            {
+                p.put(sx, sy, Rgba(r, g, b, 255), f64::from(a) / 255.0);
+            }
+        });
+    }
+
+    /// Stamp a smooth RGBA sprite. `pitch` is the game-space width of one source texel.
+    /// Premultiplied interpolation preserves coverage without pulling colour out of transparent texels.
+    pub fn sprite_smooth(&mut self, x: f64, y: f64, w: u32, h: u32, pitch: f64, rgba: &[u8]) {
+        let pixels = rgba.as_chunks::<4>();
+        if !(pitch > 0.0 && pitch.is_finite())
+            || !pixels.1.is_empty()
+            || (w as usize).checked_mul(h as usize) != Some(pixels.0.len())
+        {
+            return;
+        }
+        let (width, height) = (f64::from(w) * pitch, f64::from(h) * pitch);
+        let get = |col: i64, row: i64| {
+            if (0..i64::from(w)).contains(&col) && (0..i64::from(h)).contains(&row) {
+                pixels.0[row as usize * w as usize + col as usize]
+            } else {
+                [0; 4]
+            }
+        };
+        self.each(x, y, x + width, y + height, |p, lx, ly, sx, sy| {
+            let (dx, dy) = (lx - x, ly - y);
+            if !(0.0..width).contains(&dx) || !(0.0..height).contains(&dy) {
+                return;
+            }
+            let (u, v) = (dx / pitch - 0.5, dy / pitch - 0.5);
+            let (col, row) = (libm::floor(u), libm::floor(v));
+            let (fx, fy) = (u - col, v - row);
+            let (col, row) = (col as i64, row as i64);
+            let (mut alpha, mut rgb) = (0.0, [0.0; 3]);
+            for (sample, weight) in [
+                (get(col, row), (1.0 - fx) * (1.0 - fy)),
+                (get(col + 1, row), fx * (1.0 - fy)),
+                (get(col, row + 1), (1.0 - fx) * fy),
+                (get(col + 1, row + 1), fx * fy),
+            ] {
+                let coverage = f64::from(sample[3]) * weight;
+                alpha += coverage;
+                for (out, channel) in rgb.iter_mut().zip(sample) {
+                    *out += f64::from(channel) * coverage;
+                }
+            }
+            if alpha > 0.0 {
+                let [r, g, b] = rgb.map(|channel| js_round(channel / alpha) as u8);
+                p.blend_px(sx, sy, Rgba(r, g, b, 255), alpha / 255.0);
+            }
+        });
+    }
+
+    /// Width of a raster texel in game units.
+    pub fn texel(&self) -> f64 {
+        self.texel
+    }
+
     /// A pixel shader over a local box. `f(x, y, out)` returns a colour, or sets `out.c` (colour), `out.a`
     /// (alpha), `out.l` (light colour, defaults to the pixel's colour) and `out.k` (light amount). Return
     /// `None` (or `Rgba::NONE`) to use `out.c`; leave it NONE to leave the pixel alone.
@@ -485,6 +700,19 @@ impl<'a> Painter<'a> {
         y1: f64,
         c: impl Param1<Rgba>,
         a: impl Param1<f64>,
+    ) {
+        self.line_by(x0, y0, x1, y1, &c, &a);
+    }
+
+    /// [`Painter::line`] with its colour and alpha borrowed, so [`Painter::polyline`] reuses them per segment.
+    fn line_by<C: Param1<Rgba>, A: Param1<f64>>(
+        &mut self,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        c: &C,
+        a: &A,
     ) {
         let (mut sx, mut sy) = (self.cell_x(x0, y0), self.cell_y(x0, y0));
         let (ex, ey) = (self.cell_x(x1, y1), self.cell_y(x1, y1));
@@ -548,7 +776,7 @@ impl<'a> Painter<'a> {
     /// A translucent disc: puffs of smoke, vapour, dust. c and a may be functions of (d: 0 centre to 1 rim,
     /// angle).
     pub fn disc(&mut self, cx: f64, cy: f64, r: f64, c: impl Param2<Rgba>, a: impl Param2<f64>) {
-        if r < 0.5 {
+        if r * self.density < 0.5 {
             return self.blend(cx, cy, c.at(0.0, 0.0), a.at(0.0, 0.0));
         }
         self.each(cx - r, cy - r, cx + r, cy + r, |p, x, y, sx, sy| {
@@ -564,7 +792,7 @@ impl<'a> Painter<'a> {
 
     /// Filled disc. c and a may be functions of (d: 0 centre to 1 rim, angle).
     pub fn circle(&mut self, cx: f64, cy: f64, r: f64, c: impl Param2<Rgba>, a: impl Param2<f64>) {
-        if r < 0.6 {
+        if r * self.density < 0.6 {
             return self.dot(cx, cy, c.at(0.0, 0.0), a.at(0.0, 0.0));
         }
         self.shade(cx - r, cy - r, cx + r, cy + r, |x, y, o| {
@@ -642,7 +870,7 @@ impl<'a> Painter<'a> {
 
     /// Filled rectangle.
     pub fn rect(&mut self, x: f64, y: f64, w: f64, h: f64, c: Rgba, a: f64) {
-        if self.sn == 0.0 {
+        if self.sn == 0.0 && self.density == 1.0 {
             let (x0, y0, x1, y1) = (js_round(x), js_round(y), js_round(x + w), js_round(y + h));
             let mut yy = y0;
             while yy < y1 {
@@ -724,9 +952,226 @@ impl<'a> Painter<'a> {
         self.poly(&[(x0, y0), (x1, y1), (x2, y2)], c, a);
     }
 
+    /// Lines through a list of points (pixelfx `polyline`). c and a may be functions of u along each segment.
+    pub fn polyline(&mut self, pts: &[(f64, f64)], c: impl Param1<Rgba>, a: impl Param1<f64>) {
+        for w in pts.windows(2) {
+            let ((x0, y0), (x1, y1)) = (w[0], w[1]);
+            self.line_by(x0, y0, x1, y1, &c, &a);
+        }
+    }
+
+    /// Thick segment with round ends. c and a may be functions of (u along, v across: 0 centre, 1 edge).
+    #[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
+    pub fn beam(
+        &mut self,
+        x0: f64,
+        y0: f64,
+        x1: f64,
+        y1: f64,
+        width: f64,
+        c: impl Param2<Rgba>,
+        a: impl Param2<f64>,
+    ) {
+        let r = width / 2.0;
+        let (dx, dy) = (x1 - x0, y1 - y0);
+        let l2 = dx * dx + dy * dy;
+        // JS `|| 1e-9`
+        let l2 = if l2 == 0.0 || l2.is_nan() { 1e-9 } else { l2 };
+        self.shade(
+            js_min(x0, x1) - r,
+            js_min(y0, y1) - r,
+            js_max(x0, x1) + r,
+            js_max(y0, y1) + r,
+            |x, y, o| {
+                let u = clamp(((x - x0) * dx + (y - y0) * dy) / l2, 0.0, 1.0);
+                let (px, py) = (x0 + dx * u - x, y0 + dy * u - y);
+                let d2 = px * px + py * py;
+                if d2 > r * r {
+                    return None;
+                }
+                let v = libm::sqrt(d2) / r;
+                o.c = c.at(u, v);
+                o.a = a.at(u, v);
+                None
+            },
+        );
+    }
+
+    /// Band of a ring from angle `a0` to `a1` (radians, a1 > a0), radius r - w to r: the slash and smear shape.
+    /// c and a may be functions of (u: 0 at a0 to 1 at a1, v: 0 inner to 1 outer). w may be a function of u for a
+    /// crescent that tapers at both ends.
+    #[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
+    pub fn arc(
+        &mut self,
+        cx: f64,
+        cy: f64,
+        r: f64,
+        w: impl Param1<f64>,
+        a0: f64,
+        a1: f64,
+        c: impl Param2<Rgba>,
+        a: impl Param2<f64>,
+    ) {
+        let span = a1 - a0;
+        let pi = core::f64::consts::PI;
+        self.shade(cx - r, cy - r, cx + r, cy + r, |x, y, o| {
+            let (dx, dy) = (x - cx, y - cy);
+            let d = libm::sqrt(dx * dx + dy * dy);
+            if d > r {
+                return None;
+            }
+            let mut ang = libm::atan2(dy, dx) - a0;
+            ang -= libm::floor(ang / (pi * 2.0)) * pi * 2.0;
+            if ang > span {
+                return None;
+            }
+            let u = ang / span;
+            let ww = w.at(u);
+            if ww <= 0.0 || d < r - ww {
+                return None;
+            }
+            let v = (d - (r - ww)) / ww;
+            o.c = c.at(u, v);
+            o.a = a.at(u, v);
+            None
+        });
+    }
+
+    // ---- sprites, text, masks
+    /// A little sprite from strings (pixelfx `sprite`): rows like `["..##..", ".#oo#."]`, `pal` maps characters to
+    /// colours (a character it lacks, or one mapped to `Rgba::NONE`, is empty; so are `.` and ` `). Top-left at
+    /// (x, y). Not [`Painter::sprite`], which stamps RGBA bytes.
+    pub fn sprite_rows(
+        &mut self,
+        rows: &[&str],
+        pal: &[(char, Rgba)],
+        x: f64,
+        y: f64,
+        o: &SpriteOpts,
+    ) {
+        let (k, a) = (o.scale, o.a);
+        let w = rows.first().map_or(0, |r| r.chars().count()) as f64;
+        let h = rows.len() as f64;
+        for (r, row) in rows.iter().enumerate() {
+            for (q, ch) in row.chars().enumerate() {
+                if ch == '.' || ch == ' ' {
+                    continue;
+                }
+                let c = match o.tint {
+                    Some(c) => c,
+                    None => pal
+                        .iter()
+                        .find(|(k, _)| *k == ch)
+                        .map_or(Rgba::NONE, |&(_, c)| c),
+                };
+                if c.pack() == 0 {
+                    continue;
+                }
+                let col = if o.flip { w - 1.0 - q as f64 } else { q as f64 };
+                let row = if o.flip_y {
+                    h - 1.0 - r as f64
+                } else {
+                    r as f64
+                };
+                if k == 1.0 {
+                    self.dot(x + col, y + row, c, a);
+                } else {
+                    self.rect(x + col * k, y + row * k, k, k, c, a);
+                }
+            }
+        }
+    }
+
+    /// Pixel text (pixelfx `text`): (x, y) is the top of the text, at its left, centre or right ([`TextOpts`]).
+    /// c may be a function of the font pixel (gx, gy).
+    pub fn text(&mut self, s: &str, x: f64, y: f64, c: impl Param2<Rgba>, o: &TextOpts) {
+        let (font, k, a) = (o.font, o.scale, o.a);
+        let w = f64::from(font.width(s)) * k;
+        let left = js_round(match o.align {
+            Align::Center => x - w / 2.0,
+            Align::Right => x - w,
+            Align::Left => x,
+        });
+        let top = js_round(y);
+        if let Some(ol) = o.outline {
+            font.raster(s, |gx, gy| {
+                let (gx, gy) = (f64::from(gx), f64::from(gy));
+                self.rect(
+                    left + gx * k - 1.0,
+                    top + gy * k - 1.0,
+                    k + 2.0,
+                    k + 2.0,
+                    ol,
+                    a,
+                );
+            });
+        }
+        if let Some(sh) = o.shadow {
+            font.raster(s, |gx, gy| {
+                let (gx, gy) = (f64::from(gx), f64::from(gy));
+                self.rect(left + gx * k + 1.0, top + gy * k + 1.0, k, k, sh, a);
+            });
+        }
+        font.raster(s, |gx, gy| {
+            let (gx, gy) = (f64::from(gx), f64::from(gy));
+            self.rect(left + gx * k, top + gy * k, k, k, c.at(gx, gy), a);
+        });
+    }
+
+    /// Size of text in pixels, `(w, h)` (pixelfx `measure`).
+    pub fn measure(s: &str, font: Font, scale: f64) -> (f64, f64) {
+        (f64::from(font.width(s)) * scale, f64::from(font.h) * scale)
+    }
+
+    /// Fill a mask with its top-left at (x, y) (pixelfx `mask`). c and a may be functions of the cell (mx, my).
+    pub fn mask(
+        &mut self,
+        m: &impl Mask,
+        x: f64,
+        y: f64,
+        c: impl Param2<Rgba>,
+        a: impl Param2<f64>,
+    ) {
+        for my in 0..m.h() {
+            for mx in 0..m.w() {
+                if m.solid(mx, my) {
+                    let (fx, fy) = (f64::from(mx), f64::from(my));
+                    self.dot(x + fx, y + fy, c.at(fx, fy), a.at(fx, fy));
+                }
+            }
+        }
+    }
+
+    /// The 1 px outline just outside a mask with its top-left at (x, y) (pixelfx `outline`). c and a may be
+    /// functions of the outline cell (mx, my), which runs from -1 to the mask's w and h.
+    pub fn outline(
+        &mut self,
+        m: &impl Mask,
+        x: f64,
+        y: f64,
+        c: impl Param2<Rgba>,
+        a: impl Param2<f64>,
+    ) {
+        let (w, h) = (i64::from(m.w()), i64::from(m.h()));
+        let at = |mx: i64, my: i64| {
+            mx >= 0 && my >= 0 && mx < w && my < h && m.solid(mx as u32, my as u32)
+        };
+        for my in -1..=h {
+            for mx in -1..=w {
+                if !at(mx, my)
+                    && (at(mx - 1, my) || at(mx + 1, my) || at(mx, my - 1) || at(mx, my + 1))
+                {
+                    let (fx, fy) = (mx as f64, my as f64);
+                    self.dot(x + fx, y + fy, c.at(fx, fy), a.at(fx, fy));
+                }
+            }
+        }
+    }
+
     // ---- light
     /// Radial glow into the light buffer: k at the centre, falling as (1 - d)^2 to 0 at radius r.
     pub fn glow(&mut self, x: f64, y: f64, r: f64, c: Rgba, k: f64) {
+        let r = r * self.density;
         if r < 1.0 || k <= 0.004 {
             return;
         }
@@ -794,6 +1239,7 @@ impl<'a> Painter<'a> {
     /// Glow around a segment (a soft beam of light).
     #[expect(clippy::too_many_arguments, reason = "pixelfx signature")]
     pub fn glow_line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, r: f64, c: Rgba, k: f64) {
+        let r = r * self.density;
         if r < 1.0 || k <= 0.004 {
             return;
         }
@@ -834,6 +1280,7 @@ impl<'a> Painter<'a> {
 
     /// Glow hugging a circle of radius `big_r` (a shockwave's light), falling off over width r.
     pub fn glow_ring(&mut self, x: f64, y: f64, big_r: f64, r: f64, c: Rgba, k: f64) {
+        let (big_r, r) = (big_r * self.density, r * self.density);
         if r < 1.0 || k <= 0.004 {
             return;
         }

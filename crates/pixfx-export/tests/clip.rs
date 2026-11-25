@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use pixfx_core::{Layer, Options, Player};
-use pixfx_draw::Frame;
+use pixfx_draw::{Frame, PixelDensity};
 use pixfx_export::clip::{ClipIndex, decode};
 use pixfx_export::{render_clip, write_clip};
 
@@ -14,13 +14,20 @@ fn out_dir(test: &str) -> PathBuf {
 /// Equal sizes, colour and light; a light word's top byte is unused (`composite_px` masks it off).
 fn same_picture(a: &Frame, b: &Frame) -> bool {
     let rgb = |f: &Frame| f.light.iter().map(|l| l & 0x00ff_ffff).collect::<Vec<_>>();
-    (a.w, a.h, a.ox, a.oy) == (b.w, b.h, b.ox, b.oy) && a.color == b.color && rgb(a) == rgb(b)
+    (a.w, a.h, a.ox, a.oy) == (b.w, b.h, b.ox, b.oy)
+        && a.density() == b.density()
+        && a.color == b.color
+        && rgb(a) == rgb(b)
 }
 
 /// Render `id`'s clip, write it, read the files back and decode them.
-fn round_trip(id: &str, test: &str) -> Result<(), String> {
+fn round_trip(id: &str, test: &str, pixel_density: PixelDensity) -> Result<(), String> {
     let fx = pixfx_effects::effect(id).ok_or(format!("no effect {id}"))?;
-    let clip = render_clip(fx, Options::default())?;
+    let options = Options {
+        pixel_density,
+        ..Options::default()
+    };
+    let clip = render_clip(fx, options.clone())?;
     let dir = out_dir(test);
     let files = write_clip(&clip, &dir, "clip").map_err(|e| e.to_string())?;
     let json = std::fs::read_to_string(&files.json).map_err(|e| e.to_string())?;
@@ -35,7 +42,7 @@ fn round_trip(id: &str, test: &str) -> Result<(), String> {
     std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
 
     // live play, stepped by real-looking uneven steps, shows the rendered frame for every index it reaches
-    let mut live = Player::live(fx, Options::default());
+    let mut live = Player::live(fx, options);
     let place = live.placement();
     let mut checked = 0;
     for step in [0.0, 0.013, 0.021, 0.034, 0.008].iter().cycle().take(400) {
@@ -75,12 +82,17 @@ fn round_trip(id: &str, test: &str) -> Result<(), String> {
 
 #[test]
 fn a_looping_effect_renders_to_the_frames_live_play_shows() -> Result<(), String> {
-    round_trip("projectiles/trail", "loop")
+    round_trip("projectiles/trail", "loop", PixelDensity::One)
 }
 
 #[test]
 fn a_one_shot_renders_to_the_frames_live_play_shows() -> Result<(), String> {
-    round_trip("explosions/body-burst", "shot")
+    round_trip("explosions/body-burst", "shot", PixelDensity::One)
+}
+
+#[test]
+fn a_dense_clip_keeps_its_raster_and_live_cache_keys() -> Result<(), String> {
+    round_trip("feedback/violet-portal", "dense", PixelDensity::Two)
 }
 
 #[test]

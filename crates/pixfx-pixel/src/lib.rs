@@ -20,6 +20,7 @@
 
 mod cut;
 mod diff;
+mod font;
 mod grid;
 mod show;
 
@@ -27,9 +28,11 @@ pub mod critique;
 pub mod frames;
 pub mod oklab;
 pub mod parts;
+pub mod pose;
 pub mod ramp;
 pub mod recover;
 pub mod reduce;
+pub mod reference;
 pub mod register;
 pub mod scale;
 pub mod sheet;

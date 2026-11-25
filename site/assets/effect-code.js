@@ -79,6 +79,7 @@ ${play}
     const lines = [
       `use pixfx_core::{${uses.join(", ")}};`,
       ...(o.palette ? ["use pixfx_draw::palette::preset;"] : []),
+      ...(o.pixelDensity === 1 ? ["use pixfx_draw::PixelDensity;"] : []),
       "use pixfx_gpui::FxScene;",
       "",
       `let effect = pixfx_effects::effect("${id}").ok_or("missing")?;`,
@@ -107,7 +108,11 @@ ${play}
   },
 
   files(id, m, o) {
-    const flags = [o.seed !== undefined ? `--seed ${o.seed}` : "", o.palette ? `--palette ${o.palette}` : ""].filter(Boolean).join(" ");
+    const flags = [
+      o.seed !== undefined ? `--seed ${o.seed}` : "",
+      o.palette ? `--palette ${o.palette}` : "",
+      o.pixelDensity === 1 ? "--pixel-density 1" : "",
+    ].filter(Boolean).join(" ");
     const args = flags ? `${id} ${flags}` : id;
     const lines = [
       "# sprite sheets (composite, colour and light PNGs) and their Aseprite-style JSON",
@@ -117,7 +122,7 @@ ${play}
       "# every frame rendered, for a game to play without painting (loadClip)",
       `cargo run -p pixfx-export --example render_clip -- ${args} --out out`,
     ];
-    const unflagged = Object.keys(o).filter((k) => k !== "seed" && k !== "palette");
+    const unflagged = Object.keys(o).filter((k) => !["seed", "palette", "pixelDensity"].includes(k));
     if (unflagged.length > 0) {
       lines.push(`# the scripts take no flag for ${unflagged.join(", ")}: set ${unflagged.length > 1 ? "them" : "it"} on the Options in the script, or copy it`);
     }
@@ -147,7 +152,8 @@ function rustOptions(o) {
   if (o.seed !== undefined) fields.push(`seed: Some(${o.seed})`);
   if (o.light !== undefined) fields.push(`light: ${rustNumber(o.light)}`);
   if (o.palette) fields.push(`palette: preset("${o.palette}").map(<[_]>::to_vec)`);
-  const own = Object.keys(o).filter((k) => !["seed", "light", "palette"].includes(k));
+  if (o.pixelDensity === 1) fields.push("pixel_density: PixelDensity::One");
+  const own = Object.keys(o).filter((k) => !["seed", "light", "palette", "pixelDensity"].includes(k));
   if (fields.length === 0 && own.length === 0) return { value: "Options::default()", lines: [], extra: false };
   const literal = fields.length === 0
     ? "Options::default()"

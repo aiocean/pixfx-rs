@@ -9,7 +9,9 @@ license.workspace = true
 libm.workspace = true
 pixfx-core = { path = "../pixfx-core" }
 pixfx-draw = { path = "../pixfx-draw" }
+png = { version = "=0.18.1", optional = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
@@ -18,6 +20,7 @@ pixfx-effects = { path = "../pixfx-effects" }
 pixfx-export = { path = "../pixfx-export" }
 
 [features]
+clip = ["dep:png", "dep:serde", "dep:serde_json"]
 # serde for the values a host reads or passes (events, placement changes)
 serde = ["dep:serde", "pixfx-core/serde"]
 # TypeScript declarations for those values, for the wasm bindings

@@ -71,9 +71,16 @@ fn each_category_lists_exactly_its_effects_and_all_lists_every_category() {
         .map(|m| m.iter().copied().collect())
         .unwrap_or_default();
     // every category with effects is in `all`; the rest of `all` are categories with none yet
-    assert!(categories.keys().all(|c| all.contains(c)), "`all` misses a category");
+    assert!(
+        categories.keys().all(|c| all.contains(c)),
+        "`all` misses a category"
+    );
     for c in all.iter().filter(|c| !categories.contains_key(*c)) {
-        assert_eq!(features.get(c), Some(&vec![]), "feature `{c}` is in `all` but no category");
+        assert_eq!(
+            features.get(c),
+            Some(&vec![]),
+            "feature `{c}` is in `all` but no category"
+        );
     }
     assert_eq!(features.get("default"), Some(&vec!["all"]));
 }

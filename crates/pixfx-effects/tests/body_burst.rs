@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use pixfx_core::{Actor, Options, Rendered, render_frames_with_actor};
+use pixfx_draw::PixelDensity;
 use pixfx_draw::color::Rgba;
 
 const RED: Rgba = Rgba(200, 30, 40, 255);
@@ -23,7 +24,11 @@ fn sprite() -> Result<Arc<Actor>, String> {
 fn render() -> Result<Rendered, String> {
     let fx = pixfx_effects::effect("explosions/body-burst").ok_or("not registered")?;
     let actor = sprite()?;
-    Ok(render_frames_with_actor(fx, &Options::default(), 0, |_| {
+    let options = Options {
+        pixel_density: PixelDensity::One,
+        ..Options::default()
+    };
+    Ok(render_frames_with_actor(fx, &options, 0, |_| {
         Some(actor.clone())
     }))
 }

@@ -1,6 +1,6 @@
 ---
 name: pixfx-effect
-description: Use when adding a new pixfx effect (one that reads the sprite it plays on or the way it moved), porting one from pixelfx or Sprite Fusion's pixel art VFX, or changing how an existing effect looks, moves, fires cues or takes options - including when its golden frame hashes or feature registration fail.
+description: Use when adding a procedural, sprite-based or hybrid pixfx effect, porting one from pixelfx or Sprite Fusion's pixel art VFX, or changing how an existing effect looks, moves, fires cues or takes options - including when its golden frame hashes or feature registration fail.
 ---
 
 # Write or change a pixfx effect
@@ -9,9 +9,21 @@ An effect is a Rust static in `crates/pixfx-effects/src/<category>/<name>.rs` wi
 returns its state; the state draws a frame from time `t`. Every renderer, script and shell picks it up from the
 registry. Work on it **built alone** behind its own feature, so nothing else compiles or runs.
 
-An effect here reads the sprite it plays on (`Silhouette`, `Actor`; skill `pixfx-sprite-aware`) or the way it moved
-(`Trace`). An effect that reads neither (a fire, an explosion, a shield, weather) is turned away: it is a sprite the
-game plays, drawn and animated as sprite art, not an engine effect. Say so and stop.
+Use procedural drawing, authored sprite frames or both. Effects can read an actor (`Silhouette`, `Actor`),
+follow motion (`Trace`) or play on their own. For authored frames, embed straight-alpha RGBA8 with
+`include_bytes!` in the feature-gated effect and draw them with `Painter::sprite`. Override
+`Effect::render_kind()` with `Sprite` or `Hybrid`. See `impacts/rune_flash.rs`.
+
+Author at the engine's pixel scale. Pack equal-sized frames in a vertical PNG strip, top to bottom in playback
+order. Convert the strip offline, then check in the RGBA bytes next to the effect:
+
+```sh
+ffmpeg -i strip.png -frames:v 1 -pix_fmt rgba -f rawvideo frames.rgba
+```
+
+Each frame occupies `width * height * 4` bytes. Select a frame using the effect's time and keep its anchor
+in local coordinates. Draw colour with `Painter::sprite` and any additive light with the painter's glow
+methods. The effect feature controls both the code and its embedded art.
 
 ## 1. Write it
 

@@ -148,7 +148,7 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
   <tbody>
     <tr><td><code>write_sheet(&amp;rendered, &amp;meta, out_dir, name) -&gt; Result&lt;SheetFiles, ExportError&gt;</code></td><td>Write <code>&lt;name&gt;.png</code>, <code>_color.png</code>, <code>_light.png</code> and <code>.json</code>, creating <code>out_dir</code>. See <a href="sheets.html">Sprite sheet format</a>.</td></tr>
     <tr><td><code>write_gif(path, &amp;rendered, scale) -&gt; Result&lt;(), ExportError&gt;</code></td><td>A looping GIF over a dark backdrop, each pixel <code>scale</code>×<code>scale</code>.</td></tr>
-    <tr><td><code>Grid</code>, <code>beanfx_json</code>, <code>FileNames</code></td><td>The pure layout and JSON functions behind <code>write_sheet</code>.</td></tr>
+    <tr><td><code>Grid</code>, <code>sheet_json</code>, <code>FileNames</code></td><td>The pure layout and JSON functions behind <code>write_sheet</code>.</td></tr>
     <tr><td><code>enum ExportError</code></td><td><code>Io</code>, <code>Png</code>, <code>Gif</code>, <code>Json</code>, or <code>TooBig { w, h, scale }</code> when a scaled image exceeds the format's size field.</td></tr>
   </tbody>
 </table>

@@ -5,12 +5,10 @@ description: Use when drawing an effect's reference sheets with an image model a
 
 # pixfx-ref
 
-Effect references from an image model, in `tools/pixfx-rs`. The library is `crates/pixfx-ref` (pure: no files, no
-network); a script per step in `crates/pixfx-ref/examples/` does the I/O. The sheet is a **reference the agent
-reads**: you write the effect's painter code by hand in `pixfx-effects` (skill `pixfx-effect`). Nothing in the
-engine paints from what this crate extracts. The effect it is for reads the sprite it plays on or the way it
-moved (skill `pixfx-new-effect`, step 0); a fire, an explosion or a shield is sprite art the game plays, not an
-engine effect.
+Effect references from an image model, in `tools/pixfx-rs`. The library is `pixfx_pixel::reference` (pure: no files, no
+network); a script per step in `crates/pixfx-pixel/examples/` does the I/O. The sheet is a **reference the agent
+reads** for procedural drawing. For sprite-based and hybrid effects, follow the asset workflow in
+`pixfx-effect`.
 
 ## What works, and what does not
 
@@ -68,17 +66,17 @@ layers is one sheet, as in the table.
 
 | Step | Do | Writes |
 |---|---|---|
-| Spec | copy `crates/pixfx-ref/examples/specs/TEMPLATE.json`; `shield/lotus.json` is the worked example | |
-| Template | `cargo run -q -p pixfx-ref --example template -- <my>.json` | `target/ref/<slug>/`: `template.png`, `sheet.json`, `prompt.txt`, `style.png` |
-| Draw | `cargo run -q -p pixfx-ref --example generate -- target/ref/<slug>` | `draw-<n>/image-01.png`, `job.json`; a line in `target/ref/spend.jsonl` |
-| Extract | `cargo run -q -p pixfx-ref --example extract -- <my>.json target/ref/<slug>/draw-<n>/image-01.png` | `target/ref/<slug>/review/`: per cell original, alpha, colour, light, rebuilt PNGs; diffs; `matrix.json`; `index.html` |
+| Spec | copy `crates/pixfx-pixel/examples/specs/TEMPLATE.json`; `shield/lotus.json` is the worked example | |
+| Template | `cargo run -q -p pixfx-pixel --example template -- <my>.json` | `target/ref/<slug>/`: `template.png`, `sheet.json`, `prompt.txt`, `style.png` |
+| Draw | `cargo run -q -p pixfx-pixel --example generate -- target/ref/<slug>` | `draw-<n>/image-01.png`, `job.json`; a line in `target/ref/spend.jsonl` |
+| Extract | `cargo run -q -p pixfx-pixel --example extract -- <my>.json target/ref/<slug>/draw-<n>/image-01.png` | `target/ref/<slug>/review/`: per cell original, alpha, colour, light, rebuilt PNGs; diffs; `matrix.json`; `index.html` |
 | Read the parts | `review/parts-<name>.{rebuilt,color,light}.png` and their maps in `matrix.json` | |
 | Write | the effect in `pixfx-effects`, a function per part (skill `pixfx-effect`) | |
-| Compare | `cargo run -q -p pixfx-ref --example compare -- <my>.json target/ref/<slug>/review <effect-id> --times "init=0.15,0.35,...;hit=...;break=..."` | `review/compare.png`, `compare.json`; prints each row's step changes, sheet and effect |
+| Compare | `cargo run -q -p pixfx-pixel --example compare -- <my>.json target/ref/<slug>/review <effect-id> --times "init=0.15,0.35,...;hit=...;break=..."` | `review/compare.png`, `compare.json`; prints each row's step changes, sheet and effect |
 | Fix, again | change the code, `compare` again, until the board and the steps agree | |
-| Gallery | `cargo run -q -p pixfx-ref --example gallery` | `target/ref/index.html`: every sheet, linking to its review page |
+| Gallery | `cargo run -q -p pixfx-pixel --example gallery` | `target/ref/index.html`: every sheet, linking to its review page |
 
-Many sheets at once (every shield): build the scripts once in release (`cargo build --release -p pixfx-ref
+Many sheets at once (every shield): build the scripts once in release (`cargo build --release -p pixfx-pixel
 --examples`, about a minute) and run `target/release/examples/<script>`. A debug `extract` spends 30 to 60 s
 compressing its PNGs, a release one 3 s; 40 of them in debug, one after another, look like a hang. Run `generate`
 for many sheets in parallel (each is a network wait) and long batches in the background.
@@ -101,7 +99,7 @@ A spec holds:
   `compare::art_ruler(cell)`, so the model draws every object at the character's scale. At `cell: 96` a square is an
   engine pixel and the sizes are the ruler's own (40, 7, 1); it needs about 1.5 times the sheet pixels a cell, so
   keep `scale` and the rows a sheet holds small enough for the model's ~1536 x 1152 answer (see the Traps of
-  `crates/pixfx-ref/AGENTS.md`). When writing painter code from a 64-square sheet, size each object from the ruler
+  `crates/pixfx-pixel/src/reference/AGENTS.md`). When writing painter code from a 64-square sheet, size each object from the ruler
   (a part and a ratio), not by copying the sheet's squares as engine pixels.
 - `parts`: the PARTS row, first on the sheet, a cell each: `name` (upper case) and `text` (what the cell holds, one
   sentence). Ask for:
@@ -152,7 +150,7 @@ A spec without `grid` and `parts` keeps the first prompt the shields were drawn 
 
 At the top, a player runs the moments in order (the parts are not frames and stay out of it): every row in turn
 or one row looped, the layer to show (rebuilt, original, colour, light), in-betweens, fps and size; space plays and
-pauses, ← → step a frame. In-betweens (`pixfx_ref::tween`, 7 by default, `extract --between N`) move the drawn
+pauses, ← → step a frame. In-betweens (`pixfx_pixel::reference::tween`, 7 by default, `extract --between N`) move the drawn
 pixels so the motion plays smooth; they never redraw: judge the drawing with in-betweens at 0.
 
 Below it, each row is one cell: **original** (over black), **the model's pixels** (the busiest part blown up with
@@ -203,7 +201,7 @@ colour pickers that recolour every frame, to try a palette before writing it.
 ## Reading compare
 
 The board is a line of sheet cells over a line of effect frames per moment, at the same scale, so silhouette, size,
-tones and placement can be put side by side. The numbers are each step's change (`pixfx_ref::entropy`): the
+tones and placement can be put side by side. The numbers are each step's change (`pixfx_pixel::reference::entropy`): the
 conditional entropy of each frame's pixels given the last one's, 0 for nothing new, 1 for unrelated. Read them as
 timing, not as a score:
 

@@ -371,7 +371,7 @@ fn with_roll<T>(
 // ---------- drawing fighters ----------
 
 use crate::picture::Picture;
-use pixfx_draw::{Frame, Rgba};
+use pixfx_draw::{Frame, PixelDensity, Rgba};
 use pixfx_fighter::look::Look;
 use pixfx_fighter::paint::{self, Appearance};
 use pixfx_fighter::status::{self, DomeStyle, Figure, Mark, Silhouette};
@@ -387,12 +387,21 @@ pub struct Sprites {
 #[wasm_bindgen]
 impl Sprites {
     #[wasm_bindgen(constructor)]
-    pub fn new(w: u32, h: u32) -> Result<Sprites, JsError> {
+    pub fn new(
+        w: u32,
+        h: u32,
+        #[wasm_bindgen(unchecked_optional_param_type = "1 | 2")] pixel_density: Option<u32>,
+    ) -> Result<Sprites, JsError> {
         if w == 0 || h == 0 {
             return Err(JsError::new("the sprites' frame must be at least 1 x 1"));
         }
+        let density = match pixel_density {
+            Some(1) => PixelDensity::One,
+            None | Some(2) => PixelDensity::Two,
+            Some(_) => return Err(JsError::new("the sprites' pixel density must be 1 or 2")),
+        };
         Ok(Sprites {
-            frame: Frame::new(w, h, 0, 0),
+            frame: Frame::with_density(w, h, 0, 0, density),
         })
     }
 
@@ -488,14 +497,16 @@ impl Sprites {
     ) -> Result<(), JsError> {
         let look = look_of(look)?;
         let idle: Appearance = parse("appearance", a)?;
-        let mut sprite = paint::paint(&look, &idle);
+        let density = self.frame.density();
+        let factor = density.factor() as i32;
+        let mut sprite = paint::paint_at_density(&look, &idle, density);
         paint::outline(&mut sprite, look.outline);
         // the face and the hair round it, a quarter of the square either side of the middle, 35 pixels up
-        let (hx, hy) = (paint::CX - size / 4, paint::FEET - 35);
+        let (hx, hy) = ((paint::CX - size / 4) * factor, (paint::FEET - 35) * factor);
         let (w, h) = (self.frame.w as i32, self.frame.h as i32);
-        for v in 0..size {
-            for u in 0..size {
-                let (px, py) = (x + u, y + v);
+        for v in 0..size * factor {
+            for u in 0..size * factor {
+                let (px, py) = (x * factor + u, y * factor + v);
                 if px < 0 || py < 0 || px >= w || py >= h {
                     continue;
                 }

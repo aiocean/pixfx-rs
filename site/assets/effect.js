@@ -1,28 +1,10 @@
-// One effect's page (effects/effect.html?id=<id>): the effect playing live on a stage, the options it takes as
-// controls, the call that plays it as set, and its facts. The stage shows the effect in a duel by default (Thunder
-// and Frost on the mountain dais, the effect staged by its role in a short take that ends at its impact), or alone
-// on a plain floor. One-shots and takes play, rest a moment, and play again.
-import { Body, FightFeel, Lighting, Sprites, createPixfx, effects, lightColor, loadPixfx, meta, putOutLight, stepLights } from "../pkg/pixfx-canvas2d.js";
-import loadRules, * as rules from "../arena/wasm/arena_wasm.js";
-import { useRules } from "../arena/duel.js";
-import { createBout, impact, step, take } from "./bout.js";
-import { roleFor } from "./effect-roles.js";
+// Playable use cases, effect options, and code samples for one effect.
+import { effects, loadPixfx, meta } from "../pkg/pixfx-canvas2d.js";
+import { loadFighters } from "./sprite-show.js";
 import { TARGETS, codeFor } from "./effect-code.js";
-import { actorOf, drawNumbers, drawStreaks, paintFighters } from "../arena/duel-art.js";
-import { createScene, drawScene } from "../arena/duel-scene.js";
-import { kindle } from "../arena/duel-light.js";
+import { DEMOS } from "./effect-demos.js";
+import { createDemo } from "./demo-view.js";
 
-/** The plain stage's sky and floor. */
-const COLORS = { sky: "#13101b", ground: "#1e1a24" };
-/** Behind the duel's scene while the screen shakes. */
-const BACKDROP = "#0b0a1c";
-/** The colour the engine says effect `fx` with `opts` lights its surroundings in (or none), asked once for each. */
-const lightColors = new Map();
-function lightOf(fx, opts) {
-  const key = `${fx} ${JSON.stringify(opts ?? {})}`;
-  if (!lightColors.has(key)) lightColors.set(key, lightColor(fx, opts));
-  return lightColors.get(key);
-}
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** The engine's palette presets (`palette: "ice"` recolours any effect), after the effect's own colours. */
@@ -39,6 +21,11 @@ const OWN = {
     { key: "width", label: "Width", min: 1, max: 7, step: 1, value: 3 },
     { key: "wave", label: "Wave", min: 0, max: 4, step: 0.1, value: 1.2 },
     { key: "turn", label: "Turn with it", min: 0, max: 1, step: 1, value: 0 },
+    // on a body: how narrow the tail ends, from where it turns translucent, from where the dither eats it
+    // (projectiles/trail.rs TAPER, SOFT, BREAKUP)
+    { key: "taper", label: "Tail width", min: 0, max: 1, step: 0.05, value: 1 },
+    { key: "soft", label: "Fade from", min: 0, max: 1, step: 0.05, value: 1 },
+    { key: "breakup", label: "Break up from", min: 0, max: 1, step: 0.05, value: 0.2 },
   ],
   "appear/teleport-beam": [
     { key: "bits", label: "Bits", min: 0, max: 24, step: 1, value: 12 },
@@ -50,8 +37,22 @@ const OWN = {
     { key: "specks", label: "Specks", min: 0, max: 20, step: 1, value: 12 },
     { key: "glyph", label: "Floor glyph", min: 0.6, max: 1.4, step: 0.05, value: 1 },
   ],
+  "appear/dither": [
+    { key: "angle", label: "Sweep angle", min: 0, max: 360, step: 15, value: 90 },
+    { key: "spread", label: "Spread", min: 0, max: 0.9, step: 0.05, value: 0.6 },
+    { key: "whiten", label: "Whiten", min: 0, max: 1, step: 0.05, value: 0.3 },
+  ],
+  "appear/fade": [
+    { key: "grow", label: "Grow", min: 0, max: 1, step: 0.05, value: 0 },
+    { key: "whiten", label: "Whiten", min: 0, max: 1, step: 0.05, value: 0.5 },
+  ],
+  "disappear/dither": [
+    { key: "angle", label: "Sweep angle", min: 0, max: 360, step: 15, value: 90 },
+    { key: "spread", label: "Spread", min: 0, max: 0.9, step: 0.05, value: 0.6 },
+    { key: "whiten", label: "Whiten", min: 0, max: 1, step: 0.05, value: 0.3 },
+  ],
   "disappear/fade": [
-    { key: "grow", label: "Grow", min: 0, max: 1, step: 0.05, value: 0.25 },
+    { key: "grow", label: "Grow", min: 0, max: 1, step: 0.05, value: 0 },
     { key: "whiten", label: "Whiten", min: 0, max: 1, step: 0.05, value: 0.5 },
   ],
   "disappear/incinerate": [
@@ -80,22 +81,33 @@ const OWN = {
   ],
 };
 
-/** Seconds a one-shot or a take rests before it plays again. */
-const REST = 0.6;
-/** A still frame (reduced motion) looks this long for the take's impact before it settles for what it has, and shows
- *  the effect this long after its impact, once it has grown. */
-const STILL_SEARCH = 6;
-const STILL_AFTER = 0.3;
-
-/** The stage's two views. */
-const MODES = [{ value: "duel", label: "In a duel" }, { value: "alone", label: "Alone" }];
+/** Labels and slider increments for options whose limits and defaults come from Rust. */
+const SLIDERS = {
+  "projectiles/violet-wake": {
+    secs: ["Wake lifetime (s)", 0.01],
+    width: ["Ribbon width", 0.1],
+  },
+  "feedback/outline": {
+    width: ["Width (px)", 1],
+    corners: ["Square corners", 1],
+  },
+  "feedback/volt-orbit": {
+    gap: ["Orbit gap", 0.1],
+    jag: ["Jaggedness", 0.1],
+    sparks: ["Sparks per arc", 1],
+    w: ["Effect canvas width (px)", 1],
+    h: ["Effect canvas height (px)", 1],
+  },
+};
 
 /** Mount the effect page now in the document. Returns how to unmount it. */
 export async function mount() {
-  await Promise.all([loadPixfx(), loadRules()]);
-  useRules(rules);
-  const id = new URLSearchParams(location.search).get("id");
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id");
+  const pixelDensity = params.get("density") === "1" ? 1 : 2;
   const root = document.getElementById("effect");
+  const screen = id?.startsWith("transitions/");
+  const [, sheets] = await Promise.all([loadPixfx(), screen ? undefined : loadFighters(pixelDensity)]);
   const ids = effects();
   if (!id || !ids.includes(id)) {
     root.innerHTML = `<h1>No such effect</h1>
@@ -103,23 +115,28 @@ export async function mount() {
     return undefined;
   }
   const m = meta(id);
+  const demos = DEMOS[id] ?? [[m.name, "Play", screen ? "screen" : undefined]];
   document.title = `${m.name} · pixfx effects`;
   const at = ids.indexOf(id);
   const prev = ids[(at - 1 + ids.length) % ids.length];
   const next = ids[(at + 1) % ids.length];
+  const densityQuery = pixelDensity === 1 ? "&amp;density=1" : "";
 
   root.innerHTML = `
     <p class="crumbs"><a href="./">Effects</a></p>
     <h1>${m.name}</h1>
     <p class="lead"><code>${id}</code>. ${m.desc}</p>
     <div class="effect-layout">
-      <figure class="effect-stage">
-        <div class="effect-mode" role="radiogroup" aria-label="Show the effect">
-          ${MODES.map((o, i) => `<label><input type="radio" name="effect-mode" value="${o.value}"${i === 0 ? " checked" : ""}> ${o.label}</label>`).join("")}
-        </div>
-        <canvas></canvas>
-        <figcaption class="effect-caption"></figcaption>
-      </figure>
+      <div class="effect-demos">
+        ${demos.map(([title, action], i) => `<figure class="effect-stage" aria-labelledby="demo-title-${i}">
+          <div class="demo-head">
+            <h2 id="demo-title-${i}">${escape(title)}</h2>
+            <button type="button">${escape(action)}</button>
+          </div>
+          <canvas aria-label="${escape(title)} preview"></canvas>
+          <figcaption class="effect-caption"></figcaption>
+        </figure>`).join("")}
+      </div>
       <div class="effect-side">
         <div class="controls"></div>
         <div class="tabs effect-code">
@@ -138,19 +155,16 @@ export async function mount() {
           <tr><th scope="row">Duration</th><td>${m.duration} s, ${m.loop ? "looping" : "once"}</td></tr>
           <tr><th scope="row">Frames per sheet</th><td>${Math.round(m.duration * m.fps)} at ${m.fps} fps</td></tr>
           <tr><th scope="row">Default seed</th><td>${m.seed}</td></tr>
+          <tr><th scope="row">Render kind</th><td>${m.renderKind}</td></tr>
           <tr><th scope="row">Tags</th><td>${m.tags.join(", ")}</td></tr>
         </tbody></table></div>
       </div>
     </div>
     <nav class="pager" aria-label="Other effects">
-      <a href="effect.html?id=${prev}" rel="prev">${meta(prev).name}</a>
-      <a href="effect.html?id=${next}" rel="next">${meta(next).name}</a>
+      <a href="effect.html?id=${prev}${densityQuery}" rel="prev">${meta(prev).name}</a>
+      <a href="effect.html?id=${next}${densityQuery}" rel="next">${meta(next).name}</a>
     </nav>`;
 
-  const canvas = root.querySelector("canvas");
-  const caption = root.querySelector(".effect-caption");
-  // the canvas pixels across the stage has room for, inside its border
-  const room = () => canvas.clientWidth;
   const call = root.querySelector(".effect-code pre");
   const code = call.querySelector("code");
   const docs = root.querySelector(".effect-code-docs a");
@@ -162,13 +176,14 @@ export async function mount() {
   });
   call.append(copy);
 
-  const role = roleFor(id, m);
-  let view = null;
+  const views = [];
   // the code for the target picked (kept across effect pages), with the options as set
   let target = TARGETS.some((t) => t.key === localStorage.getItem(CODE_TARGET)) ? localStorage.getItem(CODE_TARGET) : TARGETS[0].key;
   const writeCode = () => {
     const t = TARGETS.find((x) => x.key === target) ?? TARGETS[0];
-    code.textContent = codeFor(t.key, id, m, controls.options());
+    const options = controls.options();
+    if (pixelDensity === 1) options.pixelDensity = pixelDensity;
+    code.textContent = codeFor(t.key, id, m, options);
     docs.href = t.docs;
     docs.textContent = `${t.label} reference`;
     root.querySelector(".effect-code [role=tabpanel]").setAttribute("aria-labelledby", `code-tab-${t.key}`);
@@ -195,28 +210,33 @@ export async function mount() {
   }
   const controls = createControls(root.querySelector(".controls"), id, m, () => {
     writeCode();
-    view.restart(controls.options());
+    for (const view of views) if (view.started) view.play();
   });
   pick(tabs.find((t) => t.dataset.target === target) ?? tabs[0], false);
 
-  const show = (mode) => {
-    view?.free();
-    view = mode === "duel" ? createDuelView(canvas, id, m, role, room(), (text) => { caption.textContent = text; }) : createAloneView(canvas, id, m, room());
-    canvas.setAttribute("aria-label", mode === "duel" ? `${m.name} in a duel, playing live` : `${m.name}, playing live`);
-    if (mode === "alone") caption.textContent = "The effect on its own, on a plain floor.";
-    view.restart(controls.options());
-  };
-  for (const input of root.querySelectorAll('input[name="effect-mode"]')) {
-    input.addEventListener("change", () => input.checked && show(input.value));
+  for (const [i, figure] of [...root.querySelectorAll(".effect-stage")].entries()) {
+    const canvas = figure.querySelector("canvas");
+    const caption = figure.querySelector("figcaption");
+    const scenario = demos[i][2];
+    const view = createDemo(canvas, id, {
+      sheets, told: (text) => { caption.textContent = text; }, still: reduceMotion, scenario, pixelDensity,
+    });
+    if (scenario === "screen") caption.textContent = "The current screen burns closed and opens onto a new area.";
+    view.play = () => {
+      view.started = true;
+      view.restart(controls.options());
+    };
+    figure.querySelector("button").addEventListener("click", view.play);
+    view.draw();
+    views.push(view);
   }
-  show(MODES[0].value);
 
   let running = true;
   let last = null;
   const frame = (now) => {
     if (!running) return;
-    if (!reduceMotion) view.step(last === null ? 0 : Math.max(0, now - last) / 1000);
-    else view.step(0);
+    const dt = last === null ? 0 : Math.min(0.05, Math.max(0, now - last) / 1000);
+    for (const view of views) if (view.started && !view.finished()) view.step(dt);
     last = now;
     requestAnimationFrame(frame);
   };
@@ -224,7 +244,7 @@ export async function mount() {
 
   return () => {
     running = false;
-    view.free();
+    for (const view of views) view.free();
   };
 }
 
@@ -233,6 +253,14 @@ export async function mount() {
 function createControls(root, id, m, changed) {
   const opts = { seed: m.seed, light: 1, palette: "default" };
   const own = [...(OWN[id] ?? [])];
+  const sliders = SLIDERS[id] ?? {};
+  for (const spec of m.options) {
+    const slider = sliders[spec.name];
+    if (spec.kind !== "num" || !spec.range || !slider) continue;
+    const [label, step] = slider;
+    const [min, max] = spec.range;
+    own.push({ key: spec.name, label, min, max, step, value: spec.default });
+  }
   // an effect that fires impact cues takes `feel`: how hard its hit shakes, freezes, rings and flashes the screen
   if (m.options.some((o) => o.name === "feel")) own.push({ key: "feel", label: "Feel", min: 0, max: 2, step: 0.1, value: 1 });
   for (const o of own) opts[o.key] = o.value;
@@ -285,275 +313,6 @@ function createControls(root, id, m, changed) {
     },
   };
 }
-
-/** Canvas pixels per game pixel: as large as fits the column, whole numbers only so pixels stay square. */
-function scaleFor(w, room, most) {
-  return Math.max(1, Math.min(most, Math.floor(room / w)));
-}
-
-// ---------- alone ----------
-
-/** The plain stage's box in game pixels: room round the effect for its glow, its origin standing on the floor 24
- *  pixels above the box's bottom (lower when the effect reaches further below its origin), its canvas centred. */
-function aloneBox(m) {
-  const pad = 24;
-  const below = Math.max(24, m.size[1] - m.origin[1] + pad);
-  const w = Math.max(200, m.size[0] + 2 * pad);
-  const h = Math.max(160, m.origin[1] + pad + below);
-  const at = { x: Math.round((w - m.size[0]) / 2) + m.origin[0], y: h - below };
-  return { w, h, at, ground: at.y };
-}
-
-/** The plain box widened to fill `room` canvas pixels across at its whole-number scale, the effect still centred,
- *  so the canvas is shown at exactly its own size. */
-function fitAlone(m, room) {
-  const box = aloneBox(m);
-  const scale = scaleFor(box.w, room, 5);
-  const w = Math.max(box.w, Math.floor(room / scale));
-  return { ...box, w, at: { ...box.at, x: box.at.x + Math.floor((w - box.w) / 2) }, scale };
-}
-
-/** The effect alone on `canvas`, on a flat sky and floor. */
-function createAloneView(canvas, id, m, room) {
-  const box = fitAlone(m, room);
-  const { scale } = box;
-  canvas.width = box.w * scale;
-  canvas.height = box.h * scale;
-  const ctx = canvas.getContext("2d");
-  const stage = createPixfx(ctx, { scale });
-  // reduced motion: nothing shakes, rings or flashes
-  if (reduceMotion) stage.feel.setShakeStrength(0).setFlashStrength(0);
-  let opts = {};
-  let effect = null;
-  let ended = false;
-  let resting = 0;
-
-  const view = {
-    restart(o) {
-      opts = o;
-      effect?.destroy();
-      ended = false;
-      effect = stage.play(id, box.at.x, box.at.y, opts).on("complete", () => {
-        ended = true;
-      });
-      resting = 0;
-      // a still frame shows the effect a second in
-      if (reduceMotion) stage.update(1);
-    },
-    step(dt) {
-      stage.update(dt);
-      // a one-shot is removed once it ends: rest a moment, then play it again
-      if (!m.loop && ended && !reduceMotion) {
-        resting += dt;
-        if (resting >= REST) view.restart(opts);
-      }
-      // the effect's cues move the whole view (a hit's shake) and lift it toward white (its flash)
-      const [sx, sy] = stage.feel.shake;
-      ctx.save();
-      ctx.translate(sx * scale, sy * scale);
-      ctx.fillStyle = COLORS.sky;
-      ctx.fillRect(-scale * 4, -scale * 4, (box.w + 8) * scale, (box.ground + 4) * scale);
-      ctx.fillStyle = COLORS.ground;
-      ctx.fillRect(-scale * 4, box.ground * scale, (box.w + 8) * scale, (box.h - box.ground + 4) * scale);
-      stage.drawLayer("back");
-      stage.drawLayer("front");
-      ctx.restore();
-      // a heavy hit's ring bends what is drawn
-      stage.warp();
-      const flash = stage.feel.flash;
-      if (flash > 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${flash})`;
-        ctx.fillRect(0, 0, box.w * scale, box.h * scale);
-      }
-    },
-    free: () => stage.destroy(),
-  };
-  return view;
-}
-
-// ---------- in a duel ----------
-
-/** The duel's box in game pixels and its scale, filling `room` canvas pixels across: 2 canvas pixels a game pixel,
- *  as the hero draws its fighters on a narrow screen, unless the column is too narrow to hold 160 game pixels. As
- *  tall as the effect over the floor, within reason and never taller than three quarters of its width, so a phone's
- *  stage is not mostly sky; the floor 20 pixels above the bottom. */
-function duelBox(m, room) {
-  const scale = room >= 320 ? 2 : 1;
-  const w = Math.floor(room / scale);
-  const h = Math.max(120, Math.min(200, m.size[1] + 40, Math.round(w * 0.75)));
-  return { w, h, ground: h - 20, scale };
-}
-
-/** The effect staged by `role` in takes between Thunder and Frost on the mountain dais, on `canvas`; each take
- *  calls `told` with the bout's sentence for what it shows. */
-function createDuelView(canvas, id, m, role, room, told) {
-  const { w, h, ground, scale } = duelBox(m, room);
-  canvas.width = w * scale;
-  canvas.height = h * scale;
-  const ctx = canvas.getContext("2d");
-  const scene = createScene(w, h, ground);
-  const stage = createPixfx(ctx, { scale });
-  // the fight's own FightFeel answers every blow; the stage's effects just play the seconds it gives them
-  stage.feel.setEnabled(false);
-  const feel = new FightFeel();
-  const sprites = new Sprites(w, h);
-  const lighting = new Lighting(w, h);
-  const bout = createBout({ left: 24, right: w - 24, ground, Body, seed: 1 + Math.floor(Math.random() * 1e6) });
-  const isLoop = (fx) => meta(fx).loop;
-  // a picture Rust painted (fighters, light), drawn and let go at once
-  const show = (picture) => {
-    stage.drawPicture(picture);
-    picture?.free();
-  };
-  const handles = new Map();
-  let lights = [];
-  let opts = {};
-  let resting = 0;
-  // whether the take has struck: its effect's first impact cue, or the first blow it lands (a bolt that sends no cue)
-  let struck = false;
-  // the fighters as last painted, each fighter's also as the sprite an effect wrapped on it reads
-  let painted = null;
-  const bodies = [];
-
-  /** The take's commands on the stage; each effect's impact cue tells the bout it landed. */
-  function play(commands) {
-    for (const c of commands) {
-      if (c.type === "play") {
-        const key = c.key;
-        const handle = stage.play(c.fx, c.x, c.y, c.opts)
-          .on("cue", () => {
-            struck = true;
-            impact(bout, key);
-          })
-          // each shot of a volley it was ordered to launch strikes where the bout aimed it
-          .on("strike", () => {
-            struck = true;
-            impact(bout, key);
-          })
-          // a one-shot that ends on its own is let go
-          .on("complete", () => handles.delete(key));
-        // an effect that reads the sprite it plays on wraps the fighter that plays it
-        if (meta(c.fx).wrapsActor) handle.wrap(() => bodies[c.by] ?? null);
-        // a trail laid under it follows the way it moves
-        if (c.trail) handle.trail(c.trail.id, c.trail.opts);
-        handles.set(key, handle);
-      } else if (c.type === "move" && handles.has(c.key)) handles.get(c.key).setPosition(c.x, c.y);
-      else if (c.type === "order" && handles.has(c.key)) handles.get(c.key).attack(c.x, c.y, c.aim, c.caster);
-      else if (c.type === "stop" && handles.has(c.key)) {
-        handles.get(c.key).stop();
-        handles.delete(c.key);
-      }
-    }
-  }
-
-  /** Each effect lights the dais in its own light's colour: `kindle` reads a ramp off a copy of each play. */
-  const lit = (commands) =>
-    commands.map((c) => {
-      if (c.type !== "play") return c;
-      const color = lightOf(c.fx, c.opts);
-      return { ...c, opts: { ...c.opts, palette: color ? [color] : undefined } };
-    });
-
-  /** Let `dt` seconds of the take pass: the fight's feel freezes and slows it, the bout moves, the effects play. */
-  function advance(dt) {
-    const run = feel.advance(dt);
-    const commands = step(bout, run);
-    if (commands.some((c) => BLOWS.has(c.type))) struck = true;
-    play(commands);
-    feel.react(commands);
-    lights = stepLights(kindle(lights, lit(commands), ground, isLoop, putOutLight), run);
-    // the fighters are painted before the effects play, so an effect wrapped on one grips this frame's pose
-    paint();
-    declareBodies();
-    stage.update(run);
-  }
-
-  /** Each standing fighter is a body the stage's volley pieces burst on (its index is its id), where it stands now. */
-  function declareBodies() {
-    for (const f of bout.fighters) {
-      if (f.dead) {
-        stage.clearBody(f.index);
-        continue;
-      }
-      const tall = f.duck > 0 ? f.spec.duck : f.spec.body;
-      stage.setBody(f.index, f.x - f.spec.halfWidth, ground - f.air - tall, f.spec.halfWidth * 2, tall);
-    }
-  }
-
-  /** Paint the fighters as they stand now (the one a blow struck shudders through the hit-stop), and keep each
-   *  one's sprite for the effects wrapped on it. */
-  function paint() {
-    if (painted) for (const picture of [...painted.fighters, painted.dust]) picture?.free();
-    painted = paintFighters(sprites, bout, feel, ground, feel.jolts());
-    for (const [i, picture] of painted.fighters.entries()) bodies[i] = actorOf(picture);
-  }
-
-  function draw() {
-    ctx.fillStyle = BACKDROP;
-    ctx.fillRect(0, 0, w * scale, h * scale);
-    ctx.save();
-    const [sx, sy] = feel.shake(reduceMotion ? 0 : 1);
-    ctx.translate(sx * scale, sy * scale);
-    drawScene(ctx, scene, bout.time, scale);
-    stage.drawLayer("back");
-    if (!painted) paint();
-    // one struck down is gone: the effect that destroyed it draws what is left of it
-    for (const [i, picture] of painted.fighters.entries()) if (!bout.fighters[i].dead) show(picture);
-    show(painted.dust);
-    painted = null;
-    // the effect lights the dais and the fighters
-    show(lighting.paint(lights, []));
-    stage.drawLayer("front");
-    // the qi a spell is thrown with, and what each blow did
-    drawStreaks(ctx, feel.streaks(), bout, scale);
-    drawNumbers(ctx, feel.numbers(), bout, scale);
-    ctx.restore();
-  }
-
-  /** A new take with options `o`, one still running cut short. `caster` (a fighter's index) keeps the one who cast
-   *  last; without it the fighters take turns. */
-  function again(o, caster) {
-    opts = o;
-    take(bout, id, role, opts, { caster });
-    told(`${bout.caption}.`);
-    resting = 0;
-    struck = false;
-    // a still frame shows the take just after its impact
-    if (reduceMotion) {
-      for (let t = 0; t < STILL_SEARCH && !struck && !bout.done; t += 1 / 30) advance(1 / 30);
-      for (let t = 0; t < STILL_AFTER && !bout.done; t += 1 / 30) advance(1 / 30);
-    }
-  }
-
-  return {
-    // the options changed: the same fighter casts again with them
-    restart: (o) => again(o, bout.caster ?? undefined),
-    step(dt) {
-      // a still frame lets no time pass, but shows each frame the painters finish
-      if (reduceMotion) advance(0);
-      else {
-        advance(dt);
-        // a take ends once its effect has landed and both fighters stand still: rest a moment, then take again;
-        // a fighter struck down is gone for good, so a death is not fought again until the options change
-        if (bout.done && !bout.fighters.some((f) => f.dead)) {
-          resting += dt;
-          if (resting >= REST) again(opts);
-        }
-      }
-      draw();
-    },
-    free() {
-      stage.destroy();
-      feel.free();
-      sprites.free();
-      lighting.free();
-      if (painted) for (const picture of [...painted.fighters, painted.dust]) picture?.free();
-    },
-  };
-}
-
-/** The bout's events that are a blow landing. */
-const BLOWS = new Set(["hit", "block", "clash"]);
 
 function escape(text) {
   return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);

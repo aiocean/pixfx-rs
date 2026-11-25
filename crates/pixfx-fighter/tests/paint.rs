@@ -260,7 +260,7 @@ fn a_body_flying_up_and_sideways_leans_along_its_flight_feet_where_they_were() {
     // landing squashes upright with its feet on the floor
     for f in [right_feet, left_feet] {
         assert!(
-            f.abs_diff(feet) <= 1,
+            f.abs_diff(feet) <= 2,
             "feet stay where they were: {f} vs {feet}"
         );
     }

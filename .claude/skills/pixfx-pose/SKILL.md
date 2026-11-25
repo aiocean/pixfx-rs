@@ -5,7 +5,7 @@ description: Make a colour-coded, captioned skeleton pose sheet that an image mo
 
 # pixfx-pose
 
-A crate in `tools/pixfx-rs/crates/pixfx-pose`. It builds a figure, poses it by joint angles, sees it from any
+The `pixfx_pixel::pose` module builds a figure, poses it by joint angles, sees it from any
 facing, and draws a sheet: one skeleton a cell, a caption above each cell, every limb in its own colour. A model
 given that sheet and a picture of the character draws the character in every pose. Tested on 2026-11-14: one call
 drew side, three-quarter, front and back views and a walk, guard, hurt and kneel to the skeletons, sword in the
@@ -30,13 +30,13 @@ Write a spec (any field but `cells` may be left out):
 ```
 
 ```
-cargo run -p pixfx-pose --example pose_sheet -- spec.json --out target/art/<name>/sheet
-cargo run -p pixfx-pose --example pose_sheet -- --presets [--facing 45] --out target/pose   # see every preset
+cargo run -p pixfx-pixel --example pose_sheet -- spec.json --out target/art/<name>/sheet
+cargo run -p pixfx-pixel --example pose_sheet -- --presets [--facing 45] --out target/pose   # see every preset
 ```
 
 The figure is the game's ruler by default (`pixfx_draw::RULER`, skill `pixfx`, "One scale: the ruler"): the duel's
-fighter, 38 pixels painted crown to soles, about 5.4 heads, the head as wide as its 7-pixel face, a 16-pixel blade,
-the soles on row 60 of a 64 cell. A character drawn on it comes out at the size of every sprite and effect beside
+fighter, 61 pixels painted crown to soles, about 5.5 heads, the head as wide as its 11-pixel face, a 26-pixel blade,
+the soles on row 96 of a 104 cell. A character drawn on it comes out at the size of every sprite and effect beside
 it, so leave `body` out for a character of this game. Give `"body": { "height": H, "heads": N }` only for a
 character of another game or another build (a chibi, a giant boss), and fill in that game's ruler too.
 
@@ -105,7 +105,7 @@ guide for the agent and never goes into a sprite or the game, so its lines do no
    the same size and in the same place as in the first image, every line exactly on the edge it traces. Do not
    draw the captions."
 
-2. `cargo run -p pixfx-ref --example generate -- <dir> --tier draft` (it always asks for a transparent background,
+2. `cargo run -p pixfx-pixel --example generate -- <dir> --tier draft` (it always asks for a transparent background,
    which ink lines need).
 3. Cut the answer on the colour sheet's own `sheet.json`:
    `cargo run -p pixfx-pixel --example cut -- <dir>/draw-1/image-01.png sheet.json --out <art>/ballpoint`.

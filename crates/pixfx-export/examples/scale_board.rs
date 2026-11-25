@@ -16,8 +16,8 @@ use std::fmt::Write as _;
 
 use common::{Args, effect, exit, file_name};
 use pixfx_core::{Options, render_frames_on_actor};
-use pixfx_export::board::{busiest, still};
 use pixfx_export::Actors;
+use pixfx_export::board::{busiest, still};
 use pixfx_export::write_png_rgba;
 
 const USAGE: &str =

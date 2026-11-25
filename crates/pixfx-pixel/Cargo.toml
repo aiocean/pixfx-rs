@@ -1,13 +1,16 @@
 [package]
 name = "pixfx-pixel"
-description = "Pixels for agents: cut a picture (an artist's, an image model's or a game's own sprite) to a pixel grid on a palette, and show it back as text and as a zoomed grid"
+description = "Agent tools for pixel art, pose sheets and effect references"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 libm.workspace = true
+pixfx-core = { path = "../pixfx-core", features = ["body"] }
 pixfx-draw = { path = "../pixfx-draw" }
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true
@@ -17,3 +20,6 @@ workspace = true
 pixfx-export = { path = "../pixfx-export" }
 # a fighter look's named colours as a palette, for tests and example scripts
 pixfx-fighter = { path = "../pixfx-fighter" }
+# Effects for style references and GIF output for the reference scripts.
+pixfx-effects = { path = "../pixfx-effects" }
+gif = "=0.14.2"

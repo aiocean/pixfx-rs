@@ -69,6 +69,8 @@ interface Shown {
   source: CanvasImageSource;
   sx: number;
   sy: number;
+  sw: number;
+  sh: number;
   x: number;
   y: number;
   w: number;
@@ -98,7 +100,7 @@ export function canvasImages(holderOf: HolderOf): CanvasImages {
     const image: Image = { add: blend === "add", shown: null };
     all.push(image);
     const it: GfxImage<null> = {
-      show(key, frame, x, y, w, h, depth) {
+      show(key, frame, x, y, w, h, depth, _place, sw = w, sh = h) {
         const holder = holderOf(key);
         if (!holder) {
           image.shown = null;
@@ -106,7 +108,7 @@ export function canvasImages(holderOf: HolderOf): CanvasImages {
         }
         // the holder is kept, not looked up when drawn: a surface Rust frees at the end of the frame still shows
         // the pixels it held this frame
-        image.shown = { source: holder.source, sx: frame === "l" ? holder.width / 2 : 0, sy: 0, x, y, w, h, depth };
+        image.shown = { source: holder.source, sx: frame === "l" ? holder.width / 2 : 0, sy: 0, sw, sh, x, y, w, h, depth };
       },
       hide() {
         image.shown = null;
@@ -132,7 +134,7 @@ export function canvasImages(holderOf: HolderOf): CanvasImages {
     ctx.imageSmoothingEnabled = false;
     for (const { s, add } of shown) {
       ctx.globalCompositeOperation = add ? "lighter" : "source-over";
-      ctx.drawImage(s.source, s.sx, s.sy, s.w, s.h, s.x * scale, s.y * scale, s.w * scale, s.h * scale);
+      ctx.drawImage(s.source, s.sx, s.sy, s.sw, s.sh, s.x * scale, s.y * scale, s.w * scale, s.h * scale);
     }
     ctx.restore();
   };
@@ -145,6 +147,10 @@ export interface PictureLike {
   readonly y: number;
   readonly w: number;
   readonly h: number;
+  readonly gameX?: number;
+  readonly gameY?: number;
+  readonly gameWidth?: number;
+  readonly gameHeight?: number;
   /** `w × h` RGBA, straight alpha; none for a picture of light alone. */
   readonly color: Uint8ClampedArray | undefined;
   /** `w × h` RGBA, to draw added. */
@@ -188,7 +194,10 @@ export function canvasPictures(make: MakeHolder): CanvasPictures {
       holder.put(owned(p.light), half, p.w, p.h);
       ctx.save();
       ctx.imageSmoothingEnabled = false;
-      const [dx, dy, dw, dh] = [p.x * scale, p.y * scale, p.w * scale, p.h * scale];
+      const dx = (p.gameX ?? p.x) * scale;
+      const dy = (p.gameY ?? p.y) * scale;
+      const dw = (p.gameWidth ?? p.w) * scale;
+      const dh = (p.gameHeight ?? p.h) * scale;
       if (color) {
         ctx.globalCompositeOperation = "source-over";
         ctx.drawImage(holder.source, 0, 0, p.w, p.h, dx, dy, dw, dh);

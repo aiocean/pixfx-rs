@@ -44,9 +44,9 @@ when no step fit (`split_by_colour`). The skill `.claude/skills/pixfx-pixel/SKIL
 
 ## Dependencies
 
-`pixfx-draw` (`Rgba`, `RgbaImage`, `to_hex`) and `libm`; for tests and examples only, `pixfx-export` (PNGs) and
-`pixfx-fighter` (a look's named colours as a palette). The tool crates `pixfx-pose` and `pixfx-ref` depend on it;
-nothing in the engine does.
+`pixfx-draw` supplies pixels, `pixfx_core::body` supplies the rig, and `serde` and `serde_json` handle artwork specs.
+Tests and examples use `pixfx-export` for PNGs, `pixfx-fighter` for named palettes, and `pixfx-core` and
+`pixfx-effects` for style references. The engine and its shells build without this crate.
 
 ## Traps
 
@@ -58,8 +58,15 @@ nothing in the engine does.
   it was. Low `total` confidence means the grid is doubtful.
 - `critique` reports every orphan cell in one issue, so one stray-pixel habit costs one warning, not the score.
 
+## Pose and reference sheets
+
+- `pose` draws captioned skeletons for image models using the `pixfx_core::body` rig. See [pose instructions](src/pose/AGENTS.md).
+- `reference` makes prompts and templates, reads model output, and compares the resulting frames. See [reference instructions](src/reference/AGENTS.md).
+- `sheet::captions` serves both modules. Model calls and file I/O live in `examples/`.
+
 ## Before you finish
 
 ```
-cargo test -p pixfx-pixel
+cargo test -p pixfx-pixel --all-targets
+cargo clippy -p pixfx-pixel --all-targets
 ```

@@ -226,6 +226,20 @@ fn headings(poses: &[Pose]) -> Option<Vec<f64>> {
 /// Sweep `brush` along `poses` (newest first), each pixel showing the cell that passed it last, its colour moved
 /// along `ramp` with age, as `look` says. Nothing for an empty brush, one pose, or a path that never moves.
 pub fn sweep(p: &mut Painter, poses: &[Pose], brush: &Brush, ramp: &[Rgba], look: &Look) {
+    sweep_filtered(p, poses, brush, ramp, look, |_| true);
+}
+
+/// Sweep a continuous trail, painting only samples whose age passes the filter.
+/// The unpainted path still contributes to heading and distance, so two complementary
+/// filters can draw a single trail on separate layers without restarting its wave.
+pub fn sweep_filtered(
+    p: &mut Painter,
+    poses: &[Pose],
+    brush: &Brush,
+    ramp: &[Rgba],
+    look: &Look,
+    visible: impl Fn(f64) -> bool,
+) {
     if brush.cells.is_empty() || poses.len() < 2 {
         return;
     }
@@ -285,7 +299,7 @@ pub fn sweep(p: &mut Painter, poses: &[Pose], brush: &Brush, ramp: &[Rgba], look
             let t = s as f64 / n;
             let age = a.age + (b.age - a.age) * t;
             let d = dist + len * t;
-            if age > secs || d < look.skip {
+            if age > secs || d < look.skip || !visible(age) {
                 continue;
             }
             let u = (age / secs).clamp(0.0, 1.0);

@@ -61,7 +61,8 @@ fn trail_box(path: &[(f64, f64)]) -> Result<(u32, u32), Box<dyn Error>> {
     if lo.0 > hi.0 {
         return Ok((0, 0));
     }
-    Ok((hi.0 - lo.0 + 1, hi.1 - lo.1 + 1))
+    let d = f.density().factor();
+    Ok(((hi.0 - lo.0 + 1).div_ceil(d), (hi.1 - lo.1 + 1).div_ceil(d)))
 }
 
 #[test]

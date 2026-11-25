@@ -1,8 +1,8 @@
-//! Point lists for lightning (pixelfx `shapes.js`) and hard-edged craft primitives (`flash_star`, `wedge`, `lobes`,
-//! `tempo`).
+//! Point lists for lightning, stars, polygons and trails (pixelfx `shapes.js`: `bolt`, `forks`, `star`, `ngon`,
+//! `trail`) and hard-edged craft primitives (`flash_star`, `wedge`, `lobes`, `tempo`).
 
 use crate::color::Rgba;
-use crate::math::{Rng, clamp, lerp, or_one};
+use crate::math::{Rng, TAU, clamp, js_max, lerp, or_one};
 use crate::painter::Painter;
 
 /// Which ramp entry a life fraction `u` (`0` fresh .. `1` dead) shows: a monotonic temperature march.
@@ -228,4 +228,34 @@ pub fn forks(
         ));
     }
     out
+}
+
+/// A star (pixelfx `star`): `n` points between radii `r1` (tips) and `r0` (inner corners), the first tip at angle
+/// `rot` (pixelfx's defaults: `n = 5`, `rot = -PI / 2`, straight up).
+pub fn star(cx: f64, cy: f64, r0: f64, r1: f64, n: u32, rot: f64) -> Vec<(f64, f64)> {
+    (0..n * 2)
+        .map(|i| {
+            let a = rot + (f64::from(i) * core::f64::consts::PI) / f64::from(n);
+            let r = if i % 2 == 1 { r0 } else { r1 };
+            (cx + libm::cos(a) * r, cy + libm::sin(a) * r)
+        })
+        .collect()
+}
+
+/// A regular polygon with `n` sides (pixelfx `ngon`; its defaults: `n = 6`, `rot = 0`).
+pub fn ngon(cx: f64, cy: f64, r: f64, n: u32, rot: f64) -> Vec<(f64, f64)> {
+    (0..n)
+        .map(|i| {
+            let a = rot + (f64::from(i) * TAU) / f64::from(n);
+            (cx + libm::cos(a) * r, cy + libm::sin(a) * r)
+        })
+        .collect()
+}
+
+/// Positions of `pos(t - i * dt)` for i = 0..n-1, held at time 0: a moving thing's trail, newest first (pixelfx
+/// `trail`).
+pub fn trail(pos: impl Fn(f64) -> (f64, f64), t: f64, n: usize, dt: f64) -> Vec<(f64, f64)> {
+    (0..n)
+        .map(|i| pos(js_max(0.0, t - i as f64 * dt)))
+        .collect()
 }

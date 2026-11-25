@@ -114,6 +114,7 @@ struct Sprite {
 pub(crate) struct Painted {
     color: Option<Sprite>,
     light: Option<Sprite>,
+    density: u32,
 }
 
 impl Painted {
@@ -133,6 +134,7 @@ impl Painted {
         Self {
             color: sprite(&frame.color, 0xff00_0000, color_bgra),
             light: sprite(&frame.light, 0x00ff_ffff, light_bgra),
+            density: frame.density().factor(),
         }
     }
 
@@ -214,6 +216,11 @@ impl Default for FxScene {
 pub struct FxHandle(u32);
 
 impl FxScene {
+    /// Choose the raster for effects played after this call.
+    pub fn set_pixel_density(&mut self, density: Option<pixfx_draw::PixelDensity>) {
+        self.scene.set_pixel_density(density);
+    }
+
     fn with(paint: Paint) -> Self {
         // effects sit at their view's origin in effect pixels; the view scales them as it paints
         let mut frames = Frames::new(paint);
@@ -455,6 +462,7 @@ impl Shell for GpuiShell<'_> {
 
     fn show(&mut self, pass: Pass, surface: &Painted) -> Result<()> {
         let s = self.scale;
+        let texel = s / surface.density as f32;
         for (sprite, blend) in [
             (&surface.color, SpriteBlend::Normal),
             (&surface.light, SpriteBlend::Additive),
@@ -464,12 +472,15 @@ impl Shell for GpuiShell<'_> {
             };
             // `pass.rect` is the frame's corner in effect pixels from the origin (the scene's scale is 1)
             let corner = point(
-                self.origin.x + px((pass.rect.x as f32 + sprite.rect.x as f32) * s),
-                self.origin.y + px((pass.rect.y as f32 + sprite.rect.y as f32) * s),
+                self.origin.x + px(pass.rect.x as f32 * s + sprite.rect.x as f32 * texel),
+                self.origin.y + px(pass.rect.y as f32 * s + sprite.rect.y as f32 * texel),
             );
             let bounds = Bounds::new(
                 corner,
-                size(px(sprite.rect.w as f32 * s), px(sprite.rect.h as f32 * s)),
+                size(
+                    px(sprite.rect.w as f32 * texel),
+                    px(sprite.rect.h as f32 * texel),
+                ),
             );
             self.window.paint_image_blended(
                 bounds,

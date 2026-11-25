@@ -35,7 +35,7 @@ test("an effect shows as sprites near where it plays, its colour normal and its 
     expect(s.x).toBeLessThanOrEqual(30);
     expect(s.x + s.width).toBeGreaterThan(30);
     expect(s.y).toBeLessThan(40);
-    expect([s.width, s.height]).toEqual([s.texture.frame.width, s.texture.frame.height]);
+    expect([s.width * 2, s.height * 2]).toEqual([s.texture.frame.width, s.texture.frame.height]);
     expect(s.texture.source.scaleMode).toBe("nearest");
   }
 });

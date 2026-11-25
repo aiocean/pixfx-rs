@@ -13,15 +13,24 @@ use core::f64::consts::PI;
 use libm::{cos, floor, sin, sqrt};
 use pixfx_core::squash::{self, Shape, SquashSpec};
 use pixfx_draw::blend::{cover_over, mul_div255, over_premul, straighten};
+use pixfx_draw::color::mix;
 use pixfx_draw::math::{js_max, js_min, js_round};
-use pixfx_draw::{Frame, Rgba, RgbaImage};
+use pixfx_draw::{Frame, PixelDensity, Rgba, RgbaImage};
 
+/// How many sprite pixels a pixel of the poses' drawing grid takes: the poses are laid out on a 40-row grid and
+/// every part lands on the sprite's own pixels through this one factor, so the standing fighter is 64 rows tall.
+pub const SCALE: f64 = 1.6;
 /// Sprite width and height, in pixels.
-pub const SPRITE: usize = 64;
+pub const SPRITE: usize = 104;
 /// Where the feet are in the sprite: x of the body's middle...
-pub const CX: i32 = 32;
+pub const CX: i32 = 52;
 /// ...and y of the soles.
-pub const FEET: i32 = 60;
+pub const FEET: i32 = 96;
+
+/// A length on the poses' drawing grid, in sprite pixels.
+fn sized(grid: f64) -> f64 {
+    js_round(grid * SCALE)
+}
 
 const WHITE: Rgba = Rgba::hex24(0xffffff);
 /// A frozen fighter is drawn in ice; a shocked one flickers with lightning.
@@ -126,26 +135,37 @@ pub struct Appearance {
     pub jolt: [i32; 2],
 }
 
-/// A painted fighter: 64x64 pixels, premultiplied RGBA8, feet at ([`CX`], [`FEET`]).
+/// A painted fighter, premultiplied RGBA8, with feet at ([`CX`], [`FEET`]) in game pixels.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Sprite {
     px: Vec<[u8; 4]>,
+    density: PixelDensity,
 }
 
 impl Default for Sprite {
     fn default() -> Self {
-        Sprite {
-            px: vec![[0; 4]; SPRITE * SPRITE],
-        }
+        Self::new(PixelDensity::One)
     }
 }
 
 impl Sprite {
+    fn new(density: PixelDensity) -> Self {
+        let side = SPRITE * density.factor() as usize;
+        Self {
+            px: vec![[0; 4]; side * side],
+            density,
+        }
+    }
+
+    fn side(&self) -> usize {
+        SPRITE * self.density.factor() as usize
+    }
+
     /// The whole sprite as a straight-alpha RGBA image.
     pub fn to_image(&self) -> RgbaImage {
         RgbaImage {
-            w: SPRITE as u32,
-            h: SPRITE as u32,
+            w: self.side() as u32,
+            h: self.side() as u32,
             rgba: self
                 .px
                 .iter()
@@ -159,19 +179,21 @@ impl Sprite {
 
     /// The pixel at (x, y) as a straight (not premultiplied) colour; `None` outside the sprite.
     pub fn pixel(&self, x: usize, y: usize) -> Option<Rgba> {
-        if x >= SPRITE {
+        let side = self.side();
+        if x >= side || y >= side {
             return None;
         }
-        self.px.get(y * SPRITE + x).map(|&p| straighten(p))
+        self.px.get(y * side + x).map(|&p| straighten(p))
     }
 
     fn alpha(&self, x: i32, y: i32) -> u8 {
-        let inside = (0..SPRITE as i32).contains(&x) && (0..SPRITE as i32).contains(&y);
+        let side = self.side();
+        let inside = (0..side as i32).contains(&x) && (0..side as i32).contains(&y);
         if !inside {
             return 0;
         }
         self.px
-            .get(y as usize * SPRITE + x as usize)
+            .get(y as usize * side + x as usize)
             .map_or(0, |p| p[3])
     }
 
@@ -186,9 +208,10 @@ impl Sprite {
         let dot8 = |v: f32| ((v * 65536.0) as i32 + 0x80) >> 8;
         let (l, r) = (dot8(x as f32), dot8(x as f32 + w as f32));
         let (y0, y1) = (floor(y) as i32, floor(y + h) as i32);
-        for row in y0.max(0)..y1.min(SPRITE as i32) {
+        let side = self.side();
+        for row in y0.max(0)..y1.min(side as i32) {
             let (first, last) = (l >> 8, (r - 1) >> 8);
-            for col in first.max(0)..=last.min(SPRITE as i32 - 1) {
+            for col in first.max(0)..=last.min(side as i32 - 1) {
                 let cover = if first == last {
                     r - l
                 } else if col == first {
@@ -198,7 +221,7 @@ impl Sprite {
                 } else {
                     256
                 };
-                if let Some(p) = self.px.get_mut(row as usize * SPRITE + col as usize) {
+                if let Some(p) = self.px.get_mut(row as usize * side + col as usize) {
                     *p = cover_over(*p, c, cover);
                 }
             }
@@ -261,21 +284,65 @@ struct Pen<'a> {
 }
 
 impl Pen<'_> {
-    fn px(&mut self, dx: f64, dy: f64, w: f64, h: f64, col: Rgba) {
-        let x = if self.face > 0.0 {
-            32.0 + dx
-        } else {
-            32.0 - dx - w + 1.0
-        };
-        let col = match self.tint {
+    fn detailed(&self) -> bool {
+        self.sprite.density == PixelDensity::Two
+    }
+
+    fn density(&self) -> f64 {
+        f64::from(self.sprite.density.factor())
+    }
+
+    fn grid(&self, value: f64) -> f64 {
+        js_round(value * self.density()) / self.density()
+    }
+
+    /// `col` as this pose is tinted: itself, white in a hit's flash, ice when frozen, lightning when shocked.
+    fn tinted(&self, col: Rgba) -> Rgba {
+        match self.tint {
             Tint::Own => col,
             Tint::Flash => WHITE,
             Tint::Shock => SHOCK,
             Tint::Ice if lum(col) > 0.7 => ICE_LIGHT,
             Tint::Ice if lum(col) > 0.4 => ICE_MID,
             Tint::Ice => ICE_DARK,
+        }
+    }
+
+    fn px(&mut self, dx: f64, dy: f64, w: f64, h: f64, col: Rgba) {
+        // a rect's edges land on whole sprite pixels and its neighbours' edges land on the same ones, so parts that
+        // touch on the grid still touch
+        let d = self.density();
+        let scale = SCALE * d;
+        let (left, right) = (js_round(dx * scale), js_round((dx + w) * scale));
+        let (low, high) = (js_round(dy * scale), js_round((dy + h) * scale));
+        let (w, h) = (js_max(right - left, 1.0), js_max(high - low, 1.0));
+        let (dx, dy) = (left, low);
+        let x = if self.face > 0.0 {
+            f64::from(CX) * d + dx
+        } else {
+            f64::from(CX) * d - dx - w + d
         };
-        self.sprite.fill_rect(x, 60.0 - dy - h + 1.0, w, h, col);
+        let col = self.tinted(col);
+        self.sprite
+            .fill_rect(x, f64::from(FEET) * d - dy - h + d, w, h, col);
+    }
+
+    /// A part that keeps its size wherever it lands (a hand, always as wide as it is tall), at `w` x `h` grid pixels
+    /// whose corner is at (dx, dy).
+    fn block(&mut self, dx: f64, dy: f64, w: f64, h: f64, col: Rgba) {
+        let d = self.density();
+        let scale = SCALE * d;
+        let (cw, ch) = (js_round(w * scale), js_round(h * scale));
+        let x = js_round(dx * scale);
+        let y = js_round(dy * scale);
+        let left = if self.face > 0.0 {
+            f64::from(CX) * d + x
+        } else {
+            f64::from(CX) * d - x - cw + d
+        };
+        let col = self.tinted(col);
+        self.sprite
+            .fill_rect(left, f64::from(FEET) * d - y - ch + d, cw, ch, col);
     }
 
     fn dot(&mut self, dx: f64, dy: f64, col: Rgba) {
@@ -284,14 +351,15 @@ impl Pen<'_> {
 
     fn line(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, col: Rgba) {
         let n = js_max(js_max((x1 - x0).abs(), (y1 - y0).abs()), 1.0);
+        let step = 1.0 / self.density();
         let mut i = 0.0;
         while i <= n {
             self.dot(
-                js_round(x0 + ((x1 - x0) * i) / n),
-                js_round(y0 + ((y1 - y0) * i) / n),
+                self.grid(x0 + ((x1 - x0) * i) / n),
+                self.grid(y0 + ((y1 - y0) * i) / n),
                 col,
             );
-            i += 1.0;
+            i += step;
         }
     }
 
@@ -300,10 +368,11 @@ impl Pen<'_> {
     fn line4(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, col: Rgba) {
         let n = js_max(js_max((x1 - x0).abs(), (y1 - y0).abs()), 1.0);
         let mut last: Option<(f64, f64)> = None;
+        let step = 1.0 / self.density();
         let mut i = 0.0;
         while i <= n {
-            let x = js_round(x0 + ((x1 - x0) * i) / n);
-            let y = js_round(y0 + ((y1 - y0) * i) / n);
+            let x = self.grid(x0 + ((x1 - x0) * i) / n);
+            let y = self.grid(y0 + ((y1 - y0) * i) / n);
             if let Some((lx, ly)) = last
                 && lx != x
                 && ly != y
@@ -312,7 +381,7 @@ impl Pen<'_> {
             }
             self.dot(x, y, col);
             last = Some((x, y));
-            i += 1.0;
+            i += step;
         }
     }
 
@@ -321,6 +390,32 @@ impl Pen<'_> {
         let c = self.c;
         let edge = if shade == 2 { c.outline } else { c.robe[2] };
         let x = dx + self.lean;
+        if self.detailed() {
+            self.quad(
+                &[
+                    (x, dy + 0.5),
+                    (x + w - 0.5, dy),
+                    (x + w, dy + 0.45),
+                    (x + w - 0.25, dy + h - 0.45),
+                    (x + 0.65, dy + h),
+                ],
+                c.robe[shade],
+            );
+            self.seam(
+                (x + 0.3, dy + h - 0.65),
+                (x + w - 0.75, dy + h - 0.9),
+                0.35,
+                mix(c.robe[shade], c.robe[0], 0.5),
+            );
+            self.seam((x + 0.5, dy + 0.7), (x + w - 0.55, dy + 0.35), 0.4, edge);
+            self.seam(
+                (x + 0.55, dy + 0.25),
+                (x + w - 0.75, dy + 0.15),
+                0.38,
+                c.trim[0],
+            );
+            return;
+        }
         self.px(x, dy, w, h, c.robe[shade]);
         if w > 2.0 {
             self.px(x, dy, 1.0, h, edge);
@@ -332,8 +427,38 @@ impl Pen<'_> {
     }
 
     fn hand(&mut self, dx: f64, dy: f64) {
-        let skin = self.c.skin[0];
-        self.px(dx + self.lean, dy, 2.0, 2.0, skin);
+        self.palm(dx + self.lean, dy);
+    }
+
+    fn palm(&mut self, x: f64, y: f64) {
+        let [skin, shade] = self.c.skin;
+        if !self.detailed() {
+            self.block(x, y, 2.0, 2.0, skin);
+            return;
+        }
+        self.quad(
+            &[
+                (x, y + 0.35),
+                (x + 1.35, y),
+                (x + 2.0, y + 0.65),
+                (x + 1.9, y + 1.65),
+                (x + 0.85, y + 2.0),
+                (x, y + 1.4),
+            ],
+            shade,
+        );
+        self.px(x + 0.35, y + 0.75, 1.45, 0.7, skin);
+        self.px(x + 0.65, y + 1.45, 0.8, 0.45, mix(skin, WHITE, 0.28));
+        self.px(x + 1.05, y + 0.3, 0.75, 0.32, skin);
+    }
+
+    fn seam(&mut self, a: (f64, f64), b: (f64, f64), width: f64, col: Rgba) {
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let steps = libm::ceil(js_max(dx.abs(), dy.abs()) * SCALE * self.density()).max(1.0) as u32;
+        for i in 0..=steps {
+            let k = f64::from(i) / f64::from(steps);
+            self.px(a.0 + dx * k, a.1 + dy * k, width, width, col);
+        }
     }
 
     /// Qi drawn in from round about to a point, closer as the spell gathers.
@@ -368,16 +493,17 @@ impl Pen<'_> {
     /// A `w` x `h` block stamped at every step from (x0, y0) to (x1, y1): a limb, or an edge of a shape.
     fn bar(&mut self, (x0, y0): (f64, f64), (x1, y1): (f64, f64), w: f64, h: f64, col: Rgba) {
         let n = js_max(js_max((x1 - x0).abs(), (y1 - y0).abs()), 1.0);
+        let step = 1.0 / self.density();
         let mut i = 0.0;
         while i <= n {
             self.px(
-                js_round(x0 + ((x1 - x0) * i) / n),
-                js_round(y0 + ((y1 - y0) * i) / n),
+                self.grid(x0 + ((x1 - x0) * i) / n),
+                self.grid(y0 + ((y1 - y0) * i) / n),
                 w,
                 h,
                 col,
             );
-            i += 1.0;
+            i += step;
         }
     }
 
@@ -385,10 +511,16 @@ impl Pen<'_> {
     fn quad(&mut self, p: &[(f64, f64)], col: Rgba) {
         let lo = p.iter().fold(f64::INFINITY, |m, q| js_min(m, q.1));
         let hi = p.iter().fold(f64::NEG_INFINITY, |m, q| js_max(m, q.1));
-        let mut y = floor(lo);
+        let raster = if self.detailed() {
+            self.density() * SCALE
+        } else {
+            1.0
+        };
+        let step = 1.0 / raster;
+        let mut y = floor(lo * raster) / raster;
         while y <= hi {
             // where the row's middle crosses each edge
-            let mid = y + 0.5;
+            let mid = y + step * 0.5;
             let (mut left, mut right) = (f64::INFINITY, f64::NEG_INFINITY);
             for (&a, &b) in p.iter().zip(p.iter().cycle().skip(1)) {
                 let (y0, y1) = (js_min(a.1, b.1), js_max(a.1, b.1));
@@ -400,10 +532,19 @@ impl Pen<'_> {
                 right = js_max(right, x);
             }
             if left <= right {
-                let x0 = js_round(left);
-                self.px(x0, y, js_round(right) - x0 + 1.0, 1.0, col);
+                let x0 = if self.detailed() {
+                    left
+                } else {
+                    self.grid(left)
+                };
+                let x1 = if self.detailed() {
+                    right
+                } else {
+                    self.grid(right) + step
+                };
+                self.px(x0, y, x1 - x0, step, col);
             }
-            y += 1.0;
+            y += step;
         }
     }
 
@@ -414,7 +555,7 @@ impl Pen<'_> {
         let (cx, cy) = (x1 - (x1 - x0).signum(), y1 - (y1 - y0).signum());
         self.bar((x0, y0), (cx, cy), 3.0, 3.0, c.robe[shade]);
         self.bar((cx, cy), (cx, cy), 3.0, 3.0, c.trim[0]);
-        self.px(x1, y1, 2.0, 2.0, c.skin[0]);
+        self.palm(x1, y1);
     }
 
     /// A head lying face up, its crown toward -dx, at (x, y) to (x + 6, y + 6). The hair streams back from the
@@ -440,6 +581,20 @@ impl Pen<'_> {
         match c.hairdo {
             Hairdo::Topknot => {
                 self.px(x - 2.0, y + 1.0, 1.0, 5.0, c.hair[0]);
+                if self.detailed() {
+                    self.quad(
+                        &[
+                            (x - 3.0, y + 1.3),
+                            (x - 5.7, y + 1.9),
+                            (x - 6.4, y + 3.15),
+                            (x - 5.65, y + 4.45),
+                            (x - 3.0, y + 4.65),
+                        ],
+                        c.hair[1],
+                    );
+                    self.seam((x - 5.65, y + 3.7), (x - 3.8, y + 4.1), 0.36, c.hair[0]);
+                    return;
+                }
                 // the knot under its gold crown, and the ribbon streaming from it
                 self.px(x - 6.0, y + 2.0, 3.0, 3.0, c.hair[1]);
                 self.px(x - 7.0, y + 1.0, 1.0, 5.0, c.trim[0]);
@@ -487,6 +642,10 @@ impl Pen<'_> {
 
     /// Neck, face, an eye (open, or screwed shut), a brow and the hair, the neck at `y`.
     fn head(&mut self, y: f64, lean: f64, eye: Eye) {
+        if self.detailed() {
+            self.profile(lean, y, eye);
+            return;
+        }
         let (c, t, wind) = (self.c, self.t, self.wind);
         self.px(-1.0 + lean, y, 2.0, 1.0, c.skin[1]);
         self.px(-3.0 + lean, y + 1.0, 7.0, 7.0, c.skin[0]);
@@ -542,6 +701,106 @@ impl Pen<'_> {
         }
     }
 
+    fn profile(&mut self, x: f64, y: f64, eye: Eye) {
+        let c = self.c;
+        let [skin, shadow] = c.skin;
+        let lit = mix(skin, WHITE, 0.24);
+        self.px(x - 1.15, y, 2.35, 2.7, shadow);
+        self.quad(
+            &[
+                (x - 3.3, y + 2.3),
+                (x - 0.8, y + 1.05),
+                (x + 2.05, y + 1.1),
+                (x + 3.5, y + 2.2),
+                (x + 3.4, y + 3.25),
+                (x + 4.1, y + 3.85),
+                (x + 3.5, y + 4.85),
+                (x + 3.5, y + 6.8),
+                (x + 1.1, y + 8.05),
+                (x - 2.3, y + 7.35),
+            ],
+            skin,
+        );
+        self.quad(
+            &[
+                (x - 2.9, y + 6.8),
+                (x - 0.65, y + 6.4),
+                (x - 0.2, y + 3.0),
+                (x + 2.3, y + 1.3),
+                (x - 0.8, y + 1.05),
+                (x - 3.15, y + 2.3),
+            ],
+            shadow,
+        );
+        self.seam((x + 2.8, y + 4.2), (x + 3.55, y + 3.65), 0.35, lit);
+        self.seam((x + 2.1, y + 2.6), (x + 3.0, y + 2.7), 0.28, shadow);
+        self.seam((x + 0.9, y + 5.65), (x + 2.9, y + 5.9), 0.35, c.hair[1]);
+        let lid = if eye == Eye::Open { 0.62 } else { 0.28 };
+        self.px(x + 1.5, y + 4.72, 1.4, lid, c.outline);
+        if eye == Eye::Open {
+            self.px(x + 1.5, y + 5.02, 0.38, 0.32, lit);
+        }
+        self.px(x - 0.5, y + 3.52, 0.9, 1.45, shadow);
+        self.px(x - 0.36, y + 4.25, 0.5, 0.64, lit);
+
+        let [base, shade] = match c.hairdo {
+            Hairdo::Topknot => [c.hair[1], c.hair[0]],
+            Hairdo::Flowing => c.hair,
+        };
+        self.quad(
+            &[
+                (x - 4.2, y + 3.5),
+                (x - 3.7, y + 7.4),
+                (x - 2.3, y + 9.0),
+                (x + 1.8, y + 8.9),
+                (x + 3.5, y + 7.85),
+                (x + 3.9, y + 6.55),
+                (x + 1.9, y + 6.85),
+                (x + 0.2, y + 6.1),
+                (x - 1.5, y + 3.4),
+            ],
+            base,
+        );
+        self.seam((x - 3.35, y + 6.6), (x - 1.15, y + 8.15), 0.55, shade);
+        self.seam((x - 0.75, y + 8.1), (x + 2.5, y + 7.65), 0.35, shade);
+        match c.hairdo {
+            Hairdo::Topknot => {
+                self.quad(
+                    &[
+                        (x - 1.6, y + 8.7),
+                        (x - 1.9, y + 10.3),
+                        (x - 1.2, y + 12.4),
+                        (x - 0.36, y + 13.0),
+                        (x + 0.7, y + 13.0),
+                        (x + 1.64, y + 12.15),
+                        (x + 1.85, y + 10.5),
+                        (x + 1.36, y + 9.0),
+                    ],
+                    base,
+                );
+                self.seam((x - 1.1, y + 11.37), (x - 0.05, y + 12.38), 0.43, shade);
+                self.seam((x - 1.3, y + 9.65), (x + 1.12, y + 9.96), 0.34, c.ribbon[1]);
+            }
+            Hairdo::Flowing => {
+                let tip = x - 8.0 + self.wind.min(0.0) + sin(self.t * 3.0);
+                self.quad(
+                    &[
+                        (x - 3.15, y + 8.1),
+                        (x - 5.0, y + 6.9),
+                        (tip - 0.9, y - 8.2),
+                        (tip + 0.85, y - 6.7),
+                        (x - 1.65, y + 6.7),
+                    ],
+                    shade,
+                );
+                self.seam((x - 4.25, y + 5.5), (tip, y - 6.6), 0.55, base);
+                self.seam((x - 3.28, y + 6.1), (tip + 1.25, y - 5.15), 0.32, base);
+                self.seam((x - 2.5, y + 7.95), (x - 1.3, y + 8.29), 0.35, c.trim[1]);
+                self.px(x - 1.82, y + 8.19, 0.4, 0.35, c.jade);
+            }
+        }
+    }
+
     /// The sword where the pose holds it, the body's top at `by`.
     fn sword(&mut self, held: Held, by: f64) {
         let (c, lean) = (self.c, self.lean);
@@ -580,6 +839,25 @@ impl Pen<'_> {
             }
             Held::Hip => {
                 // in its scabbard at the hip, hilt forward, a tassel hanging
+                if self.detailed() {
+                    let x = lean;
+                    self.quad(
+                        &[
+                            (x - 9.3, by - 8.9),
+                            (x - 8.2, by - 9.0),
+                            (x + 3.7, by - 1.45),
+                            (x + 2.9, by - 0.35),
+                        ],
+                        c.trim[1],
+                    );
+                    self.seam((x - 9.0, by - 8.75), (x + 3.15, by - 0.95), 0.45, dull);
+                    self.seam((x - 8.8, by - 8.23), (x + 3.2, by - 0.55), 0.33, c.trim[0]);
+                    self.seam((x + 2.6, by - 0.9), (x + 3.75, by + 0.62), 0.5, c.trim[0]);
+                    self.seam((x + 3.7, by - 0.23), (x + 6.45, by + 1.05), 0.65, c.robe[2]);
+                    self.px(x + 6.32, by + 0.9, 0.5, 0.7, c.trim[1]);
+                    self.seam((x + 3.5, by - 1.3), (x + 4.1, by - 3.2), 0.32, c.ribbon[1]);
+                    return;
+                }
                 self.line(-9.0 + lean, by - 9.0, 3.0 + lean, by - 1.0, dull);
                 self.line(-9.0 + lean, by - 8.0, 2.0 + lean, by - 1.0, c.trim[1]);
                 self.px(3.0 + lean, by - 1.0, 1.0, 2.0, c.trim[0]);
@@ -592,6 +870,11 @@ impl Pen<'_> {
 
 /// Paint fighter `a`'s pose into a sprite, not yet outlined. A tumble is painted curled up; [`draw`] turns it.
 pub fn paint(look: &Look, a: &Appearance) -> Sprite {
+    paint_at_density(look, a, PixelDensity::One)
+}
+
+/// Paint the pose on the requested raster without changing its game-space placement.
+pub fn paint_at_density(look: &Look, a: &Appearance, density: PixelDensity) -> Sprite {
     let t = a.pose_t;
     let still = a.frozen;
     let tint = if a.flash {
@@ -610,7 +893,7 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
         js_max(-3.0, js_min(3.0, -a.vx * a.face * 0.03)) - 1.0 + js_round(sin(t * 4.0))
     };
     let mut pen = Pen {
-        sprite: Sprite::default(),
+        sprite: Sprite::new(density),
         c: look,
         face: a.face,
         tint,
@@ -901,7 +1184,7 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
             );
             pen.line4(5.0, 19.0, 9.0, 14.0, c.robe[1]);
             pen.line4(11.0, 16.0, 11.0, 13.0, c.trim[0]);
-            pen.px(12.0, 14.0, 2.0, 2.0, c.skin[0]);
+            pen.palm(12.0, 14.0);
             return pen.sprite;
         }
         Pose::Roll => {
@@ -1028,7 +1311,7 @@ pub fn paint(look: &Look, a: &Appearance) -> Sprite {
             // forearms along the thighs, hands on the knees, thumb and finger touching
             pen.px(1.0, by - 1.0, 7.0, 2.0, c.robe[1]);
             pen.px(1.0, by, 7.0, 1.0, c.trim[0]);
-            pen.px(8.0, 4.0, 2.0, 2.0, c.skin[0]);
+            pen.palm(8.0, 4.0);
             pen.px(9.0, 6.0, 1.0, 1.0, c.skin[1]);
             pen.head(by + 9.0, 0.0, Eye::Shut);
             return pen.sprite;
@@ -1139,35 +1422,153 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
     // the lower robe, flaring to the hem, open at the front over the inner robe; shorter as the knees bend
     let top = 15.0 - drop;
     let mut dy = 2.0 + tuck;
-    while dy <= top {
-        let flare = js_max(0.0, js_round((8.0 - dy) / 2.0)) + if drop > 0.0 { 1.0 } else { 0.0 };
-        let back = -5.0 - flare + if dy < 6.0 { js_min(0.0, wind) } else { 0.0 };
-        let front = 4.0 + js_max(0.0, flare - 1.0);
-        pen.px(back, dy, front - back + 1.0, 1.0, c.robe[1]);
-        pen.px(back, dy, 2.0, 1.0, c.robe[2]);
-        pen.px(front - 1.0, dy, 1.0, 1.0, c.robe[0]);
-        pen.px(1.0, dy, 2.0, 1.0, c.inner[usize::from(dy < 8.0)]);
-        dy += 1.0;
+    if pen.detailed() {
+        let wind = js_min(0.0, wind);
+        let flare = if drop > 0.0 { 1.0 } else { 0.0 };
+        let back = -7.8 - flare + wind;
+        let front = 6.15 + flare;
+        pen.quad(
+            &[(back, dy), (front, dy), (4.4, top + 1.0), (-4.9, top + 1.0)],
+            c.robe[1],
+        );
+        pen.quad(
+            &[
+                (back, dy),
+                (back + 2.25, dy),
+                (-3.5, top),
+                (-4.9, top + 1.0),
+            ],
+            c.robe[2],
+        );
+        pen.quad(
+            &[
+                (back + 2.7, dy + 0.8),
+                (back + 4.9, dy + 0.55),
+                (-1.85, top),
+            ],
+            mix(c.robe[1], c.robe[0], 0.62),
+        );
+        pen.quad(
+            &[(0.85, dy), (3.25, dy), (2.25, top + 0.8), (0.9, top)],
+            c.inner[1],
+        );
+        pen.seam((1.65, dy + 1.0), (1.23, top), 0.62, c.inner[0]);
+        pen.quad(
+            &[(4.15, dy), (front, dy), (4.25, top + 1.0), (3.0, top)],
+            c.robe[0],
+        );
+        pen.seam(
+            (back + 0.35, dy + 0.4),
+            (front - 0.45, dy + 0.4),
+            0.46,
+            c.trim[1],
+        );
+        pen.seam(
+            (back + 0.5, dy + 0.85),
+            (front - 0.6, dy + 0.85),
+            0.38,
+            c.trim[0],
+        );
+        for x in [back + 2.0, back + 5.35, 3.45] {
+            pen.seam(
+                (x, dy + 1.45),
+                (x * 0.66, top - 2.0),
+                0.31,
+                mix(c.robe[1], c.robe[2], 0.55),
+            );
+        }
+    } else {
+        while dy <= top {
+            let flare =
+                js_max(0.0, js_round((8.0 - dy) / 2.0)) + if drop > 0.0 { 1.0 } else { 0.0 };
+            let back = -5.0 - flare + if dy < 6.0 { js_min(0.0, wind) } else { 0.0 };
+            let front = 4.0 + js_max(0.0, flare - 1.0);
+            pen.px(back, dy, front - back + 1.0, 1.0, c.robe[1]);
+            pen.px(back, dy, 2.0, 1.0, c.robe[2]);
+            pen.px(front - 1.0, dy, 1.0, 1.0, c.robe[0]);
+            pen.px(1.0, dy, 2.0, 1.0, c.inner[usize::from(dy < 8.0)]);
+            dy += 1.0;
+        }
+        pen.px(
+            -7.0 + js_min(0.0, wind),
+            2.0 + tuck,
+            13.0 - js_min(0.0, wind),
+            1.0,
+            c.trim[0],
+        );
+        pen.px(-6.0, 3.0 + tuck, 1.0, 1.0, c.trim[1]);
     }
-    pen.px(
-        -7.0 + js_min(0.0, wind),
-        2.0 + tuck,
-        13.0 - js_min(0.0, wind),
-        1.0,
-        c.trim[0],
-    );
-    pen.px(-6.0, 3.0 + tuck, 1.0, 1.0, c.trim[1]);
 
     // the body: robe crossed over the inner robe, a sash with a jade pendant and a tail that streams back
     let by = 16.0 - bob - drop;
-    pen.px(-5.0 + lean, by, 10.0, 9.0, c.robe[1]);
-    pen.px(-5.0 + lean, by, 2.0, 9.0, c.robe[2]);
-    pen.px(3.0 + lean, by + 1.0, 1.0, 8.0, c.robe[0]);
-    pen.line(lean, by + 2.0, 3.0 + lean, by + 8.0, c.inner[0]);
-    pen.line(-1.0 + lean, by + 2.0, 2.0 + lean, by + 8.0, c.trim[0]);
+    if pen.detailed() {
+        let x = lean;
+        pen.quad(
+            &[
+                (x - 5.15, by),
+                (x + 4.5, by),
+                (x + 4.8, by + 6.7),
+                (x + 2.9, by + 8.9),
+                (x - 2.4, by + 9.25),
+                (x - 4.8, by + 7.0),
+            ],
+            c.robe[1],
+        );
+        pen.quad(
+            &[
+                (x - 5.05, by + 1.3),
+                (x - 3.2, by + 1.4),
+                (x - 1.7, by + 8.8),
+                (x - 3.7, by + 8.1),
+                (x - 4.65, by + 6.7),
+            ],
+            c.robe[2],
+        );
+        pen.quad(
+            &[
+                (x - 2.7, by + 8.8),
+                (x + 0.4, by + 8.85),
+                (x + 3.8, by + 5.25),
+                (x + 2.6, by + 3.4),
+            ],
+            c.robe[0],
+        );
+        pen.seam((x - 1.56, by + 8.7), (x + 3.6, by + 5.05), 0.48, c.inner[0]);
+        pen.seam((x + 3.1, by + 8.5), (x - 0.85, by + 2.1), 0.68, c.trim[1]);
+        pen.seam((x + 2.9, by + 8.45), (x - 1.08, by + 2.35), 0.35, c.trim[0]);
+        pen.seam(
+            (x - 3.35, by + 5.75),
+            (x - 2.7, by + 3.2),
+            0.31,
+            mix(c.robe[1], c.robe[0], 0.6),
+        );
+    } else {
+        pen.px(-5.0 + lean, by, 10.0, 9.0, c.robe[1]);
+        pen.px(-5.0 + lean, by, 2.0, 9.0, c.robe[2]);
+        pen.px(3.0 + lean, by + 1.0, 1.0, 8.0, c.robe[0]);
+        pen.line(lean, by + 2.0, 3.0 + lean, by + 8.0, c.inner[0]);
+        pen.line(-1.0 + lean, by + 2.0, 2.0 + lean, by + 8.0, c.trim[0]);
+    }
     pen.px(-5.0 + lean, by, 10.0, 2.0, c.inner[1]);
     pen.px(-5.0 + lean, by + 1.0, 10.0, 1.0, c.inner[0]);
     pen.px(1.0 + lean, by, 2.0, 2.0, c.trim[0]);
+    if pen.detailed() {
+        pen.px(
+            -4.45 + lean,
+            by + 1.62,
+            8.6,
+            0.35,
+            mix(c.inner[0], c.trim[0], 0.28),
+        );
+        pen.px(1.4 + lean, by + 0.4, 1.05, 0.75, c.trim[1]);
+        pen.px(
+            1.55 + lean,
+            by + 1.25,
+            0.72,
+            0.35,
+            mix(c.trim[0], WHITE, 0.45),
+        );
+    }
     pen.px(2.0 + lean, by - 3.0, 1.0, 3.0, c.ribbon[1]);
     pen.px(2.0 + lean, by - 4.0, 1.0, 1.0, c.jade);
     for i in 0..6 {
@@ -1374,20 +1775,21 @@ fn standing(mut pen: Pen<'_>, a: &Appearance) -> Sprite {
 
 /// Ring every painted pixel with `color`: each empty pixel touching a painted one (alpha over 128) takes it.
 pub fn outline(sprite: &mut Sprite, color: Rgba) {
-    let n = SPRITE as i32;
-    let painted = |s: &Sprite, x: i32, y: i32| s.alpha(x, y) > 128;
+    let n = sprite.side() as i32;
+    let radius = sprite.density.factor() as i32;
+    let painted = |x: i32, y: i32| sprite.alpha(x, y) > 128;
     let mut ring = Vec::new();
     for y in 0..n {
         for x in 0..n {
             if sprite.alpha(x, y) > 0 {
                 continue;
             }
-            if painted(sprite, x - 1, y)
-                || painted(sprite, x + 1, y)
-                || painted(sprite, x, y - 1)
-                || painted(sprite, x, y + 1)
-            {
-                ring.push(y as usize * SPRITE + x as usize);
+            let touch = (-radius..=radius).any(|dy| {
+                let width = radius - dy.abs();
+                (-width..=width).any(|dx| painted(x + dx, y + dy))
+            });
+            if touch {
+                ring.push((y * n + x) as usize);
             }
         }
     }
@@ -1401,8 +1803,8 @@ pub fn outline(sprite: &mut Sprite, color: Rgba) {
 /// Where a turning pose turns about, in pixels above the feet: a tumble round its middle, a roll round its ball.
 fn pivot(pose: Pose) -> Option<i32> {
     match pose {
-        Pose::Tumble => Some(18),
-        Pose::Roll => Some(5),
+        Pose::Tumble => Some(sized(18.0) as i32),
+        Pose::Roll => Some(sized(5.0) as i32),
         _ => None,
     }
 }
@@ -1432,21 +1834,23 @@ fn deform(sprite: &Sprite, shape: Shape) -> Sprite {
     if shape == Shape::IDENTITY {
         return sprite.clone();
     }
-    let mut out = Sprite::default();
-    for y in 0..SPRITE as i32 {
-        for x in 0..SPRITE as i32 {
-            let (fx, fy) = shape.source(f64::from(x - CX), f64::from(y - FEET));
+    let mut out = Sprite::new(sprite.density);
+    let side = sprite.side();
+    let d = sprite.density.factor() as i32;
+    let (cx, feet) = (CX * d, FEET * d);
+    for y in 0..side as i32 {
+        for x in 0..side as i32 {
+            let (fx, fy) = shape.source(f64::from(x - cx), f64::from(y - feet));
             if !(fx.is_finite() && fy.is_finite()) {
                 continue;
             }
-            let (sx, sy) = (CX + js_round(fx) as i32, FEET + js_round(fy) as i32);
-            let inside = (0..SPRITE as i32).contains(&sx) && (0..SPRITE as i32).contains(&sy);
+            let (sx, sy) = (cx + js_round(fx) as i32, feet + js_round(fy) as i32);
+            let inside = (0..side as i32).contains(&sx) && (0..side as i32).contains(&sy);
             if !inside {
                 continue;
             }
-            let from = sprite.px.get(sy as usize * SPRITE + sx as usize).copied();
-            if let (Some(p), Some(slot)) = (from, out.px.get_mut(y as usize * SPRITE + x as usize))
-            {
+            let from = sprite.px.get(sy as usize * side + sx as usize).copied();
+            if let (Some(p), Some(slot)) = (from, out.px.get_mut(y as usize * side + x as usize)) {
                 *slot = p;
             }
         }
@@ -1468,7 +1872,7 @@ fn quarter_turns(a: &Appearance) -> i32 {
 pub fn draw(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64) {
     if a.dodged > 0.0 && !a.out {
         let ghost = Appearance {
-            x: a.x + a.face * 7.0,
+            x: a.x + a.face * sized(7.0),
             flash: true,
             jolt: [0, 0],
             ..*a
@@ -1494,7 +1898,11 @@ fn untouchable_alpha(a: &Appearance) -> f64 {
 
 fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f64) {
     let t = a.pose_t;
-    let mut sprite = deform(&paint(look, a), shape(a));
+    let density = frame.density();
+    let d = density.factor() as i32;
+    let factor = f64::from(d);
+    let (pivot_x, feet) = (CX * d, FEET * d);
+    let mut sprite = deform(&paint_at_density(look, a, density), shape(a));
     let windup = a.act.and_then(|k| k.windup);
     let p = windup.map(|w| w.progress);
     let glow = matches!(a.pose, Pose::Channel | Pose::Cast).then_some(look.glow);
@@ -1506,16 +1914,20 @@ fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f6
     // the last fifth of a long wind-up trembles with the power held in
     let tremble =
         windup.is_some_and(|w| w.progress > 0.8 && w.long) && floor(t * 30.0) % 2.0 != 0.0;
-    let x = js_round(a.x) as i32 - CX + a.jolt[0] + i32::from(tremble);
-    let y = js_round(ground_y - a.air) as i32 - FEET + a.jolt[1];
+    let x = js_round(a.x * factor) as i32 - pivot_x + (a.jolt[0] + i32::from(tremble)) * d;
+    let y = js_round((ground_y - a.air) * factor) as i32 - feet + a.jolt[1] * d;
     if let Some(glow) = glow {
         // an aura in two hard-edged rings, the inner one brighter, swelling as the spell builds
         let k = p.unwrap_or(1.0);
-        let (cx, cy) = (f64::from(x + CX), f64::from(y + FEET - 20));
+        let (cx, cy) = (
+            f64::from(x + pivot_x),
+            f64::from(y + feet) - sized(20.0) * factor,
+        );
         for (rx, ry, base) in [
-            (10.0 + 4.0 * k, 22.0 + 3.0 * k, 0.07),
-            (7.0 + 2.0 * k, 17.0 + 2.0 * k, 0.09),
+            (sized(10.0 + 4.0 * k), sized(22.0 + 3.0 * k), 0.07),
+            (sized(7.0 + 2.0 * k), sized(17.0 + 2.0 * k), 0.09),
         ] {
+            let (rx, ry) = (rx * factor, ry * factor);
             let ga = alpha * (base + 0.12 * k) * (0.85 + 0.15 * sin(t * 9.0));
             // the canvas takes a fill's alpha to 8 bits, then premultiplies the colour by it
             let a8 = js_round(ga * 255.0) as u32;
@@ -1537,24 +1949,25 @@ fn blit(frame: &mut Frame, look: &Look, a: &Appearance, ground_y: f64, alpha: f6
     }
     let a8 = js_round(alpha * 255.0) as u32;
     let turn = quarter_turns(a).rem_euclid(4);
-    let pv = pivot(a.pose).map_or(0, |d| FEET - d);
-    for sy in 0..SPRITE as i32 {
-        for sx in 0..SPRITE as i32 {
-            let Some(&p) = sprite.px.get(sy as usize * SPRITE + sx as usize) else {
+    let pv = pivot(a.pose).map_or(0, |offset| feet - offset * d);
+    let side = sprite.side();
+    for sy in 0..side as i32 {
+        for sx in 0..side as i32 {
+            let Some(&p) = sprite.px.get(sy as usize * side + sx as usize) else {
                 continue;
             };
             if p[3] == 0 {
                 continue;
             }
             // a pixel's centre turned about the pivot, in whole quarter turns
-            let (u, v) = (sx - CX, sy - pv);
+            let (u, v) = (sx - pivot_x, sy - pv);
             let (dx, dy) = match turn {
                 1 => (-v - 1, u),
                 2 => (-u - 1, -v - 1),
                 3 => (v, -u - 1),
                 _ => (u, v),
             };
-            let (wx, wy) = (x + CX + dx, y + pv + dy);
+            let (wx, wy) = (x + pivot_x + dx, y + pv + dy);
             let src = if alpha >= 1.0 {
                 p
             } else {
